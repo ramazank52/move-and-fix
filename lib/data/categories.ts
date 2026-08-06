@@ -4,6 +4,9 @@ export interface ServiceCategory {
   icon: string;
   color: string;
   subcategories: string[];
+  pricingType?: "fixed" | "km_based" | "hourly";
+  kmRate?: number; // TL per km
+  basePrice?: number; // Base price in TL
 }
 
 export const CATEGORIES: ServiceCategory[] = [
@@ -75,7 +78,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Araç Hizmetleri",
     icon: "🚗",
     color: "#64748B",
-    subcategories: ["Çekici", "Lastik Değişimi", "Akü Takviye", "Oto Tamiri", "Yol Yardım"],
+    subcategories: ["Lastik Değişimi", "Akü Takviye", "Oto Tamiri"],
+    pricingType: "fixed",
   },
   {
     id: "garden",
@@ -90,5 +94,35 @@ export const CATEGORIES: ServiceCategory[] = [
     icon: "🐾",
     color: "#EC4899",
     subcategories: ["Bakım", "Gezdirme", "Veteriner", "Eğitim"],
+  },
+  {
+    id: "courier",
+    name: "Kurye & Evrak",
+    icon: "📦",
+    color: "#0EA5E9",
+    subcategories: ["Evrak Teslim", "Paket Gönderimi", "Moto Kurye", "Araçlı Kurye"],
+    pricingType: "km_based",
+    kmRate: 12,
+    basePrice: 50,
+  },
+  {
+    id: "tow_truck",
+    name: "Çekici",
+    icon: "🚛",
+    color: "#DC2626",
+    subcategories: ["Şehir İçi Çekici", "Şehirler Arası Çekici", "Ağır Vasıta Çekici", "Motosiklet Çekici"],
+    pricingType: "km_based",
+    kmRate: 25,
+    basePrice: 200,
+  },
+  {
+    id: "roadside",
+    name: "Yol Yardım",
+    icon: "🚨",
+    color: "#B91C1C",
+    subcategories: ["Akü Takviye", "Lastik Değişimi", "Yakıt İkmali", "Kilit Açma", "Arıza Çekici"],
+    pricingType: "km_based",
+    kmRate: 18,
+    basePrice: 100,
   },
 ];

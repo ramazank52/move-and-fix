@@ -51,3 +51,14 @@
 - [x] Generate app logo
 - [x] Configure app.config.ts branding
 - [x] Splash screen setup
+
+## Phase 9: New Features (v1.1)
+- [x] Add Kurye/Evrak service category with km-based pricing
+- [x] Add Çekici (Tow Truck) service category with km-based pricing
+- [x] Add Yol Yardım (Roadside Assistance) category with km-based pricing
+- [x] KM-based pricing calculator component
+- [x] Map integration - show provider locations in real-time
+- [x] Map route display between customer and provider
+- [x] Push notification system integration
+- [x] Backend API connection for real user auth
+- [x] Database integration for persistent data

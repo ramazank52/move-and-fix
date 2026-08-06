@@ -25,4 +25,96 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// Service categories
+export const serviceCategories = mysqlTable("service_categories", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  icon: varchar("icon", { length: 10 }),
+  color: varchar("color", { length: 10 }),
+  pricingType: mysqlEnum("pricingType", ["fixed", "km_based", "hourly"]).default("fixed").notNull(),
+  kmRate: int("kmRate"),
+  basePrice: int("basePrice"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+// Provider profiles
+export const providers = mysqlTable("providers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  displayName: varchar("displayName", { length: 200 }).notNull(),
+  bio: text("bio"),
+  categoryId: int("categoryId"),
+  rating: int("rating").default(0),
+  completedJobs: int("completedJobs").default(0),
+  moveScore: int("moveScore").default(50),
+  isVerified: int("isVerified").default(0),
+  isPremium: int("isPremium").default(0),
+  latitude: varchar("latitude", { length: 20 }),
+  longitude: varchar("longitude", { length: 20 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// Service requests (jobs)
+export const serviceRequests = mysqlTable("service_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  categoryId: int("categoryId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  status: mysqlEnum("status", ["pending", "active", "completed", "cancelled"]).default("pending").notNull(),
+  address: text("address"),
+  latitude: varchar("latitude", { length: 20 }),
+  longitude: varchar("longitude", { length: 20 }),
+  budgetMin: int("budgetMin"),
+  budgetMax: int("budgetMax"),
+  distanceKm: int("distanceKm"),
+  estimatedPrice: int("estimatedPrice"),
+  assignedProviderId: int("assignedProviderId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// Offers from providers
+export const offers = mysqlTable("offers", {
+  id: int("id").autoincrement().primaryKey(),
+  requestId: int("requestId").notNull(),
+  providerId: int("providerId").notNull(),
+  price: int("price").notNull(),
+  message: text("message"),
+  estimatedTime: varchar("estimatedTime", { length: 100 }),
+  status: mysqlEnum("status", ["pending", "accepted", "rejected"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+// Messages
+export const messages = mysqlTable("messages", {
+  id: int("id").autoincrement().primaryKey(),
+  senderId: int("senderId").notNull(),
+  receiverId: int("receiverId").notNull(),
+  requestId: int("requestId"),
+  content: text("content").notNull(),
+  isRead: int("isRead").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+// Payments (escrow)
+export const payments = mysqlTable("payments", {
+  id: int("id").autoincrement().primaryKey(),
+  requestId: int("requestId").notNull(),
+  userId: int("userId").notNull(),
+  providerId: int("providerId").notNull(),
+  amount: int("amount").notNull(),
+  status: mysqlEnum("status", ["pending", "held", "released", "refunded"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// Export types
+export type ServiceCategory = typeof serviceCategories.$inferSelect;
+export type Provider = typeof providers.$inferSelect;
+export type ServiceRequest = typeof serviceRequests.$inferSelect;
+export type Offer = typeof offers.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+export type Payment = typeof payments.$inferSelect;

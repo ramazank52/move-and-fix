@@ -366,6 +366,149 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         </View>
+
+        {/* Emergency & Transport Services */}
+        <View className="px-5 mt-6">
+          <Text className="text-lg font-bold text-foreground mb-3">Acil & Ulaşım Hizmetleri</Text>
+          <View style={{ gap: 10 }}>
+            <Pressable
+              onPress={() => router.push("/service/tow-truck" as any)}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "#DC2626" + "10",
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#DC2626" + "25",
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "#DC2626" + "18",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 22 }}>🚛</Text>
+              </View>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>Çekici</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>7/24 • ₺25/km • Başlangıç ₺200</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push("/service/roadside" as any)}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "#B91C1C" + "10",
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#B91C1C" + "25",
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "#B91C1C" + "18",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 22 }}>🚨</Text>
+              </View>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>Yol Yardım</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>7/24 • ₺18/km • Başlangıç ₺100</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push("/service/courier" as any)}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "#0EA5E9" + "10",
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#0EA5E9" + "25",
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "#0EA5E9" + "18",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 22 }}>📦</Text>
+              </View>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>Kurye & Evrak</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>Hızlı teslimat • ₺12/km • Başlangıç ₺50</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
+
+            {/* Map Link */}
+            <Pressable
+              onPress={() => router.push("/map" as any)}
+              style={({ pressed }) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "#3B82F6" + "10",
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#3B82F6" + "25",
+                  opacity: pressed ? 0.9 : 1,
+                },
+              ]}
+            >
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: "#3B82F6" + "18",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 22 }}>📍</Text>
+              </View>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>Yakınımdaki Ustalar</Text>
+                <Text style={{ fontSize: 12, color: colors.muted }}>Haritada ustaları gör</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
+          </View>
+        </View>
       </ScrollView>
     </ScreenContainer>
   );

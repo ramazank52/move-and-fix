@@ -1,5 +1,5 @@
 import { Text, View, FlatList, Pressable } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Redirect } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -10,6 +10,12 @@ export default function CategoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const router = useRouter();
+
+  // Route km-based categories to their dedicated screens
+  if (id === "courier") return <Redirect href={"/service/courier" as any} />;
+  if (id === "tow_truck") return <Redirect href={"/service/tow-truck" as any} />;
+  if (id === "roadside") return <Redirect href={"/service/roadside" as any} />;
+
   const category = CATEGORIES.find((c) => c.id === id);
   const providers = SAMPLE_PROVIDERS.filter((p) => p.category === id);
 
