@@ -1,0 +1,53 @@
+# Move&Fix Project TODO
+
+## Phase 1: Foundation
+- [x] Configure theme colors (brand orange)
+- [x] Set up tab navigation structure (customer tabs)
+- [x] Add icon mappings for all tabs
+- [x] Create shared components (ServiceCard, CategoryChip, StatusBadge)
+
+## Phase 2: Authentication & Profile
+- [x] Onboarding screens (3 slides)
+- [x] Login screen
+- [x] Register screen (customer/provider role selection)
+- [x] Profile screen with user info
+- [x] Address management
+
+## Phase 3: Home & Discovery
+- [x] Home screen with search, categories, nearby providers
+- [x] Service categories grid
+- [x] Provider listing with filters
+- [x] Provider detail/profile screen
+- [x] Favorites system
+
+## Phase 4: Service & Offers
+- [x] Create service request (multi-step form)
+- [x] Offer system (send/receive/compare offers)
+- [x] Job tracking screen
+- [x] Review and rating system
+
+## Phase 5: Communication & Payments
+- [x] Chat/messaging system
+- [x] Notifications screen
+- [x] Escrow payment flow
+- [x] Payment history
+
+## Phase 6: Provider & Admin
+- [x] Provider dashboard (earnings, stats)
+- [x] Provider job management
+- [x] Provider calendar/availability
+- [x] Admin dashboard
+- [x] Category management (admin)
+- [x] User management (admin)
+
+## Phase 7: AI & Premium
+- [x] AI Assistant chat (MoveAI)
+- [x] AI-powered service suggestions
+- [x] Multi-language support (TR, EN, DE, FR, AR)
+- [x] Premium membership plans
+- [x] Campaign/coupon system
+
+## Phase 8: Branding
+- [x] Generate app logo
+- [x] Configure app.config.ts branding
+- [x] Splash screen setup
