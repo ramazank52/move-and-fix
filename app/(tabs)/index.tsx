@@ -6,6 +6,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { CATEGORIES } from "@/lib/data/categories";
 import { SAMPLE_PROVIDERS } from "@/lib/data/providers";
 import { useRouter } from "expo-router";
+import { FirstUseInfoModal } from "@/components/first-use-info";
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -16,6 +17,7 @@ export default function HomeScreen() {
 
   return (
     <ScreenContainer>
+      <FirstUseInfoModal />
       <ScrollView
         contentContainerStyle={{ paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}

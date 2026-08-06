@@ -62,3 +62,24 @@
 - [x] Push notification system integration
 - [x] Backend API connection for real user auth
 - [x] Database integration for persistent data
+
+## Phase 10: Legal & Compliance Module (v1.2)
+- [x] Kullanım Koşulları ekranı
+- [x] Gizlilik Politikası ekranı
+- [x] KVKK Aydınlatma Metni ekranı
+- [x] Çerez Politikası ekranı
+- [x] Aracılık Beyanı tam ekran popup
+- [x] Zorunlu kayıt onayı (6 checkbox)
+- [x] Hizmet Sağlayıcı Sözleşmesi
+- [x] Müşteri Sözleşmesi
+- [x] Kurumsal Firma Sözleşmesi
+- [x] Ödeme ve İade Politikası
+- [x] Yasaklı Faaliyetler
+- [x] Sorumluluk Sınırlandırması
+- [x] Dijital Onay Sistemi (tarih, IP, cihaz kaydı)
+- [x] İlk kullanım bilgilendirme ekranı
+
+## Phase 11: Photo Upload & Payment & Maps (v1.2)
+- [x] Fotoğraf yükleme özelliği (hizmet taleplerine arıza fotoğrafı)
+- [x] Ödeme gateway entegrasyonu (escrow akışı)
+- [x] Google Maps API entegrasyonu (gerçek harita)

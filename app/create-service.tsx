@@ -5,6 +5,7 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { CATEGORIES } from "@/lib/data/categories";
 import { useRouter } from "expo-router";
+import { PhotoUpload } from "@/components/photo-upload";
 
 export default function CreateServiceScreen() {
   const colors = useColors();
@@ -14,6 +15,7 @@ export default function CreateServiceScreen() {
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [budget, setBudget] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
 
   const totalSteps = 4;
 
@@ -117,26 +119,14 @@ export default function CreateServiceScreen() {
                 textAlignVertical: "top",
               }}
             />
-            <Pressable
-              style={({ pressed }) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginTop: 14,
-                  padding: 12,
-                  borderRadius: 10,
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-            >
-              <IconSymbol name="camera.fill" size={20} color={colors.primary} />
-              <Text style={{ marginLeft: 10, color: colors.primary, fontWeight: "500" }}>
-                Fotoğraf Ekle
-              </Text>
-            </Pressable>
+            <View style={{ marginTop: 16 }}>
+              <PhotoUpload
+                photos={photos}
+                onPhotosChange={setPhotos}
+                maxPhotos={5}
+                label="Arıza Fotoğrafları"
+              />
+            </View>
           </View>
         )}
 

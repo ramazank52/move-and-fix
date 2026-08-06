@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { RegistrationConsent } from "@/components/registration-consent";
 
 type UserRole = "customer" | "provider";
 
@@ -14,8 +15,13 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"form" | "consent">("form");
 
   const handleRegister = () => {
+    setStep("consent");
+  };
+
+  const handleConsentAccepted = () => {
     router.replace("/(tabs)" as any);
   };
 
@@ -78,87 +84,92 @@ export default function RegisterScreen() {
 
           {/* Form */}
           <View style={{ gap: 14 }}>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Ad Soyad"
-              placeholderTextColor={colors.muted}
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 15,
-                color: colors.foreground,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            />
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="E-posta"
-              placeholderTextColor={colors.muted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 15,
-                color: colors.foreground,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            />
-            <TextInput
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="Telefon"
-              placeholderTextColor={colors.muted}
-              keyboardType="phone-pad"
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 15,
-                color: colors.foreground,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Şifre"
-              placeholderTextColor={colors.muted}
-              secureTextEntry
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 15,
-                color: colors.foreground,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            />
+            {step === "form" ? (
+              <>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Ad Soyad"
+                  placeholderTextColor={colors.muted}
+                  style={{
+                    backgroundColor: colors.surface,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 15,
+                    color: colors.foreground,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                />
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="E-posta"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={{
+                    backgroundColor: colors.surface,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 15,
+                    color: colors.foreground,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                />
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Telefon"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="phone-pad"
+                  style={{
+                    backgroundColor: colors.surface,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 15,
+                    color: colors.foreground,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                />
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Şifre"
+                  placeholderTextColor={colors.muted}
+                  secureTextEntry
+                  style={{
+                    backgroundColor: colors.surface,
+                    borderRadius: 12,
+                    padding: 14,
+                    fontSize: 15,
+                    color: colors.foreground,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                />
+                <Pressable
+                  onPress={handleRegister}
+                  style={({ pressed }) => [
+                    {
+                      marginTop: 10,
+                      backgroundColor: colors.primary,
+                      borderRadius: 12,
+                      paddingVertical: 15,
+                      alignItems: "center",
+                      opacity: pressed ? 0.9 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600" }}>Devam Et</Text>
+                </Pressable>
+              </>
+            ) : (
+              <RegistrationConsent onAllAccepted={handleConsentAccepted} />
+            )}
           </View>
-
-          <Pressable
-            onPress={handleRegister}
-            style={({ pressed }) => [
-              {
-                marginTop: 24,
-                backgroundColor: colors.primary,
-                borderRadius: 12,
-                paddingVertical: 15,
-                alignItems: "center",
-                opacity: pressed ? 0.9 : 1,
-              },
-            ]}
-          >
-            <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600" }}>Kayıt Ol</Text>
-          </Pressable>
 
           <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 20 }}>
             <Text style={{ color: colors.muted, fontSize: 14 }}>Zaten hesabınız var mı? </Text>

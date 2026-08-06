@@ -48,6 +48,7 @@ const MAPPING = {
   "chart.bar.fill": "bar-chart",
   "questionmark.circle.fill": "help",
   "sparkles": "auto-awesome",
+  "doc.text.fill": "description",
 } as IconMapping;
 
 /**

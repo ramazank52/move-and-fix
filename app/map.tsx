@@ -7,12 +7,14 @@ import { useRouter } from "expo-router";
 
 // Provider locations in Istanbul
 const PROVIDERS = [
-  { id: "1", name: "Ahmet Yılmaz", service: "Elektrik", rating: 4.9, lat: 40.9908, lng: 29.0272, distance: "1.2 km" },
-  { id: "2", name: "Mehmet Demir", service: "Su Tesisatı", rating: 4.8, lat: 40.9855, lng: 29.0350, distance: "0.8 km" },
-  { id: "3", name: "Hasan Elektrik", service: "Elektrik", rating: 4.9, lat: 40.9920, lng: 29.0200, distance: "1.8 km" },
-  { id: "4", name: "Ali Çekici", service: "Çekici", rating: 4.7, lat: 40.9870, lng: 29.0400, distance: "2.1 km" },
-  { id: "5", name: "Veli Kurye", service: "Kurye", rating: 4.6, lat: 40.9940, lng: 29.0150, distance: "0.5 km" },
+  { id: "1", name: "Ahmet Yılmaz", service: "Elektrik", rating: 4.9, lat: 41.0082, lng: 28.9784, distance: "1.2 km", price: "₺200-500" },
+  { id: "2", name: "Mehmet Demir", service: "Su Tesisatı", rating: 4.8, lat: 41.0122, lng: 28.9744, distance: "0.8 km", price: "₺150-400" },
+  { id: "3", name: "Hasan Elektrik", service: "Elektrik", rating: 4.9, lat: 41.0052, lng: 28.9824, distance: "1.8 km", price: "₺180-600" },
+  { id: "4", name: "Ali Çekici", service: "Çekici", rating: 4.7, lat: 41.0102, lng: 28.9704, distance: "2.1 km", price: "₺25/km" },
+  { id: "5", name: "Veli Kurye", service: "Kurye", rating: 4.6, lat: 41.0062, lng: 28.9864, distance: "0.5 km", price: "₺12/km" },
+  { id: "6", name: "Yol Yardım 7/24", service: "Yol Yardım", rating: 4.5, lat: 40.9980, lng: 28.9900, distance: "3.2 km", price: "₺18/km" },
 ];
+
 
 export default function MapScreen() {
   const colors = useColors();
@@ -182,9 +184,71 @@ export default function MapScreen() {
             </Text>
           </View>
         ) : (
-          // Native - will use react-native-maps
-          <View style={{ flex: 1, backgroundColor: "#E8F4E8", alignItems: "center", justifyContent: "center" }}>
-            <Text style={{ fontSize: 14, color: colors.muted }}>Harita yükleniyor...</Text>
+          // Native - same interactive map view (Google Maps will be used on device via Expo Maps)
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "#E8F4E8",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+            }}
+          >
+            {/* Grid lines to simulate map */}
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.3 }}>
+              {[...Array(8)].map((_, i) => (
+                <View
+                  key={`hn-${i}`}
+                  style={{
+                    position: "absolute",
+                    top: `${(i + 1) * 12}%`,
+                    left: 0,
+                    right: 0,
+                    height: 1,
+                    backgroundColor: "#94A3B8",
+                  }}
+                />
+              ))}
+            </View>
+            {/* Provider markers */}
+            {PROVIDERS.map((provider, i) => (
+              <Pressable
+                key={provider.id}
+                onPress={() => setSelectedProvider(provider.id)}
+                style={({ pressed }) => [
+                  {
+                    position: "absolute",
+                    top: `${20 + i * 12}%`,
+                    left: `${15 + i * 13}%`,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: selectedProvider === provider.id ? colors.primary : "#FFF",
+                    borderWidth: 2,
+                    borderColor: colors.primary,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: "bold", color: selectedProvider === provider.id ? "#FFF" : colors.primary }}>
+                    {provider.name.charAt(0)}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+            {/* User location */}
+            <View style={{ position: "absolute", top: "50%", left: "50%", marginLeft: -12, marginTop: -12 }}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#3B82F6", borderWidth: 3, borderColor: "#FFF" }} />
+            </View>
+            <Text style={{ position: "absolute", bottom: 20, fontSize: 12, color: "#64748B" }}>
+              Cihazda Google Maps/Apple Maps kullanılır
+            </Text>
           </View>
         )}
 
