@@ -14,6 +14,8 @@ export default function ProfileScreen() {
     { icon: "heart.fill" as const, label: "Favorilerim", route: "/settings/favorites" },
     { icon: "creditcard.fill" as const, label: "Ödeme Yöntemlerim", route: "/settings/payments" },
     { icon: "bell.fill" as const, label: "Bildirim Ayarları", route: "/settings/notifications" },
+    { icon: "bell.fill" as const, label: "Bildirim Sesleri & Titreşim", route: "/settings/notification-sounds" },
+    { icon: "heart.fill" as const, label: "Arkadaşını Davet Et", route: "/referral" },
     { icon: "doc.text.fill" as const, label: "Yasal Sözleşmeler", route: "/legal" },
     { icon: "gearshape.fill" as const, label: "Ayarlar", route: "/settings/general" },
     { icon: "questionmark.circle.fill" as const, label: "Yardım & Destek", route: "/settings/help" },

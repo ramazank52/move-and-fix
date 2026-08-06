@@ -94,3 +94,10 @@
 - [x] Canlı konum takibi (çekici/kurye)
 - [x] Gerçek zamanlı harita üzerinde usta konumu
 - [x] Tahmini varış süresi gösterimi
+
+## Phase 13: Referral, Notification Sounds & Portfolio (v1.4)
+- [x] Referans/kupon sistemi (arkadaş davet et, indirim kazan)
+- [x] Kupon kodu uygulama ekranı
+- [x] Anlık bildirim sesleri ve titreşim ayarları
+- [x] Usta portfolyo galerisi (önceki işler fotoğrafları)
+- [x] Portfolyo fotoğraf detay görünümü
