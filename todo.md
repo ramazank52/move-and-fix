@@ -83,3 +83,14 @@
 - [x] Fotoğraf yükleme özelliği (hizmet taleplerine arıza fotoğrafı)
 - [x] Ödeme gateway entegrasyonu (escrow akışı)
 - [x] Google Maps API entegrasyonu (gerçek harita)
+
+## Phase 12: Auth Verification, Reviews & Live Tracking (v1.3)
+- [x] E-posta doğrulama ekranı (OTP kodu)
+- [x] SMS doğrulama ekranı (OTP kodu)
+- [x] Doğrulama durumu profil badge'i
+- [x] Yorum ve puanlama sistemi (1-5 yıldız + metin)
+- [x] Hizmet sonrası değerlendirme popup'ı
+- [x] Usta profil sayfasında yorumlar bölümü
+- [x] Canlı konum takibi (çekici/kurye)
+- [x] Gerçek zamanlı harita üzerinde usta konumu
+- [x] Tahmini varış süresi gösterimi

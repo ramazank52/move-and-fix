@@ -8,11 +8,13 @@ export default function ProfileScreen() {
   const colors = useColors();
 
   const menuItems = [
+    { icon: "checkmark.shield.fill" as const, label: "Hesap Doğrulama", route: "/verify/email" },
     { icon: "person.fill" as const, label: "Profil Bilgileri", route: "/settings/profile-edit" },
     { icon: "location.fill" as const, label: "Adreslerim", route: "/settings/addresses" },
     { icon: "heart.fill" as const, label: "Favorilerim", route: "/settings/favorites" },
     { icon: "creditcard.fill" as const, label: "Ödeme Yöntemlerim", route: "/settings/payments" },
     { icon: "bell.fill" as const, label: "Bildirim Ayarları", route: "/settings/notifications" },
+    { icon: "doc.text.fill" as const, label: "Yasal Sözleşmeler", route: "/legal" },
     { icon: "gearshape.fill" as const, label: "Ayarlar", route: "/settings/general" },
     { icon: "questionmark.circle.fill" as const, label: "Yardım & Destek", route: "/settings/help" },
     { icon: "sparkles" as const, label: "Premium Üyelik", route: "/premium" },
@@ -38,6 +40,15 @@ export default function ProfileScreen() {
           </View>
           <Text className="text-xl font-bold text-foreground">Kullanıcı</Text>
           <Text className="text-sm text-muted mt-1">kullanici@email.com</Text>
+          {/* Verification Badges */}
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.success + "15", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+              <Text style={{ fontSize: 11, color: colors.success, fontWeight: "600" }}>✓ E-posta Doğrulanmış</Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.primary + "15", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: "600" }}>✓ Telefon Doğrulanmış</Text>
+            </View>
+          </View>
           <View className="flex-row mt-3 gap-4">
             <View className="items-center">
               <Text className="text-lg font-bold text-foreground">12</Text>

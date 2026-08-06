@@ -49,6 +49,7 @@ const MAPPING = {
   "questionmark.circle.fill": "help",
   "sparkles": "auto-awesome",
   "doc.text.fill": "description",
+  "checkmark.shield.fill": "verified-user",
 } as IconMapping;
 
 /**
