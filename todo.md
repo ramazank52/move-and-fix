@@ -101,3 +101,8 @@
 - [x] Anlık bildirim sesleri ve titreşim ayarları
 - [x] Usta portfolyo galerisi (önceki işler fotoğrafları)
 - [x] Portfolyo fotoğraf detay görünümü
+
+## Phase 14: Comparison, Voice Messages & History Report (v1.5)
+- [x] Favorilere ekleme ve karşılaştırma (yan yana karşılaştırma)
+- [x] Sesli mesaj gönderme ve alma
+- [x] Hizmet geçmişi raporu (istatistikler)
