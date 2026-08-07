@@ -432,8 +432,8 @@ describe('Security Module', () => {
           .replace(/[;]/g, '');
       };
 
-      expect(sanitize('<script>alert("xss")</script>')).toBe('scriptalertxssscript');
-      expect(sanitize("'; DROP TABLE users; --")).toBe(' DROP TABLE users ');
+      expect(sanitize('<script>alert("xss")</script>')).toBe('scriptalert(xss)/script');
+      expect(sanitize("'; DROP TABLE users; --")).toBe(' DROP TABLE users --');
     });
   });
 

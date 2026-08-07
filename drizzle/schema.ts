@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, index, uniqueIndex } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -20,7 +20,11 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Issue #20: Database indexes for frequently queried columns
+  emailIdx: uniqueIndex("users_email_idx").on(table.email),
+  roleIdx: index("users_role_idx").on(table.role),
+}));
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -54,7 +58,13 @@ export const providers = mysqlTable("providers", {
   longitude: varchar("longitude", { length: 20 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ({
+  // Issue #20: Database indexes
+  userIdIdx: index("providers_userId_idx").on(table.userId),
+  categoryIdIdx: index("providers_categoryId_idx").on(table.categoryId),
+  ratingIdx: index("providers_rating_idx").on(table.rating),
+  isVerifiedIdx: index("providers_isVerified_idx").on(table.isVerified),
+}));
 
 // Service requests (jobs)
 export const serviceRequests = mysqlTable("service_requests", {
@@ -74,7 +84,13 @@ export const serviceRequests = mysqlTable("service_requests", {
   assignedProviderId: int("assignedProviderId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ({
+  // Issue #20: Database indexes
+  userIdIdx: index("service_requests_userId_idx").on(table.userId),
+  statusIdx: index("service_requests_status_idx").on(table.status),
+  categoryIdIdx: index("service_requests_categoryId_idx").on(table.categoryId),
+  assignedProviderIdx: index("service_requests_assignedProviderId_idx").on(table.assignedProviderId),
+}));
 
 // Offers from providers
 export const offers = mysqlTable("offers", {
@@ -86,7 +102,12 @@ export const offers = mysqlTable("offers", {
   estimatedTime: varchar("estimatedTime", { length: 100 }),
   status: mysqlEnum("status", ["pending", "accepted", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Issue #20: Database indexes
+  requestIdIdx: index("offers_requestId_idx").on(table.requestId),
+  providerIdIdx: index("offers_providerId_idx").on(table.providerId),
+  statusIdx: index("offers_status_idx").on(table.status),
+}));
 
 // Messages
 export const messages = mysqlTable("messages", {
@@ -97,7 +118,13 @@ export const messages = mysqlTable("messages", {
   content: text("content").notNull(),
   isRead: int("isRead").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Issue #20: Database indexes
+  senderIdIdx: index("messages_senderId_idx").on(table.senderId),
+  receiverIdIdx: index("messages_receiverId_idx").on(table.receiverId),
+  requestIdIdx: index("messages_requestId_idx").on(table.requestId),
+  isReadIdx: index("messages_isRead_idx").on(table.isRead),
+}));
 
 // Payments (escrow)
 export const payments = mysqlTable("payments", {
@@ -109,7 +136,13 @@ export const payments = mysqlTable("payments", {
   status: mysqlEnum("status", ["pending", "held", "released", "refunded"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ({
+  // Issue #20: Database indexes
+  requestIdIdx: index("payments_requestId_idx").on(table.requestId),
+  userIdIdx: index("payments_userId_idx").on(table.userId),
+  providerIdIdx: index("payments_providerId_idx").on(table.providerId),
+  statusIdx: index("payments_status_idx").on(table.status),
+}));
 
 // Export types
 export type ServiceCategory = typeof serviceCategories.$inferSelect;

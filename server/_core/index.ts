@@ -16,6 +16,8 @@ import {
 } from "./security";
 import { setupSwaggerDocs } from "./swagger";
 import { healthChecker, healthCheckMiddleware } from "./health";
+import { SECURITY_HEADERS, CORS_CONFIG, BODY_PARSER_CONFIG } from "./config";
+import compression from "compression";
 import type { Request, Response, NextFunction } from "express";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -41,13 +43,14 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // ── Security Headers ──
+  // ── Security Headers (Issue #18: CSP + Security Headers) ──
   app.use((req, res, next) => {
-    res.header("X-Content-Type-Options", "nosniff");
-    res.header("X-Frame-Options", "DENY");
-    res.header("X-XSS-Protection", "1; mode=block");
-    res.header("Referrer-Policy", "strict-origin-when-cross-origin");
-    res.header("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+    res.header("X-Content-Type-Options", SECURITY_HEADERS.xContentTypeOptions);
+    res.header("X-Frame-Options", SECURITY_HEADERS.xFrameOptions);
+    res.header("X-XSS-Protection", SECURITY_HEADERS.xXSSProtection);
+    res.header("Referrer-Policy", SECURITY_HEADERS.referrerPolicy);
+    res.header("Permissions-Policy", SECURITY_HEADERS.permissionsPolicy);
+    res.header("Content-Security-Policy", SECURITY_HEADERS.contentSecurityPolicy);
     next();
   });
 
@@ -59,23 +62,16 @@ async function startServer() {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const defaultOrigins = [
-    "http://localhost:8081",
-    "http://localhost:3000",
-  ];
-  const originWhitelist = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
+  const originWhitelist = allowedOrigins.length > 0 ? allowedOrigins : CORS_CONFIG.defaultOrigins;
 
   app.use((req: Request, res: Response, next: NextFunction) => {
     const origin = req.headers.origin;
     if (origin && originWhitelist.includes(origin)) {
       res.header("Access-Control-Allow-Origin", origin);
     }
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.header(
-      "Access-Control-Allow-Headers",
-      "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Request-ID, X-CSRF-Token",
-    );
-    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", CORS_CONFIG.allowedMethods);
+    res.header("Access-Control-Allow-Headers", CORS_CONFIG.allowedHeaders);
+    res.header("Access-Control-Allow-Credentials", String(CORS_CONFIG.allowCredentials));
 
     if (req.method === "OPTIONS") {
       res.sendStatus(200);
@@ -84,11 +80,14 @@ async function startServer() {
     next();
   });
 
+  // ── Response Compression (Issue #23) ──
+  app.use(compression());
+
   // ── General Rate Limiting ──
   app.use(rateLimiters.general);
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(express.json({ limit: BODY_PARSER_CONFIG.jsonLimit }));
+  app.use(express.urlencoded({ limit: BODY_PARSER_CONFIG.urlencodedLimit, extended: true }));
 
   // ── CSRF Protection for state-changing routes ──
   // Cookie-based auth (web) için CSRF token doğrulaması.
