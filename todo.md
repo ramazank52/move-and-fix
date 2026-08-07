@@ -151,6 +151,6 @@
 - [x] #36 Offline support — documentated as future enhancement
 - [x] #39 Real-time updates — MoveOS polling (documented)
 - [x] #40 Data export — CSV export butonu (MoveOS dashboard)
-- [ ] Move&Fix mobil uygulaması, ortak backend ve MoveOS yönetim paneli entegrasyonlarını uçtan uca doğrula
-- [ ] Bağımsız nihai production-readiness denetimi gerçekleştir
-- [ ] Güncel ayrıntılı denetim raporu, test kanıtları ve açık riskler kaydını teslim et
+- [x] Move&Fix mobil uygulaması, ortak backend ve MoveOS yönetim paneli entegrasyonlarını uçtan uca doğrula
+- [x] Bağımsız nihai production-readiness denetimi gerçekleştir
+- [x] Güncel ayrıntılı denetim raporu, test kanıtları ve açık riskler kaydını teslim et
