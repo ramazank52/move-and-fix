@@ -154,3 +154,20 @@
 - [x] Move&Fix mobil uygulaması, ortak backend ve MoveOS yönetim paneli entegrasyonlarını uçtan uca doğrula
 - [x] Bağımsız nihai production-readiness denetimi gerçekleştir
 - [x] Güncel ayrıntılı denetim raporu, test kanıtları ve açık riskler kaydını teslim et
+
+## Phase 17: E2E User Scenario Validation
+- [x] Backend API yüzeyini doğrula (tRPC endpoint'leri, auth, health, swagger)
+- [x] Kayıt ve kimlik doğrulama akışını test et
+- [x] Hizmet talebi oluşturma akışını test et
+- [x] Teklif verme ve kabul akışını test et
+- [x] Mesajlaşma akışını test et
+- [x] Bildirim akışını test et
+- [x] Konum takibi akışını test et
+- [x] Ödeme ve escrow akışını test et
+- [x] Cüzdan ve para çekme akışını test et
+- [x] Dosya yükleme akışını test et
+- [x] Admin paneli (MoveOS) entegrasyonunu test et — REST adapter oluşturuldu (ownerRestAdapter.ts)
+- [x] AI komut akışını test et
+- [x] Hata senaryolarını test et
+- [x] Başarısız senaryoları düzelt ve tekrar test et — 2 hata düzeltildi, 24/24 E2E test başarılı
+- [x] Nihai doğrulama ve sonuç sun

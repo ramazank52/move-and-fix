@@ -15,6 +15,7 @@ import {
   corsOptions,
 } from "./security";
 import { setupSwaggerDocs } from "./swagger";
+import { registerOwnerRestRoutes } from "./ownerRestAdapter";
 import { healthChecker, healthCheckMiddleware } from "./health";
 import { SECURITY_HEADERS, CORS_CONFIG, BODY_PARSER_CONFIG } from "./config";
 import compression from "compression";
@@ -134,6 +135,7 @@ async function startServer() {
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  registerOwnerRestRoutes(app);
 
   // ── Health Checks ──
   app.use("/api/health/detailed", healthCheckMiddleware(healthChecker));

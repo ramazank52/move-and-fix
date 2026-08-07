@@ -1,24 +1,23 @@
 /**
- * End-to-End (E2E) Tests — Rewritten
+ * E2E User Scenario Tests
  *
- * Bu test dosyası, Move&Fix sisteminin tam kullanıcı yolculuğunu
+ * Bu test dosyası, Move&Fix sisteminin tüm kritik kullanıcı akışlarını
  * gerçek HTTP istekleriyle uçtan uca doğrular.
  *
- * Eski test dosyası, mevcut olmayan REST endpoint'lere (/api/auth/register, /api/orders vb.)
- * gidiyordu. Bu sürüm, gerçek API yüzeyiyle (tRPC + owner REST adapter) çalışır.
- *
  * Test edilen akışlar:
- * 1. Owner login + dashboard (MoveOS admin)
- * 2. Kategori yönetimi (liste + oluşturma)
- * 3. AI komut işleme
- * 4. Cüzdan ve para çekme
- * 5. Analitik raporlar
- * 6. Kullanıcı yönetimi
- * 7. Health check + security headers
- * 8. tRPC public endpoints
- * 9. Hata senaryoları
- * 10. 2FA verification
- * 11. Logout
+ * 1. Owner login (MoveOS admin)
+ * 2. Dashboard verileri
+ * 3. Kategori yönetimi
+ * 4. AI komut
+ * 5. Cüzdan ve para çekme
+ * 6. Analitik
+ * 7. Kullanıcı yönetimi
+ * 8. Health check
+ * 9. Security headers
+ * 10. tRPC auth.me
+ * 11. Hata senaryoları
+ * 12. 2FA verification
+ * 13. Logout
  */
 
 import { describe, it, expect } from "vitest";
@@ -69,10 +68,10 @@ function httpRequest(
   });
 }
 
-describe("E2E: Complete User Journey", () => {
-  // ── 1. Owner Authentication ──
+describe("E2E User Scenarios", () => {
+  // ── 1. Owner Login (MoveOS Admin) ──
 
-  describe("1. Owner Authentication", () => {
+  describe("Owner Login", () => {
     it("should login with correct credentials", async () => {
       const res = await httpRequest("POST", "/api/owner/login", {
         email: "owner@movefix.com",
@@ -83,22 +82,15 @@ describe("E2E: Complete User Journey", () => {
       expect(body.token).toBeTruthy();
       expect(body.user.email).toBe("owner@movefix.com");
       expect(body.user.role).toBe("owner");
+      expect(body.requires2FA).toBe(false);
     });
 
-    it("should reject wrong password", async () => {
+    it("should reject wrong credentials", async () => {
       const res = await httpRequest("POST", "/api/owner/login", {
         email: "owner@movefix.com",
         password: "wrongpass",
       });
       expect(res.status).toBe(401);
-    });
-
-    it("should reject short password (Zod validation)", async () => {
-      const res = await httpRequest("POST", "/api/owner/login", {
-        email: "test@test.com",
-        password: "123",
-      });
-      expect(res.status).toBe(400);
     });
 
     it("should reject missing fields", async () => {
@@ -109,7 +101,7 @@ describe("E2E: Complete User Journey", () => {
 
   // ── 2. Dashboard ──
 
-  describe("2. Dashboard", () => {
+  describe("Dashboard", () => {
     it("should return dashboard data with auth", async () => {
       const res = await httpRequest("GET", "/api/owner/dashboard", undefined, {
         Authorization: `Bearer ${OWNER_TOKEN}`,
@@ -127,9 +119,9 @@ describe("E2E: Complete User Journey", () => {
     });
   });
 
-  // ── 3. Category Management ──
+  // ── 3. Categories ──
 
-  describe("3. Category Management", () => {
+  describe("Categories", () => {
     it("should list categories", async () => {
       const res = await httpRequest("GET", "/api/owner/categories", undefined, {
         Authorization: `Bearer ${OWNER_TOKEN}`,
@@ -138,27 +130,29 @@ describe("E2E: Complete User Journey", () => {
       const body = res.body as Array<{ id: number; name: string; commission: number }>;
       expect(Array.isArray(body)).toBe(true);
       expect(body.length).toBeGreaterThan(0);
+      expect(body[0].name).toBeTruthy();
+      expect(body[0].commission).toBeGreaterThan(0);
     });
 
     it("should create a category", async () => {
       const res = await httpRequest("POST", "/api/owner/categories", {
-        name: "Bahçe Bakımı",
-        description: "Bahçe bakım hizmetleri",
-        commission: 12,
+        name: "Test Kategori",
+        description: "Test açıklama",
+        commission: 15,
       }, {
         Authorization: `Bearer ${OWNER_TOKEN}`,
       });
       expect(res.status).toBe(200);
       const body = res.body as { id: number; name: string; active: boolean };
-      expect(body.name).toBe("Bahçe Bakımı");
+      expect(body.name).toBe("Test Kategori");
       expect(body.active).toBe(true);
     });
   });
 
   // ── 4. AI Command ──
 
-  describe("4. AI Command", () => {
-    it("should process category creation command", async () => {
+  describe("AI Command", () => {
+    it("should process a category creation command", async () => {
       const res = await httpRequest("POST", "/api/owner/ai-command", {
         command: "Yeni kategori ekle: Bahçe Tasarımı",
       }, {
@@ -170,7 +164,7 @@ describe("E2E: Complete User Journey", () => {
       expect(body.action).toBeTruthy();
     });
 
-    it("should process commission update command", async () => {
+    it("should process a commission command", async () => {
       const res = await httpRequest("POST", "/api/owner/ai-command", {
         command: "Komisyon oranını güncelle",
       }, {
@@ -182,9 +176,9 @@ describe("E2E: Complete User Journey", () => {
     });
   });
 
-  // ── 5. Wallet & Withdrawal ──
+  // ── 5. Wallet ──
 
-  describe("5. Wallet & Withdrawal", () => {
+  describe("Wallet", () => {
     it("should return wallet info", async () => {
       const res = await httpRequest("GET", "/api/owner/wallet", undefined, {
         Authorization: `Bearer ${OWNER_TOKEN}`,
@@ -222,7 +216,7 @@ describe("E2E: Complete User Journey", () => {
 
   // ── 6. Analytics ──
 
-  describe("6. Analytics", () => {
+  describe("Analytics", () => {
     it("should return analytics data", async () => {
       const res = await httpRequest("GET", "/api/owner/analytics", undefined, {
         Authorization: `Bearer ${OWNER_TOKEN}`,
@@ -234,9 +228,9 @@ describe("E2E: Complete User Journey", () => {
     });
   });
 
-  // ── 7. User Management ──
+  // ── 7. Users ──
 
-  describe("7. User Management", () => {
+  describe("Users", () => {
     it("should list users", async () => {
       const res = await httpRequest("GET", "/api/owner/users", undefined, {
         Authorization: `Bearer ${OWNER_TOKEN}`,
@@ -252,57 +246,73 @@ describe("E2E: Complete User Journey", () => {
         Authorization: `Bearer ${OWNER_TOKEN}`,
       });
       expect(res.status).toBe(200);
-      const body = res.body as { id: string };
+      const body = res.body as { id: string; email: string };
       expect(body.id).toBe("1");
     });
   });
 
-  // ── 8. Health & Security ──
+  // ── 8. Health Check ──
 
-  describe("8. Health & Security", () => {
+  describe("Health Check", () => {
     it("should return health status", async () => {
       const res = await httpRequest("GET", "/api/health");
       expect(res.status).toBe(200);
       const body = res.body as { ok: boolean; timestamp: number };
       expect(body.ok).toBe(true);
+      expect(body.timestamp).toBeGreaterThan(0);
     });
+  });
 
+  // ── 9. Security Headers ──
+
+  describe("Security Headers", () => {
     it("should include security headers", async () => {
       const res = await httpRequest("GET", "/api/health");
       expect(res.headers["x-content-type-options"]).toBe("nosniff");
       expect(res.headers["x-frame-options"]).toBe("DENY");
+      expect(res.headers["x-xss-protection"]).toBe("1; mode=block");
       expect(res.headers["content-security-policy"]).toBeTruthy();
+      expect(res.headers["referrer-policy"]).toBeTruthy();
     });
   });
 
-  // ── 9. tRPC Public Endpoints ──
+  // ── 10. tRPC Endpoints ──
 
-  describe("9. tRPC Public Endpoints", () => {
-    it("should return auth.me (unauthenticated)", async () => {
+  describe("tRPC Endpoints", () => {
+    it("should return user from auth.me (unauthenticated = null)", async () => {
       const res = await httpRequest("GET", "/api/trpc/auth.me");
       expect(res.status).toBe(200);
       const body = res.body as { result: { data: { json: unknown } } };
       expect(body.result).toBeDefined();
     });
 
-    it("should return nearby providers", async () => {
+    it("should return nearby providers (public procedure)", async () => {
       const res = await httpRequest("GET", "/api/trpc/providers.nearby?input=%7B%22json%22%3A%7B%22lat%22%3A%2241.0082%22%2C%22lng%22%3A%2228.9784%22%7D%7D");
       expect(res.status).toBe(200);
     });
   });
 
-  // ── 10. Error Scenarios ──
+  // ── 11. Error Scenarios ──
 
-  describe("10. Error Scenarios", () => {
+  describe("Error Scenarios", () => {
     it("should return 404 for unknown endpoint", async () => {
       const res = await httpRequest("GET", "/api/nonexistent");
       expect(res.status).toBe(404);
     });
+
+    it("should reject owner login with short password", async () => {
+      const res = await httpRequest("POST", "/api/owner/login", {
+        email: "test@test.com",
+        password: "123",
+      });
+      // Zod validation error — password must be >= 6 chars
+      expect(res.status).toBe(400);
+    });
   });
 
-  // ── 11. 2FA ──
+  // ── 12. 2FA Verification ──
 
-  describe("11. 2FA Verification", () => {
+  describe("2FA Verification", () => {
     it("should verify with correct OTP", async () => {
       const res = await httpRequest("POST", "/api/owner/verify-2fa", {
         email: "owner@movefix.com",
@@ -323,9 +333,9 @@ describe("E2E: Complete User Journey", () => {
     });
   });
 
-  // ── 12. Logout ──
+  // ── 13. Logout ──
 
-  describe("12. Logout", () => {
+  describe("Logout", () => {
     it("should logout successfully", async () => {
       const res = await httpRequest("POST", "/api/owner/logout", {}, {
         Authorization: `Bearer ${OWNER_TOKEN}`,
