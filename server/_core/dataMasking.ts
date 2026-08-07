@@ -1,3 +1,12 @@
+import type { NextFunction, Request, Response } from 'express';
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    maskedBody?: unknown;
+    maskedHeaders?: unknown;
+  }
+}
+
 /**
  * Sensitive Data Masking Module
  * 
@@ -49,7 +58,7 @@ const SENSITIVE_FIELDS = [
  * @param depth - Current recursion depth (max 10)
  * @returns Masked object
  */
-export function maskSensitiveData(obj: any, depth = 0): any {
+export function maskSensitiveData(obj: unknown, depth = 0): unknown {
   // Prevent infinite recursion
   if (depth > 10 || obj === null || obj === undefined) {
     return obj;
@@ -65,8 +74,12 @@ export function maskSensitiveData(obj: any, depth = 0): any {
     return obj.map(item => maskSensitiveData(item, depth + 1));
   }
 
+  if (!isRecord(obj)) {
+    return obj;
+  }
+
   // Handle objects
-  const masked: any = {};
+  const masked: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     if (isSensitiveField(key)) {
       masked[key] = maskValue(value);
@@ -78,6 +91,13 @@ export function maskSensitiveData(obj: any, depth = 0): any {
   }
 
   return masked;
+}
+
+/**
+ * Narrow an unknown runtime value to an enumerable string-keyed record.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -95,7 +115,7 @@ function isSensitiveField(fieldName: string): boolean {
  * @param value - Value to mask
  * @returns Masked value
  */
-function maskValue(value: any): string {
+function maskValue(value: unknown): string {
   if (value === null || value === undefined) {
     return '[REDACTED]';
   }
@@ -194,14 +214,18 @@ export function maskAPIKey(apiKey: string): string {
  * @param data - Data to log
  * @returns Safe data for logging
  */
-export function createSafeLogEntry(data: any): any {
+export function createSafeLogEntry(data: unknown): unknown {
   return maskSensitiveData(data);
 }
 
 /**
  * Middleware for Express to mask sensitive data in logs
  */
-export function logMaskingMiddleware(req: any, res: any, next: any) {
+export function logMaskingMiddleware(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): void {
   // Store original body
   const originalBody = req.body;
 
@@ -220,9 +244,9 @@ export function logMaskingMiddleware(req: any, res: any, next: any) {
  * @param space - Indentation (optional)
  * @returns JSON string with masked sensitive data
  */
-export function safeJSONStringify(obj: any, space?: number): string {
+export function safeJSONStringify(obj: unknown, space?: number): string {
   const masked = maskSensitiveData(obj);
-  return JSON.stringify(masked, null, space);
+  return JSON.stringify(masked, null, space) ?? 'undefined';
 }
 
 /**
@@ -230,10 +254,9 @@ export function safeJSONStringify(obj: any, space?: number): string {
  * @param message - Log message
  * @param data - Data to log
  */
-export function safeConsoleLog(message: string, data?: any): void {
-  const maskedData = data ? maskSensitiveData(data) : undefined;
-  if (maskedData) {
-    console.log(`[INFO] ${message}`, maskedData);
+export function safeConsoleLog(message: string, data?: unknown): void {
+  if (data !== undefined) {
+    console.log(`[INFO] ${message}`, maskSensitiveData(data));
   } else {
     console.log(`[INFO] ${message}`);
   }
@@ -244,10 +267,9 @@ export function safeConsoleLog(message: string, data?: any): void {
  * @param message - Error message
  * @param error - Error object or data
  */
-export function safeConsoleError(message: string, error?: any): void {
-  const maskedError = error ? maskSensitiveData(error) : undefined;
-  if (maskedError) {
-    console.error(`[ERROR] ${message}`, maskedError);
+export function safeConsoleError(message: string, error?: unknown): void {
+  if (error !== undefined) {
+    console.error(`[ERROR] ${message}`, maskSensitiveData(error));
   } else {
     console.error(`[ERROR] ${message}`);
   }

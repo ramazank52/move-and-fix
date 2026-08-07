@@ -6,6 +6,7 @@
 
 import { router, publicProcedure, protectedProcedure } from './trpc';
 import { z } from 'zod';
+import { AuthError } from './errors';
 
 export const ownerRouter = router({
   /**
@@ -30,7 +31,7 @@ export const ownerRouter = router({
           requires2FA: false,
         };
       }
-      throw new Error('Geçersiz kimlik bilgileri');
+      throw new AuthError('Geçersiz kimlik bilgileri');
     }),
 
   verify2FA: publicProcedure
@@ -51,7 +52,7 @@ export const ownerRouter = router({
           },
         };
       }
-      throw new Error('Geçersiz OTP kodu');
+      throw new AuthError('Geçersiz OTP kodu');
     }),
 
   logout: protectedProcedure

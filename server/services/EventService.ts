@@ -21,6 +21,13 @@
  * - provider.added
  */
 
+import {
+  ErrorCategory,
+  ErrorSeverity,
+  normalizeError,
+} from '../_core/errors';
+import type { INotificationSender, IWalletService } from './interfaces';
+
 export enum EventType {
   // Payment Events
   PAYMENT_COMPLETED = 'payment.completed',
@@ -69,7 +76,7 @@ export interface Event {
   id: string;
   type: EventType;
   source: string; // Hangi servis tarafından tetiklendi
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   timestamp: Date;
   processed: boolean;
   processedAt?: Date;
@@ -99,10 +106,26 @@ export class EventService {
   private listeners: Map<EventType, EventListener[]> = new Map();
   private eventQueue: Event[] = [];
   private eventLogs: EventLog[] = [];
+  private notificationSender: INotificationSender | null = null;
+  private walletService: IWalletService | null = null;
 
   constructor() {
     this.registerDefaultListeners();
     this.startEventProcessor();
+  }
+
+  /**
+   * Notification sender bağımlılığını enjekte et (döngüsel import'u önler)
+   */
+  setNotificationSender(sender: INotificationSender): void {
+    this.notificationSender = sender;
+  }
+
+  /**
+   * Wallet service bağımlılığını enjekte et
+   */
+  setWalletService(wallet: IWalletService): void {
+    this.walletService = wallet;
   }
 
   /**
@@ -159,7 +182,7 @@ export class EventService {
   async emit(
     eventType: EventType,
     source: string,
-    data: Record<string, any>
+    data: Record<string, unknown>
   ): Promise<Event> {
     const event: Event = {
       id: `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -227,11 +250,18 @@ export class EventService {
         log.completedAt = new Date();
 
         console.log(`✅ Event işlendi: ${event.type} → ${listener.id}`);
-      } catch (error) {
-        console.error(`❌ Event işleme hatası: ${event.type}`, error);
+      } catch (error: unknown) {
+        const eventError = normalizeError(error, {
+          code: 'EVENT_LISTENER_ERROR',
+          category: ErrorCategory.UNKNOWN,
+          severity: ErrorSeverity.HIGH,
+          retryable: listener.retryable,
+          context: { eventId: event.id, eventType: event.type, listenerId: listener.id },
+        });
+        console.error(`❌ Event işleme hatası: ${event.type}`, eventError);
 
         // Retry mantığı
-        if (listener.retryable && event.retryCount < event.maxRetries) {
+        if (listener.retryable && eventError.retryable && event.retryCount < event.maxRetries) {
           event.retryCount++;
           this.eventQueue.push(event); // Kuyruğa geri koy
         }
@@ -250,18 +280,27 @@ export class EventService {
 
     console.log(`💰 Ödeme tamamlandı: ${orderId} - ${amount}₺`);
 
-    // 1. Escrow'dan ödeme yap
-    // await walletService.releaseEscrowPayment(orderId);
+    // 1. Escrow'dan ödeme yap (enjekte edilen wallet adapter üzerinden)
+    if (this.walletService) {
+      try {
+        await this.walletService.releaseEscrowPayment(orderId as string);
+      } catch (error: unknown) {
+        console.error('Escrow serbest bırakma hatası:', error);
+      }
+    }
 
-    // 2. Bildirim gönder
-    // await notificationService.sendNotification(
-    //   providerId,
-    //   NotificationType.PAYMENT_RECEIVED,
-    //   { amount, orderId }
-    // );
-
-    // 3. Analytics güncelle
-    // await analyticsService.recordPayment(orderId, amount);
+    // 2. Bildirim gönder (enjekte edilen sender adapter üzerinden)
+    if (this.notificationSender) {
+      try {
+        await this.notificationSender.sendNotification(
+          providerId as string,
+          'PAYMENT_RECEIVED',
+          { amount, orderId },
+        );
+      } catch (error: unknown) {
+        console.error('Ödeme bildirim hatası:', error);
+      }
+    }
   }
 
   /**
@@ -273,14 +312,26 @@ export class EventService {
     console.log(`❌ Ödeme başarısız: ${orderId} - ${reason}`);
 
     // 1. Escrow'dan geri ödeme yap
-    // await walletService.refundEscrow(orderId, reason);
+    if (this.walletService) {
+      try {
+        await this.walletService.refundEscrow(orderId as string, reason as string);
+      } catch (error: unknown) {
+        console.error('Escrow geri ödeme hatası:', error);
+      }
+    }
 
     // 2. Müşteriye bildirim gönder
-    // await notificationService.sendNotification(
-    //   customerId,
-    //   NotificationType.PAYMENT_FAILED,
-    //   { reason, orderId }
-    // );
+    if (this.notificationSender) {
+      try {
+        await this.notificationSender.sendNotification(
+          customerId as string,
+          'PAYMENT_FAILED',
+          { reason, orderId },
+        );
+      } catch (error: unknown) {
+        console.error('Ödeme başarısız bildirim hatası:', error);
+      }
+    }
   }
 
   /**
@@ -292,14 +343,17 @@ export class EventService {
     console.log(`📦 Sipariş oluşturuldu: ${orderId}`);
 
     // 1. Usta'ya bildirim gönder
-    // await notificationService.sendNotification(
-    //   providerId,
-    //   NotificationType.ORDER_CREATED,
-    //   { orderId, category }
-    // );
-
-    // 2. Analytics güncelle
-    // await analyticsService.recordOrder(orderId);
+    if (this.notificationSender) {
+      try {
+        await this.notificationSender.sendNotification(
+          providerId as string,
+          'ORDER_CREATED',
+          { orderId, category },
+        );
+      } catch (error: unknown) {
+        console.error('Sipariş bildirim hatası:', error);
+      }
+    }
   }
 
   /**
@@ -311,14 +365,20 @@ export class EventService {
     console.log(`✅ Sipariş tamamlandı: ${orderId}`);
 
     // 1. Ödemeyi serbest bırak
-    // await this.emit(EventType.PAYMENT_COMPLETED, 'order', { orderId });
+    await this.emit(EventType.PAYMENT_COMPLETED, 'order', { orderId, customerId, providerId });
 
     // 2. Değerlendirme isteği gönder
-    // await notificationService.sendNotification(
-    //   customerId,
-    //   NotificationType.REVIEW_REQUESTED,
-    //   { orderId, providerId }
-    // );
+    if (this.notificationSender) {
+      try {
+        await this.notificationSender.sendNotification(
+          customerId as string,
+          'REVIEW_REQUESTED',
+          { orderId, providerId },
+        );
+      } catch (error: unknown) {
+        console.error('Değerlendirme bildirim hatası:', error);
+      }
+    }
   }
 
   /**
@@ -329,15 +389,18 @@ export class EventService {
 
     console.log(`🏦 Para çekme tamamlandı: ${userId} - ${amount}₺`);
 
-    // 1. Muhasebe kaydı oluştur
-    // await accountingService.createRecord({...});
-
-    // 2. Kullanıcıya bildirim gönder
-    // await notificationService.sendNotification(
-    //   userId,
-    //   NotificationType.WITHDRAWAL_COMPLETED,
-    //   { amount, bankAccountId }
-    // );
+    // Kullanıcıya bildirim gönder
+    if (this.notificationSender) {
+      try {
+        await this.notificationSender.sendNotification(
+          userId as string,
+          'WITHDRAWAL_COMPLETED',
+          { amount, bankAccountId },
+        );
+      } catch (error: unknown) {
+        console.error('Para çekme bildirim hatası:', error);
+      }
+    }
   }
 
   /**
@@ -348,15 +411,18 @@ export class EventService {
 
     console.log(`👤 Yeni kullanıcı kaydoldu: ${userId} (${userType})`);
 
-    // 1. Hoşgeldin e-postası gönder
-    // await notificationService.sendNotification(
-    //   userId,
-    //   NotificationType.WELCOME,
-    //   { email, userType }
-    // );
-
-    // 2. Analytics güncelle
-    // await analyticsService.recordNewUser(userId, userType);
+    // Hoşgeldin bildirimi gönder
+    if (this.notificationSender) {
+      try {
+        await this.notificationSender.sendNotification(
+          userId as string,
+          'WELCOME',
+          { email, userType },
+        );
+      } catch (error: unknown) {
+        console.error('Hoşgeldin bildirim hatası:', error);
+      }
+    }
   }
 
   /**
@@ -367,15 +433,18 @@ export class EventService {
 
     console.log(`🤖 AI komutu çalıştırıldı: ${commandId}`);
 
-    // 1. Sonucu log'la
-    // await loggingService.log({...});
-
-    // 2. Kullanıcıya bildirim gönder
-    // await notificationService.sendNotification(
-    //   userId,
-    //   NotificationType.AI_COMMAND_COMPLETED,
-    //   { commandId, action }
-    // );
+    // Kullanıcıya bildirim gönder
+    if (this.notificationSender) {
+      try {
+        await this.notificationSender.sendNotification(
+          userId as string,
+          'AI_COMMAND_COMPLETED',
+          { commandId, action },
+        );
+      } catch (error: unknown) {
+        console.error('AI komut bildirim hatası:', error);
+      }
+    }
   }
 
   /**

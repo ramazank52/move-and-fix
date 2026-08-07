@@ -16,6 +16,12 @@
  * - Test edilebilir (Bağımsız modüller)
  */
 
+import {
+  ConflictError,
+  ExternalServiceError,
+  NotFoundError,
+} from '../_core/errors';
+
 export enum AIProvider {
   OPENAI = 'openai',
   GEMINI = 'gemini',
@@ -37,7 +43,7 @@ export interface AICommand {
   id: string;
   type: AICommandType;
   input: string;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   requiredPermissions: string[];
 }
 
@@ -47,7 +53,7 @@ export interface AIResponse {
   output: string;
   actions: AIAction[];
   confidence: number; // 0-1
-  preview?: Record<string, any>;
+  preview?: Record<string, unknown>;
   requiresApproval: boolean;
   executedAt?: Date;
 }
@@ -56,14 +62,14 @@ export interface AIAction {
   type: string;
   target: string;
   operation: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export interface AIMemory {
   conversationId: string;
   userId: string;
   messages: AIMessage[];
-  context: Record<string, any>;
+  context: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -74,6 +80,11 @@ export interface AIMessage {
   timestamp: Date;
 }
 
+export interface AIProviderMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
 export interface AIProviderConfig {
   name: AIProvider;
   apiKey?: string;
@@ -82,6 +93,12 @@ export interface AIProviderConfig {
   temperature?: number;
   maxTokens?: number;
   enabled: boolean;
+}
+
+export interface AIExecutionResult {
+  success: true;
+  message: string;
+  result: Record<string, unknown>;
 }
 
 export class AIService {
@@ -286,7 +303,9 @@ export class AIService {
     const enabledProviders = Array.from(this.providers.values()).filter(p => p.enabled);
 
     if (enabledProviders.length === 0) {
-      throw new Error('Etkin AI Provider bulunamadı');
+      throw new ExternalServiceError('AI', 'Etkin AI Provider bulunamadı', {
+        retryable: false,
+      });
     }
 
     // Tercih sırası: OpenAI > Gemini > Local
@@ -302,7 +321,7 @@ export class AIService {
    */
   private async callAIProvider(
     provider: AIProviderConfig,
-    messages: any[]
+    messages: AIProviderMessage[]
   ): Promise<string> {
     // Mock implementasyon
     console.log(`🤖 AI Provider: ${provider.name}`);
@@ -439,11 +458,11 @@ export class AIService {
   async setProvider(provider: AIProvider): Promise<void> {
     const config = this.providers.get(provider);
     if (!config) {
-      throw new Error(`Provider bulunamadı: ${provider}`);
+      throw new NotFoundError('AI Provider', { provider });
     }
 
     if (!config.enabled) {
-      throw new Error(`Provider etkin değil: ${provider}`);
+      throw new ConflictError(`Provider etkin değil: ${provider}`, { provider });
     }
 
     console.log(`🔄 AI Provider değiştirildi: ${provider}`);
@@ -452,7 +471,7 @@ export class AIService {
   /**
    * AI Komutunu onayla ve çalıştır
    */
-  async approveAndExecute(responseId: string): Promise<any> {
+  async approveAndExecute(responseId: string): Promise<AIExecutionResult> {
     // Mock implementasyon
     return {
       success: true,

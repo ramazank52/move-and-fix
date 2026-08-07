@@ -1,3 +1,5 @@
+import { clearInterval, setInterval } from 'node:timers';
+
 /**
  * Notification Retry Mechanism
  * 
@@ -17,7 +19,7 @@ export interface RetryableNotification {
   id: string;
   type: 'push' | 'sms' | 'email' | 'in-app';
   userId: string;
-  data: any;
+  data: unknown;
   retryCount: number;
   lastRetryAt?: Date;
   nextRetryAt?: Date;
@@ -251,13 +253,26 @@ export function retryable(
   maxRetries: number = 5
 ) {
   return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
+    _target: object,
+    _propertyKey: string | symbol,
+    descriptor: TypedPropertyDescriptor<(
+      this: unknown,
+      ...args: unknown[]
+    ) => unknown>
+  ): TypedPropertyDescriptor<(
+    this: unknown,
+    ...args: unknown[]
+  ) => unknown> {
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function (...args: any[]) {
+    if (!originalMethod) {
+      throw new TypeError('The retryable decorator can only be applied to methods');
+    }
+
+    descriptor.value = async function (
+      this: unknown,
+      ...args: unknown[]
+    ): Promise<unknown> {
       let lastError: Error | null = null;
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -267,7 +282,7 @@ export function retryable(
           lastError = error instanceof Error ? error : new Error(String(error));
 
           if (attempt < maxRetries) {
-            const delay = retryService['calculateNextRetryDelay'](attempt);
+            const delay = retryService.calculateNextRetryDelay(attempt);
             console.warn(
               `[RETRY] Attempt ${attempt + 1}/${maxRetries + 1} failed, retrying in ${delay}ms`,
               lastError.message
@@ -277,7 +292,7 @@ export function retryable(
         }
       }
 
-      throw lastError;
+      throw lastError ?? new Error('Retryable method failed without an error');
     };
 
     return descriptor;
@@ -289,7 +304,7 @@ export function retryable(
  */
 export class BatchRetryProcessor {
   private retryService: NotificationRetryService;
-  private processingInterval: any = null;
+  private processingInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(retryService: NotificationRetryService) {
     this.retryService = retryService;
@@ -330,7 +345,7 @@ export class BatchRetryProcessor {
    */
   stop(): void {
     if (this.processingInterval) {
-      clearInterval(this.processingInterval as any);
+      clearInterval(this.processingInterval);
       this.processingInterval = null;
       console.log('[RETRY] Batch retry processor stopped');
     }

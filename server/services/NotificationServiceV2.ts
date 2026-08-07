@@ -16,6 +16,14 @@
  * - Tracking
  */
 
+import {
+  AppError,
+  ExternalServiceError,
+  getErrorMessage,
+} from '../_core/errors';
+import type { IEventPublisher } from './interfaces';
+import { EventType } from './EventService';
+
 export enum NotificationChannel {
   PUSH = 'push',
   SMS = 'sms',
@@ -61,7 +69,7 @@ export interface Notification {
   channels: NotificationChannel[];
   title: string;
   body: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   status: 'pending' | 'sent' | 'failed' | 'delivered';
   createdAt: Date;
   sentAt?: Date;
@@ -95,14 +103,34 @@ export interface NotificationTemplate {
   variables: string[]; // {{variable}} formatında
 }
 
+function asNotificationError(error: unknown, context: Record<string, unknown>): AppError {
+  if (error instanceof AppError) {
+    return error;
+  }
+
+  return new ExternalServiceError(
+    'NotificationService',
+    getErrorMessage(error, 'Bildirim işlemi başarısız oldu'),
+    { retryable: true, context, cause: error },
+  );
+}
+
 export class NotificationServiceV2 {
   private templates: Map<string, NotificationTemplate> = new Map();
   private notificationQueue: Notification[] = [];
   private userPreferences: Map<string, UserNotificationPreferences> = new Map();
+  private eventPublisher: IEventPublisher | null = null;
 
   constructor() {
     this.initializeTemplates();
     this.startNotificationProcessor();
+  }
+
+  /**
+   * Event publisher bağımlılığını enjekte et (döngüsel import'u önler)
+   */
+  setEventPublisher(publisher: IEventPublisher): void {
+    this.eventPublisher = publisher;
   }
 
   /**
@@ -163,7 +191,7 @@ export class NotificationServiceV2 {
   async sendNotification(
     userId: string,
     type: NotificationType,
-    data: Record<string, any>,
+    data: Record<string, unknown>,
     overrideChannels?: NotificationChannel[]
   ): Promise<Notification> {
     try {
@@ -200,8 +228,8 @@ export class NotificationServiceV2 {
         userId,
         type,
         channels,
-        title: data.title || 'Move&Fix Bildirimi',
-        body: data.body || '',
+        title: typeof data.title === 'string' ? data.title : 'Move&Fix Bildirimi',
+        body: typeof data.body === 'string' ? data.body : '',
         data,
         status: 'pending',
         createdAt: new Date(),
@@ -217,9 +245,10 @@ export class NotificationServiceV2 {
       console.log(`📬 Bildirim kuyruğa eklendi: ${userId} - ${type}`);
 
       return notification;
-    } catch (error) {
-      console.error('Bildirim gönderme hatası:', error);
-      throw error;
+    } catch (error: unknown) {
+      const notificationError = asNotificationError(error, { userId, type });
+      console.error('Bildirim gönderme hatası:', notificationError);
+      throw notificationError;
     }
   }
 
@@ -258,15 +287,19 @@ export class NotificationServiceV2 {
               await this.sendInAppNotification(notification);
               break;
           }
-        } catch (error) {
-          console.error(`Bildirim gönderme hatası (${channel}):`, error);
+        } catch (error: unknown) {
+          const channelError = asNotificationError(error, {
+            notificationId: notification.id,
+            channel,
+          });
+          console.error(`Bildirim gönderme hatası (${channel}):`, channelError);
           notification.retryCount++;
 
           if (notification.retryCount < 3) {
             this.notificationQueue.push(notification);
           } else {
             notification.status = 'failed';
-            notification.failureReason = `Kanal: ${channel} - Max retry exceeded`;
+            notification.failureReason = `Kanal: ${channel} - ${channelError.message}`;
           }
         }
       }
@@ -275,10 +308,47 @@ export class NotificationServiceV2 {
         notification.status = 'sent';
         notification.sentAt = new Date();
       }
-    } catch (error) {
-      console.error('Bildirim işleme hatası:', error);
+
+      // Event yayınlama (döngüsel import yok — enjekte edilen adapter üzerinden)
+      if (this.eventPublisher) {
+        try {
+          await this.eventPublisher.emit(
+            EventType.NOTIFICATION_SENT,
+            'NotificationServiceV2',
+            {
+              notificationId: notification.id,
+              userId: notification.userId,
+              status: notification.status,
+            },
+          );
+        } catch {
+          // Event yayınlama hatası bildirim akışını bozmamalı
+        }
+      }
+    } catch (error: unknown) {
+      const notificationError = asNotificationError(error, {
+        notificationId: notification.id,
+      });
+      console.error('Bildirim işleme hatası:', notificationError);
       notification.status = 'failed';
-      notification.failureReason = String(error);
+      notification.failureReason = notificationError.message;
+
+      // Event yayınlama (failure)
+      if (this.eventPublisher) {
+        try {
+          await this.eventPublisher.emit(
+            EventType.NOTIFICATION_FAILED,
+            'NotificationServiceV2',
+            {
+              notificationId: notification.id,
+              userId: notification.userId,
+              reason: notification.failureReason,
+            },
+          );
+        } catch {
+          // Sessizce yut — bildirim akışını bozma
+        }
+      }
     }
   }
 

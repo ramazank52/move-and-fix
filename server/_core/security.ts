@@ -13,20 +13,54 @@
  */
 
 import crypto from 'crypto';
-// import rateLimit from 'express-rate-limit';
-// import helmet from 'helmet';
-// import cors from 'cors';
-// import mongoSanitize from 'express-mongo-sanitize';
+import type { Request, Response, NextFunction } from 'express';
+
+/**
+ * In-Memory Rate Limiter
+ *
+ * Sliding window rate limiter — production'da Redis ile değiştirilebilir.
+ * Her IP için istek sayısını zaman penceresinde takip eder.
+ */
+class RateLimiter {
+  private hits: Map<string, number[]> = new Map();
+  private windowMs: number;
+  private maxHits: number;
+
+  constructor(windowMs: number, maxHits: number) {
+    this.windowMs = windowMs;
+    this.maxHits = maxHits;
+  }
+
+  middleware(req: Request, res: Response, next: NextFunction): void {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const windowStart = now - this.windowMs;
+
+    const hits = this.hits.get(ip) || [];
+    const recentHits = hits.filter((t) => t > windowStart);
+
+    if (recentHits.length >= this.maxHits) {
+      res.status(429).json({
+        error: 'Too many requests',
+        retryAfter: Math.ceil(this.windowMs / 1000),
+      });
+      return;
+    }
+
+    recentHits.push(now);
+    this.hits.set(ip, recentHits);
+    next();
+  }
+}
 
 /**
  * Rate Limiting Middleware'leri
  */
-// Rate limiters will be configured with express-rate-limit package
 export const rateLimiters = {
-  general: (req: any, res: any, next: any) => next(),
-  login: (req: any, res: any, next: any) => next(),
-  payment: (req: any, res: any, next: any) => next(),
-  apiKey: (req: any, res: any, next: any) => next(),
+  general: new RateLimiter(60_000, 100).middleware.bind(new RateLimiter(60_000, 100)),
+  login: new RateLimiter(15 * 60_000, 10).middleware.bind(new RateLimiter(15 * 60_000, 10)),
+  payment: new RateLimiter(60_000, 20).middleware.bind(new RateLimiter(60_000, 20)),
+  apiKey: new RateLimiter(60_000, 30).middleware.bind(new RateLimiter(60_000, 30)),
 };
 
 /**
@@ -243,9 +277,9 @@ export class CSRFProtection {
 /**
  * Request ID Middleware
  */
-export const requestIdMiddleware = (req: any, res: any, next: any) => {
-  const requestId = req.headers['x-request-id'] || crypto.randomUUID();
-  req.id = requestId;
+export const requestIdMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+  (req as unknown as Record<string, unknown>).id = requestId;
   res.setHeader('X-Request-ID', requestId);
   next();
 };

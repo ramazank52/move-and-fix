@@ -27,15 +27,15 @@ export const swaggerSpec = {
   },
   servers: [
     {
-      url: 'https://api.movefix.com/v1',
+      url: 'https://api.movefix.com',
       description: 'Production server',
     },
     {
-      url: 'https://staging-api.movefix.com/v1',
+      url: 'https://staging-api.movefix.com',
       description: 'Staging server',
     },
     {
-      url: 'http://localhost:3000/v1',
+      url: 'http://localhost:3000',
       description: 'Development server',
     },
   ],
@@ -74,322 +74,152 @@ export const swaggerSpec = {
     },
   ],
   paths: {
-    '/auth/login': {
-      post: {
-        tags: ['Authentication'],
-        summary: 'User login',
-        description: 'Authenticate user with email and password',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['email', 'password'],
-                properties: {
-                  email: {
-                    type: 'string',
-                    format: 'email',
-                    example: 'user@example.com',
-                  },
-                  password: {
-                    type: 'string',
-                    format: 'password',
-                    example: 'SecurePass123!',
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: 'Login successful',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    token: {
-                      type: 'string',
-                      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-                    },
-                    user: {
-                      $ref: '#/components/schemas/User',
-                    },
-                  },
-                },
-              },
-            },
-          },
-          401: {
-            description: 'Invalid credentials',
-            content: {
-              'application/json': {
-                schema: {
-                  $ref: '#/components/schemas/Error',
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-    '/auth/register': {
-      post: {
-        tags: ['Authentication'],
-        summary: 'User registration',
-        description: 'Create a new user account',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['email', 'password', 'name', 'phone'],
-                properties: {
-                  email: {
-                    type: 'string',
-                    format: 'email',
-                  },
-                  password: {
-                    type: 'string',
-                    format: 'password',
-                  },
-                  name: {
-                    type: 'string',
-                  },
-                  phone: {
-                    type: 'string',
-                  },
-                  userType: {
-                    type: 'string',
-                    enum: ['customer', 'provider'],
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          201: {
-            description: 'User registered successfully',
-            content: {
-              'application/json': {
-                schema: {
-                  $ref: '#/components/schemas/User',
-                },
-              },
-            },
-          },
-          400: {
-            description: 'Validation error',
-          },
-          409: {
-            description: 'User already exists',
-          },
-        },
-      },
-    },
-    '/orders': {
+    '/api/oauth/callback': {
       get: {
-        tags: ['Orders'],
-        summary: 'List orders',
-        description: 'Get list of orders for current user',
-        security: [{ bearerAuth: [] }],
+        tags: ['Authentication'],
+        summary: 'OAuth callback',
+        description: 'OAuth2 authorization code callback — exchanges code for session token and redirects to frontend',
         parameters: [
-          {
-            name: 'status',
-            in: 'query',
-            schema: {
-              type: 'string',
-              enum: ['pending', 'accepted', 'completed', 'cancelled'],
-            },
-          },
-          {
-            name: 'limit',
-            in: 'query',
-            schema: {
-              type: 'integer',
-              default: 20,
-            },
-          },
-          {
-            name: 'offset',
-            in: 'query',
-            schema: {
-              type: 'integer',
-              default: 0,
-            },
-          },
+          { name: 'code', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'state', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          302: { description: 'Redirect to frontend with session cookie' },
+          400: { description: 'Missing code or state' },
+          500: { description: 'OAuth callback failed' },
+        },
+      },
+    },
+    '/api/oauth/mobile': {
+      get: {
+        tags: ['Authentication'],
+        summary: 'OAuth mobile exchange',
+        description: 'Exchange OAuth code for session token (mobile flow — returns JSON instead of redirect)',
+        parameters: [
+          { name: 'code', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'state', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: {
           200: {
-            description: 'List of orders',
+            description: 'Session token and user info',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    data: {
-                      type: 'array',
-                      items: {
-                        $ref: '#/components/schemas/Order',
-                      },
-                    },
-                    total: {
-                      type: 'integer',
-                    },
-                    limit: {
-                      type: 'integer',
-                    },
-                    offset: {
-                      type: 'integer',
-                    },
+                    app_session_id: { type: 'string' },
+                    user: { $ref: '#/components/schemas/User' },
                   },
                 },
               },
             },
           },
-          401: {
-            description: 'Unauthorized',
-          },
-        },
-      },
-      post: {
-        tags: ['Orders'],
-        summary: 'Create order',
-        description: 'Create a new service order',
-        security: [{ bearerAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['category', 'description', 'budget'],
-                properties: {
-                  category: {
-                    type: 'string',
-                    example: 'temizlik',
-                  },
-                  description: {
-                    type: 'string',
-                  },
-                  budget: {
-                    type: 'number',
-                    example: 1000,
-                  },
-                  location: {
-                    type: 'object',
-                    properties: {
-                      latitude: {
-                        type: 'number',
-                      },
-                      longitude: {
-                        type: 'number',
-                      },
-                      address: {
-                        type: 'string',
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          201: {
-            description: 'Order created',
-            content: {
-              'application/json': {
-                schema: {
-                  $ref: '#/components/schemas/Order',
-                },
-              },
-            },
-          },
-          400: {
-            description: 'Validation error',
-          },
+          400: { description: 'Missing code or state' },
+          500: { description: 'OAuth mobile exchange failed' },
         },
       },
     },
-    '/payments': {
-      post: {
-        tags: ['Payments'],
-        summary: 'Create payment',
-        description: 'Process a payment for an order',
-        security: [{ bearerAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['orderId', 'amount', 'paymentMethod'],
-                properties: {
-                  orderId: {
-                    type: 'string',
-                  },
-                  amount: {
-                    type: 'number',
-                  },
-                  paymentMethod: {
-                    type: 'string',
-                    enum: ['card', 'wallet', 'bank_transfer'],
-                  },
-                  cardToken: {
-                    type: 'string',
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: 'Payment processed',
-            content: {
-              'application/json': {
-                schema: {
-                  $ref: '#/components/schemas/Payment',
-                },
-              },
-            },
-          },
-          402: {
-            description: 'Payment failed',
-          },
-        },
-      },
-    },
-    '/wallet/balance': {
+    '/api/auth/me': {
       get: {
-        tags: ['Wallet'],
-        summary: 'Get wallet balance',
-        description: 'Get current wallet balance',
-        security: [{ bearerAuth: [] }],
+        tags: ['Authentication'],
+        summary: 'Get current user',
+        description: 'Returns the authenticated user (works with both cookie and Bearer token)',
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         responses: {
           200: {
-            description: 'Wallet balance',
+            description: 'Current user',
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
-                    balance: {
-                      type: 'number',
-                    },
-                    currency: {
-                      type: 'string',
-                      example: 'TRY',
-                    },
-                    lastUpdated: {
-                      type: 'string',
-                      format: 'date-time',
-                    },
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Not authenticated' },
+        },
+      },
+    },
+    '/api/auth/logout': {
+      post: {
+        tags: ['Authentication'],
+        summary: 'Logout',
+        description: 'Clear session cookie',
+        responses: {
+          200: {
+            description: 'Logout successful',
+            content: {
+              'application/json': {
+                schema: { type: 'object', properties: { success: { type: 'boolean' } } },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/auth/session': {
+      post: {
+        tags: ['Authentication'],
+        summary: 'Establish session from Bearer token',
+        description: 'Exchange Bearer token for session cookie (used by iframe preview)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Session established',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Bearer token required' },
+          401: { description: 'Invalid token' },
+        },
+      },
+    },
+    '/api/csrf-token': {
+      get: {
+        tags: ['Authentication'],
+        summary: 'Get CSRF token',
+        description: 'Generate a CSRF token for cookie-based state-changing requests',
+        security: [{ cookieAuth: [] }],
+        responses: {
+          200: {
+            description: 'CSRF token',
+            content: {
+              'application/json': {
+                schema: { type: 'object', properties: { token: { type: 'string' } } },
+              },
+            },
+          },
+          401: { description: 'Not authenticated' },
+        },
+      },
+    },
+    '/api/health': {
+      get: {
+        tags: ['System'],
+        summary: 'Health check',
+        description: 'Simple health check endpoint',
+        responses: {
+          200: {
+            description: 'Server is healthy',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    ok: { type: 'boolean' },
+                    timestamp: { type: 'number' },
                   },
                 },
               },
@@ -398,97 +228,243 @@ export const swaggerSpec = {
         },
       },
     },
-    '/wallet/withdraw': {
+    '/api/health/detailed': {
+      get: {
+        tags: ['System'],
+        summary: 'Detailed health check',
+        description: 'Detailed system health including database, services, and dependencies',
+        responses: {
+          200: {
+            description: 'Detailed health status',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/HealthStatus' },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/trpc/{procedure}': {
       post: {
-        tags: ['Wallet'],
-        summary: 'Withdraw funds',
-        description: 'Withdraw funds from wallet to bank account',
-        security: [{ bearerAuth: [] }],
+        tags: ['tRPC'],
+        summary: 'tRPC procedure call',
+        description: 'Call a tRPC procedure. Procedures: system.*, owner.*, auth.*, requests.*, offers.*, messages.*, providers.*',
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: 'procedure', in: 'path', required: true, schema: { type: 'string' }, example: 'requests.create' },
+        ],
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['amount', 'bankAccount'],
-                properties: {
-                  amount: {
-                    type: 'number',
-                  },
-                  bankAccount: {
-                    type: 'string',
-                  },
-                },
+                description: 'tRPC procedure input (varies by procedure)',
               },
             },
           },
         },
         responses: {
+          200: { description: 'Procedure result' },
+          400: { description: 'Bad request' },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Forbidden (CSRF or insufficient permissions)' },
+          429: { description: 'Rate limited' },
+        },
+      },
+    },
+    '/api-docs': {
+      get: {
+        tags: ['Documentation'],
+        summary: 'OpenAPI spec',
+        description: 'Returns the OpenAPI 3.0 specification as JSON',
+        responses: {
           200: {
-            description: 'Withdrawal processed',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    withdrawalId: {
-                      type: 'string',
-                    },
-                    status: {
-                      type: 'string',
-                      enum: ['pending', 'completed', 'failed'],
-                    },
-                  },
-                },
-              },
-            },
+            description: 'OpenAPI spec',
+            content: { 'application/json': { schema: { type: 'object' } } },
           },
         },
       },
     },
-    '/notifications/preferences': {
+    '/api-docs/ui': {
       get: {
-        tags: ['Notifications'],
-        summary: 'Get notification preferences',
-        security: [{ bearerAuth: [] }],
+        tags: ['Documentation'],
+        summary: 'API documentation UI',
+        description: 'Interactive API documentation (ReDoc)',
         responses: {
-          200: {
-            description: 'Notification preferences',
-            content: {
-              'application/json': {
-                schema: {
-                  $ref: '#/components/schemas/NotificationPreferences',
-                },
-              },
-            },
-          },
+          200: { description: 'HTML documentation page' },
         },
       },
-      put: {
-        tags: ['Notifications'],
-        summary: 'Update notification preferences',
-        security: [{ bearerAuth: [] }],
+    },
+    // REST endpoints below are documented for reference but the actual API surface is tRPC-based.
+    // These paths are kept for OpenAPI consumer compatibility.
+    '/api/trpc/requests.create': {
+      post: {
+        tags: ['Service Requests'],
+        summary: 'Create service request',
+        description: 'Create a new service request (tRPC: requests.create)',
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
-                $ref: '#/components/schemas/NotificationPreferences',
+                type: 'object',
+                required: ['categoryId', 'title'],
+                properties: {
+                  categoryId: { type: 'integer' },
+                  title: { type: 'string', maxLength: 255 },
+                  description: { type: 'string' },
+                  address: { type: 'string' },
+                  latitude: { type: 'string' },
+                  longitude: { type: 'string' },
+                  budgetMin: { type: 'number' },
+                  budgetMax: { type: 'number' },
+                  distanceKm: { type: 'number' },
+                  estimatedPrice: { type: 'number' },
+                },
               },
             },
           },
         },
         responses: {
-          200: {
-            description: 'Preferences updated',
-          },
+          200: { description: 'Service request created' },
+          400: { description: 'Validation error' },
+          401: { description: 'Unauthorized' },
         },
       },
     },
+    '/api/trpc/offers.create': {
+      post: {
+        tags: ['Offers'],
+        summary: 'Create offer',
+        description: 'Create a new offer for a service request (tRPC: offers.create)',
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['requestId', 'providerId', 'price'],
+                properties: {
+                  requestId: { type: 'integer' },
+                  providerId: { type: 'integer' },
+                  price: { type: 'number' },
+                  message: { type: 'string' },
+                  estimatedTime: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Offer created' },
+          400: { description: 'Validation error' },
+          401: { description: 'Unauthorized' },
+        },
+      },
+    },
+    '/api/trpc/messages.send': {
+      post: {
+        tags: ['Messages'],
+        summary: 'Send message',
+        description: 'Send a message to another user (tRPC: messages.send)',
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['receiverId', 'content'],
+                properties: {
+                  receiverId: { type: 'integer' },
+                  content: { type: 'string', minLength: 1 },
+                  requestId: { type: 'integer' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Message sent' },
+          400: { description: 'Validation error' },
+          401: { description: 'Unauthorized' },
+        },
+      },
+    },
+    '/api/trpc/providers.nearby': {
+      post: {
+        tags: ['Providers'],
+        summary: 'Get nearby providers',
+        description: 'Get nearby service providers by location (tRPC: providers.nearby)',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['lat', 'lng'],
+                properties: {
+                  lat: { type: 'string' },
+                  lng: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'List of nearby providers' },
+        },
+      },
+    },
+    '/api/trpc/owner.aiCommand': {
+      post: {
+        tags: ['Admin'],
+        summary: 'AI command (Owner only)',
+        description: 'Execute an AI command from the admin panel (tRPC: owner.aiCommand)',
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['command'],
+                properties: {
+                  command: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'AI command result' },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Forbidden (owner only)' },
+        },
+      },
+    },
+    '/api/trpc/owner.withdrawFunds': {
+      post: {
+        tags: ['Admin'],
+        summary: 'Withdraw funds (Owner only)',
+        description: 'Withdraw platform funds (tRPC: owner.withdrawFunds)',
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          200: { description: 'Withdrawal processed' },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Forbidden (owner only)' },
+        },
+      },
+    },
+    // Legacy REST paths kept for reference
     '/analytics/dashboard': {
       get: {
         tags: ['Analytics'],
-        summary: 'Get analytics dashboard',
+        summary: 'Get analytics dashboard (legacy)',
         description: 'Get system analytics and monitoring data (Admin only)',
         security: [{ bearerAuth: [] }],
         responses: {
@@ -663,13 +639,36 @@ export const swaggerSpec = {
           },
         },
       },
+      HealthStatus: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['healthy', 'degraded', 'unhealthy'],
+          },
+          timestamp: {
+            type: 'string',
+            format: 'date-time',
+          },
+          checks: {
+            type: 'object',
+            additionalProperties: true,
+          },
+        },
+      },
     },
     securitySchemes: {
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        description: 'JWT token obtained from /auth/login',
+        description: 'Bearer token (mobile auth) — obtained from /api/oauth/mobile',
+      },
+      cookieAuth: {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'app_session',
+        description: 'Session cookie (web auth) — obtained from /api/oauth/callback or /api/auth/session',
       },
     },
   },
@@ -678,14 +677,14 @@ export const swaggerSpec = {
 /**
  * API Documentation Routes
  */
-export const setupSwaggerDocs = (app: any) => {
+export const setupSwaggerDocs = (app: import('express').Express) => {
   // Swagger UI endpoint
-  app.get('/api-docs', (req: any, res: any) => {
+  app.get('/api-docs', (_req, res) => {
     res.json(swaggerSpec);
   });
 
   // Swagger UI HTML
-  app.get('/api-docs/ui', (req: any, res: any) => {
+  app.get('/api-docs/ui', (_req, res) => {
     res.send(`
       <!DOCTYPE html>
       <html>

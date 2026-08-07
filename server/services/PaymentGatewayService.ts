@@ -15,6 +15,14 @@
  * - Muhasebe kayıtları
  */
 
+import {
+  AppError,
+  NotFoundError,
+  PaymentError,
+  ValidationError,
+  getErrorMessage,
+} from '../_core/errors';
+
 export enum PaymentProvider {
   IYZICO = 'iyzico',
   STRIPE = 'stripe',
@@ -51,7 +59,7 @@ export interface PaymentTransaction {
   commission: number;
   providerPayout: number;
   companyEarnings: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,9 +90,44 @@ export interface WithdrawalRequest {
   completedAt?: Date;
 }
 
+export interface RefundResult {
+  success: true;
+  refundId: string;
+  amount: number;
+  reason: string;
+}
+
+export interface ChargebackResult {
+  success: true;
+  chargebackId: string;
+  amount: number;
+  status: 'investigating';
+}
+
+export interface AccountingEntry {
+  id: string;
+  transactionId: string;
+  type: 'income' | 'expense' | 'commission';
+  amount: number;
+  description: string;
+  createdAt: Date;
+}
+
+function asPaymentOperationError(error: unknown, operation: string): AppError {
+  if (error instanceof AppError) {
+    return error;
+  }
+
+  return new PaymentError(getErrorMessage(error, `${operation} başarısız oldu`), {
+    retryable: true,
+    context: { operation },
+    cause: error,
+  });
+}
+
 export class PaymentGatewayService {
-  private iyzico: any; // iyzico SDK
-  private stripe: any; // Stripe SDK
+  private iyzico?: unknown; // iyzico SDK adapter'ı
+  private stripe?: unknown; // Stripe SDK adapter'ı
 
   constructor() {
     this.initializeProviders();
@@ -129,7 +172,7 @@ export class PaymentGatewayService {
       // Kart bilgilerini getir
       const card = await this.getCard(cardId);
       if (!card) {
-        throw new Error('Kart bulunamadı');
+        throw new NotFoundError('Kart', { cardId });
       }
 
       // Komisyon hesapla
@@ -155,7 +198,7 @@ export class PaymentGatewayService {
           orderId
         );
       } else {
-        throw new Error('Bilinmeyen ödeme sağlayıcısı');
+        throw new ValidationError('Bilinmeyen ödeme sağlayıcısı', { provider });
       }
 
       // Transaction kaydını oluştur
@@ -185,9 +228,10 @@ export class PaymentGatewayService {
       // await db.savePaymentTransaction(transaction);
 
       return transaction;
-    } catch (error) {
-      console.error('Ödeme işlemi başarısız:', error);
-      throw error;
+    } catch (error: unknown) {
+      const paymentError = asPaymentOperationError(error, 'Ödeme işlemi');
+      console.error('Ödeme işlemi başarısız:', paymentError);
+      throw paymentError;
     }
   }
 
@@ -261,12 +305,18 @@ export class PaymentGatewayService {
       // Bakiye kontrol et
       const balance = await this.getUserBalance(userId);
       if (balance < amount) {
-        throw new Error('Yetersiz bakiye');
+        throw new PaymentError('Yetersiz bakiye', {
+          context: { userId, requestedAmount: amount },
+        });
       }
 
       // Minimum çekme tutarı kontrol et
       if (amount < 100) {
-        throw new Error('Minimum çekme tutarı 100₺ dir');
+        throw new ValidationError('Minimum çekme tutarı 100₺ dir', {
+          field: 'amount',
+          value: amount,
+          minimum: 100,
+        });
       }
 
       // Para çekme işlemini başlat
@@ -285,7 +335,7 @@ export class PaymentGatewayService {
           bankAccountId
         );
       } else {
-        throw new Error('Bilinmeyen ödeme sağlayıcısı');
+        throw new ValidationError('Bilinmeyen ödeme sağlayıcısı', { provider });
       }
 
       const withdrawal: WithdrawalRequest = {
@@ -303,9 +353,10 @@ export class PaymentGatewayService {
       // await db.saveWithdrawalRequest(withdrawal);
 
       return withdrawal;
-    } catch (error) {
-      console.error('Para çekme isteği başarısız:', error);
-      throw error;
+    } catch (error: unknown) {
+      const paymentError = asPaymentOperationError(error, 'Para çekme isteği');
+      console.error('Para çekme isteği başarısız:', paymentError);
+      throw paymentError;
     }
   }
 
@@ -336,11 +387,11 @@ export class PaymentGatewayService {
   /**
    * İade işlemi
    */
-  async refundPayment(transactionId: string, reason: string): Promise<any> {
+  async refundPayment(transactionId: string, reason: string): Promise<RefundResult> {
     try {
       const transaction = await this.getTransaction(transactionId);
       if (!transaction) {
-        throw new Error('İşlem bulunamadı');
+        throw new NotFoundError('İşlem', { transactionId });
       }
 
       if (transaction.provider === PaymentProvider.IYZICO) {
@@ -357,20 +408,24 @@ export class PaymentGatewayService {
         amount: transaction.amount,
         reason,
       };
-    } catch (error) {
-      console.error('İade işlemi başarısız:', error);
-      throw error;
+    } catch (error: unknown) {
+      const paymentError = asPaymentOperationError(error, 'İade işlemi');
+      console.error('İade işlemi başarısız:', paymentError);
+      throw paymentError;
     }
   }
 
   /**
    * Chargeback yönetimi
    */
-  async handleChargeback(transactionId: string, chargebackAmount: number): Promise<any> {
+  async handleChargeback(
+    transactionId: string,
+    chargebackAmount: number,
+  ): Promise<ChargebackResult> {
     try {
       const transaction = await this.getTransaction(transactionId);
       if (!transaction) {
-        throw new Error('İşlem bulunamadı');
+        throw new NotFoundError('İşlem', { transactionId });
       }
 
       console.log(`⚠️ Chargeback: ${chargebackAmount}₺ - İşlem #${transactionId}`);
@@ -385,9 +440,10 @@ export class PaymentGatewayService {
         amount: chargebackAmount,
         status: 'investigating',
       };
-    } catch (error) {
-      console.error('Chargeback işlemi başarısız:', error);
-      throw error;
+    } catch (error: unknown) {
+      const paymentError = asPaymentOperationError(error, 'Chargeback işlemi');
+      console.error('Chargeback işlemi başarısız:', paymentError);
+      throw paymentError;
     }
   }
 
@@ -430,7 +486,7 @@ export class PaymentGatewayService {
           cvv
         );
       } else {
-        throw new Error('Bilinmeyen ödeme sağlayıcısı');
+        throw new ValidationError('Bilinmeyen ödeme sağlayıcısı', { provider });
       }
 
       const card: PaymentCard = {
@@ -451,9 +507,10 @@ export class PaymentGatewayService {
       // await db.saveCard(card);
 
       return card;
-    } catch (error) {
-      console.error('Kart ekleme başarısız:', error);
-      throw error;
+    } catch (error: unknown) {
+      const paymentError = asPaymentOperationError(error, 'Kart ekleme');
+      console.error('Kart ekleme başarısız:', paymentError);
+      throw paymentError;
     }
   }
 
@@ -547,7 +604,7 @@ export class PaymentGatewayService {
     type: 'income' | 'expense' | 'commission',
     amount: number,
     description: string
-  ): Promise<any> {
+  ): Promise<AccountingEntry> {
     return {
       id: `ACC-${Date.now()}`,
       transactionId,

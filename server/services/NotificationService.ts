@@ -15,6 +15,13 @@
  * - Bildirim kuyruğu
  */
 
+import {
+  ErrorCategory,
+  ErrorSeverity,
+  NotFoundError,
+  normalizeError,
+} from '../_core/errors';
+
 export enum NotificationChannel {
   PUSH = 'push',
   SMS = 'sms',
@@ -59,7 +66,7 @@ export interface NotificationMessage {
   channels: NotificationChannel[];
   title: string;
   body: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   status: 'pending' | 'sent' | 'failed' | 'read';
   sentAt?: Date;
   readAt?: Date;
@@ -130,7 +137,7 @@ export class NotificationService {
   async sendNotification(
     userId: string,
     type: NotificationType,
-    data: Record<string, any>
+    data: Record<string, unknown>
   ): Promise<NotificationMessage> {
     // Kullanıcı tercihlerini getir
     const preferences = await this.getUserPreferences(userId);
@@ -138,7 +145,7 @@ export class NotificationService {
     // Bildirim şablonunu getir
     const template = this.templates.get(type);
     if (!template) {
-      throw new Error(`Bildirim şablonu bulunamadı: ${type}`);
+      throw new NotFoundError('Bildirim şablonu', { type });
     }
 
     // Başlık ve gövdeyi hazırla
@@ -196,8 +203,15 @@ export class NotificationService {
             await this.saveInAppNotification(userId, message);
             break;
         }
-      } catch (error) {
-        console.error(`${channel} gönderimi başarısız:`, error);
+      } catch (error: unknown) {
+        const channelError = normalizeError(error, {
+          code: 'NOTIFICATION_CHANNEL_ERROR',
+          category: ErrorCategory.EXTERNAL_SERVICE,
+          severity: ErrorSeverity.HIGH,
+          retryable: true,
+          context: { userId, type, channel },
+        });
+        console.error(`${channel} gönderimi başarısız:`, channelError);
       }
     }
 
@@ -316,9 +330,10 @@ export class NotificationService {
   /**
    * Şablonu değişkenlerle doldur
    */
-  private interpolateTemplate(template: string, data: Record<string, any>): string {
+  private interpolateTemplate(template: string, data: Record<string, unknown>): string {
     return template.replace(/{{(\w+)}}/g, (match, key) => {
-      return data[key] || match;
+      const value = data[key];
+      return value === undefined || value === null ? match : String(value);
     });
   }
 
@@ -354,7 +369,7 @@ export class NotificationService {
   async sendBulkNotification(
     userIds: string[],
     type: NotificationType,
-    data: Record<string, any>
+    data: Record<string, unknown>
   ): Promise<NotificationMessage[]> {
     const messages: NotificationMessage[] = [];
 
@@ -362,8 +377,15 @@ export class NotificationService {
       try {
         const message = await this.sendNotification(userId, type, data);
         messages.push(message);
-      } catch (error) {
-        console.error(`Kullanıcı ${userId} için bildirim gönderilemedi:`, error);
+      } catch (error: unknown) {
+        const notificationError = normalizeError(error, {
+          code: 'NOTIFICATION_DELIVERY_ERROR',
+          category: ErrorCategory.EXTERNAL_SERVICE,
+          severity: ErrorSeverity.HIGH,
+          retryable: true,
+          context: { userId, type },
+        });
+        console.error(`Kullanıcı ${userId} için bildirim gönderilemedi:`, notificationError);
       }
     }
 
@@ -379,7 +401,7 @@ export class NotificationService {
   ): Promise<NotificationTemplate> {
     const existing = this.templates.get(type);
     if (!existing) {
-      throw new Error(`Şablon bulunamadı: ${type}`);
+      throw new NotFoundError('Bildirim şablonu', { type });
     }
 
     const updated = { ...existing, ...template };

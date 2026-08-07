@@ -12,6 +12,13 @@
  * - Refund işlemleri
  */
 
+import {
+  ConflictError,
+  NotFoundError,
+  PaymentError,
+  ValidationError,
+} from '../_core/errors';
+
 export enum WalletTransactionType {
   DEPOSIT = 'deposit',
   ESCROW_HOLD = 'escrow_hold',
@@ -48,7 +55,7 @@ export interface WalletTransaction {
   description: string;
   relatedOrderId?: string;
   relatedJobId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,17 +89,25 @@ export class WalletService {
   ): Promise<EscrowTransaction> {
     // Validasyon
     if (amount <= 0) {
-      throw new Error('Ödeme tutarı 0 dan büyük olmalıdır');
+      throw new ValidationError('Ödeme tutarı 0 dan büyük olmalıdır', {
+        field: 'amount',
+        value: amount,
+      });
     }
 
     if (commissionRate < 0 || commissionRate > 100) {
-      throw new Error('Komisyon oranı 0-100 arasında olmalıdır');
+      throw new ValidationError('Komisyon oranı 0-100 arasında olmalıdır', {
+        field: 'commissionRate',
+        value: commissionRate,
+      });
     }
 
     // Müşterinin bakiyesini kontrol et
     const customerBalance = await this.getBalance(customerId);
     if (customerBalance.availableBalance < amount) {
-      throw new Error('Yetersiz bakiye');
+      throw new PaymentError('Yetersiz bakiye', {
+        context: { customerId, requestedAmount: amount },
+      });
     }
 
     // Komisyon hesapla
@@ -137,11 +152,14 @@ export class WalletService {
     const escrow = await this.getEscrowTransaction(escrowId);
 
     if (!escrow) {
-      throw new Error('Escrow işlemi bulunamadı');
+      throw new NotFoundError('Escrow işlemi', { escrowId });
     }
 
     if (escrow.status !== 'held') {
-      throw new Error('Escrow zaten işlenmiş');
+      throw new ConflictError('Escrow zaten işlenmiş', {
+        escrowId,
+        status: escrow.status,
+      });
     }
 
     // Ustaya ödeme yap
@@ -180,11 +198,14 @@ export class WalletService {
     const escrow = await this.getEscrowTransaction(escrowId);
 
     if (!escrow) {
-      throw new Error('Escrow işlemi bulunamadı');
+      throw new NotFoundError('Escrow işlemi', { escrowId });
     }
 
     if (escrow.status !== 'held') {
-      throw new Error('Sadece bekleme durumundaki Escrow işlemleri geri alınabilir');
+      throw new ConflictError(
+        'Sadece bekleme durumundaki Escrow işlemleri geri alınabilir',
+        { escrowId, status: escrow.status },
+      );
     }
 
     // Müşteriye geri ödeme yap
@@ -232,7 +253,7 @@ export class WalletService {
     description: string;
     relatedOrderId?: string;
     relatedJobId?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }): Promise<WalletTransaction> {
     const transaction: WalletTransaction = {
       id: `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -266,12 +287,18 @@ export class WalletService {
     const balance = await this.getBalance(userId);
 
     if (balance.availableBalance < amount) {
-      throw new Error('Yetersiz bakiye');
+      throw new PaymentError('Yetersiz bakiye', {
+        context: { userId, requestedAmount: amount },
+      });
     }
 
     // Minimum çekme tutarı kontrol et
     if (amount < 100) {
-      throw new Error('Minimum çekme tutarı 100₺ dir');
+      throw new ValidationError('Minimum çekme tutarı 100₺ dir', {
+        field: 'amount',
+        value: amount,
+        minimum: 100,
+      });
     }
 
     // Para çekme işlemi oluştur
