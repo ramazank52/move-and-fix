@@ -106,3 +106,8 @@
 - [x] Favorilere ekleme ve karşılaştırma (yan yana karşılaştırma)
 - [x] Sesli mesaj gönderme ve alma
 - [x] Hizmet geçmişi raporu (istatistikler)
+
+## Phase 15: Chat Notifications, Provider Filter & Calendar (v1.6)
+- [x] Canlı sohbet bildirimleri
+- [x] Usta filtreleme (puan, fiyat, mesafe)
+- [x] Hizmet takvimi (planlanan ve geçmiş hizmetler)

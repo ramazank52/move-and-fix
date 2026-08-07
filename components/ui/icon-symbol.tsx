@@ -50,6 +50,7 @@ const MAPPING = {
   "sparkles": "auto-awesome",
   "doc.text.fill": "description",
   "checkmark.shield.fill": "verified-user",
+  "line.horizontal.3.decrease.circle.fill": "filter-list",
 } as IconMapping;
 
 /**

@@ -19,6 +19,8 @@ export default function ProfileScreen() {
     { icon: "person.fill" as const, label: "Ustaları Karşılaştır", route: "/compare-providers" },
     { icon: "message.fill" as const, label: "Sesli Mesajlar", route: "/chat/voice-message" },
     { icon: "chart.bar.fill" as const, label: "Hizmet Geçmişi Raporu", route: "/history-report" },
+    { icon: "line.horizontal.3.decrease.circle.fill" as const, label: "Usta Filtreleme", route: "/explore/filter" },
+    { icon: "calendar" as const, label: "Hizmet Takvimi", route: "/calendar" },
     { icon: "doc.text.fill" as const, label: "Yasal Sözleşmeler", route: "/legal" },
     { icon: "gearshape.fill" as const, label: "Ayarlar", route: "/settings/general" },
     { icon: "questionmark.circle.fill" as const, label: "Yardım & Destek", route: "/settings/help" },
