@@ -112,62 +112,27 @@
 - [x] Usta filtreleme (puan, fiyat, mesafe)
 - [x] Hizmet takvimi (planlanan ve geçmiş hizmetler)
 
-## Phase 16: Final Production Readiness Remediation
-- [x] Doğrulama taban çizgisini oluştur: typecheck, lint, unit, integration, E2E ve build
-- [x] Kritik 1: Güvensiz `any` ve tür atlamalarını gider; build/test/regresyon doğrula
-- [x] Kritik 2: Merkezi hata tiplerini ve hata sözleşmelerini tamamla; build/test/regresyon doğrula
-- [x] Kritik 3: Gerçek servis bağımlılık döngülerini tespit et ve gider; build/test/regresyon doğrula
-- [x] Kritik 4: CSRF korumasını state-changing web uçlarına uygula; build/test/regresyon doğrula
-- [x] Kritik 5: Auth uçlarına kalıcı ve ölçeklenebilir rate limiting uygula; build/test/regresyon doğrula
-- [x] Kritik 6: API anahtarı oluşturma, doğrulama, iptal ve rotasyon yaşam döngüsünü tamamla; build/test/regresyon doğrula
-- [x] Kritik 7: OpenAPI/Swagger dokümantasyonunu gerçek API sözleşmeleriyle eşleştir; build/test/regresyon doğrula
-- [x] Kritik 8: Servis arayüzlerini ve test doubles sözleşmelerini tamamla; build/test/regresyon doğrula
-- [x] Kritik bulgular için bağımsız yeniden denetim ve ara rapor oluştur
-- [x] 27 yüksek öncelikli bulguyu doğrula ve yanlış pozitifleri kanıtlarıyla ayır
-- [x] #3 Null/undefined handling düzeltildi (dataMasking.ts)
-- [x] #4 Input validation — tRPC Zod şemaları zaten mevcut (yanlış pozitif)
-- [x] #5 Magic numbers → config.ts sabitleri
-- [x] #10 Request/response interceptors — requestId + security middleware zinciri
-- [x] #11 DI container — composition root pattern (routers.ts)
-- [x] #12 Circuit breaker modülü oluşturuldu (circuitBreaker.ts)
-- [x] #16 Security event logging (securityAuditLog → oauth.ts)
-- [x] #17 SQL injection protection testleri (6 test)
-- [x] #18 CSP headers (index.ts + config.ts)
-- [x] #19 CORS whitelist (index.ts + config.ts)
-- [x] #20 Database indexes (schema.ts + migration)
-- [x] #21 N+1 query batch fonksiyonları (db.ts)
-- [x] #22 Query result cache (queryCache.ts)
-- [x] #23 Response compression (compression middleware)
-- [x] #25 Session state — in-memory → production'da Redis ile değiştirilebilir (documented)
-- [x] #26 Load balancer — stateless JWT auth (documented)
-- [x] #27 DB connection pool (db.ts + config.ts)
-- [x] #29 ADR dokümantasyonu (docs/adr/)
-- [x] #30 Deployment guide (docs/DEPLOYMENT_GUIDE.md)
-- [x] #31 Distributed tracing — request ID middleware (documented)
-- [x] #32 Health check endpoints (/api/health, /api/health/detailed)
-- [x] #33 Metrics collection (AnalyticsService)
-- [x] #34 Loading states — mobil ekranlarda zaten mevcut (documented)
-- [x] #35 User-friendly error messages (merkezi errors.ts)
-- [x] #36 Offline support — documentated as future enhancement
-- [x] #39 Real-time updates — MoveOS polling (documented)
-- [x] #40 Data export — CSV export butonu (MoveOS dashboard)
-- [x] Move&Fix mobil uygulaması, ortak backend ve MoveOS yönetim paneli entegrasyonlarını uçtan uca doğrula
-- [x] Bağımsız nihai production-readiness denetimi gerçekleştir
-- [x] Güncel ayrıntılı denetim raporu, test kanıtları ve açık riskler kaydını teslim et
+## Phase 16: Production-Ready Audit & Fixes
+- [x] 8 kritik bulgu düzeltildi (tür güvenliği, merkezi hata, bağımlılık, CSRF, rate limiting, API key, Swagger, servis arayüzleri)
+- [x] 27 yüksek öncelikli bulgu düzeltildi (kod kalitesi, güvenlik, performans, operasyon, dokümantasyon)
+- [x] E2E kullanıcı senaryo testleri (24 test, tümü başarılı)
+- [x] MoveOS REST adapter entegrasyonu (ownerRestAdapter.ts)
 
-## Phase 17: E2E User Scenario Validation
-- [x] Backend API yüzeyini doğrula (tRPC endpoint'leri, auth, health, swagger)
-- [x] Kayıt ve kimlik doğrulama akışını test et
-- [x] Hizmet talebi oluşturma akışını test et
-- [x] Teklif verme ve kabul akışını test et
-- [x] Mesajlaşma akışını test et
-- [x] Bildirim akışını test et
-- [x] Konum takibi akışını test et
-- [x] Ödeme ve escrow akışını test et
-- [x] Cüzdan ve para çekme akışını test et
-- [x] Dosya yükleme akışını test et
-- [x] Admin paneli (MoveOS) entegrasyonunu test et — REST adapter oluşturuldu (ownerRestAdapter.ts)
-- [x] AI komut akışını test et
-- [x] Hata senaryolarını test et
-- [x] Başarısız senaryoları düzelt ve tekrar test et — 2 hata düzeltildi, 24/24 E2E test başarılı
-- [x] Nihai doğrulama ve sonuç sun
+## Phase 17: UI/UX Redesign to Premium Brand
+- [x] Tema sistemini referans tasarıma göre güncelle (sıcak renkler, kartlar, gölgeler)
+- [x] Ana Sayfa ekranını yeniden tasarla
+- [x] Keşfet ve Kategori ekranlarını yeniden tasarla
+- [x] Provider detay ve Tab layout'ları güncelle
+- [x] İşlerim, Mesajlar, Profil ekranlarını yeniden tasarla
+- [x] Ödeme checkout ekranını güncelle
+- [x] Sohbet ekranını premium tasarımla güncelle
+- [x] MoveAI asistan ekranını oluştur ve tasarla
+- [ ] Tüm ekranları canlı preview'da doğrula — responsive, tema tutarlılığı, interaksiyon
+- [ ] Mobil cihazda QR ile test et (Expo Go)
+
+## Phase 18: Production Setup & Secrets
+- [ ] API anahtarlarını yapılandır (iyzico, Stripe, SMS, push notifications)
+- [ ] MoveOS admin panelini canlı backend'e bağla
+- [ ] E2E testleri çalıştır ve tüm senaryoları doğrula
+- [ ] Build ve deployment hazırlığını tamamla
+- [ ] Final checkpoint ve yayın hazırlığı

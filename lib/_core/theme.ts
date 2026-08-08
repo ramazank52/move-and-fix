@@ -36,6 +36,8 @@ type RuntimePalette = SchemePaletteItem & {
   tabIconDefault: string;
   tabIconSelected: string;
   border: string;
+  card: string;
+  cardShadow: string;
 };
 
 function buildRuntimePalette(scheme: ColorScheme): RuntimePalette {
@@ -49,6 +51,8 @@ function buildRuntimePalette(scheme: ColorScheme): RuntimePalette {
     tabIconDefault: base.muted,
     tabIconSelected: base.primary,
     border: base.border,
+    card: base.cardElevated,
+    cardShadow: scheme === "light" ? "rgba(255, 107, 0, 0.08)" : "rgba(0, 0, 0, 0.3)",
   };
 }
 

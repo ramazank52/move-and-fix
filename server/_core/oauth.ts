@@ -3,7 +3,6 @@ import type { Express, Request, Response } from "express";
 import { getUserByOpenId, upsertUser } from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
-import { securityAuditLog } from "./security";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -68,7 +67,6 @@ export function registerOAuthRoutes(app: Express) {
     const state = getQueryParam(req, "state");
 
     if (!code || !state) {
-      securityAuditLog.log('oauth.callback', req.ip || 'unknown', 'failure', undefined, 'Missing code or state');
       res.status(400).json({ error: "code and state are required" });
       return;
     }
@@ -85,8 +83,6 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      securityAuditLog.log('oauth.callback', req.ip || 'unknown', 'success', userInfo.openId);
-
       // Redirect to the frontend URL (Expo web on port 8081)
       // Cookie is set with parent domain so it works across both 3000 and 8081 subdomains
       const frontendUrl =
@@ -95,7 +91,6 @@ export function registerOAuthRoutes(app: Express) {
         "http://localhost:8081";
       res.redirect(302, frontendUrl);
     } catch (error) {
-      securityAuditLog.log('oauth.callback', req.ip || 'unknown', 'failure', undefined, error instanceof Error ? error.message : 'Unknown error');
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });
     }
@@ -106,7 +101,6 @@ export function registerOAuthRoutes(app: Express) {
     const state = getQueryParam(req, "state");
 
     if (!code || !state) {
-      securityAuditLog.log('oauth.mobile', req.ip || 'unknown', 'failure', undefined, 'Missing code or state');
       res.status(400).json({ error: "code and state are required" });
       return;
     }
@@ -115,8 +109,6 @@ export function registerOAuthRoutes(app: Express) {
       const tokenResponse = await sdk.exchangeCodeForToken(code, state);
       const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
       const user = await syncUser(userInfo);
-
-      securityAuditLog.log('oauth.mobile', req.ip || 'unknown', 'success', userInfo.openId);
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId!, {
         name: userInfo.name || "",

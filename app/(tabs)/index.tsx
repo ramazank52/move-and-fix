@@ -1,515 +1,560 @@
-import { ScrollView, Text, View, TextInput, Pressable, FlatList } from "react-native";
-import { useState } from "react";
+import {
+  ScrollView,
+  Text,
+  View,
+  Pressable,
+  TextInput,
+  FlatList,
+  Dimensions,
+  Platform,
+} from "react-native";
+import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ServiceCategoryCard } from "@/components/service-category-card";
 import { CATEGORIES } from "@/lib/data/categories";
 import { SAMPLE_PROVIDERS } from "@/lib/data/providers";
-import { useRouter } from "expo-router";
-import { FirstUseInfoModal } from "@/components/first-use-info";
+import { useColors } from "@/hooks/use-colors";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useState, useCallback } from "react";
+
+const { width: screenWidth } = Dimensions.get("window");
+const CARD_GAP = 12;
+const CARD_WIDTH = (screenWidth - 48 - CARD_GAP) / 2;
 
 export default function HomeScreen() {
   const colors = useColors();
-  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const topProviders = SAMPLE_PROVIDERS.filter((p) => p.rating >= 4.8);
+  const topProviders = SAMPLE_PROVIDERS.filter((p) => p.premium).slice(0, 4);
+  const emergencyCategories = CATEGORIES.filter((c) =>
+    ["plumbing", "electrical", "locksmith", "roadside", "tow_truck"].includes(c.id)
+  );
+
+  const handleSearch = useCallback(() => {
+    if (searchQuery.trim()) {
+      router.push(`/explore?q=${encodeURIComponent(searchQuery)}` as any);
+    }
+  }, [searchQuery]);
+
+  const renderCategory = useCallback(
+    ({ item }: { item: typeof CATEGORIES[0] }) => <ServiceCategoryCard category={item} />,
+    []
+  );
+
+  const renderProvider = useCallback(
+    ({ item }: { item: typeof SAMPLE_PROVIDERS[0] }) => (
+      <Pressable
+        onPress={() => router.push(`/provider/${item.id}` as any)}
+        style={({ pressed }) => [
+          {
+            width: CARD_WIDTH,
+            backgroundColor: colors.card,
+            borderRadius: 20,
+            padding: 16,
+            marginRight: CARD_GAP,
+            opacity: pressed ? 0.9 : 1,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.06,
+            shadowRadius: 12,
+            elevation: 2,
+            borderWidth: 0.5,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              backgroundColor: colors.primary + "15",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "700", color: colors.primary }}>
+              {item.avatarInitials}
+            </Text>
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }} numberOfLines={1}>
+                {item.name}
+              </Text>
+              {item.verified && (
+                <IconSymbol name="checkmark.seal.fill" size={14} color={colors.primary} style={{ marginLeft: 4 }} />
+              )}
+            </View>
+            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+              {item.categoryName}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+          <IconSymbol name="star.fill" size={14} color="#FFB800" />
+          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, marginLeft: 4 }}>
+            {item.rating}
+          </Text>
+          <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 4 }}>
+            ({item.reviewCount})
+          </Text>
+          <View style={{ flex: 1 }} />
+          <Text style={{ fontSize: 12, color: colors.muted }}>{item.distance}</Text>
+        </View>
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingTop: 10,
+            borderTopWidth: 0.5,
+            borderTopColor: colors.border,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <IconSymbol name="clock.fill" size={12} color={colors.muted} />
+            <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 4 }}>
+              {item.responseTime}
+            </Text>
+          </View>
+          {item.available ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: colors.success + "15",
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 8,
+              }}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: colors.success,
+                  marginRight: 4,
+                }}
+              />
+              <Text style={{ fontSize: 10, fontWeight: "600", color: colors.success }}>
+                Müsait
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={{
+                backgroundColor: colors.muted + "15",
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ fontSize: 10, fontWeight: "600", color: colors.muted }}>
+                Meşgul
+              </Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
+    ),
+    [CARD_WIDTH, colors]
+  );
 
   return (
-    <ScreenContainer>
-      <FirstUseInfoModal />
+    <ScreenContainer edges={["top", "left", "right"]}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
         {/* Header */}
-        <View className="px-5 pt-4 pb-2">
-          <View className="flex-row items-center justify-between">
+        <View
+          style={{
+            paddingHorizontal: 20,
+            paddingTop: Platform.OS === "web" ? 20 : 12,
+            paddingBottom: 16,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <View>
-              <Text className="text-sm text-muted">Merhaba 👋</Text>
-              <Text className="text-xl font-bold text-foreground">Move&Fix</Text>
+              <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 2 }}>
+                Hoş geldin 👋
+              </Text>
+              <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>
+                Ne ihtiyacın var?
+              </Text>
             </View>
             <Pressable
               onPress={() => router.push("/notifications" as any)}
               style={({ pressed }) => [
                 {
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: colors.surface,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  backgroundColor: colors.card,
                   alignItems: "center",
                   justifyContent: "center",
-                  opacity: pressed ? 0.7 : 1,
+                  opacity: pressed ? 0.85 : 1,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  elevation: 2,
                 },
               ]}
             >
-              <IconSymbol name="bell.fill" size={20} color={colors.foreground} />
+              <IconSymbol name="bell.fill" size={22} color={colors.foreground} />
+              <View
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  right: 12,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: colors.primary,
+                  borderWidth: 2,
+                  borderColor: colors.card,
+                }}
+              />
             </Pressable>
           </View>
         </View>
 
         {/* Search Bar */}
-        <View className="px-5 mt-3">
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
           <Pressable
-            onPress={() => router.push("/(tabs)/explore" as any)}
+            onPress={handleSearch}
             style={({ pressed }) => [
               {
                 flexDirection: "row",
                 alignItems: "center",
-                backgroundColor: colors.surface,
-                borderRadius: 14,
-                paddingHorizontal: 14,
-                paddingVertical: 13,
-                borderWidth: 1,
-                borderColor: colors.border,
+                backgroundColor: colors.card,
+                borderRadius: 16,
+                paddingHorizontal: 16,
+                height: 52,
                 opacity: pressed ? 0.9 : 1,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                elevation: 2,
+                borderWidth: 0.5,
+                borderColor: colors.border,
               },
             ]}
           >
-            <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
-            <Text style={{ marginLeft: 10, color: colors.muted, fontSize: 15 }}>
-              Hizmet veya usta ara...
-            </Text>
+            <IconSymbol name="magnifyingglass" size={20} color={colors.muted} />
+            <TextInput
+              placeholder="Hizmet, usta veya kategori ara..."
+              placeholderTextColor={colors.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+              style={{
+                flex: 1,
+                marginLeft: 12,
+                fontSize: 15,
+                color: colors.foreground,
+              }}
+            />
           </Pressable>
         </View>
 
-        {/* Campaign Banner */}
-        <View className="px-5 mt-5">
-          <View
-            style={{
-              backgroundColor: colors.primary,
-              borderRadius: 16,
-              padding: 20,
-              overflow: "hidden",
-            }}
+        {/* Emergency Banner */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+          <Pressable
+            onPress={() => router.push("/explore?filter=emergency" as any)}
+            style={({ pressed }) => [
+              {
+                flexDirection: "row",
+                alignItems: "center",
+                borderRadius: 20,
+                padding: 20,
+                opacity: pressed ? 0.92 : 1,
+                shadowColor: colors.primary,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.2,
+                shadowRadius: 16,
+                elevation: 4,
+              },
+            ]}
           >
-            <Text style={{ color: "#FFF", fontSize: 18, fontWeight: "bold" }}>
-              İlk Hizmetine %20 İndirim!
-            </Text>
-            <Text style={{ color: "#FFF", fontSize: 13, marginTop: 6, opacity: 0.9 }}>
-              Yeni üyelere özel kampanya. Hemen hizmet al!
-            </Text>
-            <Pressable
-              style={({ pressed }) => [
-                {
-                  marginTop: 12,
-                  backgroundColor: "#FFF",
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  alignSelf: "flex-start",
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-            >
-              <Text style={{ color: colors.primary, fontWeight: "600", fontSize: 13 }}>
-                Keşfet
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Categories */}
-        <View className="mt-6">
-          <View className="px-5 flex-row items-center justify-between mb-3">
-            <Text className="text-lg font-bold text-foreground">Hizmet Kategorileri</Text>
-            <Pressable onPress={() => router.push("/(tabs)/explore" as any)}>
-              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "600" }}>
-                Tümü
-              </Text>
-            </Pressable>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-          >
-            {CATEGORIES.slice(0, 8).map((cat) => (
-              <Pressable
-                key={cat.id}
-                onPress={() => router.push(`/category/${cat.id}` as any)}
-                style={({ pressed }) => [
-                  {
-                    alignItems: "center",
-                    width: 72,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}
-              >
-                <View
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 16,
-                    backgroundColor: cat.color + "18",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: 6,
-                  }}
-                >
-                  <Text style={{ fontSize: 24 }}>{cat.icon}</Text>
-                </View>
-                <Text
-                  style={{ fontSize: 11, color: colors.foreground, textAlign: "center" }}
-                  numberOfLines={1}
-                >
-                  {cat.name}
+            {/* Gradient background via two-layer approach */}
+            <View
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                backgroundColor: colors.primary,
+                borderRadius: 20,
+              }}
+            />
+            <View style={{ flex: 1, zIndex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                <IconSymbol name="bolt.fill" size={16} color="#FFF" />
+                <Text style={{ fontSize: 16, fontWeight: "800", color: "#FFF", marginLeft: 6 }}>
+                  Acil Hizmetler
                 </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Top Rated Providers */}
-        <View className="mt-6">
-          <View className="px-5 flex-row items-center justify-between mb-3">
-            <Text className="text-lg font-bold text-foreground">En Yüksek Puanlı</Text>
-            <Pressable>
-              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "600" }}>
-                Tümü
+              </View>
+              <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.9)" }}>
+                Su borusu patladı? Elektrik mi kesildi? Hemen usta çağır
               </Text>
-            </Pressable>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-          >
-            {topProviders.map((provider) => (
-              <Pressable
-                key={provider.id}
-                onPress={() => router.push(`/provider/${provider.id}` as any)}
-                style={({ pressed }) => [
-                  {
-                    width: 200,
-                    backgroundColor: colors.surface,
-                    borderRadius: 14,
-                    padding: 14,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    opacity: pressed ? 0.9 : 1,
-                  },
-                ]}
+              <View
+                style={{
+                  flexDirection: "row",
+                  marginTop: 12,
+                  alignItems: "center",
+                }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                {emergencyCategories.slice(0, 4).map((cat, idx) => (
                   <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      backgroundColor: colors.primary + "20",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ fontSize: 16, fontWeight: "bold", color: colors.primary }}>
-                      {provider.name.charAt(0)}
-                    </Text>
-                  </View>
-                  <View style={{ marginLeft: 10, flex: 1 }}>
-                    <Text
-                      style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}
-                      numberOfLines={1}
-                    >
-                      {provider.name}
-                    </Text>
-                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
-                      <Text style={{ fontSize: 12, color: "#F59E0B" }}>★</Text>
-                      <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 3 }}>
-                        {provider.rating} ({provider.reviewCount})
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                {provider.verified && (
-                  <View
+                    key={cat.id}
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
-                      marginBottom: 6,
+                      marginRight: 8,
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 10,
                     }}
                   >
-                    <Text style={{ fontSize: 11, color: colors.success }}>✓ Doğrulanmış</Text>
-                    {provider.premium && (
-                      <Text style={{ fontSize: 11, color: "#A855F7", marginLeft: 8 }}>
-                        ★ Premium
-                      </Text>
-                    )}
+                    <Text style={{ fontSize: 14, marginRight: 4 }}>{cat.icon}</Text>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: "#FFF" }}>
+                      {cat.name}
+                    </Text>
                   </View>
-                )}
-                <Text style={{ fontSize: 12, color: colors.muted }}>{provider.distance}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+                ))}
+              </View>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Categories Grid */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 14,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>
+              Hizmet Kategorileri
+            </Text>
+            <Pressable onPress={() => router.push("/explore" as any)}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
+                Tümünü Gör
+              </Text>
+            </Pressable>
+          </View>
+          <FlatList
+            data={CATEGORIES.slice(0, 8)}
+            renderItem={renderCategory}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            scrollEnabled={false}
+            columnWrapperStyle={{ gap: CARD_GAP, marginBottom: CARD_GAP }}
+          />
+        </View>
+
+        {/* Top Providers */}
+        <View style={{ marginBottom: 28 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 20,
+              marginBottom: 14,
+            }}
+          >
+            <View>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>
+                Öne Çıkan Ustalar
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                En yüksek puanlı profesyoneller
+              </Text>
+            </View>
+            <Pressable onPress={() => router.push("/explore" as any)}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
+                Tümü
+              </Text>
+            </Pressable>
+          </View>
+          <FlatList
+            data={topProviders}
+            renderItem={renderProvider}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20 }}
+          />
         </View>
 
         {/* AI Assistant CTA */}
-        <View className="px-5 mt-6">
+        <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
           <Pressable
             onPress={() => router.push("/ai-assistant" as any)}
             style={({ pressed }) => [
               {
                 flexDirection: "row",
                 alignItems: "center",
-                backgroundColor: "#6366F1" + "15",
-                borderRadius: 14,
-                padding: 16,
-                borderWidth: 1,
-                borderColor: "#6366F1" + "30",
-                opacity: pressed ? 0.9 : 1,
+                backgroundColor: colors.card,
+                borderRadius: 20,
+                padding: 18,
+                opacity: pressed ? 0.92 : 1,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.06,
+                shadowRadius: 12,
+                elevation: 3,
+                borderWidth: 0.5,
+                borderColor: colors.border,
               },
             ]}
           >
             <View
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: "#6366F1",
+                width: 52,
+                height: 52,
+                borderRadius: 16,
+                backgroundColor: colors.accentPurple + "15",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <IconSymbol name="sparkles" size={22} color="#FFF" />
+              <IconSymbol name="sparkles" size={26} color={colors.accentPurple} />
             </View>
-            <View style={{ marginLeft: 14, flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>
-                MoveAI Asistan
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
+                MoveAI Asistanı
               </Text>
-              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                Yapay zekâ ile hizmet bul, fiyat tahmini al
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
+                Yapay zeka ile ihtiyacını anlat, en uygun ustayı bul
               </Text>
             </View>
-            <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            <IconSymbol name="chevron.right" size={18} color={colors.muted} />
           </Pressable>
         </View>
 
-        {/* Quick Actions */}
-        <View className="px-5 mt-6">
-          <Text className="text-lg font-bold text-foreground mb-3">Hızlı İşlemler</Text>
+        {/* Home Ideas Section */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground, marginBottom: 4 }}>
+            Evin için bir fikir
+          </Text>
+          <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 14 }}>
+            Popüler hizmetler ve ilham veren içerikler
+          </Text>
           <View style={{ flexDirection: "row", gap: 12 }}>
             <Pressable
-              onPress={() => router.push("/create-service" as any)}
+              onPress={() => router.push("/category/cleaning" as any)}
               style={({ pressed }) => [
                 {
                   flex: 1,
-                  backgroundColor: colors.success + "15",
-                  borderRadius: 14,
+                  borderRadius: 18,
                   padding: 16,
-                  alignItems: "center",
-                  opacity: pressed ? 0.8 : 1,
+                  minHeight: 120,
+                  justifyContent: "flex-end",
+                  opacity: pressed ? 0.9 : 1,
+                  backgroundColor: "#DCFCE7",
                 },
               ]}
             >
-              <IconSymbol name="plus.circle.fill" size={28} color={colors.success} />
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: colors.success,
-                  marginTop: 6,
-                  textAlign: "center",
-                }}
-              >
-                Hizmet Talebi
+              <Text style={{ fontSize: 24, marginBottom: 8 }}>✨</Text>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: "#166534" }}>
+                Detaylı Temizlik
+              </Text>
+              <Text style={{ fontSize: 11, color: "#15803D", marginTop: 4 }}>
+                ₺500'den başlayan fiyatlar
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => router.push("/(tabs)/explore" as any)}
+              onPress={() => router.push("/category/painting" as any)}
               style={({ pressed }) => [
                 {
                   flex: 1,
-                  backgroundColor: colors.primary + "15",
-                  borderRadius: 14,
+                  borderRadius: 18,
                   padding: 16,
-                  alignItems: "center",
-                  opacity: pressed ? 0.8 : 1,
+                  minHeight: 120,
+                  justifyContent: "flex-end",
+                  opacity: pressed ? 0.9 : 1,
+                  backgroundColor: "#EDE9FE",
                 },
               ]}
             >
-              <IconSymbol name="magnifyingglass" size={28} color={colors.primary} />
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: colors.primary,
-                  marginTop: 6,
-                  textAlign: "center",
-                }}
-              >
-                Usta Bul
+              <Text style={{ fontSize: 24, marginBottom: 8 }}>🎨</Text>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: "#5B21B6" }}>
+                Evini Yenile
               </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => router.push("/(tabs)/my-jobs" as any)}
-              style={({ pressed }) => [
-                {
-                  flex: 1,
-                  backgroundColor: "#6366F1" + "15",
-                  borderRadius: 14,
-                  padding: 16,
-                  alignItems: "center",
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-            >
-              <IconSymbol name="briefcase.fill" size={28} color="#6366F1" />
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: "#6366F1",
-                  marginTop: 6,
-                  textAlign: "center",
-                }}
-              >
-                İşlerim
+              <Text style={{ fontSize: 11, color: "#6D28D9", marginTop: 4 }}>
+                Boya & badana hizmetleri
               </Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Emergency & Transport Services */}
-        <View className="px-5 mt-6">
-          <Text className="text-lg font-bold text-foreground mb-3">Acil & Ulaşım Hizmetleri</Text>
-          <View style={{ gap: 10 }}>
+        {/* KM-based Services */}
+        <View style={{ paddingHorizontal: 20 }}>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground, marginBottom: 14 }}>
+            Araç & Yol Hizmetleri
+          </Text>
+          {CATEGORIES.filter((c) => c.pricingType === "km_based").map((cat) => (
             <Pressable
-              onPress={() => router.push("/service/tow-truck" as any)}
+              key={cat.id}
+              onPress={() => router.push(`/category/${cat.id}` as any)}
               style={({ pressed }) => [
                 {
                   flexDirection: "row",
                   alignItems: "center",
-                  backgroundColor: "#DC2626" + "10",
-                  borderRadius: 14,
+                  backgroundColor: colors.card,
+                  borderRadius: 16,
                   padding: 14,
-                  borderWidth: 1,
-                  borderColor: "#DC2626" + "25",
+                  marginBottom: 10,
                   opacity: pressed ? 0.9 : 1,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 8,
+                  elevation: 1,
+                  borderWidth: 0.5,
+                  borderColor: colors.border,
                 },
               ]}
             >
               <View
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: "#DC2626" + "18",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 22 }}>🚛</Text>
-              </View>
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>Çekici</Text>
-                <Text style={{ fontSize: 12, color: colors.muted }}>7/24 • ₺25/km • Başlangıç ₺200</Text>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-            </Pressable>
-
-            <Pressable
-              onPress={() => router.push("/service/roadside" as any)}
-              style={({ pressed }) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: "#B91C1C" + "10",
+                  width: 48,
+                  height: 48,
                   borderRadius: 14,
-                  padding: 14,
-                  borderWidth: 1,
-                  borderColor: "#B91C1C" + "25",
-                  opacity: pressed ? 0.9 : 1,
-                },
-              ]}
-            >
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: "#B91C1C" + "18",
+                  backgroundColor: cat.gradientColors[0],
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ fontSize: 22 }}>🚨</Text>
+                <Text style={{ fontSize: 24 }}>{cat.icon}</Text>
               </View>
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>Yol Yardım</Text>
-                <Text style={{ fontSize: 12, color: colors.muted }}>7/24 • ₺18/km • Başlangıç ₺100</Text>
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
+                  {cat.name}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
+                  ₺{cat.basePrice} başlangıç + ₺{cat.kmRate}/km
+                </Text>
               </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+              <IconSymbol name="chevron.right" size={18} color={colors.muted} />
             </Pressable>
-
-            <Pressable
-              onPress={() => router.push("/service/courier" as any)}
-              style={({ pressed }) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: "#0EA5E9" + "10",
-                  borderRadius: 14,
-                  padding: 14,
-                  borderWidth: 1,
-                  borderColor: "#0EA5E9" + "25",
-                  opacity: pressed ? 0.9 : 1,
-                },
-              ]}
-            >
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: "#0EA5E9" + "18",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 22 }}>📦</Text>
-              </View>
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>Kurye & Evrak</Text>
-                <Text style={{ fontSize: 12, color: colors.muted }}>Hızlı teslimat • ₺12/km • Başlangıç ₺50</Text>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-            </Pressable>
-
-            {/* Map Link */}
-            <Pressable
-              onPress={() => router.push("/map" as any)}
-              style={({ pressed }) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: "#3B82F6" + "10",
-                  borderRadius: 14,
-                  padding: 14,
-                  borderWidth: 1,
-                  borderColor: "#3B82F6" + "25",
-                  opacity: pressed ? 0.9 : 1,
-                },
-              ]}
-            >
-              <View
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: "#3B82F6" + "18",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 22 }}>📍</Text>
-              </View>
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>Yakınımdaki Ustalar</Text>
-                <Text style={{ fontSize: 12, color: colors.muted }}>Haritada ustaları gör</Text>
-              </View>
-              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-            </Pressable>
-          </View>
+          ))}
         </View>
       </ScrollView>
     </ScreenContainer>

@@ -1,20 +1,44 @@
-import { Text, View, FlatList, Pressable } from "react-native";
+import { View, Text, Pressable, FlatList } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { SAMPLE_CONVERSATIONS } from "@/lib/data/messages";
 import { useRouter } from "expo-router";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 
 export default function MessagesScreen() {
   const colors = useColors();
   const router = useRouter();
 
   return (
-    <ScreenContainer className="px-4 pt-4">
-      <Text className="text-2xl font-bold text-foreground mb-4">Mesajlar</Text>
+    <ScreenContainer className="px-5 pt-6">
+      {/* Title */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.foreground }}>
+          Mesajlar
+        </Text>
+        <Pressable
+          style={({ pressed }) => [
+            {
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: colors.card,
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: 0.5,
+              borderColor: colors.border,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <IconSymbol name="square.and.pencil" size={18} color={colors.primary} />
+        </Pressable>
+      </View>
+
       <FlatList
         data={SAMPLE_CONVERSATIONS}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ gap: 2, paddingBottom: 20 }}
+        contentContainerStyle={{ gap: 8, paddingBottom: 20 }}
         renderItem={({ item }) => (
           <Pressable
             onPress={() => router.push(`/chat/${item.id}` as any)}
@@ -23,35 +47,38 @@ export default function MessagesScreen() {
                 flexDirection: "row",
                 alignItems: "center",
                 padding: 14,
-                borderRadius: 12,
-                backgroundColor: pressed ? colors.surface : "transparent",
+                borderRadius: 18,
+                backgroundColor: pressed ? colors.card : colors.background,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+                opacity: pressed ? 0.9 : 1,
               },
             ]}
           >
             <View
               style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                backgroundColor: colors.primary,
+                width: 52,
+                height: 52,
+                borderRadius: 16,
+                backgroundColor: colors.primary + "15",
                 alignItems: "center",
                 justifyContent: "center",
-                marginRight: 12,
+                marginRight: 14,
               }}
             >
-              <Text style={{ color: "#FFF", fontWeight: "bold", fontSize: 18 }}>
+              <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 18 }}>
                 {item.name.charAt(0)}
               </Text>
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ fontWeight: "600", color: colors.foreground, fontSize: 15 }}>
+                <Text style={{ fontWeight: "700", color: colors.foreground, fontSize: 15 }}>
                   {item.name}
                 </Text>
                 <Text style={{ color: colors.muted, fontSize: 12 }}>{item.time}</Text>
               </View>
               <Text
-                style={{ color: colors.muted, fontSize: 14, marginTop: 2 }}
+                style={{ color: colors.muted, fontSize: 14, marginTop: 3 }}
                 numberOfLines={1}
               >
                 {item.lastMessage}
@@ -60,16 +87,17 @@ export default function MessagesScreen() {
             {item.unread > 0 && (
               <View
                 style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
+                  minWidth: 22,
+                  height: 22,
+                  borderRadius: 11,
                   backgroundColor: colors.primary,
                   alignItems: "center",
                   justifyContent: "center",
                   marginLeft: 8,
+                  paddingHorizontal: 6,
                 }}
               >
-                <Text style={{ color: "#FFF", fontSize: 11, fontWeight: "bold" }}>
+                <Text style={{ color: "#FFF", fontSize: 11, fontWeight: "800" }}>
                   {item.unread}
                 </Text>
               </View>
@@ -77,8 +105,28 @@ export default function MessagesScreen() {
           </Pressable>
         )}
         ListEmptyComponent={
-          <View className="items-center justify-center py-12">
-            <Text className="text-muted text-base">Henüz mesajınız yok</Text>
+          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 60 }}>
+            <View
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 22,
+                backgroundColor: colors.card,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 16,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
+            >
+              <IconSymbol name="message.fill" size={30} color={colors.muted} />
+            </View>
+            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
+              Henüz mesajınız yok
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+              Bir usta ile iletişime geçtiğinizde mesajlarınız burada görünecek
+            </Text>
           </View>
         }
       />

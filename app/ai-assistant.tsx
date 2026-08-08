@@ -10,6 +10,7 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: string;
+  suggestions?: string[];
 }
 
 const AI_RESPONSES: Record<string, string> = {
@@ -23,6 +24,15 @@ const AI_RESPONSES: Record<string, string> = {
     "Fiyat tahmini için hizmet türünü ve konumunuzu belirtir misiniz? Geçmiş verilere dayanarak size yaklaşık bir fiyat aralığı sunabilirim.",
 };
 
+const QUICK_PROMPTS = [
+  "Klima bakımı",
+  "Nakliye fiyatı",
+  "Acil tesisatçı",
+  "Ev temizliği",
+  "Çekici çağır",
+  "Kurye lazım",
+];
+
 export default function AIAssistantScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -33,23 +43,23 @@ export default function AIAssistantScreen() {
       text: AI_RESPONSES.default,
       isUser: false,
       timestamp: "Şimdi",
+      suggestions: QUICK_PROMPTS.slice(0, 3),
     },
   ]);
   const flatListRef = useRef<FlatList>(null);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+  const sendMessage = (text: string) => {
+    if (!text.trim()) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
-      text: input,
+      text,
       isUser: true,
       timestamp: "Şimdi",
     };
 
-    // Simple keyword matching for demo
     let response = AI_RESPONSES.default;
-    const lowerInput = input.toLowerCase();
+    const lowerInput = text.toLowerCase();
     if (lowerInput.includes("klima") || lowerInput.includes("bakım")) {
       response = AI_RESPONSES.klima;
     } else if (lowerInput.includes("nakliye") || lowerInput.includes("taşıma") || lowerInput.includes("taşın")) {
@@ -63,6 +73,7 @@ export default function AIAssistantScreen() {
       text: response,
       isUser: false,
       timestamp: "Şimdi",
+      suggestions: ["En yakın usta", "Fiyat karşılaştır", "Randevu al"],
     };
 
     setMessages((prev) => [...prev, userMsg, aiMsg]);
@@ -78,7 +89,7 @@ export default function AIAssistantScreen() {
           flexDirection: "row",
           alignItems: "center",
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingVertical: 14,
           borderBottomWidth: 0.5,
           borderBottomColor: colors.border,
         }}
@@ -88,20 +99,23 @@ export default function AIAssistantScreen() {
         </Pressable>
         <View
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            backgroundColor: "#6366F1",
+            width: 42,
+            height: 42,
+            borderRadius: 14,
+            backgroundColor: colors.accentPurple + "15",
             alignItems: "center",
             justifyContent: "center",
             marginLeft: 10,
           }}
         >
-          <IconSymbol name="sparkles" size={16} color="#FFF" />
+          <IconSymbol name="sparkles" size={22} color={colors.accentPurple} />
         </View>
-        <View style={{ marginLeft: 10 }}>
-          <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>MoveAI Asistan</Text>
-          <Text style={{ fontSize: 12, color: colors.success }}>Çevrimiçi</Text>
+        <View style={{ marginLeft: 12, flex: 1 }}>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>MoveAI Asistanı</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success, marginRight: 5 }} />
+            <Text style={{ fontSize: 12, color: colors.success, fontWeight: "500" }}>Çevrimiçi</Text>
+          </View>
         </View>
       </View>
 
@@ -115,19 +129,34 @@ export default function AIAssistantScreen() {
           <View
             style={{
               alignSelf: item.isUser ? "flex-end" : "flex-start",
-              maxWidth: "80%",
+              maxWidth: "82%",
               marginBottom: 12,
             }}
           >
             <View
               style={{
-                backgroundColor: item.isUser ? colors.primary : colors.surface,
-                borderRadius: 16,
-                borderTopRightRadius: item.isUser ? 4 : 16,
-                borderTopLeftRadius: item.isUser ? 16 : 4,
-                padding: 12,
+                backgroundColor: item.isUser ? colors.primary : colors.card,
+                borderRadius: 20,
+                borderTopRightRadius: item.isUser ? 6 : 20,
+                borderTopLeftRadius: item.isUser ? 20 : 6,
+                padding: 14,
+                borderWidth: item.isUser ? 0 : 0.5,
+                borderColor: colors.border,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 4,
+                elevation: 1,
               }}
             >
+              {!item.isUser && (
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <IconSymbol name="sparkles" size={14} color={colors.accentPurple} />
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: colors.accentPurple, marginLeft: 5 }}>
+                    MoveAI
+                  </Text>
+                </View>
+              )}
               <Text
                 style={{
                   fontSize: 14,
@@ -137,6 +166,31 @@ export default function AIAssistantScreen() {
               >
                 {item.text}
               </Text>
+              {item.suggestions && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+                  {item.suggestions.map((sug: string, si: number) => (
+                    <Pressable
+                      key={si}
+                      onPress={() => sendMessage(sug)}
+                      style={({ pressed }) => [
+                        {
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 12,
+                          backgroundColor: colors.accentPurple + "12",
+                          borderWidth: 0.5,
+                          borderColor: colors.accentPurple + "30",
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.accentPurple }}>
+                        {sug}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </View>
             <Text
               style={{
@@ -152,52 +206,96 @@ export default function AIAssistantScreen() {
         )}
       />
 
+      {/* Quick Prompts — only show when no user messages yet */}
+      {messages.length <= 1 && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 10 }}>
+            Hızlı Sorular
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {QUICK_PROMPTS.map((prompt, pi) => (
+              <Pressable
+                key={pi}
+                onPress={() => sendMessage(prompt)}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingHorizontal: 14,
+                    paddingVertical: 9,
+                    borderRadius: 14,
+                    backgroundColor: colors.card,
+                    borderWidth: 0.5,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <IconSymbol name="sparkles" size={12} color={colors.accentPurple} />
+                <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "500", marginLeft: 6 }}>
+                  {prompt}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
       {/* Input */}
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
-            paddingHorizontal: 16,
+            paddingHorizontal: 12,
             paddingVertical: 10,
             borderTopWidth: 0.5,
             borderTopColor: colors.border,
             backgroundColor: colors.background,
+            paddingBottom: Platform.OS === "ios" ? 10 : 12,
           }}
         >
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="MoveAI'ye sorun..."
+            placeholder="MoveAI'ya soru sorun..."
             placeholderTextColor={colors.muted}
             style={{
               flex: 1,
-              backgroundColor: colors.surface,
-              borderRadius: 20,
+              backgroundColor: colors.card,
+              borderRadius: 22,
               paddingHorizontal: 16,
               paddingVertical: 10,
               fontSize: 15,
               color: colors.foreground,
-              marginRight: 10,
+              marginHorizontal: 4,
+              borderWidth: 0.5,
+              borderColor: colors.border,
             }}
             returnKeyType="send"
-            onSubmitEditing={sendMessage}
+            onSubmitEditing={() => sendMessage(input)}
           />
           <Pressable
-            onPress={sendMessage}
+            onPress={() => sendMessage(input)}
             style={({ pressed }) => [
               {
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: colors.primary,
+                width: 42,
+                height: 42,
+                borderRadius: 21,
+                backgroundColor: colors.accentPurple,
                 alignItems: "center",
                 justifyContent: "center",
+                marginLeft: 6,
                 opacity: pressed ? 0.8 : 1,
+                shadowColor: colors.accentPurple,
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+                elevation: 2,
               },
             ]}
           >
-            <IconSymbol name="paperplane.fill" size={18} color="#FFF" />
+            <IconSymbol name="paperplane.fill" size={16} color="#FFF" />
           </Pressable>
         </View>
       </KeyboardAvoidingView>

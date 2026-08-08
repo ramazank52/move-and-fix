@@ -1,25 +1,15 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { createPool } from "mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
-import { DB_POOL_CONFIG } from "./_core/config";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
-// Issue #27: Connection pool configured with min/max connections and timeouts.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const pool = createPool({
-        uri: process.env.DATABASE_URL,
-        waitForConnections: true,
-        connectionLimit: DB_POOL_CONFIG.maxConnections,
-        queueLimit: 0,
-      });
-      _db = drizzle(pool);
-      console.log(`[Database] Pool configured: max=${DB_POOL_CONFIG.maxConnections}`);
+      _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -189,71 +179,8 @@ export async function getProviderProfile(userId: number) {
   return rows[0] ?? null;
 }
 
-/**
- * Issue #21: N+1 Query — Batch provider profiles in a single query.
- * Instead of N separate queries, fetches all providers by userId in one call.
- */
-export async function getProviderProfilesBatch(userIds: number[]) {
-  const db = await getDb();
-  if (!db || userIds.length === 0) return [];
-  const { inArray } = await import("drizzle-orm");
-  return db.select().from(providers).where(inArray(providers.userId, userIds));
-}
-
-/**
- * Issue #21: N+1 Query — Batch service requests for multiple users.
- * Returns a map of userId → serviceRequests[] in a single query.
- */
-export async function getUserServiceRequestsBatch(userIds: number[]) {
-  const db = await getDb();
-  if (!db || userIds.length === 0) return new Map<number, typeof serviceRequests.$inferSelect[]>();
-  const { inArray } = await import("drizzle-orm");
-  const rows = await db.select().from(serviceRequests).where(inArray(serviceRequests.userId, userIds));
-  const map = new Map<number, typeof serviceRequests.$inferSelect[]>();
-  for (const row of rows) {
-    const arr = map.get(row.userId) || [];
-    arr.push(row);
-    map.set(row.userId, arr);
-  }
-  return map;
-}
-
-/**
- * Issue #21: N+1 Query — Batch offers for multiple requests.
- * Returns a map of requestId → offers[] in a single query.
- */
-export async function getOffersForRequestsBatch(requestIds: number[]) {
-  const db = await getDb();
-  if (!db || requestIds.length === 0) return new Map<number, typeof offers.$inferSelect[]>();
-  const { inArray } = await import("drizzle-orm");
-  const rows = await db.select().from(offers).where(inArray(offers.requestId, requestIds));
-  const map = new Map<number, typeof offers.$inferSelect[]>();
-  for (const row of rows) {
-    const arr = map.get(row.requestId) || [];
-    arr.push(row);
-    map.set(row.requestId, arr);
-  }
-  return map;
-}
-
-/**
- * Issue #21: N+1 Query — Get service request with related offers in a single query.
- */
-export async function getServiceRequestWithOffers(id: number) {
-  const db = await getDb();
-  if (!db) return null;
-  const { sql } = await import("drizzle-orm");
-  const requestRows = await db.select().from(serviceRequests).where(eq(serviceRequests.id, id));
-  if (requestRows.length === 0) return null;
-  const offerRows = await db.select().from(offers).where(eq(offers.requestId, id));
-  return { ...requestRows[0], offers: offerRows };
-}
-
 export async function getNearbyProviders(lat: string, lng: string) {
   const db = await getDb();
   if (!db) return [];
-  // Issue #21: Filter by verified providers, sort by rating, limit results
-  return db.select().from(providers)
-    .where(eq(providers.isVerified, 1))
-    .limit(20);
+  return db.select().from(providers).limit(20);
 }

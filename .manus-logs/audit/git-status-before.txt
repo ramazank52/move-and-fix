@@ -1,4 +1,0 @@
- [31mM[m todo.md
-[31m??[m .manus-logs/
-[31m??[m AUDIT_FINDINGS_DETAILED.md
-[31m??[m FINAL_ARCHITECTURE_AUDIT.md

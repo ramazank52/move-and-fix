@@ -3,10 +3,12 @@ export interface ServiceCategory {
   name: string;
   icon: string;
   color: string;
+  gradientColors: [string, string];
+  serviceCount: number;
   subcategories: string[];
   pricingType?: "fixed" | "km_based" | "hourly";
-  kmRate?: number; // TL per km
-  basePrice?: number; // Base price in TL
+  kmRate?: number;
+  basePrice?: number;
 }
 
 export const CATEGORIES: ServiceCategory[] = [
@@ -15,6 +17,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Temizlik",
     icon: "🧹",
     color: "#10B981",
+    gradientColors: ["#D1FAE5", "#A7F3D0"],
+    serviceCount: 128,
     subcategories: ["Ev Temizliği", "Ofis Temizliği", "Derin Temizlik", "Cam Temizliği"],
   },
   {
@@ -22,6 +26,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Su Tesisatı",
     icon: "🔧",
     color: "#3B82F6",
+    gradientColors: ["#DBEAFE", "#BFDBFE"],
+    serviceCount: 96,
     subcategories: ["Tıkanıklık Açma", "Musluk Tamiri", "Sızdırma Onarım", "Boru Döşeme"],
   },
   {
@@ -29,6 +35,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Elektrik",
     icon: "⚡",
     color: "#F59E0B",
+    gradientColors: ["#FEF3C7", "#FDE68A"],
+    serviceCount: 110,
     subcategories: ["Priz/Anahtar", "Aydınlatma", "Sigorta", "Kablo Döşeme"],
   },
   {
@@ -36,6 +44,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Boya & Badana",
     icon: "🎨",
     color: "#8B5CF6",
+    gradientColors: ["#EDE9FE", "#DDD6FE"],
+    serviceCount: 87,
     subcategories: ["İç Cephe Boya", "Dış Cephe Boya", "Dekoratif Boya", "Alçı İşleri"],
   },
   {
@@ -43,27 +53,35 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Klima",
     icon: "❄️",
     color: "#06B6D4",
+    gradientColors: ["#CFFAFE", "#A5F3FC"],
+    serviceCount: 75,
     subcategories: ["Klima Montajı", "Klima Bakımı", "Klima Tamiri", "Klima Temizliği"],
   },
   {
     id: "heating",
     name: "Kombi & Isıtma",
     icon: "🔥",
-    color: "#EF4444",
+    color: "#FF6B00",
+    gradientColors: ["#FFEDD5", "#FED7AA"],
+    serviceCount: 64,
     subcategories: ["Kombi Montajı", "Kombi Bakımı", "Kombi Tamiri", "Kalorifer Tamiri"],
   },
   {
     id: "moving",
     name: "Nakliyat",
     icon: "🚚",
-    color: "#F97316",
+    color: "#84CC16",
+    gradientColors: ["#ECFCCB", "#D9F99D"],
+    serviceCount: 92,
     subcategories: ["Ev Taşıma", "Ofis Taşıma", "Eşya Taşıma", "Şehirler Arası"],
   },
   {
     id: "locksmith",
     name: "Çilingir",
     icon: "🔑",
-    color: "#6366F1",
+    color: "#A855F7",
+    gradientColors: ["#F3E8FF", "#E9D5FF"],
+    serviceCount: 55,
     subcategories: ["Kapı Açma", "Kilit Değişimi", "Anahtar Kopyalama", "Çelik Kapı"],
   },
   {
@@ -71,6 +89,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Mobilya Montaj",
     icon: "🪑",
     color: "#A855F7",
+    gradientColors: ["#F3E8FF", "#E9D5FF"],
+    serviceCount: 43,
     subcategories: ["Dolap Montajı", "Mutfak Montajı", "Raf Montajı", "Demontaj"],
   },
   {
@@ -78,6 +98,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Araç Hizmetleri",
     icon: "🚗",
     color: "#64748B",
+    gradientColors: ["#F1F5F9", "#E2E8F0"],
+    serviceCount: 38,
     subcategories: ["Lastik Değişimi", "Akü Takviye", "Oto Tamiri"],
     pricingType: "fixed",
   },
@@ -86,6 +108,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Bahçe",
     icon: "🌿",
     color: "#22C55E",
+    gradientColors: ["#DCFCE7", "#BBF7D0"],
+    serviceCount: 29,
     subcategories: ["Bahçe Düzenleme", "Çim Biçme", "Ağaç Budama", "Peyzaj"],
   },
   {
@@ -93,6 +117,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Evcil Hayvan",
     icon: "🐾",
     color: "#EC4899",
+    gradientColors: ["#FCE7F3", "#FBCFE8"],
+    serviceCount: 22,
     subcategories: ["Bakım", "Gezdirme", "Veteriner", "Eğitim"],
   },
   {
@@ -100,6 +126,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Kurye & Evrak",
     icon: "📦",
     color: "#0EA5E9",
+    gradientColors: ["#E0F2FE", "#BAE6FD"],
+    serviceCount: 156,
     subcategories: ["Evrak Teslim", "Paket Gönderimi", "Moto Kurye", "Araçlı Kurye"],
     pricingType: "km_based",
     kmRate: 12,
@@ -110,6 +138,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Çekici",
     icon: "🚛",
     color: "#DC2626",
+    gradientColors: ["#FEE2E2", "#FECACA"],
+    serviceCount: 127,
     subcategories: ["Şehir İçi Çekici", "Şehirler Arası Çekici", "Ağır Vasıta Çekici", "Motosiklet Çekici"],
     pricingType: "km_based",
     kmRate: 25,
@@ -120,6 +150,8 @@ export const CATEGORIES: ServiceCategory[] = [
     name: "Yol Yardım",
     icon: "🚨",
     color: "#B91C1C",
+    gradientColors: ["#FEE2E2", "#FECACA"],
+    serviceCount: 98,
     subcategories: ["Akü Takviye", "Lastik Değişimi", "Yakıt İkmali", "Kilit Açma", "Arıza Çekici"],
     pricingType: "km_based",
     kmRate: 18,
