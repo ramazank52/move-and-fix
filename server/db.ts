@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -8,6 +8,12 @@ import {
   walletWithdrawals,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import {
+  assertPaymentStatusTransition,
+  calculatePaymentBreakdown,
+  commissionRateForProvider,
+  type EscrowPaymentStatus,
+} from "./payments/policy";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -97,7 +103,51 @@ export async function getUserByOpenId(openId: string) {
 
 // TODO: add feature queries here as your schema grows.
 
-import { serviceRequests, providers, offers, messages, payments } from "../drizzle/schema";
+import {
+  serviceCategories,
+  serviceRequests,
+  providers,
+  offers,
+  messages,
+  payments,
+  paymentWebhookEvents,
+  providerFavorites,
+  reviews,
+} from "../drizzle/schema";
+
+// Service Categories
+export async function getActiveServiceCategories() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: serviceCategories.id,
+      name: serviceCategories.name,
+      slug: serviceCategories.slug,
+      icon: serviceCategories.icon,
+      color: serviceCategories.color,
+      pricingType: serviceCategories.pricingType,
+      kmRate: serviceCategories.kmRate,
+      basePrice: serviceCategories.basePrice,
+      createdAt: serviceCategories.createdAt,
+      professionalCount: sql<number>`count(${providers.id})`,
+    })
+    .from(serviceCategories)
+    .leftJoin(providers, eq(providers.categoryId, serviceCategories.id))
+    .groupBy(serviceCategories.id)
+    .orderBy(serviceCategories.id);
+}
+
+export async function getServiceCategoryBySlug(slug: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(serviceCategories)
+    .where(eq(serviceCategories.slug, slug))
+    .limit(1);
+  return rows[0] ?? null;
+}
 
 // Service Requests
 export async function createServiceRequest(data: {
@@ -222,10 +272,109 @@ export async function getProviderProfile(userId: number) {
   return rows[0] ?? null;
 }
 
-export async function getNearbyProviders(lat: string, lng: string) {
+export async function getNearbyProviders(lat?: string, lng?: string) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(providers).limit(20);
+  // Distance sorting will be enabled when device location is supplied and a
+  // geospatial index is available. Without it, return verified/high-score
+  // professionals instead of presenting a fabricated distance.
+  void lat;
+  void lng;
+  return db
+    .select()
+    .from(providers)
+    .orderBy(desc(providers.isVerified), desc(providers.moveScore), desc(providers.rating))
+    .limit(20);
+}
+
+export async function getProviderById(providerId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      id: providers.id,
+      providerUserId: providers.userId,
+      displayName: providers.displayName,
+      bio: providers.bio,
+      categoryId: providers.categoryId,
+      rating: providers.rating,
+      completedJobs: providers.completedJobs,
+      moveScore: providers.moveScore,
+      isVerified: providers.isVerified,
+      isPremium: providers.isPremium,
+      latitude: providers.latitude,
+      longitude: providers.longitude,
+      createdAt: providers.createdAt,
+    })
+    .from(providers)
+    .where(eq(providers.id, providerId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getProvidersByCategory(categoryId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(providers)
+    .where(eq(providers.categoryId, categoryId))
+    .limit(100);
+}
+
+export async function getFavoriteProviders(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: providers.id,
+      providerUserId: providers.userId,
+      displayName: providers.displayName,
+      bio: providers.bio,
+      categoryId: providers.categoryId,
+      rating: providers.rating,
+      completedJobs: providers.completedJobs,
+      moveScore: providers.moveScore,
+      isVerified: providers.isVerified,
+      isPremium: providers.isPremium,
+      createdAt: providerFavorites.createdAt,
+    })
+    .from(providerFavorites)
+    .innerJoin(providers, eq(providers.id, providerFavorites.providerId))
+    .where(eq(providerFavorites.userId, userId))
+    .orderBy(desc(providerFavorites.createdAt));
+}
+
+export async function isFavoriteProvider(userId: number, providerId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db
+    .select({ id: providerFavorites.id })
+    .from(providerFavorites)
+    .where(and(eq(providerFavorites.userId, userId), eq(providerFavorites.providerId, providerId)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+export async function addFavoriteProvider(userId: number, providerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const provider = await getProviderById(providerId);
+  if (!provider) throw new Error("Provider not found");
+  await db
+    .insert(providerFavorites)
+    .values({ userId, providerId })
+    .onDuplicateKeyUpdate({ set: { providerId } });
+  return { success: true };
+}
+
+export async function removeFavoriteProvider(userId: number, providerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .delete(providerFavorites)
+    .where(and(eq(providerFavorites.userId, userId), eq(providerFavorites.providerId, providerId)));
+  return { success: true };
 }
 
 // ── Job Lifecycle Functions ──
@@ -314,25 +463,72 @@ export async function createReview(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // For now, store review as a message with special content
-  // In a full implementation, we'd have a reviews table
-  await db.insert(messages).values({
-    senderId: data.userId,
-    receiverId: data.providerId,
-    requestId: data.requestId,
-    content: `[REVIEW] Rating: ${data.rating}/5${data.comment ? ` — ${data.comment}` : ""}`,
+  return db.transaction(async (tx) => {
+    const requestRows = await tx
+      .select()
+      .from(serviceRequests)
+      .where(and(eq(serviceRequests.id, data.requestId), eq(serviceRequests.userId, data.userId)))
+      .limit(1);
+    const request = requestRows[0];
+    if (!request) throw new Error("Hizmet talebi bulunamadı");
+    if (request.status !== "completed") throw new Error("Yalnızca tamamlanan işler değerlendirilebilir");
+    if (request.assignedProviderId !== data.providerId) throw new Error("Bu profesyonel ilgili işe atanmamış");
+
+    const existing = await tx
+      .select({ id: reviews.id })
+      .from(reviews)
+      .where(eq(reviews.requestId, data.requestId))
+      .limit(1);
+    if (existing[0]) throw new Error("Bu iş daha önce değerlendirildi");
+
+    const providerRows = await tx
+      .select()
+      .from(providers)
+      .where(eq(providers.id, data.providerId))
+      .limit(1);
+    const provider = providerRows[0];
+    if (!provider) throw new Error("Profesyonel bulunamadı");
+
+    const countRows = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(reviews)
+      .where(eq(reviews.providerId, data.providerId));
+    const reviewCount = Number(countRows[0]?.count ?? 0);
+    const currentRating = Number(provider.rating ?? 0);
+    const newRating = Math.round((currentRating * reviewCount + data.rating) / (reviewCount + 1));
+
+    const result = await tx.insert(reviews).values({
+      requestId: data.requestId,
+      userId: data.userId,
+      providerId: data.providerId,
+      rating: data.rating,
+      comment: data.comment?.trim() || null,
+    });
+    await tx.update(providers).set({ rating: newRating }).where(eq(providers.id, data.providerId));
+
+    return { success: true, reviewId: result[0].insertId };
   });
+}
 
-  // Update provider rating
-  const providerRows = await db.select().from(providers).where(eq(providers.id, data.providerId)).limit(1);
-  if (providerRows.length > 0) {
-    const currentRating = (providerRows[0].rating ?? 0) as number;
-    const currentJobs = (providerRows[0].completedJobs ?? 0) as number;
-    const newRating = Math.round((currentRating * currentJobs + data.rating) / (currentJobs + 1));
-    await db.update(providers).set({ rating: newRating }).where(eq(providers.id, data.providerId));
-  }
-
-  return { success: true };
+export async function getProviderReviews(providerId: number, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: reviews.id,
+      requestId: reviews.requestId,
+      providerId: reviews.providerId,
+      rating: reviews.rating,
+      comment: reviews.comment,
+      createdAt: reviews.createdAt,
+      reviewerName: users.name,
+    })
+    .from(reviews)
+    .innerJoin(users, eq(reviews.userId, users.id))
+    .where(eq(reviews.providerId, providerId))
+    .orderBy(desc(reviews.createdAt))
+    .limit(limit)
+    .offset(offset);
 }
 
 // Provider dashboard: get jobs assigned to a provider
@@ -394,25 +590,345 @@ export async function getNewJobsForProvider(providerId: number) {
   ).limit(20);
 }
 
-// Create payment record (escrow)
+export async function getPaymentQuote(requestId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const requestRows = await db
+    .select()
+    .from(serviceRequests)
+    .where(and(eq(serviceRequests.id, requestId), eq(serviceRequests.userId, userId)))
+    .limit(1);
+  const request = requestRows[0];
+  if (!request) throw new Error("PAYMENT_REQUEST_NOT_FOUND");
+  if (request.status !== "active" || request.assignedProviderId == null) {
+    throw new Error("PAYMENT_REQUEST_NOT_READY");
+  }
+
+  const offerRows = await db
+    .select()
+    .from(offers)
+    .where(
+      and(
+        eq(offers.requestId, request.id),
+        eq(offers.providerId, request.assignedProviderId),
+        eq(offers.status, "accepted"),
+      ),
+    )
+    .limit(1);
+  const offer = offerRows[0];
+  if (!offer) throw new Error("PAYMENT_ACCEPTED_OFFER_NOT_FOUND");
+
+  const providerRows = await db
+    .select()
+    .from(providers)
+    .where(eq(providers.id, request.assignedProviderId))
+    .limit(1);
+  const provider = providerRows[0];
+  if (!provider) throw new Error("PAYMENT_PROVIDER_NOT_FOUND");
+
+  const breakdown = calculatePaymentBreakdown(
+    offer.price,
+    commissionRateForProvider(provider.isPremium === 1),
+  );
+
+  return {
+    requestId: request.id,
+    requestTitle: request.title,
+    providerId: provider.id,
+    providerName: provider.displayName,
+    offerId: offer.id,
+    currency: "TRY" as const,
+    ...breakdown,
+  };
+}
+
+// Creates only a pending intent. A verified gateway webhook is responsible for pending -> held.
 export async function createPayment(data: {
   requestId: number;
   userId: number;
-  providerId: number;
-  amount: number;
+  idempotencyKey: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(payments).values(data);
-  return result[0].insertId;
+  const quote = await getPaymentQuote(data.requestId, data.userId);
+  const scopedKey = `${data.userId}:${data.idempotencyKey}`;
+
+  const createIntent = async () => db.transaction(async (tx) => {
+    const existingByKey = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.idempotencyKey, scopedKey))
+      .limit(1);
+    if (existingByKey[0]) {
+      if (existingByKey[0].userId !== data.userId || existingByKey[0].requestId !== data.requestId) {
+        throw new Error("PAYMENT_IDEMPOTENCY_CONFLICT");
+      }
+      return { payment: existingByKey[0], duplicated: true };
+    }
+
+    const existingForRequest = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.requestId, data.requestId))
+      .limit(1);
+    if (existingForRequest[0]) {
+      if (existingForRequest[0].userId !== data.userId) throw new Error("PAYMENT_FORBIDDEN");
+      return { payment: existingForRequest[0], duplicated: true };
+    }
+
+    const result = await tx.insert(payments).values({
+      requestId: quote.requestId,
+      userId: data.userId,
+      providerId: quote.providerId,
+      offerId: quote.offerId,
+      amount: quote.amount,
+      commissionRateBps: quote.commissionRateBps,
+      commissionAmount: quote.commissionAmount,
+      providerPayout: quote.providerPayout,
+      idempotencyKey: scopedKey,
+      status: "pending",
+    });
+    const rows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, result[0].insertId))
+      .limit(1);
+    if (!rows[0]) throw new Error("PAYMENT_CREATE_FAILED");
+    return { payment: rows[0], duplicated: false };
+  });
+
+  try {
+    const result = await createIntent();
+    return {
+      ...result,
+      quote,
+      gatewayReady: false as const,
+      blocker: "PAYMENT_GATEWAY_CREDENTIALS_REQUIRED" as const,
+    };
+  } catch (error) {
+    const mysqlCode = (error as { code?: string } | null)?.code;
+    if (mysqlCode !== "ER_DUP_ENTRY") throw error;
+    const rows = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.requestId, data.requestId))
+      .limit(1);
+    if (!rows[0] || rows[0].userId !== data.userId) throw error;
+    return {
+      payment: rows[0],
+      duplicated: true,
+      quote,
+      gatewayReady: false as const,
+      blocker: "PAYMENT_GATEWAY_CREDENTIALS_REQUIRED" as const,
+    };
+  }
 }
 
-// Update payment status
-export async function updatePaymentStatus(paymentId: number, status: "pending" | "held" | "released" | "refunded") {
+export async function reservePaymentGateway(data: {
+  paymentId: number;
+  userId: number;
+  provider: PaymentWebhookProvider;
+}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(payments).set({ status }).where(eq(payments.id, paymentId));
-  return { success: true, paymentId, status };
+
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, data.paymentId))
+      .limit(1);
+    const payment = rows[0];
+    if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+    if (payment.userId !== data.userId) throw new Error("PAYMENT_FORBIDDEN");
+    if (payment.status !== "pending") throw new Error("PAYMENT_GATEWAY_INVALID_STATUS");
+    if (payment.gatewayProvider && payment.gatewayProvider !== data.provider) {
+      throw new Error("PAYMENT_GATEWAY_PROVIDER_CONFLICT");
+    }
+
+    if (!payment.gatewayProvider) {
+      const updateResult = await tx
+        .update(payments)
+        .set({ gatewayProvider: data.provider })
+        .where(
+          and(
+            eq(payments.id, data.paymentId),
+            eq(payments.userId, data.userId),
+            eq(payments.status, "pending"),
+            isNull(payments.gatewayProvider),
+          ),
+        );
+      if (updateResult[0].affectedRows !== 1) {
+        throw new Error("PAYMENT_GATEWAY_RESERVATION_CONFLICT");
+      }
+    }
+
+    const updatedRows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, data.paymentId))
+      .limit(1);
+    if (!updatedRows[0]) throw new Error("PAYMENT_NOT_FOUND");
+    return updatedRows[0];
+  });
+}
+
+export async function attachPaymentGatewayTransaction(data: {
+  paymentId: number;
+  userId: number;
+  provider: PaymentWebhookProvider;
+  gatewayPaymentId?: string;
+  gatewayCheckoutToken?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (!data.gatewayPaymentId && !data.gatewayCheckoutToken) {
+    throw new Error("PAYMENT_GATEWAY_REFERENCE_REQUIRED");
+  }
+  if (data.provider === "stripe" && (!data.gatewayPaymentId || data.gatewayCheckoutToken)) {
+    throw new Error("PAYMENT_GATEWAY_REFERENCE_INVALID");
+  }
+  if (data.provider === "iyzico" && !data.gatewayCheckoutToken) {
+    throw new Error("PAYMENT_GATEWAY_REFERENCE_INVALID");
+  }
+
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, data.paymentId))
+      .limit(1);
+    const payment = rows[0];
+    if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+    if (payment.userId !== data.userId) throw new Error("PAYMENT_FORBIDDEN");
+    if (payment.status !== "pending") throw new Error("PAYMENT_GATEWAY_INVALID_STATUS");
+    if (payment.gatewayProvider !== data.provider) {
+      throw new Error("PAYMENT_GATEWAY_PROVIDER_CONFLICT");
+    }
+    if (
+      payment.gatewayPaymentId &&
+      data.gatewayPaymentId &&
+      payment.gatewayPaymentId !== data.gatewayPaymentId
+    ) {
+      throw new Error("PAYMENT_GATEWAY_TRANSACTION_CONFLICT");
+    }
+    if (
+      payment.gatewayCheckoutToken &&
+      data.gatewayCheckoutToken &&
+      payment.gatewayCheckoutToken !== data.gatewayCheckoutToken
+    ) {
+      throw new Error("PAYMENT_GATEWAY_TRANSACTION_CONFLICT");
+    }
+
+    const updates: {
+      gatewayPaymentId?: string;
+      gatewayCheckoutToken?: string;
+    } = {};
+    if (!payment.gatewayPaymentId && data.gatewayPaymentId) {
+      updates.gatewayPaymentId = data.gatewayPaymentId;
+    }
+    if (!payment.gatewayCheckoutToken && data.gatewayCheckoutToken) {
+      updates.gatewayCheckoutToken = data.gatewayCheckoutToken;
+    }
+    if (Object.keys(updates).length === 0) {
+      return { payment, duplicated: true };
+    }
+
+    const updateResult = await tx
+      .update(payments)
+      .set(updates)
+      .where(
+        and(
+          eq(payments.id, data.paymentId),
+          eq(payments.userId, data.userId),
+          eq(payments.gatewayProvider, data.provider),
+          eq(payments.status, "pending"),
+          ...(updates.gatewayPaymentId ? [isNull(payments.gatewayPaymentId)] : []),
+          ...(updates.gatewayCheckoutToken ? [isNull(payments.gatewayCheckoutToken)] : []),
+        ),
+      );
+    if (updateResult[0].affectedRows !== 1) {
+      throw new Error("PAYMENT_GATEWAY_TRANSACTION_CONFLICT");
+    }
+
+    const updatedRows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, data.paymentId))
+      .limit(1);
+    if (!updatedRows[0]) throw new Error("PAYMENT_NOT_FOUND");
+    return { payment: updatedRows[0], duplicated: false };
+  });
+}
+
+export async function getPaymentByIyzicoCheckoutToken(checkoutToken: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const token = checkoutToken.trim();
+  if (!token || token.length > 512) throw new Error("PAYMENT_CHECKOUT_TOKEN_INVALID");
+
+  const rows = await db
+    .select()
+    .from(payments)
+    .where(
+      and(
+        eq(payments.gatewayProvider, "iyzico"),
+        eq(payments.gatewayCheckoutToken, token),
+      ),
+    )
+    .limit(1);
+  const payment = rows[0];
+  if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+  return payment;
+}
+
+export async function transitionPaymentStatus(data: {
+  paymentId: number;
+  actorUserId: number;
+  nextStatus: EscrowPaymentStatus;
+  requireAdmin?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, data.paymentId))
+      .limit(1);
+    const payment = rows[0];
+    if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+    if (!data.requireAdmin && payment.userId !== data.actorUserId) throw new Error("PAYMENT_FORBIDDEN");
+    if (payment.status === data.nextStatus) return { payment, duplicated: true };
+
+    assertPaymentStatusTransition(payment.status, data.nextStatus);
+
+    const requestRows = await tx
+      .select()
+      .from(serviceRequests)
+      .where(eq(serviceRequests.id, payment.requestId))
+      .limit(1);
+    const request = requestRows[0];
+    if (!request) throw new Error("PAYMENT_REQUEST_NOT_FOUND");
+    if (data.nextStatus === "released" && request.status !== "completed") {
+      throw new Error("PAYMENT_JOB_NOT_COMPLETED");
+    }
+
+    await tx
+      .update(payments)
+      .set({ status: data.nextStatus })
+      .where(and(eq(payments.id, data.paymentId), eq(payments.status, payment.status)));
+
+    const updatedRows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, data.paymentId))
+      .limit(1);
+    if (!updatedRows[0]) throw new Error("PAYMENT_UPDATE_FAILED");
+    return { payment: updatedRows[0], duplicated: false };
+  });
 }
 
 // Get payments for a user
@@ -420,6 +936,210 @@ export async function getUserPayments(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(payments).where(eq(payments.userId, userId));
+}
+
+export type PaymentWebhookProvider = "iyzico" | "stripe";
+
+export async function resolvePaymentForGatewayWebhook(data: {
+  provider: PaymentWebhookProvider;
+  gatewayPaymentId: string;
+  internalPaymentId?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return db.transaction(async (tx) => {
+    const byReference = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.gatewayPaymentId, data.gatewayPaymentId))
+      .limit(1);
+    let payment = byReference[0];
+
+    if (!payment && data.internalPaymentId) {
+      const byId = await tx
+        .select()
+        .from(payments)
+        .where(eq(payments.id, data.internalPaymentId))
+        .limit(1);
+      payment = byId[0];
+    }
+    if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+    if (payment.gatewayProvider && payment.gatewayProvider !== data.provider) {
+      throw new Error("PAYMENT_GATEWAY_PROVIDER_CONFLICT");
+    }
+    if (
+      payment.gatewayPaymentId &&
+      payment.gatewayPaymentId !== data.gatewayPaymentId
+    ) {
+      throw new Error("PAYMENT_GATEWAY_TRANSACTION_CONFLICT");
+    }
+
+    if (!payment.gatewayProvider || !payment.gatewayPaymentId) {
+      const updateResult = await tx
+        .update(payments)
+        .set({
+          gatewayProvider: data.provider,
+          gatewayPaymentId: data.gatewayPaymentId,
+        })
+        .where(
+          and(
+            eq(payments.id, payment.id),
+            payment.gatewayProvider
+              ? eq(payments.gatewayProvider, data.provider)
+              : isNull(payments.gatewayProvider),
+            payment.gatewayPaymentId
+              ? eq(payments.gatewayPaymentId, data.gatewayPaymentId)
+              : isNull(payments.gatewayPaymentId),
+          ),
+        );
+      if (updateResult[0].affectedRows !== 1) {
+        throw new Error("PAYMENT_GATEWAY_TRANSACTION_CONFLICT");
+      }
+      const updatedRows = await tx
+        .select()
+        .from(payments)
+        .where(eq(payments.id, payment.id))
+        .limit(1);
+      if (!updatedRows[0]) throw new Error("PAYMENT_NOT_FOUND");
+      payment = updatedRows[0];
+    }
+
+    return payment;
+  });
+}
+
+export async function transitionPaymentFromVerifiedWebhook(data: {
+  paymentId: number;
+  nextStatus: "held" | "refunded";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, data.paymentId))
+      .limit(1);
+    const payment = rows[0];
+    if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+    if (payment.status === data.nextStatus) return { payment, duplicated: true };
+
+    assertPaymentStatusTransition(payment.status, data.nextStatus);
+    const updateResult = await tx
+      .update(payments)
+      .set({ status: data.nextStatus })
+      .where(and(eq(payments.id, payment.id), eq(payments.status, payment.status)));
+    if (updateResult[0].affectedRows !== 1) throw new Error("PAYMENT_UPDATE_CONFLICT");
+
+    const updatedRows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, payment.id))
+      .limit(1);
+    if (!updatedRows[0]) throw new Error("PAYMENT_UPDATE_FAILED");
+    return { payment: updatedRows[0], duplicated: false };
+  });
+}
+
+export async function claimPaymentWebhookEvent(data: {
+  provider: PaymentWebhookProvider;
+  eventId: string;
+  eventType: string;
+  payloadHash: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    const result = await db.insert(paymentWebhookEvents).values({
+      provider: data.provider,
+      eventId: data.eventId,
+      eventType: data.eventType,
+      payloadHash: data.payloadHash,
+      status: "processing",
+    });
+    const rows = await db
+      .select()
+      .from(paymentWebhookEvents)
+      .where(eq(paymentWebhookEvents.id, result[0].insertId))
+      .limit(1);
+    if (!rows[0]) throw new Error("PAYMENT_WEBHOOK_CLAIM_FAILED");
+    return { event: rows[0], claimed: true, duplicated: false };
+  } catch (error) {
+    const mysqlCode = (error as { code?: string } | null)?.code;
+    if (mysqlCode !== "ER_DUP_ENTRY") throw error;
+  }
+
+  const existingRows = await db
+    .select()
+    .from(paymentWebhookEvents)
+    .where(
+      and(
+        eq(paymentWebhookEvents.provider, data.provider),
+        eq(paymentWebhookEvents.eventId, data.eventId),
+      ),
+    )
+    .limit(1);
+  const existing = existingRows[0];
+  if (!existing) throw new Error("PAYMENT_WEBHOOK_CLAIM_FAILED");
+  if (existing.payloadHash !== data.payloadHash) {
+    throw new Error("PAYMENT_WEBHOOK_PAYLOAD_MISMATCH");
+  }
+
+  if (existing.status === "failed") {
+    const retryResult = await db
+      .update(paymentWebhookEvents)
+      .set({
+        status: "processing",
+        error: null,
+        receivedAt: new Date(),
+        processedAt: null,
+      })
+      .where(
+        and(
+          eq(paymentWebhookEvents.id, existing.id),
+          eq(paymentWebhookEvents.status, "failed"),
+        ),
+      );
+    if (retryResult[0].affectedRows === 1) {
+      return {
+        event: { ...existing, status: "processing" as const, error: null, processedAt: null },
+        claimed: true,
+        duplicated: true,
+      };
+    }
+  }
+
+  return { event: existing, claimed: false, duplicated: true };
+}
+
+export async function completePaymentWebhookEvent(data: {
+  provider: PaymentWebhookProvider;
+  eventId: string;
+  status: "processed" | "failed";
+  error?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .update(paymentWebhookEvents)
+    .set({
+      status: data.status,
+      error: data.status === "failed" ? data.error?.slice(0, 2_000) ?? "Unknown processing error" : null,
+      processedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(paymentWebhookEvents.provider, data.provider),
+        eq(paymentWebhookEvents.eventId, data.eventId),
+        eq(paymentWebhookEvents.status, "processing"),
+      ),
+    );
+
+  if (result[0].affectedRows !== 1) throw new Error("PAYMENT_WEBHOOK_STATE_CONFLICT");
 }
 
 export async function ensureWalletAccount(userId: number) {

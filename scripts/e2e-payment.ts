@@ -12,10 +12,13 @@ async function tRPC(procedure: string, method: "GET" | "POST", token: string, bo
     "Content-Type": "application/json",
     "Authorization": `Bearer ${token}`,
   };
-  const res = await fetch(`${API}/api/trpc/${procedure}`, {
+  const query = method === "GET" && body
+    ? `?input=${encodeURIComponent(JSON.stringify({ json: body }))}`
+    : "";
+  const res = await fetch(`${API}/api/trpc/${procedure}${query}`, {
     method,
     headers,
-    body: body ? JSON.stringify({ json: body }) : undefined,
+    body: method === "POST" && body ? JSON.stringify({ json: body }) : undefined,
   });
   const data = await res.json() as any;
   if (data.error) {
@@ -50,9 +53,9 @@ async function main() {
   log("offers.create — Provider teklif ver");
   const offer = await tRPC("offers.create", "POST", providerToken, {
     requestId,
-    providerId: 3,
     price: 350,
     message: "Test offer",
+    estimatedTime: "2 saat",
   });
   const offerId = typeof offer === "number" ? offer : (offer as any)?.id;
   console.log("Offer ID:", offerId);
@@ -61,31 +64,50 @@ async function main() {
   log("offers.accept — Teklif kabul");
   await tRPC("offers.accept", "POST", customerToken, { offerId });
 
-  // 4. Create payment
-  log("payments.create — Ödeme oluştur");
+  // 4. Server-derived quote; client amount/provider is never accepted
+  log("payments.quote — Server-derived amount/provider/commission");
+  const quote = await tRPC("payments.quote", "GET", customerToken, { requestId });
+  console.log("Quote:", quote);
+
+  const idempotencyKey = `payment-e2e-${requestId}-${Date.now()}`;
+  log("payments.create — Güvenli pending ödeme niyeti");
   const payment = await tRPC("payments.create", "POST", customerToken, {
     requestId,
-    providerId: 3,
-    amount: 350,
+    idempotencyKey,
+    providerId: 999,
+    amount: 1,
+    commissionRateBps: 0,
   });
-  const paymentId = typeof payment === "number" ? payment : (payment as any)?.id;
+  const paymentId = (payment as any)?.payment?.id;
   console.log("Payment ID:", paymentId);
+  if (!paymentId) throw new Error("payments.create failed — no payment ID");
+  if ((payment as any)?.payment?.amount !== (quote as any)?.amount) {
+    throw new Error("Amount tampering protection failed");
+  }
 
-  // 5. Update payment status — held (escrow)
-  log("payments.updateStatus — Escrow (held)");
-  const heldStatus = await tRPC("payments.updateStatus", "POST", customerToken, {
-    paymentId,
-    status: "held",
+  // 5. Same idempotency key must return the same payment
+  log("payments.create — Duplicate idempotency replay");
+  const duplicate = await tRPC("payments.create", "POST", customerToken, {
+    requestId,
+    idempotencyKey,
   });
-  console.log("Held:", heldStatus);
+  if ((duplicate as any)?.payment?.id !== paymentId || !(duplicate as any)?.duplicated) {
+    throw new Error("Idempotency protection failed");
+  }
+  console.log("Duplicate safely returned existing payment:", paymentId);
 
-  // 6. Update payment status — completed (release to provider)
-  log("payments.updateStatus — Tamamlandı (release)");
-  const completedStatus = await tRPC("payments.updateStatus", "POST", customerToken, {
-    paymentId,
-    status: "released",
-  });
-  console.log("Released:", completedStatus);
+  // 6. Pending payment cannot be released; gateway webhook must first confirm held
+  log("payments.release — Pending ödeme için release reddi");
+  let releaseBlocked = false;
+  try {
+    await tRPC("payments.release", "POST", customerToken, { paymentId });
+  } catch (error) {
+    releaseBlocked = true;
+    console.log("Release correctly blocked:", error instanceof Error ? error.message : error);
+  }
+  if (!releaseBlocked) {
+    throw new Error("Invalid release unexpectedly succeeded");
+  }
 
   // 7. List payments
   log("payments.list — Ödeme geçmişi");

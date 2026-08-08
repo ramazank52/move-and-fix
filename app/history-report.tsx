@@ -1,11 +1,9 @@
-import { Text, View, Pressable, ScrollView, Dimensions } from "react-native";
+import { Text, View, Pressable, ScrollView } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface MonthlyStats {
   month: string;
@@ -328,4 +326,3 @@ export default function HistoryReportScreen() {
     </ScreenContainer>
   );
 }
-

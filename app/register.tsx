@@ -38,7 +38,7 @@ export default function RegisterScreen() {
           <View style={{ alignItems: "center", marginBottom: 30 }}>
             <Text style={{ fontSize: 26, fontWeight: "bold", color: colors.foreground }}>Hesap Oluştur</Text>
             <Text style={{ fontSize: 14, color: colors.muted, marginTop: 6 }}>
-              Move&Fix'e hoş geldiniz
+              Move&Fix’e hoş geldiniz
             </Text>
           </View>
 

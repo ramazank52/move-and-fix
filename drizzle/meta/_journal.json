@@ -22,6 +22,48 @@
       "when": 1786209693325,
       "tag": "0002_redundant_photon",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1786214188737,
+      "tag": "0003_exotic_otto_octavius",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1786214867604,
+      "tag": "0004_glamorous_blue_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1786216157566,
+      "tag": "0005_whole_boomer",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1786216619177,
+      "tag": "0006_lame_centennial",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1786217194720,
+      "tag": "0007_concerned_toro",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1786218548326,
+      "tag": "0008_silent_young_avengers",
+      "breakpoints": true
     }
   ]
 }

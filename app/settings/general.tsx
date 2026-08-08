@@ -10,7 +10,7 @@ export default function GeneralSettingsScreen() {
   const router = useRouter();
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
-  const [language, setLanguage] = useState("Türkçe");
+  const [language] = useState("Türkçe");
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
@@ -144,4 +144,3 @@ export default function GeneralSettingsScreen() {
     </ScreenContainer>
   );
 }
-

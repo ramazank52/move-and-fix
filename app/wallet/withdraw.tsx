@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
+import * as Crypto from "expo-crypto";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -8,7 +9,7 @@ import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 
 function createIdempotencyKey() {
-  return `wallet-withdraw-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  return `wallet-withdraw-${Crypto.randomUUID()}`;
 }
 
 export default function WalletWithdrawScreen() {

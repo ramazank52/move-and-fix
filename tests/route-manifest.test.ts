@@ -26,6 +26,7 @@ const criticalNavigationTargets = [
   "onboarding.tsx",
   "login.tsx",
   "oauth/callback.tsx",
+  "payment/return.tsx",
   "admin.tsx",
   "chat/[id].tsx",
   "wallet/transactions.tsx",

@@ -1,5 +1,4 @@
 import { Text, View, Pressable, Image, Alert, Platform } from "react-native";
-import { useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";

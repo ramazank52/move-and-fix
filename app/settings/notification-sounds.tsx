@@ -1,4 +1,4 @@
-import { Text, View, Pressable, ScrollView, Switch } from "react-native";
+import { Text, View, Pressable, ScrollView, Switch, Platform } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -6,7 +6,6 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { DEFAULT_SOUND_SETTINGS, type NotificationType } from "@/lib/notification-sounds";
 import * as Haptics from "expo-haptics";
-import { Platform } from "react-native";
 
 const NOTIFICATION_TYPES: { type: NotificationType; label: string; icon: string }[] = [
   { type: "new_offer", label: "Yeni Teklif", icon: "📋" },
@@ -233,4 +232,3 @@ export default function NotificationSoundsScreen() {
     </ScreenContainer>
   );
 }
-

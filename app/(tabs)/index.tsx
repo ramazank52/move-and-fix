@@ -19,7 +19,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
 
   // Fetch data
-  const { data: activeJobs, isLoading: jobsLoading } = trpc.requests.list.useQuery(undefined, {
+  const { data: activeJobs } = trpc.requests.list.useQuery(undefined, {
     enabled: !!user,
   });
 

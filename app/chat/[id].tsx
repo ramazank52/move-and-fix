@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { View, Text, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -63,7 +63,7 @@ export default function ChatRoomScreen() {
       content: text,
       receiverId: otherUid,
     });
-  }, [input, sendMessageMutation, id, otherUserId]);
+  }, [input, sendMessageMutation, id, otherUid]);
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>

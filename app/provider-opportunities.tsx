@@ -29,7 +29,7 @@ export default function ProviderOpportunitiesScreen() {
 
   const profileQuery = trpc.providers.myProfile.useQuery();
   const jobsQuery = trpc.providers.newJobs.useQuery();
-  const opportunities = jobsQuery.data ?? [];
+  const opportunities = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data]);
   const selectedOpportunity = useMemo(
     () => opportunities.find((item) => item.id === selectedRequestId) ?? null,
     [opportunities, selectedRequestId],

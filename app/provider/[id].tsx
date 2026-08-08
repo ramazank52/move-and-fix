@@ -1,47 +1,156 @@
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-} from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { SAMPLE_PROVIDERS } from "@/lib/data/providers";
+import { useColors } from "@/hooks/use-colors";
+import { trpc } from "@/lib/trpc";
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase("tr-TR"))
+    .join("");
+}
+
+function formatReviewDate(value: Date | string) {
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+}
 
 export default function ProviderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const providerId = Number(id);
   const colors = useColors();
   const router = useRouter();
-  const provider = SAMPLE_PROVIDERS.find((p) => p.id === id) || SAMPLE_PROVIDERS[0];
+  const utils = trpc.useUtils();
+  const validProviderId = Number.isInteger(providerId) && providerId > 0;
+
+  const providerQuery = trpc.providers.byId.useQuery(
+    { providerId },
+    { enabled: validProviderId }
+  );
+  const categoriesQuery = trpc.categories.list.useQuery();
+  const reviewsQuery = trpc.reviews.forProvider.useQuery(
+    { providerId, limit: 10, offset: 0 },
+    { enabled: validProviderId }
+  );
+  const favoriteQuery = trpc.providers.favoriteStatus.useQuery(
+    { providerId },
+    { enabled: validProviderId && Boolean(providerQuery.data) }
+  );
+  const invalidateFavorites = async () => {
+    await Promise.all([
+      utils.providers.favoriteList.invalidate(),
+      utils.providers.favoriteStatus.invalidate({ providerId }),
+    ]);
+  };
+  const addFavorite = trpc.providers.favoriteAdd.useMutation({
+    onSuccess: invalidateFavorites,
+    onError: (error) => Alert.alert("Favori güncellenemedi", error.message),
+  });
+  const removeFavorite = trpc.providers.favoriteRemove.useMutation({
+    onSuccess: invalidateFavorites,
+    onError: (error) => Alert.alert("Favori güncellenemedi", error.message),
+  });
+
+  const provider = providerQuery.data;
+  const category = categoriesQuery.data?.find((item) => item.id === provider?.categoryId);
+  const reviews = reviewsQuery.data ?? [];
+
+  const header = (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 0.5,
+        borderBottomColor: colors.border,
+      }}
+    >
+      <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
+        <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
+      </Pressable>
+      <Text style={{ flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700", color: colors.foreground }}>
+        Usta Profili
+      </Text>
+      {providerQuery.data ? (
+        <Pressable
+          accessibilityLabel={favoriteQuery.data ? "Favorilerden çıkar" : "Favorilere ekle"}
+          disabled={favoriteQuery.isLoading || addFavorite.isPending || removeFavorite.isPending}
+          onPress={() => {
+            if (favoriteQuery.data) removeFavorite.mutate({ providerId });
+            else addFavorite.mutate({ providerId });
+          }}
+          style={({ pressed }) => ({
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: pressed ? 0.7 : 1,
+            width: 30,
+          })}
+        >
+          <IconSymbol
+            name="heart.fill"
+            size={22}
+            color={favoriteQuery.data ? colors.error : colors.muted}
+          />
+        </Pressable>
+      ) : (
+        <View style={{ width: 30 }} />
+      )}
+    </View>
+  );
+
+  if (!validProviderId || providerQuery.isLoading) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]}>
+        {header}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
+          {validProviderId ? <ActivityIndicator color={colors.primary} /> : null}
+          <Text style={{ color: colors.muted }}>
+            {validProviderId ? "Profesyonel bilgileri yükleniyor..." : "Geçersiz profesyonel bağlantısı"}
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (providerQuery.error || !provider) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]}>
+        {header}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 14 }}>
+          <IconSymbol name="person.fill" size={40} color={colors.muted} />
+          <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: "700", textAlign: "center" }}>
+            Profesyonel bulunamadı
+          </Text>
+          <Text style={{ color: colors.muted, fontSize: 13, textAlign: "center" }}>
+            {providerQuery.error?.message ?? "Bu profil artık kullanılamıyor olabilir."}
+          </Text>
+          <Pressable
+            onPress={() => providerQuery.refetch()}
+            style={{ backgroundColor: colors.primary, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10 }}
+          >
+            <Text style={{ color: "#FFF", fontWeight: "700" }}>Yeniden Dene</Text>
+          </Pressable>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  const startingPrice = category?.basePrice
+    ? new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(category.basePrice)
+    : "Teklif ile belirlenir";
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: 0.5,
-          borderBottomColor: colors.border,
-        }}
-      >
-        <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
-          <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
-        </Pressable>
-        <Text style={{ flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700", color: colors.foreground }}>
-          Usta Profili
-        </Text>
-        <Pressable style={{ padding: 4 }}>
-          <IconSymbol name="heart" size={22} color={colors.muted} />
-        </Pressable>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Profile Header */}
+      {header}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 118 }}>
         <View style={{ alignItems: "center", paddingVertical: 24, paddingHorizontal: 20 }}>
           <View
             style={{
@@ -55,257 +164,135 @@ export default function ProviderDetailScreen() {
             }}
           >
             <Text style={{ fontSize: 32, fontWeight: "800", color: colors.primary }}>
-              {provider.avatarInitials}
+              {initials(provider.displayName)}
             </Text>
           </View>
-          <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>
-            {provider.name}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>
+              {provider.displayName}
+            </Text>
+            {provider.isVerified === 1 ? (
+              <IconSymbol name="checkmark.seal.fill" size={18} color={colors.primary} />
+            ) : null}
+          </View>
           <Text style={{ fontSize: 14, color: colors.muted, marginTop: 4 }}>
-            {provider.categoryName} · {provider.location}
+            {category?.name ?? "Profesyonel Hizmet"}
           </Text>
 
-          {/* Badges */}
           <View style={{ flexDirection: "row", marginTop: 12, gap: 8 }}>
-            {provider.verified && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: colors.success + "15",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 10,
-                }}
-              >
+            {provider.isVerified === 1 ? (
+              <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.success + "15", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
                 <IconSymbol name="checkmark.seal.fill" size={12} color={colors.success} />
-                <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600", marginLeft: 4 }}>
-                  Doğrulanmış
-                </Text>
+                <Text style={{ fontSize: 12, color: colors.success, fontWeight: "600", marginLeft: 4 }}>Doğrulanmış</Text>
               </View>
-            )}
-            {provider.premium && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: colors.accentPurple + "15",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 10,
-                }}
-              >
+            ) : null}
+            {provider.isPremium === 1 ? (
+              <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.accentPurple + "15", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 }}>
                 <IconSymbol name="star.fill" size={12} color={colors.accentPurple} />
-                <Text style={{ fontSize: 12, color: colors.accentPurple, fontWeight: "600", marginLeft: 4 }}>
-                  Premium
-                </Text>
+                <Text style={{ fontSize: 12, color: colors.accentPurple, fontWeight: "600", marginLeft: 4 }}>Premium</Text>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
 
-        {/* Stats Card */}
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              backgroundColor: colors.card,
-              borderRadius: 20,
-              padding: 20,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.05,
-              shadowRadius: 10,
-              elevation: 2,
-              borderWidth: 0.5,
-              borderColor: colors.border,
-            }}
-          >
+          <View style={{ flexDirection: "row", backgroundColor: colors.card, borderRadius: 20, padding: 20, borderWidth: 0.5, borderColor: colors.border }}>
             <View style={{ flex: 1, alignItems: "center" }}>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <IconSymbol name="star.fill" size={16} color="#FFB800" />
-                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground, marginLeft: 4 }}>
-                  {provider.rating}
-                </Text>
+                <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground, marginLeft: 4 }}>{provider.rating ?? 0}</Text>
               </View>
               <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>Puan</Text>
             </View>
             <View style={{ width: 1, backgroundColor: colors.border }} />
             <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>
-                {provider.completedJobs}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>Tamamlanan İş</Text>
+              <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{provider.completedJobs ?? 0}</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>Tamamlanan</Text>
             </View>
             <View style={{ width: 1, backgroundColor: colors.border }} />
             <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>
-                {provider.responseTime}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>Yanıt Süresi</Text>
+              <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{provider.moveScore ?? 0}</Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>MoveScore</Text>
             </View>
           </View>
         </View>
 
-        {/* About */}
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
-            Hakkında
-          </Text>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>Hakkında</Text>
           <Text style={{ fontSize: 14, color: colors.muted, lineHeight: 22 }}>
-            {provider.description}
+            {provider.bio?.trim() || "Profesyonel henüz bir tanıtım metni eklemedi."}
           </Text>
         </View>
 
-        {/* Services */}
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
-            Hizmetler
-          </Text>
-          <View style={{ gap: 8 }}>
-            {provider.services.map((service) => (
-              <View
-                key={service}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingVertical: 12,
-                  paddingHorizontal: 14,
-                  backgroundColor: colors.card,
-                  borderRadius: 14,
-                  borderWidth: 0.5,
-                  borderColor: colors.border,
-                }}
-              >
-                <View
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 8,
-                    backgroundColor: colors.success + "15",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <IconSymbol name="checkmark" size={16} color={colors.success} />
-                </View>
-                <Text style={{ marginLeft: 12, fontSize: 14, color: colors.foreground, fontWeight: "500" }}>
-                  {service}
-                </Text>
-              </View>
-            ))}
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>Hizmet</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 14, backgroundColor: colors.card, borderRadius: 14, borderWidth: 0.5, borderColor: colors.border }}>
+            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.success + "15", alignItems: "center", justifyContent: "center" }}>
+              <IconSymbol name="checkmark" size={16} color={colors.success} />
+            </View>
+            <Text style={{ marginLeft: 12, fontSize: 14, color: colors.foreground, fontWeight: "500" }}>
+              {category?.name ?? "Profesyonel hizmet"}
+            </Text>
           </View>
         </View>
 
-        {/* Price */}
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              backgroundColor: colors.primary + "08",
-              borderRadius: 16,
-              padding: 18,
-            }}
-          >
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.primary + "08", borderRadius: 16, padding: 18 }}>
             <View>
               <Text style={{ fontSize: 13, color: colors.muted }}>Başlangıç Fiyatı</Text>
-              <Text style={{ fontSize: 22, fontWeight: "800", color: colors.primary, marginTop: 4 }}>
-                {provider.price}
-              </Text>
+              <Text style={{ fontSize: 22, fontWeight: "800", color: colors.primary, marginTop: 4 }}>{startingPrice}</Text>
             </View>
             <IconSymbol name="tag.fill" size={24} color={colors.primary} />
           </View>
         </View>
 
-        {/* Reviews */}
         <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
           <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
-            Değerlendirmeler ({provider.reviewCount})
+            Değerlendirmeler ({reviews.length})
           </Text>
-          <View
-            style={{
-              backgroundColor: colors.card,
-              borderRadius: 18,
-              padding: 16,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
-              borderWidth: 0.5,
-              borderColor: colors.border,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-              <View style={{ flexDirection: "row" }}>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <IconSymbol key={i} name="star.fill" size={14} color="#FFB800" />
-                ))}
-              </View>
-              <Text style={{ fontSize: 13, color: colors.muted, marginLeft: 8, fontWeight: "600" }}>
-                Ayşe K.
-              </Text>
-              <View style={{ flex: 1 }} />
-              <Text style={{ fontSize: 11, color: colors.muted }}>3 gün önce</Text>
+          {reviewsQuery.isLoading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : reviewsQuery.error ? (
+            <Pressable onPress={() => reviewsQuery.refetch()} style={{ padding: 16, borderRadius: 16, backgroundColor: colors.card }}>
+              <Text style={{ color: colors.error, textAlign: "center" }}>Değerlendirmeler yüklenemedi. Yeniden dene.</Text>
+            </Pressable>
+          ) : reviews.length === 0 ? (
+            <View style={{ padding: 20, borderRadius: 16, backgroundColor: colors.card, alignItems: "center" }}>
+              <IconSymbol name="star.fill" size={24} color={colors.muted} />
+              <Text style={{ color: colors.muted, marginTop: 8 }}>Henüz doğrulanmış değerlendirme yok.</Text>
             </View>
-            <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }}>
-              Çok profesyonel ve hızlı bir hizmet aldım. Kesinlikle tavsiye ederim.
-            </Text>
-          </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {reviews.map((review) => (
+                <View key={review.id} style={{ backgroundColor: colors.card, borderRadius: 18, padding: 16, borderWidth: 0.5, borderColor: colors.border }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <View style={{ flexDirection: "row" }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <IconSymbol key={star} name="star.fill" size={14} color={star <= review.rating ? "#FFB800" : colors.border} />
+                      ))}
+                    </View>
+                    <Text style={{ fontSize: 13, color: colors.muted, marginLeft: 8, fontWeight: "600" }}>{review.reviewerName || "Move&Fix kullanıcısı"}</Text>
+                    <View style={{ flex: 1 }} />
+                    <Text style={{ fontSize: 11, color: colors.muted }}>{formatReviewDate(review.createdAt)}</Text>
+                  </View>
+                  <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 22 }}>{review.comment || "Puanlama bırakıldı."}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 
-      {/* Bottom CTA */}
-      <View
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          flexDirection: "row",
-          padding: 16,
-          paddingBottom: 30,
-          backgroundColor: colors.background,
-          borderTopWidth: 0.5,
-          borderTopColor: colors.border,
-          gap: 12,
-        }}
-      >
+      <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", padding: 16, paddingBottom: 30, backgroundColor: colors.background, borderTopWidth: 0.5, borderTopColor: colors.border, gap: 12 }}>
         <Pressable
-          onPress={() => router.push(`/chat/${provider.id}?otherUserId=${provider.id}` as any)}
-          style={({ pressed }) => [
-            {
-              flex: 1,
-              paddingVertical: 14,
-              borderRadius: 14,
-              borderWidth: 1.5,
-              borderColor: colors.primary,
-              alignItems: "center",
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
+          onPress={() => router.push(`/chat/${provider.providerUserId}?otherUserId=${provider.providerUserId}` as never)}
+          style={({ pressed }) => ({ flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.primary, alignItems: "center", opacity: pressed ? 0.8 : 1 })}
         >
           <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 15 }}>Mesaj Gönder</Text>
         </Pressable>
         <Pressable
-          onPress={() => router.push(`/create-service?providerId=${provider.id}` as any)}
-          style={({ pressed }) => [
-            {
-              flex: 1,
-              paddingVertical: 14,
-              borderRadius: 14,
-              backgroundColor: colors.primary,
-              alignItems: "center",
-              opacity: pressed ? 0.8 : 1,
-              shadowColor: colors.primary,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.2,
-              shadowRadius: 12,
-              elevation: 3,
-            },
-          ]}
+          onPress={() => router.push(`/create-service?providerId=${provider.id}&categoryId=${provider.categoryId ?? ""}` as never)}
+          style={({ pressed }) => ({ flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary, alignItems: "center", opacity: pressed ? 0.8 : 1 })}
         >
           <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 15 }}>Teklif İste</Text>
         </Pressable>

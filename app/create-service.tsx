@@ -478,7 +478,7 @@ export default function CreateServiceScreen() {
             >
               <IconSymbol name="info.circle.fill" size={18} color={colors.primary} />
               <Text style={{ flex: 1, marginLeft: 8, fontSize: 12, color: colors.muted, lineHeight: 18 }}>
-                Talebiniz oluşturulduktan sonra size uygun ustalar teklif gönderecektir. Teklifleri "İşlerim" ekranından takip edebilirsiniz.
+                Talebiniz oluşturulduktan sonra size uygun ustalar teklif gönderecektir. Teklifleri “İşlerim” ekranından takip edebilirsiniz.
               </Text>
             </View>
           </View>

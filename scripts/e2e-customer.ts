@@ -12,10 +12,13 @@ async function tRPC(procedure: string, method: "GET" | "POST", token: string, bo
     "Content-Type": "application/json",
     "Authorization": `Bearer ${token}`,
   };
-  const res = await fetch(`${API}/api/trpc/${procedure}`, {
+  const query = method === "GET" && body
+    ? `?input=${encodeURIComponent(JSON.stringify({ json: body }))}`
+    : "";
+  const res = await fetch(`${API}/api/trpc/${procedure}${query}`, {
     method,
     headers,
-    body: body ? JSON.stringify({ json: body }) : undefined,
+    body: method === "POST" && body ? JSON.stringify({ json: body }) : undefined,
   });
   const data = await res.json() as any;
   if (data.error) {
@@ -61,7 +64,6 @@ async function main() {
   log("offers.create — Provider teklif ver");
   const offer = await tRPC("offers.create", "POST", providerToken, {
     requestId,
-    providerId: 3, // provider user id (Mehmet Usta = user 3)
     price: 350,
     message: "Bugün gelebilirim, tahmini 2 saat sürer",
     estimatedTime: "2 saat",
@@ -75,24 +77,22 @@ async function main() {
   const accepted = await tRPC("offers.accept", "POST", customerToken, { offerId });
   console.log("Offer accepted:", accepted);
 
-  // 5. payments.create — Ödeme oluştur
-  log("payments.create — Ödeme oluştur");
+  // 5. payments.quote/create — Tutar ve provider yalnızca sunucudan türetilir
+  log("payments.quote — Güvenli ödeme özeti");
+  const quote = await tRPC("payments.quote", "GET", customerToken, { requestId });
+  console.log("Server-derived quote:", quote);
+
+  log("payments.create — İdempotent pending ödeme niyeti oluştur");
   const payment = await tRPC("payments.create", "POST", customerToken, {
     requestId,
-    providerId: 3,
-    amount: 350,
+    idempotencyKey: `customer-e2e-${requestId}-${Date.now()}`,
   });
   console.log("Payment created:", payment);
-  const paymentId = typeof payment === "number" ? payment : (payment as any)?.id;
+  const paymentId = (payment as any)?.payment?.id;
   if (!paymentId) throw new Error("payments.create failed — no payment ID");
-
-  // 6. payments.updateStatus — Ödeme durumu: held (escrow)
-  log("payments.updateStatus — Ödeme escrow'da tutuluyor");
-  const payStatus = await tRPC("payments.updateStatus", "POST", customerToken, {
-    paymentId,
-    status: "held",
-  });
-  console.log("Payment status updated:", payStatus);
+  if (!(payment as any)?.gatewayReady) {
+    console.log("BLOCKER: Gerçek gateway credential yok; ödeme pending kaldı ve tahsilat yapılmadı.");
+  }
 
   // 7. jobs.updateStatus — İş durumu: active
   log("jobs.updateStatus — İş aktif");

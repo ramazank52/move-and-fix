@@ -29,6 +29,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     user,
     req: {
       protocol: "https",
+      hostname: "localhost",
       headers: {},
     } as TrpcContext["req"],
     res: {
@@ -41,8 +42,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
   return { ctx, clearedCookies };
 }
 
-// TODO: Remove `.skip` below once you implement user authentication
-describe.skip("auth.logout", () => {
+describe("auth.logout", () => {
   it("clears the session cookie and reports success", async () => {
     const { ctx, clearedCookies } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
@@ -59,5 +59,30 @@ describe.skip("auth.logout", () => {
       httpOnly: true,
       path: "/",
     });
+  });
+
+  it("rejects protected endpoints when the next request has no authenticated user", async () => {
+    const { ctx } = createAuthContext();
+    const authenticatedCaller = appRouter.createCaller(ctx);
+    await authenticatedCaller.auth.logout();
+
+    const nextRequestContext: TrpcContext = {
+      ...ctx,
+      user: null,
+    };
+    const unauthenticatedCaller = appRouter.createCaller(nextRequestContext);
+
+    await expect(unauthenticatedCaller.requests.list()).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+  });
+
+  it("is idempotent when an already logged-out client calls logout again", async () => {
+    const { ctx, clearedCookies } = createAuthContext();
+    const caller = appRouter.createCaller({ ...ctx, user: null });
+
+    await expect(caller.auth.logout()).resolves.toEqual({ success: true });
+    expect(clearedCookies).toHaveLength(1);
+    expect(clearedCookies[0]?.name).toBe(COOKIE_NAME);
   });
 });

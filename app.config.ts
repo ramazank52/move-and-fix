@@ -25,6 +25,7 @@ const bundleId =
 // e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
+const paymentScheme = "moveandfix";
 
 const env = {
   // App branding - update these values directly (do not use env vars)
@@ -34,6 +35,7 @@ const env = {
   // Leave empty to use the default icon from assets/images/icon.png
   logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663875455116/EHwKtCbZUjvNkcyU.png",
   scheme: schemeFromBundleId,
+  paymentScheme,
   iosBundleId: bundleId,
   androidPackage: bundleId,
 };
@@ -44,7 +46,7 @@ const config: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: env.scheme,
+  scheme: [env.scheme, env.paymentScheme],
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
@@ -74,6 +76,10 @@ const config: ExpoConfig = {
             scheme: env.scheme,
             host: "*",
           },
+          {
+            scheme: env.paymentScheme,
+            host: "*",
+          },
         ],
         category: ["BROWSABLE", "DEFAULT"],
       },
@@ -86,6 +92,13 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    [
+      "@stripe/stripe-react-native",
+      {
+        merchantIdentifier: "merchant.space.manus.moveandfix",
+        enableGooglePay: false,
+      },
+    ],
     [
       "expo-audio",
       {

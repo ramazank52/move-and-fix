@@ -1,11 +1,10 @@
-import { Text, View, Pressable, ScrollView, Share, Alert } from "react-native";
+import { Text, View, Pressable, ScrollView, Share, Alert, Platform } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import * as Haptics from "expo-haptics";
-import { Platform } from "react-native";
 
 const REFERRAL_CODE = "MOVEFIX2026";
 
@@ -33,7 +32,7 @@ export default function ReferralScreen() {
         message: `Move&Fix'e katıl ve ilk hizmetinde ₺50 indirim kazan! Referans kodum: ${REFERRAL_CODE}\n\nİndir: https://movefix.app/ref/${REFERRAL_CODE}`,
         title: "Move&Fix - Arkadaşını Davet Et",
       });
-    } catch (error) {
+    } catch {
       // User cancelled
     }
   };

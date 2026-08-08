@@ -1,9 +1,7 @@
-import { Text, View, Pressable, Dimensions } from "react-native";
+import { Text, View, Pressable } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
-
-const { width } = Dimensions.get("window");
 
 const slides = [
   {

@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -56,6 +56,19 @@ export const providers = mysqlTable("providers", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const providerFavorites = mysqlTable(
+  "provider_favorites",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    providerId: int("providerId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_favorites_user_provider_unique").on(table.userId, table.providerId),
+  ],
+);
+
 // Service requests (jobs)
 export const serviceRequests = mysqlTable("service_requests", {
   id: int("id").autoincrement().primaryKey(),
@@ -102,13 +115,53 @@ export const messages = mysqlTable("messages", {
 // Payments (escrow)
 export const payments = mysqlTable("payments", {
   id: int("id").autoincrement().primaryKey(),
-  requestId: int("requestId").notNull(),
+  requestId: int("requestId").notNull().unique(),
   userId: int("userId").notNull(),
   providerId: int("providerId").notNull(),
+  offerId: int("offerId"),
   amount: int("amount").notNull(),
+  commissionRateBps: int("commissionRateBps"),
+  commissionAmount: int("commissionAmount"),
+  providerPayout: int("providerPayout"),
+  idempotencyKey: varchar("idempotencyKey", { length: 128 }).unique(),
+  gatewayProvider: mysqlEnum("gatewayProvider", ["iyzico", "stripe"]),
+  gatewayCheckoutToken: varchar("gatewayCheckoutToken", { length: 191 }).unique(),
+  gatewayPaymentId: varchar("gatewayPaymentId", { length: 191 }).unique(),
   status: mysqlEnum("status", ["pending", "held", "released", "refunded"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// Payment webhook delivery ledger — provider event IDs are globally idempotent per provider.
+export const paymentWebhookEvents = mysqlTable(
+  "payment_webhook_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    provider: mysqlEnum("provider", ["iyzico", "stripe"]).notNull(),
+    eventId: varchar("eventId", { length: 191 }).notNull(),
+    eventType: varchar("eventType", { length: 96 }).notNull(),
+    payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["processing", "processed", "failed"])
+      .default("processing")
+      .notNull(),
+    error: text("error"),
+    receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+    processedAt: timestamp("processedAt"),
+  },
+  (table) => [
+    uniqueIndex("payment_webhook_provider_event_unique").on(table.provider, table.eventId),
+  ],
+);
+
+// Verified reviews — exactly one review is allowed for each completed request.
+export const reviews = mysqlTable("reviews", {
+  id: int("id").autoincrement().primaryKey(),
+  requestId: int("requestId").notNull().unique(),
+  userId: int("userId").notNull(),
+  providerId: int("providerId").notNull(),
+  rating: int("rating").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 // User wallet balances — amounts are stored in the currency's minor unit.
@@ -160,10 +213,13 @@ export const walletWithdrawals = mysqlTable("wallet_withdrawals", {
 // Export types
 export type ServiceCategory = typeof serviceCategories.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
+export type ProviderFavorite = typeof providerFavorites.$inferSelect;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;
 export type Offer = typeof offers.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type PaymentWebhookEvent = typeof paymentWebhookEvents.$inferSelect;
+export type Review = typeof reviews.$inferSelect;
 export type WalletAccount = typeof walletAccounts.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
 export type WalletWithdrawal = typeof walletWithdrawals.$inferSelect;

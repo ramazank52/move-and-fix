@@ -1,4 +1,4 @@
-import { Text, View, Pressable, Platform } from "react-native";
+import { Text, View, Pressable } from "react-native";
 import { useState, useEffect } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -18,7 +18,7 @@ export default function LiveTrackingScreen() {
   const [eta, setEta] = useState(12); // minutes
   const [distance, setDistance] = useState(3.2); // km
   const [status, setStatus] = useState<"approaching" | "arrived" | "working">("approaching");
-  const [providerLocation, setProviderLocation] = useState({ lat: 41.005, lng: 28.975 });
+  const [, setProviderLocation] = useState({ lat: 41.005, lng: 28.975 });
 
   // Simulate movement
   useEffect(() => {
@@ -341,4 +341,3 @@ export default function LiveTrackingScreen() {
     </ScreenContainer>
   );
 }
-

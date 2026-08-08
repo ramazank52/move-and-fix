@@ -11,6 +11,10 @@ import { notificationService } from "./services/NotificationService";
 import { notificationServiceV2 } from "./services/NotificationServiceV2";
 import { aiService } from "./services/AIService";
 import { eventService } from "./services/EventService";
+import {
+  gatewayCheckoutService,
+  GatewayCheckoutError,
+} from "./payments/GatewayCheckoutService";
 
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
 // Döngüsel import'u önlemek için servisler burada birbirine bağlanır.
@@ -145,9 +149,25 @@ export const appRouter = router({
         rating: z.number().min(1).max(5),
         comment: z.string().optional(),
       }))
-      .mutation(({ ctx, input }) => {
-        return db.createReview({ ...input, userId: ctx.user.id });
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createReview({ ...input, userId: ctx.user.id });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Değerlendirme kaydedilemedi";
+          throw new TRPCError({
+            code: message.includes("bulunamadı") ? "NOT_FOUND" : "BAD_REQUEST",
+            message,
+          });
+        }
       }),
+  }),
+
+  // Service categories — shared by customer discovery and service request flows
+  categories: router({
+    list: publicProcedure.query(() => db.getActiveServiceCategories()),
+    bySlug: publicProcedure
+      .input(z.object({ slug: z.string().trim().min(1).max(100) }))
+      .query(({ input }) => db.getServiceCategoryBySlug(input.slug)),
   }),
 
   // Messages
@@ -171,10 +191,26 @@ export const appRouter = router({
   // Providers
   providers: router({
     nearby: publicProcedure
-      .input(z.object({ lat: z.string(), lng: z.string() }))
+      .input(z.object({ lat: z.string().optional(), lng: z.string().optional() }).optional())
       .query(({ input }) => {
-        return db.getNearbyProviders(input.lat, input.lng);
+        return db.getNearbyProviders(input?.lat, input?.lng);
       }),
+    byId: publicProcedure
+      .input(z.object({ providerId: z.number().int().positive() }))
+      .query(({ input }) => db.getProviderById(input.providerId)),
+    byCategory: publicProcedure
+      .input(z.object({ categoryId: z.number().int().positive() }))
+      .query(({ input }) => db.getProvidersByCategory(input.categoryId)),
+    favoriteList: protectedProcedure.query(({ ctx }) => db.getFavoriteProviders(ctx.user.id)),
+    favoriteStatus: protectedProcedure
+      .input(z.object({ providerId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.isFavoriteProvider(ctx.user.id, input.providerId)),
+    favoriteAdd: protectedProcedure
+      .input(z.object({ providerId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => db.addFavoriteProvider(ctx.user.id, input.providerId)),
+    favoriteRemove: protectedProcedure
+      .input(z.object({ providerId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => db.removeFavoriteProvider(ctx.user.id, input.providerId)),
     myProfile: protectedProcedure.query(({ ctx }) => {
       return db.getProviderProfile(ctx.user.id);
     }),
@@ -187,6 +223,16 @@ export const appRouter = router({
     newJobs: protectedProcedure.query(({ ctx }) => {
       return db.getNewJobsForProvider(ctx.user.id);
     }),
+  }),
+
+  reviews: router({
+    forProvider: publicProcedure
+      .input(z.object({
+        providerId: z.number().int().positive(),
+        limit: z.number().int().min(1).max(100).default(50),
+        offset: z.number().int().min(0).default(0),
+      }))
+      .query(({ input }) => db.getProviderReviews(input.providerId, input.limit, input.offset)),
   }),
 
   // MoveAI — Customer-facing AI assistant
@@ -296,22 +342,173 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
     list: protectedProcedure.query(({ ctx }) => {
       return db.getUserPayments(ctx.user.id);
     }),
+    quote: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        try {
+          return await db.getPaymentQuote(input.requestId, ctx.user.id);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "PAYMENT_QUOTE_FAILED";
+          if (message === "PAYMENT_REQUEST_NOT_FOUND") {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
+          }
+          if (message.includes("NOT_READY") || message.includes("OFFER_NOT_FOUND")) {
+            throw new TRPCError({ code: "CONFLICT", message: "Ödeme için kabul edilmiş aktif bir teklif bulunamadı" });
+          }
+          throw error;
+        }
+      }),
     create: protectedProcedure
       .input(z.object({
-        requestId: z.number(),
-        providerId: z.number(),
-        amount: z.number().min(1),
+        requestId: z.number().int().positive(),
+        idempotencyKey: z.string().trim().min(16).max(96),
       }))
-      .mutation(({ ctx, input }) => {
-        return db.createPayment({ ...input, userId: ctx.user.id });
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createPayment({ ...input, userId: ctx.user.id });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "PAYMENT_CREATE_FAILED";
+          if (message === "PAYMENT_REQUEST_NOT_FOUND") {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
+          }
+          if (message === "PAYMENT_FORBIDDEN") {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Bu ödeme üzerinde işlem yetkiniz yok" });
+          }
+          if (message.includes("NOT_READY") || message.includes("OFFER_NOT_FOUND")) {
+            throw new TRPCError({ code: "CONFLICT", message: "Ödeme için kabul edilmiş aktif bir teklif bulunamadı" });
+          }
+          if (message === "PAYMENT_IDEMPOTENCY_CONFLICT") {
+            throw new TRPCError({ code: "CONFLICT", message: "Idempotency anahtarı başka bir ödeme için kullanılmış" });
+          }
+          throw error;
+        }
       }),
-    updateStatus: protectedProcedure
+    initializeGateway: protectedProcedure
       .input(z.object({
-        paymentId: z.number(),
-        status: z.enum(["pending", "held", "released", "refunded"]),
+        paymentId: z.number().int().positive(),
+        provider: z.enum(["iyzico", "stripe"]),
+        buyer: z.object({
+          gsmNumber: z.string().trim().regex(/^(?:\+?90|0)?5\d{9}$/).optional(),
+          identityNumber: z.string().trim().regex(/^\d{11}$/).optional(),
+          address: z.string().trim().min(10).max(500).optional(),
+          city: z.string().trim().min(2).max(100).optional(),
+          zipCode: z.string().trim().regex(/^\d{5}$/).optional(),
+        }).default({}),
+      }).superRefine((input, context) => {
+        if (input.provider !== "iyzico") return;
+        const requiredFields = ["gsmNumber", "identityNumber", "address", "city"] as const;
+        for (const field of requiredFields) {
+          if (!input.buyer[field]) {
+            context.addIssue({
+              code: "custom",
+              path: ["buyer", field],
+              message: "iyzico için zorunlu alan",
+            });
+          }
+        }
       }))
-      .mutation(({ input }) => {
-        return db.updatePaymentStatus(input.paymentId, input.status);
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const payment = await db.reservePaymentGateway({
+            paymentId: input.paymentId,
+            userId: ctx.user.id,
+            provider: input.provider,
+          });
+          const quote = await db.getPaymentQuote(payment.requestId, ctx.user.id);
+          const checkout = await gatewayCheckoutService.initialize({
+            provider: input.provider,
+            paymentId: payment.id,
+            requestId: payment.requestId,
+            requestTitle: quote.requestTitle,
+            amount: payment.amount,
+            currency: quote.currency,
+            idempotencyKey: payment.idempotencyKey ?? `payment:${payment.id}`,
+            buyer: {
+              id: ctx.user.id,
+              name: ctx.user.name?.trim() || "MoveFix Kullanıcısı",
+              email: ctx.user.email?.trim() || "noreply@movefix.invalid",
+              ipAddress: ctx.req.ip || ctx.req.socket.remoteAddress || "127.0.0.1",
+              ...input.buyer,
+            },
+          });
+          await db.attachPaymentGatewayTransaction({
+            paymentId: payment.id,
+            userId: ctx.user.id,
+            provider: input.provider,
+            gatewayPaymentId:
+              checkout.provider === "stripe" ? checkout.gatewayTransactionId : undefined,
+            gatewayCheckoutToken:
+              checkout.provider === "iyzico" ? checkout.checkoutToken : undefined,
+          });
+          return checkout;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "PAYMENT_GATEWAY_FAILED";
+          if (message === "PAYMENT_NOT_FOUND") {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Ödeme bulunamadı" });
+          }
+          if (message === "PAYMENT_FORBIDDEN") {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Bu ödeme üzerinde işlem yetkiniz yok" });
+          }
+          if (message.includes("INVALID_STATUS") || message.includes("CONFLICT")) {
+            throw new TRPCError({ code: "CONFLICT", message: "Ödeme sağlayıcısı mevcut ödeme durumunda başlatılamaz" });
+          }
+          if (error instanceof GatewayCheckoutError) {
+            if (error.code === "GATEWAY_NOT_CONFIGURED") {
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message });
+            }
+            if (error.code === "GATEWAY_INVALID_INPUT") {
+              throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+            }
+            if (error.code === "GATEWAY_TIMEOUT") {
+              throw new TRPCError({ code: "TIMEOUT", message: error.message });
+            }
+            throw new TRPCError({ code: "BAD_GATEWAY", message: error.message });
+          }
+          throw error;
+        }
+      }),
+    release: protectedProcedure
+      .input(z.object({
+        paymentId: z.number().int().positive(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.transitionPaymentStatus({
+            paymentId: input.paymentId,
+            actorUserId: ctx.user.id,
+            nextStatus: "released",
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "PAYMENT_RELEASE_FAILED";
+          if (message === "PAYMENT_NOT_FOUND") throw new TRPCError({ code: "NOT_FOUND", message: "Ödeme bulunamadı" });
+          if (message === "PAYMENT_FORBIDDEN") throw new TRPCError({ code: "FORBIDDEN", message: "Bu ödemeyi serbest bırakma yetkiniz yok" });
+          if (message.includes("INVALID_TRANSITION") || message === "PAYMENT_JOB_NOT_COMPLETED") {
+            throw new TRPCError({ code: "CONFLICT", message: "Ödeme mevcut durumda serbest bırakılamaz" });
+          }
+          throw error;
+        }
+      }),
+    refund: protectedProcedure
+      .input(z.object({ paymentId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "İade işlemi yalnızca yetkili yönetici tarafından yapılabilir" });
+        }
+        try {
+          return await db.transitionPaymentStatus({
+            paymentId: input.paymentId,
+            actorUserId: ctx.user.id,
+            nextStatus: "refunded",
+            requireAdmin: true,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "PAYMENT_REFUND_FAILED";
+          if (message === "PAYMENT_NOT_FOUND") throw new TRPCError({ code: "NOT_FOUND", message: "Ödeme bulunamadı" });
+          if (message.includes("INVALID_TRANSITION")) {
+            throw new TRPCError({ code: "CONFLICT", message: "Ödeme mevcut durumda iade edilemez" });
+          }
+          throw error;
+        }
       }),
   }),
 

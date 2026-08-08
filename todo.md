@@ -139,10 +139,10 @@
 
 ## Phase 19: Referans Görsel UI Uygulaması
 - [ ] Design System'i referans görselin renk/typography/spacing değerlerine birebir güncelle
-- [ ] Ana Sayfa — referans görsel layout: selamlama, arama, MoveAI banner, hızlı erişim, aktif iş kartı, kategoriler, yakındaki ustalar
-- [ ] Keşfet — arama, kategori filtreleri, kategori listesi DB'den
-- [ ] MoveAI — gerçek LLM akışı, sıcak/doğal konuşma, service request oluşturma
-- [ ] Hizmet Talebi — 5 adımlı stepper (Hizmet→Detay→Zaman→Konum→Onay), fotoğraf yükleme, aciliyet, konum
+- [x] Ana Sayfa — referans görsel layout: selamlama, arama, MoveAI banner, hızlı erişim, aktif iş kartı, kategoriler, yakındaki ustalar
+- [x] Keşfet — arama, kategori filtreleri, kategori listesi DB'den
+- [x] MoveAI — gerçek LLM akışı, sıcak/doğal konuşma, service request oluşturma
+- [x] Hizmet Talebi — 5 adımlı stepper (Hizmet→Detay→Zaman→Konum→Onay), fotoğraf yükleme, aciliyet, konum
 - [ ] Profesyonel Listesi — kart: avatar, isim, kategori, puan, yorum, mesafe, müsaitlik, ETA, fiyat
 - [ ] Teklifler — teklif kartları, karşılaştır, kabul et, reddet
 - [ ] Ödeme — premium tasarım, hizmet/profesyonel/bedel/toplam/ödeme yöntemi/MoveWallet/güvenlik
@@ -164,46 +164,46 @@
 - [ ] Offline/network failure durumlarını ele al
 
 ## Phase 22: Mock Data → Gerçek API
-- [ ] lib/data/providers.ts → tRPC providers.nearby/list API'ye bağla
-- [ ] lib/data/categories.ts → tRPC requests.categories veya DB'den getir
-- [ ] lib/data/jobs.ts → tRPC requests.list/providers.myJobs API'ye bağla
-- [ ] lib/data/messages.ts → tRPC messages.conversations API'ye bağla
-- [ ] app/payment/checkout.tsx → tRPC payments.create/updateStatus API'ye bağla
-- [ ] app/(tabs)/profile.tsx → use-auth hook'una ve gerçek kullanıcı verisine bağla
-- [ ] app/create-service.tsx → tRPC requests.create API'ye bağla, gerçek backend'e request oluştur
+- [x] lib/data/providers.ts → tRPC providers.nearby/list API'ye bağla
+- [x] lib/data/categories.ts → tRPC requests.categories veya DB'den getir
+- [x] lib/data/jobs.ts → tRPC requests.list/providers.myJobs API'ye bağla
+- [x] lib/data/messages.ts → tRPC messages.conversations API'ye bağla
+- [x] app/payment/checkout.tsx → tRPC payments.create/initializeGateway API'ye bağla
+- [x] app/(tabs)/profile.tsx → use-auth hook'una ve gerçek kullanıcı verisine bağla
+- [x] app/create-service.tsx → tRPC requests.create API'ye bağla, gerçek backend'e request oluştur
 
 ## Phase 23: Güvenlik Hardening
-- [ ] IDOR test — customer → another user's job access
-- [ ] Provider → another provider's job access
-- [ ] Privilege escalation test
-- [ ] Payment manipulation — client'tan gelen fiyat/commission/payout değerlerine güvenme
-- [ ] Duplicate payment prevention — idempotency
-- [ ] Duplicate offer/request prevention
-- [ ] Unauthorized wallet withdrawal prevention
-- [ ] Server-side fiyat/commission hesabı
+- [x] IDOR test — customer → another user's job access
+- [x] Provider → another provider's job access
+- [x] Privilege escalation test
+- [x] Payment manipulation — client'tan gelen fiyat/commission/payout değerlerine güvenme
+- [x] Duplicate payment prevention — idempotency
+- [x] Duplicate offer/request prevention
+- [x] Unauthorized wallet withdrawal prevention
+- [x] Server-side fiyat/commission hesabı
 
 ## Phase 24: Auth Logout Test
-- [ ] Skipped auth logout testini gerçek testle değiştir
-- [ ] Logout sonrası protected endpoint erişim testi
-- [ ] Logout sonrası session/token davranışı testi
-- [ ] Logout sonrası cached user data temizleme testi
-- [ ] Logout sonrası eski oturum tekrar kullanım engeli testi
+- [x] Skipped auth logout testini gerçek testle değiştir
+- [x] Logout sonrası protected endpoint erişim testi
+- [x] Logout sonrası session/token davranışı testi
+- [x] Logout sonrası cached user data temizleme testi
+- [x] Logout sonrası eski oturum tekrar kullanım engeli testi
 
 ## Phase 25: Payment Hardening
-- [ ] Duplicate payment test
-- [ ] Payment timeout test
-- [ ] Gateway failure test
-- [ ] Webhook duplication/idempotency test
-- [ ] Amount tampering test
-- [ ] Unauthorized release/refund test
-- [ ] Provider payout calculation test
-- [ ] Commission calculation test
+- [x] Duplicate payment test
+- [x] Payment timeout test
+- [x] Gateway failure test
+- [x] Webhook duplication/idempotency test
+- [x] Amount tampering test
+- [x] Unauthorized release/refund test
+- [x] Provider payout calculation test
+- [x] Commission calculation test
 
 ## Phase 26: Final Build & Test
-- [ ] TypeScript 0 hata
-- [ ] Lint 0 hata
-- [ ] Build PASS
-- [ ] Test 0 failed, skipped=0
+- [x] TypeScript 0 hata
+- [x] Lint 0 hata
+- [x] Build PASS
+- [x] Test 0 failed, skipped=0
 - [ ] Final production readiness raporu
 
 ## Phase 27: Route ve Navigation Bütünlüğü
@@ -212,3 +212,12 @@
 - [x] Geçersiz wallet alt route’larını çalışan ekran/aksiyonlarla değiştir
 - [x] Profesyonel yeni iş fırsatları ekranını gerçek route ve provider lifecycle’a bağla
 - [x] Auth, tab, nested route, back ve deep-link davranışlarını deterministik testlerle doğrula
+
+## Phase 28: Mobil Checkout Gateway Sunumu ve Final Doğrulama
+- [x] Expo yapılandırmasına Stripe native config plugin ve ödeme dönüş scheme’i ekle
+- [x] Kök provider hiyerarşisine web-safe StripeProvider ekle
+- [x] Checkout ekranını payments.create → payments.initializeGateway zincirine bağla
+- [x] Stripe PaymentSheet ve iyzico hosted checkout akışlarını fail-closed olarak uygula
+- [x] Eksik credential, kullanıcı iptali ve SDK/gateway hatalarını dürüst BLOCKER durumlarıyla göster
+- [x] TypeScript, lint, build ve tüm testleri çalıştır; hata ve skipped test bırakma
+- [ ] Final production status raporunu doğrulanmış sonuçlarla hazırla

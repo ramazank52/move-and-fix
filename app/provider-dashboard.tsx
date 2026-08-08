@@ -3,7 +3,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  FlatList,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";

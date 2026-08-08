@@ -12,10 +12,13 @@ async function tRPC(procedure: string, method: "GET" | "POST", token: string, bo
     "Content-Type": "application/json",
     "Authorization": `Bearer ${token}`,
   };
-  const res = await fetch(`${API}/api/trpc/${procedure}`, {
+  const query = method === "GET" && body
+    ? `?input=${encodeURIComponent(JSON.stringify({ json: body }))}`
+    : "";
+  const res = await fetch(`${API}/api/trpc/${procedure}${query}`, {
     method,
     headers,
-    body: body ? JSON.stringify({ json: body }) : undefined,
+    body: method === "POST" && body ? JSON.stringify({ json: body }) : undefined,
   });
   const data = await res.json() as any;
   if (data.error) {
@@ -68,7 +71,6 @@ async function main() {
   log("offers.create — Teklif ver");
   const offer = await tRPC("offers.create", "POST", providerToken, {
     requestId,
-    providerId: 3, // provider user ID
     price: 800,
     message: "Klima bakım + gaz dolumu, aynı gün servis",
     estimatedTime: "1.5 saat",

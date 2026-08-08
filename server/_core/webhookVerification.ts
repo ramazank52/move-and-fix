@@ -1,22 +1,19 @@
 /**
- * Webhook Signature Verification Module
- * 
- * Verifies webhook signatures from payment gateways (iyzico, Stripe)
- * to ensure authenticity and prevent unauthorized webhook calls.
- * 
- * CRITICAL SECURITY: All webhooks must be verified before processing
+ * Payment webhook signature verification.
+ *
+ * Security invariants:
+ * - Stripe is verified against the unmodified raw request body.
+ * - iyzico uses X-IYZ-SIGNATURE-V3 and provider-defined ordered fields.
+ * - Missing credentials fail closed; no development/mock success path exists.
+ * - Durable replay protection is implemented by payment_webhook_events in db.ts.
  */
 
-import crypto from 'crypto';
+import crypto from "node:crypto";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
 
-// Simple logger utility
-const logger = {
-  info: (msg: string, data?: any) => console.log(`[INFO] ${msg}`, data || ''),
-  warn: (msg: string, data?: any) => console.warn(`[WARN] ${msg}`, data || ''),
-  error: (msg: string, data?: any) => console.error(`[ERROR] ${msg}`, data || '')
-};
+const STRIPE_TIMESTAMP_TOLERANCE_SECONDS = 5 * 60;
 
-interface WebhookVerificationConfig {
+export interface WebhookVerificationConfig {
   iyzico?: {
     secretKey: string;
   };
@@ -25,267 +22,206 @@ interface WebhookVerificationConfig {
   };
 }
 
-interface VerificationResult {
+export interface VerificationResult {
   valid: boolean;
   error?: string;
-  provider?: string;
+  provider?: "iyzico" | "stripe";
 }
 
-/**
- * Webhook Verification Service
- * Handles signature verification for multiple payment providers
- */
+export interface IyzicoDirectWebhookPayload {
+  iyziEventType: string;
+  paymentId: string;
+  paymentConversationId: string;
+  status: string;
+  iyziReferenceCode?: string;
+}
+
+function safeHexEqual(received: string, expected: string): boolean {
+  if (!/^[a-f0-9]+$/i.test(received) || received.length !== expected.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(
+    Buffer.from(received.toLowerCase(), "utf8"),
+    Buffer.from(expected.toLowerCase(), "utf8"),
+  );
+}
+
+function parseIyzicoDirectPayload(payload: string): IyzicoDirectWebhookPayload | null {
+  try {
+    const parsed = JSON.parse(payload) as Partial<IyzicoDirectWebhookPayload>;
+    const requiredFields: Array<keyof IyzicoDirectWebhookPayload> = [
+      "iyziEventType",
+      "paymentId",
+      "paymentConversationId",
+      "status",
+    ];
+
+    if (requiredFields.some((field) => typeof parsed[field] !== "string" || !parsed[field])) {
+      return null;
+    }
+
+    return parsed as IyzicoDirectWebhookPayload;
+  } catch {
+    return null;
+  }
+}
+
 export class WebhookVerificationService {
-  private config: WebhookVerificationConfig;
+  constructor(private readonly config: WebhookVerificationConfig) {}
 
-  constructor(config: WebhookVerificationConfig) {
-    this.config = config;
-    logger.info('WebhookVerificationService initialized');
-  }
-
-  /**
-   * Verify iyzico webhook signature
-   * iyzico uses HMAC-SHA1 signature verification
-   */
-  verifyIyzicoSignature(
-    payload: string,
-    signature: string
-  ): VerificationResult {
-    try {
-      if (!this.config.iyzico?.secretKey) {
-        logger.error('iyzico secret key not configured');
-        return {
-          valid: false,
-          error: 'iyzico secret key not configured',
-          provider: 'iyzico'
-        };
-      }
-
-      // iyzico uses HMAC-SHA1
-      const expectedSignature = crypto
-        .createHmac('sha1', this.config.iyzico.secretKey)
-        .update(payload)
-        .digest('base64');
-
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature)
-      );
-
-      if (!isValid) {
-        logger.warn('Invalid iyzico webhook signature', {
-          received: signature.substring(0, 10) + '...',
-          expected: expectedSignature.substring(0, 10) + '...'
-        });
-      }
-
-      return {
-        valid: isValid,
-        provider: 'iyzico'
-      };
-    } catch (error) {
-      logger.error('Error verifying iyzico signature', { error });
+  verifyIyzicoSignature(payload: string, signature: string): VerificationResult {
+    const secretKey = this.config.iyzico?.secretKey;
+    if (!secretKey) {
       return {
         valid: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        provider: 'iyzico'
+        error: "iyzico webhook secret is not configured",
+        provider: "iyzico",
       };
     }
-  }
 
-  /**
-   * Verify Stripe webhook signature
-   * Stripe uses HMAC-SHA256 signature verification
-   */
-  verifyStripeSignature(
-    payload: string,
-    signature: string
-  ): VerificationResult {
-    try {
-      if (!this.config.stripe?.signingSecret) {
-        logger.error('Stripe signing secret not configured');
-        return {
-          valid: false,
-          error: 'Stripe signing secret not configured',
-          provider: 'stripe'
-        };
-      }
-
-      // Stripe signature format: t=timestamp,v1=signature
-      const parts = signature.split(',');
-      const timestamp = parts.find(p => p.startsWith('t='))?.substring(2);
-      const receivedSignature = parts.find(p => p.startsWith('v1='))?.substring(3);
-
-      if (!timestamp || !receivedSignature) {
-        logger.warn('Invalid Stripe signature format', { signature });
-        return {
-          valid: false,
-          error: 'Invalid signature format',
-          provider: 'stripe'
-        };
-      }
-
-      // Prevent replay attacks - check timestamp is recent (within 5 minutes)
-      const signedContent = `${timestamp}.${payload}`;
-      const expectedSignature = crypto
-        .createHmac('sha256', this.config.stripe.signingSecret)
-        .update(signedContent)
-        .digest('hex');
-
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(receivedSignature),
-        Buffer.from(expectedSignature)
-      );
-
-      if (!isValid) {
-        logger.warn('Invalid Stripe webhook signature', {
-          received: receivedSignature.substring(0, 10) + '...',
-          expected: expectedSignature.substring(0, 10) + '...'
-        });
-      }
-
-      return {
-        valid: isValid,
-        provider: 'stripe'
-      };
-    } catch (error) {
-      logger.error('Error verifying Stripe signature', { error });
+    const body = parseIyzicoDirectPayload(payload);
+    if (!body) {
       return {
         valid: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        provider: 'stripe'
+        error: "Invalid iyzico direct webhook payload",
+        provider: "iyzico",
       };
     }
+
+    // Official V3 direct-format source order:
+    // secretKey + iyziEventType + paymentId + paymentConversationId + status
+    const source = [
+      secretKey,
+      body.iyziEventType,
+      body.paymentId,
+      body.paymentConversationId,
+      body.status,
+    ].join("");
+    const expected = crypto.createHmac("sha256", secretKey).update(source).digest("hex");
+
+    return {
+      valid: safeHexEqual(signature, expected),
+      provider: "iyzico",
+      ...(!safeHexEqual(signature, expected) ? { error: "Invalid iyzico signature" } : {}),
+    };
   }
 
-  /**
-   * Generic webhook verification
-   * Detects provider and verifies accordingly
-   */
+  verifyStripeSignature(payload: string, signatureHeader: string): VerificationResult {
+    const signingSecret = this.config.stripe?.signingSecret;
+    if (!signingSecret) {
+      return {
+        valid: false,
+        error: "Stripe webhook signing secret is not configured",
+        provider: "stripe",
+      };
+    }
+
+    const parts = signatureHeader.split(",").map((part) => part.trim());
+    const timestampValue = parts.find((part) => part.startsWith("t="))?.slice(2);
+    const signatures = parts
+      .filter((part) => part.startsWith("v1="))
+      .map((part) => part.slice(3));
+    const timestamp = Number(timestampValue);
+
+    if (!Number.isFinite(timestamp) || signatures.length === 0) {
+      return {
+        valid: false,
+        error: "Invalid Stripe signature header",
+        provider: "stripe",
+      };
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (Math.abs(nowSeconds - timestamp) > STRIPE_TIMESTAMP_TOLERANCE_SECONDS) {
+      return {
+        valid: false,
+        error: "Stripe signature timestamp is outside the allowed tolerance",
+        provider: "stripe",
+      };
+    }
+
+    const expected = crypto
+      .createHmac("sha256", signingSecret)
+      .update(`${timestamp}.${payload}`)
+      .digest("hex");
+    const valid = signatures.some((signature) => safeHexEqual(signature, expected));
+
+    return {
+      valid,
+      provider: "stripe",
+      ...(!valid ? { error: "Invalid Stripe signature" } : {}),
+    };
+  }
+
   verify(
     payload: string,
     signature: string,
-    provider: 'iyzico' | 'stripe'
+    provider: "iyzico" | "stripe",
   ): VerificationResult {
-    logger.info(`Verifying webhook signature for provider: ${provider}`);
-
-    switch (provider) {
-      case 'iyzico':
-        return this.verifyIyzicoSignature(payload, signature);
-      case 'stripe':
-        return this.verifyStripeSignature(payload, signature);
-      default:
-        return {
-          valid: false,
-          error: `Unknown provider: ${provider}`
-        };
-    }
+    return provider === "iyzico"
+      ? this.verifyIyzicoSignature(payload, signature)
+      : this.verifyStripeSignature(payload, signature);
   }
 }
 
-/**
- * Middleware for Express to verify webhook signatures
- */
+export interface RawBodyRequest extends Request {
+  rawBody?: Buffer;
+}
+
 export function webhookVerificationMiddleware(
   verificationService: WebhookVerificationService,
-  provider: 'iyzico' | 'stripe'
-) {
-  return (req: any, res: any, next: any) => {
-    try {
-      const signature = req.headers['x-iyzico-signature'] ||
-                       req.headers['stripe-signature'];
+  provider: "iyzico" | "stripe",
+): RequestHandler {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const rawRequest = req as RawBodyRequest;
+    const headerName = provider === "iyzico" ? "x-iyz-signature-v3" : "stripe-signature";
+    const signature = req.header(headerName);
 
-      if (!signature) {
-        logger.error('Missing webhook signature header', {
-          provider,
-          headers: Object.keys(req.headers)
-        });
-        return res.status(401).json({
-          error: 'Missing signature',
-          message: 'Webhook signature required'
-        });
-      }
-
-      // Get raw body for signature verification
-      const payload = req.rawBody || JSON.stringify(req.body);
-
-      const result = verificationService.verify(payload, signature, provider);
-
-      if (!result.valid) {
-        logger.error('Webhook signature verification failed', {
-          provider,
-          error: result.error
-        });
-        return res.status(401).json({
-          error: 'Invalid signature',
-          message: 'Webhook signature verification failed'
-        });
-      }
-
-      logger.info('Webhook signature verified successfully', { provider });
-      next();
-    } catch (error) {
-      logger.error('Error in webhook verification middleware', { error });
-      return res.status(500).json({
-        error: 'Verification error',
-        message: 'Failed to verify webhook signature'
-      });
+    if (!signature) {
+      res.status(401).json({ error: "Missing webhook signature" });
+      return;
     }
+
+    if (!rawRequest.rawBody) {
+      res.status(400).json({ error: "Webhook raw body is required" });
+      return;
+    }
+
+    const result = verificationService.verify(
+      rawRequest.rawBody.toString("utf8"),
+      signature,
+      provider,
+    );
+
+    if (!result.valid) {
+      const misconfigured = result.error?.includes("not configured") ?? false;
+      res.status(misconfigured ? 503 : 401).json({
+        error: misconfigured ? "Webhook provider is not configured" : "Invalid webhook signature",
+      });
+      return;
+    }
+
+    next();
   };
 }
 
 /**
- * Webhook Replay Attack Prevention
- * Tracks processed webhook IDs to prevent duplicate processing
+ * @deprecated Replay protection must use the durable payment_webhook_events table.
+ * Retained only to avoid breaking older imports while they are migrated.
  */
 export class WebhookReplayProtection {
-  private processedWebhooks = new Map<string, number>();
-  private readonly EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 hours
-
-  /**
-   * Check if webhook has been processed before
-   */
-  isProcessed(webhookId: string): boolean {
-    const timestamp = this.processedWebhooks.get(webhookId);
-    if (!timestamp) {
-      return false;
-    }
-
-    // Check if entry has expired
-    if (Date.now() - timestamp > this.EXPIRY_TIME) {
-      this.processedWebhooks.delete(webhookId);
-      return false;
-    }
-
-    return true;
+  isProcessed(_webhookId: string): boolean {
+    return false;
   }
 
-  /**
-   * Mark webhook as processed
-   */
-  markProcessed(webhookId: string): void {
-    this.processedWebhooks.set(webhookId, Date.now());
-    logger.info(`Webhook ${webhookId} marked as processed`);
+  markProcessed(_webhookId: string): void {
+    // Intentionally empty: in-memory replay state is unsafe in multi-instance deployments.
   }
 
-  /**
-   * Clean up expired entries
-   */
   cleanup(): void {
-    const now = Date.now();
-    for (const [id, timestamp] of this.processedWebhooks.entries()) {
-      if (now - timestamp > this.EXPIRY_TIME) {
-        this.processedWebhooks.delete(id);
-      }
-    }
-    logger.info('Webhook replay protection cleanup completed');
+    // Durable records are managed by the database retention policy.
   }
 }
 
-// Export singleton instances
 export const webhookReplayProtection = new WebhookReplayProtection();
-
-// Cleanup every hour
-setInterval(() => {
-  webhookReplayProtection.cleanup();
-}, 60 * 60 * 1000);

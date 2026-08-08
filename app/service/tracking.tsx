@@ -1,4 +1,4 @@
-import { Text, View, Pressable, Platform } from "react-native";
+import { Text, View, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -264,4 +264,3 @@ export default function TrackingScreen() {
     </ScreenContainer>
   );
 }
-

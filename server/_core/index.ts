@@ -12,6 +12,7 @@ import { createContext } from "./context";
 import { setupSwaggerDocs } from "./swagger";
 import { healthChecker, healthCheckMiddleware } from "./health";
 import { rateLimiters, requestIdMiddleware, CSRFProtection } from "./security";
+import { registerPaymentWebhookRoutes } from "../payments/registerPaymentWebhookRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -82,6 +83,9 @@ async function startServer() {
   // Rate limiting — auth endpoints (stricter)
   app.use("/api/auth/", rateLimiters.login);
   app.use("/api/owner/login", rateLimiters.login);
+
+  // Payment webhooks must receive the unmodified raw body before global JSON parsing.
+  registerPaymentWebhookRoutes(app);
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));

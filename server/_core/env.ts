@@ -7,4 +7,18 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  paymentCallbackBaseUrl:
+    process.env.PAYMENT_CALLBACK_BASE_URL ?? process.env.API_BASE_URL ?? "",
+  paymentMobileReturnUrl: process.env.PAYMENT_MOBILE_RETURN_URL ?? "",
+  paymentGatewayTimeoutMs: Math.max(
+    1_000,
+    Number.parseInt(process.env.PAYMENT_GATEWAY_TIMEOUT_MS ?? "12000", 10) || 12_000,
+  ),
+  iyzicoApiKey: process.env.IYZICO_API_KEY ?? "",
+  iyzicoSecretKey: process.env.IYZICO_SECRET_KEY ?? "",
+  iyzicoBaseUrl: process.env.IYZICO_BASE_URL ?? "https://sandbox-api.iyzipay.com",
+  iyzicoWebhookSecret:
+    process.env.IYZICO_WEBHOOK_SECRET ?? process.env.IYZICO_SECRET_KEY ?? "",
+  stripeSecretKey: process.env.STRIPE_API_KEY ?? process.env.STRIPE_SECRET_KEY ?? "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
 };

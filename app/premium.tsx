@@ -56,7 +56,7 @@ export default function PremiumScreen() {
           </View>
           <Text style={{ fontSize: 24, fontWeight: "bold", color: colors.foreground }}>Move&Fix Premium</Text>
           <Text style={{ fontSize: 14, color: colors.muted, textAlign: "center", marginTop: 8 }}>
-            Daha iyi hizmet deneyimi için Premium'a geçin
+            Daha iyi hizmet deneyimi için Premium’a geçin
           </Text>
         </View>
 
@@ -134,10 +134,9 @@ export default function PremiumScreen() {
             },
           ]}
         >
-          <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600" }}>Premium'a Geç</Text>
+          <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600" }}>Premium’a Geç</Text>
         </Pressable>
       </ScrollView>
     </ScreenContainer>
   );
 }
-

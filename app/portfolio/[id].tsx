@@ -1,6 +1,6 @@
 import { Text, View, Pressable, ScrollView, Dimensions, Modal } from "react-native";
 import { useState } from "react";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -33,7 +33,6 @@ const PORTFOLIO_ITEMS: PortfolioItem[] = [
 export default function PortfolioScreen() {
   const colors = useColors();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
   const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
   const [showBefore, setShowBefore] = useState(false);
 

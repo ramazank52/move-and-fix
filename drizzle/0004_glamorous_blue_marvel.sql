@@ -1,0 +1,1 @@
+ALTER TABLE `payments` ADD CONSTRAINT `payments_requestId_unique` UNIQUE(`requestId`);

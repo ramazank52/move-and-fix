@@ -1,7 +1,6 @@
-import { Text, View, ScrollView, Switch } from "react-native";
+import { Text, View, ScrollView, Switch, Pressable } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
-import { Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
