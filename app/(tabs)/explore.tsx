@@ -18,18 +18,21 @@ type FilterTab = "all" | "emergency" | "km_based" | "providers";
 
 // Kategori ikon mapping — emoji DEĞİL, profesyonel ikonlar
 const CATEGORY_ICONS: Record<string, { icon: string; color: string }> = {
+  cleaning: { icon: "sparkles", color: "#10B981" },
   plumbing: { icon: "wrench.fill", color: "#3B82F6" },
   electrical: { icon: "bolt.fill", color: "#F59E0B" },
-  cleaning: { icon: "sparkles", color: "#8A5CFF" },
-  hvac: { icon: "sun.max.fill", color: "#FF6A00" },
-  towing: { icon: "car.fill", color: "#EF4444" },
-  courier: { icon: "shippingbox.fill", color: "#22C55E" },
-  roadside: { icon: "wrench.adjustable.fill", color: "#8A5CFF" },
+  painting: { icon: "palette.fill", color: "#8B5CF6" },
+  ac: { icon: "sun.max.fill", color: "#06B6D4" },
+  heating: { icon: "flame.fill", color: "#FF6B00" },
+  moving: { icon: "shippingbox.fill", color: "#84CC16" },
   locksmith: { icon: "lock.fill", color: "#EF4444" },
-  painting: { icon: "paintbrush.fill", color: "#3B82F6" },
-  renovation: { icon: "house.fill", color: "#F59E0B" },
-  gardening: { icon: "leaf.fill", color: "#22C55E" },
-  moving: { icon: "shippingbox.fill", color: "#FF6A00" },
+  furniture: { icon: "sofa.fill", color: "#8B5CF6" },
+  car: { icon: "car.fill", color: "#3B82F6" },
+  garden: { icon: "leaf.fill", color: "#22C55E" },
+  petcare: { icon: "heart.fill", color: "#EC4899" },
+  courier: { icon: "shippingbox.fill", color: "#22C55E" },
+  tow_truck: { icon: "car.fill", color: "#EF4444" },
+  roadside: { icon: "wrench.adjustable.fill", color: "#8A5CFF" },
 };
 
 export default function ExploreScreen() {
@@ -242,7 +245,7 @@ export default function ExploreScreen() {
             </Text>
             <View style={{ gap: 8 }}>
               {filteredCategories.map((category) => {
-                const iconData = CATEGORY_ICONS[category.id] || { icon: "house", color: colors.primary };
+                const iconData = CATEGORY_ICONS[category.id] || { icon: "questionmark.circle.fill", color: colors.muted };
                 return (
                   <Pressable
                     key={category.id}
