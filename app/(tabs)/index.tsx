@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -42,31 +42,50 @@ export default function HomeScreen() {
 
   return (
     <ScreenContainer className="p-0">
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header Section */}
-        <View className="px-5 pt-4 pb-2">
-          <Text className="text-2xl font-bold text-foreground">
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+          <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground }}>
             Merhaba {userName}
           </Text>
-          <Text className="text-sm text-muted mt-1">
+          <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>
             Bugün sana nasıl yardımcı olabilirim?
           </Text>
         </View>
 
         {/* Search Bar */}
-        <View className="px-5 py-3">
-          <View className="flex-row items-center bg-surface border border-border rounded-xl px-3 py-3">
-            <IconSymbol size={18} name="magnifyingglass" color={colors.muted} />
+        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: colors.surface,
+              borderWidth: 0.5,
+              borderColor: colors.border,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+            }}
+          >
+            <IconSymbol size={16} name="magnifyingglass" color={colors.muted} />
             <TextInput
               placeholder="Ne arıyorsun?"
               placeholderTextColor={colors.muted}
-              className="flex-1 ml-2 text-foreground text-sm"
+              style={{
+                flex: 1,
+                marginLeft: 8,
+                color: colors.foreground,
+                fontSize: 14,
+              }}
             />
           </View>
         </View>
 
         {/* MoveAI Banner — Mor gradient, belirgin kart */}
-        <View className="px-5 py-3">
+        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
           <Pressable
             onPress={() => router.push("/ai-assistant" as any)}
             style={({ pressed }) => [
@@ -86,7 +105,7 @@ export default function HomeScreen() {
               },
             ]}
           >
-            <View className="flex-row items-center flex-1">
+            <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
               {/* MoveAI ikon container */}
               <View
                 style={{
@@ -100,9 +119,9 @@ export default function HomeScreen() {
               >
                 <IconSymbol name="sparkles" size={24} color="#FFFFFF" />
               </View>
-              <View className="ml-3 flex-1">
-                <Text className="text-sm font-bold text-white">MoveAI ile anlat</Text>
-                <Text className="text-xs text-white/80 mt-1">
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF" }}>MoveAI ile anlat</Text>
+                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 4 }}>
                   Doğal dille söyle, biz halledelim
                 </Text>
               </View>
@@ -112,9 +131,11 @@ export default function HomeScreen() {
         </View>
 
         {/* Quick Access — Profesyonel ikon container'ları */}
-        <View className="px-5 py-4">
-          <Text className="text-sm font-semibold text-foreground mb-3">Hızlı Erişim</Text>
-          <View className="flex-row gap-3">
+        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
+            Hızlı Erişim
+          </Text>
+          <View style={{ flexDirection: "row", gap: 10 }}>
             {quickAccess.map((cat, idx) => (
               <Pressable
                 key={idx}
@@ -145,7 +166,7 @@ export default function HomeScreen() {
                 >
                   <IconSymbol size={20} name={cat.icon} color={cat.color} />
                 </View>
-                <Text className="text-xs font-semibold text-foreground text-center">
+                <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, textAlign: "center" }}>
                   {cat.name}
                 </Text>
               </Pressable>
@@ -155,7 +176,7 @@ export default function HomeScreen() {
 
         {/* Active Job Card */}
         {activeJob && (
-          <View className="px-5 py-2">
+          <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
             <Pressable
               onPress={() => router.push(`/job/${activeJob.id}` as any)}
               style={({ pressed }) => [
@@ -169,10 +190,10 @@ export default function HomeScreen() {
                 },
               ]}
             >
-              <View className="flex-row justify-between items-start mb-3">
-                <View className="flex-1">
-                  <Text className="text-xs text-muted">Aktif İş</Text>
-                  <Text className="text-base font-semibold text-foreground mt-1">
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>Aktif İş</Text>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground, marginTop: 4 }}>
                     Hizmet Talebi #{activeJob.id}
                   </Text>
                 </View>
@@ -184,11 +205,11 @@ export default function HomeScreen() {
                     borderRadius: 8,
                   }}
                 >
-                  <Text className="text-xs font-semibold text-primary">Yolda</Text>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>Yolda</Text>
                 </View>
               </View>
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <View
                     style={{
                       width: 32,
@@ -202,29 +223,31 @@ export default function HomeScreen() {
                     <IconSymbol size={16} name="person.fill" color={colors.primary} />
                   </View>
                   <View>
-                    <Text className="text-xs font-semibold text-foreground">Profesyonel</Text>
-                    <Text className="text-xs text-muted">5 km uzakta</Text>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: colors.foreground }}>Profesyonel</Text>
+                    <Text style={{ fontSize: 11, color: colors.muted }}>5 km uzakta</Text>
                   </View>
                 </View>
-                <Text className="text-xs text-muted">ETA: 10 dk</Text>
+                <Text style={{ fontSize: 11, color: colors.muted }}>ETA: 10 dk</Text>
               </View>
             </Pressable>
           </View>
         )}
 
         {/* Nearby Professionals — Gerçek kart yapısı */}
-        <View className="px-5 py-4">
-          <View className="flex-row justify-between items-center mb-3">
-            <Text className="text-sm font-semibold text-foreground">Yakındaki Ustalar</Text>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>Yakındaki Ustalar</Text>
             <Pressable onPress={() => router.push("/explore" as any)}>
-              <Text className="text-xs text-primary font-semibold">Tümü</Text>
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>Tümü</Text>
             </Pressable>
           </View>
 
           {providersLoading ? (
-            <ActivityIndicator color={colors.primary} />
+            <View style={{ alignItems: "center", paddingVertical: 20 }}>
+              <ActivityIndicator color={colors.primary} size="small" />
+            </View>
           ) : nearbyProviders && nearbyProviders.length > 0 ? (
-            <View className="gap-3">
+            <View style={{ gap: 10 }}>
               {nearbyProviders.slice(0, 3).map((provider) => (
                 <Pressable
                   key={provider.id}
@@ -243,7 +266,7 @@ export default function HomeScreen() {
                     },
                   ]}
                 >
-                  <View className="flex-row items-center flex-1">
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                     {/* Avatar */}
                     <View
                       style={{
@@ -257,21 +280,21 @@ export default function HomeScreen() {
                     >
                       <IconSymbol size={20} name="person.fill" color={colors.primary} />
                     </View>
-                    <View className="ml-3 flex-1">
-                      <View className="flex-row items-center gap-1">
-                        <Text className="text-sm font-semibold text-foreground">
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
                           {provider.displayName}
                         </Text>
                         {provider.isVerified ? (
                           <IconSymbol size={12} name="checkmark.seal.fill" color={colors.accentBlue} />
                         ) : null}
                       </View>
-                      <View className="flex-row items-center gap-2 mt-1">
-                        <View className="flex-row items-center gap-1">
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
                           <IconSymbol size={10} name="star.fill" color={colors.warning} />
-                          <Text className="text-xs text-muted">{provider.rating || 0}</Text>
+                          <Text style={{ fontSize: 11, color: colors.muted }}>{provider.rating || 0}</Text>
                         </View>
-                        <Text className="text-xs text-muted">• Yakında</Text>
+                        <Text style={{ fontSize: 11, color: colors.muted }}>• Yakında</Text>
                       </View>
                     </View>
                   </View>
@@ -283,7 +306,7 @@ export default function HomeScreen() {
                       borderRadius: 10,
                     }}
                   >
-                    <Text className="text-xs font-semibold text-white">Teklif Gör</Text>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#FFFFFF" }}>Teklif Gör</Text>
                   </View>
                 </Pressable>
               ))}
@@ -313,10 +336,10 @@ export default function HomeScreen() {
               >
                 <IconSymbol size={24} name="magnifyingglass" color={colors.muted} />
               </View>
-              <Text className="text-sm font-semibold text-foreground text-center">
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, textAlign: "center" }}>
                 Yakında profesyonel bulunamadı
               </Text>
-              <Text className="text-xs text-muted text-center mt-1">
+              <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", marginTop: 4 }}>
                 Konumunuzu değiştirin veya farklı bir hizmet arayın
               </Text>
             </View>
@@ -324,9 +347,11 @@ export default function HomeScreen() {
         </View>
 
         {/* Popular Services — Kart yapısı */}
-        <View className="px-5 py-4">
-          <Text className="text-sm font-semibold text-foreground mb-3">Popüler Hizmetler</Text>
-          <View className="flex-row flex-wrap gap-3">
+        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
+            Popüler Hizmetler
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
             {popularServices.map((service, idx) => (
               <Pressable
                 key={idx}
@@ -343,7 +368,7 @@ export default function HomeScreen() {
                   },
                 ]}
               >
-                <View className="flex-row items-center justify-between mb-2">
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <View
                     style={{
                       width: 36,
@@ -356,10 +381,11 @@ export default function HomeScreen() {
                   >
                     <IconSymbol size={18} name={service.icon} color={colors.primary} />
                   </View>
-                  <IconSymbol size={14} name="chevron.right" color={colors.muted} />
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>{service.count}</Text>
                 </View>
-                <Text className="text-sm font-semibold text-foreground">{service.name}</Text>
-                <Text className="text-xs text-muted mt-1">{service.count} hizmet</Text>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
+                  {service.name}
+                </Text>
               </Pressable>
             ))}
           </View>
