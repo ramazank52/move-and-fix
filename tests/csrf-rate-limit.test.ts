@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rateLimiters, csrfProtection } from '../server/_core/security';
+import { rateLimiters, csrfProtection, RateLimiter } from '../server/_core/security';
 
 describe('CSRF Protection (Critical 4)', () => {
   it('generates and verifies CSRF tokens', () => {
@@ -58,7 +58,8 @@ describe('Rate Limiting (Critical 5)', () => {
   });
 
   it('blocks after exceeding limit', () => {
-    // Çok sayıda istek göndererek limiti aş
+    // Doğrudan RateLimiter sınıfını test et — production limitinden bağımsız
+    const testLimiter = new RateLimiter(60_000, 5);
     let blocked = false;
     let statusCode = 0;
     const mockRes = {
@@ -68,10 +69,10 @@ describe('Rate Limiting (Critical 5)', () => {
       },
     };
 
-    // 100 istek gönder (general limit: 100/dakika)
-    for (let i = 0; i < 105; i++) {
-      rateLimiters.general(
-        { ip: '10.0.0.1', socket: { remoteAddress: '10.0.0.1' } } as never,
+    // 6 istek gönder (limit: 5/dakika)
+    for (let i = 0; i < 6; i++) {
+      testLimiter.middleware(
+        { ip: '10.0.0.2', socket: { remoteAddress: '10.0.0.2' } } as never,
         mockRes as never,
         () => {},
       );

@@ -63,9 +63,9 @@ async function authenticateOwner(req: Request): Promise<boolean> {
 
 /**
  * Owner yetkilendirme middleware'i
+ * Mock owner token veya gerçek admin session token kabul eder.
  */
-function requireOwnerAuth(req: Request, res: Response): boolean {
-  // Önce auth dene
+async function requireOwnerAuth(req: Request, res: Response): Promise<boolean> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     res.status(401).json({ error: "Yetkilendirme gerekli", code: "UNAUTHORIZED" });
@@ -74,15 +74,19 @@ function requireOwnerAuth(req: Request, res: Response): boolean {
 
   const token = authHeader.slice("Bearer ".length).trim();
 
-  // Mock owner token'ı kabul et
+  // Mock owner token'ı kabul et (MoveOS development için)
   if (token.startsWith("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lciI")) {
     return true;
   }
 
-  // Gerçek session token dene
+  // Gerçek session token doğrula ve admin rolü kontrol et
   try {
-    // sync authenticate — eğer başarısız olursa catch'e düşer
-    return true; // TODO: gerçek auth ekle
+    const user = await sdk.authenticateRequest(req);
+    if (user.role !== "admin") {
+      res.status(403).json({ error: "Admin yetkisi gerekli", code: "FORBIDDEN" });
+      return false;
+    }
+    return true;
   } catch {
     res.status(401).json({ error: "Geçersiz token", code: "INVALID_TOKEN" });
     return false;
@@ -164,7 +168,7 @@ export function registerOwnerRestRoutes(app: Express) {
   // ── Dashboard ──
 
   app.get("/api/owner/dashboard", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const result = await callOwnerProcedure(req, res, "dashboard");
       res.json(result);
@@ -176,7 +180,7 @@ export function registerOwnerRestRoutes(app: Express) {
   // ── Users ──
 
   app.get("/api/owner/users", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const filters = {
         role: typeof req.query.role === "string" ? req.query.role : undefined,
@@ -192,7 +196,7 @@ export function registerOwnerRestRoutes(app: Express) {
   });
 
   app.get("/api/owner/users/:userId", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const result = await callOwnerProcedure(req, res, "getUser", { userId: req.params.userId });
       res.json(result);
@@ -202,13 +206,13 @@ export function registerOwnerRestRoutes(app: Express) {
   });
 
   app.put("/api/owner/users/:userId", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     // TODO: gerçek DB güncelleme
     res.json({ success: true, userId: req.params.userId, ...req.body });
   });
 
   app.delete("/api/owner/users/:userId", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     // TODO: gerçek DB silme
     res.json({ success: true, userId: req.params.userId });
   });
@@ -216,7 +220,7 @@ export function registerOwnerRestRoutes(app: Express) {
   // ── Categories ──
 
   app.get("/api/owner/categories", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const result = await callOwnerProcedure(req, res, "categories");
       res.json(result);
@@ -226,7 +230,7 @@ export function registerOwnerRestRoutes(app: Express) {
   });
 
   app.post("/api/owner/categories", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const { name, description, commission } = req.body;
       if (!name || !description || commission === undefined) {
@@ -241,7 +245,7 @@ export function registerOwnerRestRoutes(app: Express) {
   });
 
   app.put("/api/owner/categories/:categoryId", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const categoryId = Number(req.params.categoryId);
       const result = await callOwnerProcedure(req, res, "updateCategory", {
@@ -255,7 +259,7 @@ export function registerOwnerRestRoutes(app: Express) {
   });
 
   app.delete("/api/owner/categories/:categoryId", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     // TODO: gerçek DB silme
     res.json({ success: true, categoryId: req.params.categoryId });
   });
@@ -263,7 +267,7 @@ export function registerOwnerRestRoutes(app: Express) {
   // ── AI Command ──
 
   app.post("/api/owner/ai-command", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const { command } = req.body;
       if (!command) {
@@ -280,7 +284,7 @@ export function registerOwnerRestRoutes(app: Express) {
   // ── Wallet ──
 
   app.get("/api/owner/wallet", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const result = await callOwnerProcedure(req, res, "wallet");
       res.json(result);
@@ -290,7 +294,7 @@ export function registerOwnerRestRoutes(app: Express) {
   });
 
   app.post("/api/owner/wallet/withdraw", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const { amount, bankAccountId } = req.body;
       if (!amount || !bankAccountId) {
@@ -307,7 +311,7 @@ export function registerOwnerRestRoutes(app: Express) {
   // ── Analytics ──
 
   app.get("/api/owner/analytics", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     try {
       const from = typeof req.query.from === "string" ? req.query.from : undefined;
       const to = typeof req.query.to === "string" ? req.query.to : undefined;
@@ -321,13 +325,13 @@ export function registerOwnerRestRoutes(app: Express) {
   // ── Services (MoveOS lib/api.ts) ──
 
   app.get("/api/owner/services", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     // TODO: gerçek servis listesi
     res.json({ services: [], total: 0 });
   });
 
   app.get("/api/owner/services/:serviceId", async (req: Request, res: Response) => {
-    if (!requireOwnerAuth(req, res)) return;
+    if (!(await requireOwnerAuth(req, res))) return;
     // TODO: gerçek servis detayı
     res.json({ id: req.params.serviceId, name: "Servis", status: "active" });
   });

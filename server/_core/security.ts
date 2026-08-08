@@ -21,7 +21,7 @@ import type { Request, Response, NextFunction } from 'express';
  * Sliding window rate limiter — production'da Redis ile değiştirilebilir.
  * Her IP için istek sayısını zaman penceresinde takip eder.
  */
-class RateLimiter {
+export class RateLimiter {
   private hits: Map<string, number[]> = new Map();
   private windowMs: number;
   private maxHits: number;
@@ -56,11 +56,18 @@ class RateLimiter {
 /**
  * Rate Limiting Middleware'leri
  */
+// Production dışında rate limit'leri gevşet (test ve development)
+const isProduction = process.env.NODE_ENV === 'production';
+const generalMax = isProduction ? 100 : 10000;
+const loginMax = isProduction ? 10 : 1000;
+const paymentMax = isProduction ? 20 : 1000;
+const apiKeyMax = isProduction ? 30 : 1000;
+
 export const rateLimiters = {
-  general: new RateLimiter(60_000, 100).middleware.bind(new RateLimiter(60_000, 100)),
-  login: new RateLimiter(15 * 60_000, 10).middleware.bind(new RateLimiter(15 * 60_000, 10)),
-  payment: new RateLimiter(60_000, 20).middleware.bind(new RateLimiter(60_000, 20)),
-  apiKey: new RateLimiter(60_000, 30).middleware.bind(new RateLimiter(60_000, 30)),
+  general: new RateLimiter(60_000, generalMax).middleware.bind(new RateLimiter(60_000, generalMax)),
+  login: new RateLimiter(15 * 60_000, loginMax).middleware.bind(new RateLimiter(15 * 60_000, loginMax)),
+  payment: new RateLimiter(60_000, paymentMax).middleware.bind(new RateLimiter(60_000, paymentMax)),
+  apiKey: new RateLimiter(60_000, apiKeyMax).middleware.bind(new RateLimiter(60_000, apiKeyMax)),
 };
 
 /**
