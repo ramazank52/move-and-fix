@@ -1,4 +1,11 @@
-import { View, Text, ScrollView, TextInput, Pressable, ActivityIndicator } from "react-native";
+import {
+  ScrollView,
+  Text,
+  View,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -24,7 +31,7 @@ export default function HomeScreen() {
   const activeJob = activeJobs?.find((j) => j.status === "active");
   const userName = user?.name?.split(" ")[0] || "Kullanıcı";
 
-  // Quick access categories — profesyonel ikonlar, emoji DEĞİL
+  // Quick access categories — referans görsele göre
   const quickAccess = [
     { name: "Acil Yardım", icon: "exclamationmark.triangle.fill" as const, color: colors.error },
     { name: "Araç", icon: "car.fill" as const, color: colors.primary },
@@ -32,7 +39,7 @@ export default function HomeScreen() {
     { name: "Taşıma", icon: "shippingbox.fill" as const, color: colors.accentPurple },
   ];
 
-  // Popular services — profesyonel ikonlar
+  // Popular services — referans görsele göre
   const popularServices = [
     { name: "Temizlik", count: 234, icon: "sparkles" as const },
     { name: "Su Tesisatı", count: 156, icon: "wrench.fill" as const },
@@ -46,18 +53,18 @@ export default function HomeScreen() {
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Section */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
-          <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground }}>
-            Merhaba {userName}
+        {/* 1. Karşılama Başlığı */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 }}>
+          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.foreground }}>
+            Merhaba {userName} 👋
           </Text>
-          <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>
+          <Text style={{ fontSize: 14, color: colors.muted, marginTop: 6, lineHeight: 20 }}>
             Bugün sana nasıl yardımcı olabilirim?
           </Text>
         </View>
 
-        {/* Search Bar */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+        {/* 2. Arama Alanı */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <View
             style={{
               flexDirection: "row",
@@ -67,7 +74,7 @@ export default function HomeScreen() {
               borderColor: colors.border,
               borderRadius: 12,
               paddingHorizontal: 12,
-              paddingVertical: 10,
+              paddingVertical: 11,
             }}
           >
             <IconSymbol size={16} name="magnifyingglass" color={colors.muted} />
@@ -76,16 +83,17 @@ export default function HomeScreen() {
               placeholderTextColor={colors.muted}
               style={{
                 flex: 1,
-                marginLeft: 8,
+                marginLeft: 10,
                 color: colors.foreground,
                 fontSize: 14,
               }}
             />
+            <IconSymbol size={14} name="location.fill" color={colors.muted} />
           </View>
         </View>
 
-        {/* MoveAI Banner — Mor gradient, belirgin kart */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+        {/* 3. MoveAI Mor Gradient Banner */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <Pressable
             onPress={() => router.push("/ai-assistant" as any)}
             style={({ pressed }) => [
@@ -97,16 +105,10 @@ export default function HomeScreen() {
                 padding: 16,
                 backgroundColor: colors.accentPurple,
                 opacity: pressed ? 0.9 : 1,
-                shadowColor: colors.accentPurple,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.25,
-                shadowRadius: 12,
-                elevation: 4,
               },
             ]}
           >
             <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-              {/* MoveAI ikon container */}
               <View
                 style={{
                   width: 44,
@@ -120,8 +122,10 @@ export default function HomeScreen() {
                 <IconSymbol name="sparkles" size={24} color="#FFFFFF" />
               </View>
               <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF" }}>MoveAI ile anlat</Text>
-                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 4 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF" }}>
+                  MoveAI ile anlat
+                </Text>
+                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 3 }}>
                   Doğal dille söyle, biz halledelim
                 </Text>
               </View>
@@ -130,8 +134,8 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* Quick Access — Profesyonel ikon container'ları */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+        {/* 4. Hızlı Erişim — 4 renkli kart */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
             Hızlı Erişim
           </Text>
@@ -174,9 +178,9 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Active Job Card */}
+        {/* 5. Aktif İş Kartı */}
         {activeJob && (
-          <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
             <Pressable
               onPress={() => router.push(`/job/${activeJob.id}` as any)}
               style={({ pressed }) => [
@@ -233,10 +237,12 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Nearby Professionals — Gerçek kart yapısı */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+        {/* 6. Yakındaki Ustalar */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>Yakındaki Ustalar</Text>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
+              Yakındaki Ustalar
+            </Text>
             <Pressable onPress={() => router.push("/explore" as any)}>
               <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>Tümü</Text>
             </Pressable>
@@ -267,7 +273,6 @@ export default function HomeScreen() {
                   ]}
                 >
                   <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                    {/* Avatar */}
                     <View
                       style={{
                         width: 44,
@@ -298,69 +303,44 @@ export default function HomeScreen() {
                       </View>
                     </View>
                   </View>
-                  <View
-                    style={{
-                      backgroundColor: colors.primary,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#FFFFFF" }}>Teklif Gör</Text>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>₺6.500</Text>
+                    <Text style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>Başlangıç</Text>
                   </View>
                 </Pressable>
               ))}
             </View>
           ) : (
-            /* Professional empty state — gerçek kart yapısında */
-            <View
-              style={{
-                borderRadius: 14,
-                padding: 24,
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-                alignItems: "center",
-              }}
-            >
-              <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: colors.muted + "15",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 12,
-                }}
-              >
-                <IconSymbol size={24} name="magnifyingglass" color={colors.muted} />
-              </View>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, textAlign: "center" }}>
-                Yakında profesyonel bulunamadı
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.muted, textAlign: "center", marginTop: 4 }}>
-                Konumunuzu değiştirin veya farklı bir hizmet arayın
-              </Text>
+            <View style={{ alignItems: "center", paddingVertical: 20 }}>
+              <Text style={{ fontSize: 14, color: colors.muted }}>Yakında profesyonel bulunamadı</Text>
             </View>
           )}
         </View>
 
-        {/* Popular Services — Kart yapısı */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
-            Popüler Hizmetler
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        {/* 7. Popüler Hizmetler */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
+              Popüler Hizmetler
+            </Text>
+            <Pressable onPress={() => router.push("/explore" as any)}>
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>Tümü</Text>
+            </Pressable>
+          </View>
+
+          <View style={{ gap: 8 }}>
             {popularServices.map((service, idx) => (
               <Pressable
                 key={idx}
                 onPress={() => router.push("/explore" as any)}
                 style={({ pressed }) => [
                   {
-                    width: "47%",
-                    borderRadius: 14,
-                    padding: 14,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
                     backgroundColor: colors.surface,
                     borderWidth: 0.5,
                     borderColor: colors.border,
@@ -368,7 +348,7 @@ export default function HomeScreen() {
                   },
                 ]}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <View
                     style={{
                       width: 36,
@@ -377,15 +357,21 @@ export default function HomeScreen() {
                       backgroundColor: colors.primary + "15",
                       alignItems: "center",
                       justifyContent: "center",
+                      marginRight: 10,
                     }}
                   >
                     <IconSymbol size={18} name={service.icon} color={colors.primary} />
                   </View>
-                  <Text style={{ fontSize: 11, fontWeight: "700", color: colors.muted }}>{service.count}</Text>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
+                      {service.name}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                      {service.count} hizmet
+                    </Text>
+                  </View>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
-                  {service.name}
-                </Text>
+                <IconSymbol size={18} name="chevron.right" color={colors.muted} />
               </Pressable>
             ))}
           </View>
