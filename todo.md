@@ -137,20 +137,71 @@
 - [ ] Build ve deployment hazırlığını tamamla
 - [ ] Final checkpoint ve yayın hazırlığı
 
-## Phase 19: Final Production Validation (17-Point Checklist)
-- [ ] 1. Mevcut durum doğrula — frontend, backend, database, auth, authorization
-- [ ] 2. Gerçek API anahtarları — provider abstraction + env config hazır bırak
-- [ ] 3. Payment E2E test — request→offer→payment→webhook→job status
-- [ ] 4. MoveAI E2E test — niyet anlama, kategori belirleme, hizmet talebi oluşturma
-- [ ] 5. Customer E2E test — register→login→home→MoveAI→request→offer→payment→job→message→completion→review
-- [ ] 6. Professional E2E test — login→dashboard→new job→offer→accepted→schedule→arrived→start→complete→earnings
-- [ ] 7. Security test — cross-user access, role auth, JWT, rate limit, input validation
-- [ ] 8. Admin/MoveOS — backend bağlantısı, mock data temizle
-- [ ] 9. Mobile test — Expo Go, iPhone boyutları, UI sorunları
-- [ ] 10. Loading/Error/Empty state — her ana ekran
-- [ ] 11. Mock data denetimi — hardcoded verileri backend'den getir
-- [ ] 12. Database denetimi — migration, schema uyumu, FK relations
-- [ ] 13. Build+Test — TypeScript, lint, build, unit, integration, API, E2E
-- [ ] 14. Performance — API çağrıları, re-render, bundle, DB queries
-- [ ] 15. Production readiness kararı — A/B/C
-- [ ] 16. Rapor — belirtilen formatta teslim
+## Phase 19: Referans Görsel UI Uygulaması
+- [ ] Design System'i referans görselin renk/typography/spacing değerlerine birebir güncelle
+- [ ] Ana Sayfa — referans görsel layout: selamlama, arama, MoveAI banner, hızlı erişim, aktif iş kartı, kategoriler, yakındaki ustalar
+- [ ] Keşfet — arama, kategori filtreleri, kategori listesi DB'den
+- [ ] MoveAI — gerçek LLM akışı, sıcak/doğal konuşma, service request oluşturma
+- [ ] Hizmet Talebi — 5 adımlı stepper (Hizmet→Detay→Zaman→Konum→Onay), fotoğraf yükleme, aciliyet, konum
+- [ ] Profesyonel Listesi — kart: avatar, isim, kategori, puan, yorum, mesafe, müsaitlik, ETA, fiyat
+- [ ] Teklifler — teklif kartları, karşılaştır, kabul et, reddet
+- [ ] Ödeme — premium tasarım, hizmet/profesyonel/bedel/toplam/ödeme yöntemi/MoveWallet/güvenlik
+- [ ] Aktif İş / Canlı Takip — harita, rota, ETA, mesaj, konum paylaşımı, status lifecycle
+- [ ] İşlerim — sekmeler: Aktif, Teklifler, Planlanan, Tamamlanan + empty/loading/error states
+- [ ] Mesajlar — conversation list, chat screen, timestamp, okunma durumu, online/müsaitlik
+- [ ] MoveWallet — bakiye, para ekle, gönder, işlem geçmişi, ödeme, iade
+- [ ] Profil — profil bilgileri, adresler, ödeme yöntemleri, MoveWallet, favoriler, ayarlar, güvenlik, bildirimler, çıkış
+
+## Phase 20: Profesyonel Uygulama Ekranları
+- [ ] Professional Dashboard — bugünkü kazanç, aktif işler, yeni teklifler, müsaitlik toggle, performans, puan
+- [ ] Yeni İş Fırsatları — hizmet, mesafe, bütçe, konum, teklif ver butonu
+- [ ] Provider lifecycle — işi gör, teklif ver, teklif yönet, kabul edilen işi gör, status güncelle, iş tamamla, kazanç, mesaj
+
+## Phase 21: Loading / Error / Empty States
+- [ ] Her ana ekrana loading state ekle
+- [ ] Her ana ekrana empty state ekle (teklif yok, profesyonel yok, mesaj yok, aktif iş yok)
+- [ ] Her ana ekrana error state ekle (internet yok, ödeme başarısız, konum alınamadı, MoveAI cevap veremedi)
+- [ ] Offline/network failure durumlarını ele al
+
+## Phase 22: Mock Data → Gerçek API
+- [ ] lib/data/providers.ts → tRPC providers.nearby/list API'ye bağla
+- [ ] lib/data/categories.ts → tRPC requests.categories veya DB'den getir
+- [ ] lib/data/jobs.ts → tRPC requests.list/providers.myJobs API'ye bağla
+- [ ] lib/data/messages.ts → tRPC messages.conversations API'ye bağla
+- [ ] app/payment/checkout.tsx → tRPC payments.create/updateStatus API'ye bağla
+- [ ] app/(tabs)/profile.tsx → use-auth hook'una ve gerçek kullanıcı verisine bağla
+- [ ] app/create-service.tsx → tRPC requests.create API'ye bağla, gerçek backend'e request oluştur
+
+## Phase 23: Güvenlik Hardening
+- [ ] IDOR test — customer → another user's job access
+- [ ] Provider → another provider's job access
+- [ ] Privilege escalation test
+- [ ] Payment manipulation — client'tan gelen fiyat/commission/payout değerlerine güvenme
+- [ ] Duplicate payment prevention — idempotency
+- [ ] Duplicate offer/request prevention
+- [ ] Unauthorized wallet withdrawal prevention
+- [ ] Server-side fiyat/commission hesabı
+
+## Phase 24: Auth Logout Test
+- [ ] Skipped auth logout testini gerçek testle değiştir
+- [ ] Logout sonrası protected endpoint erişim testi
+- [ ] Logout sonrası session/token davranışı testi
+- [ ] Logout sonrası cached user data temizleme testi
+- [ ] Logout sonrası eski oturum tekrar kullanım engeli testi
+
+## Phase 25: Payment Hardening
+- [ ] Duplicate payment test
+- [ ] Payment timeout test
+- [ ] Gateway failure test
+- [ ] Webhook duplication/idempotency test
+- [ ] Amount tampering test
+- [ ] Unauthorized release/refund test
+- [ ] Provider payout calculation test
+- [ ] Commission calculation test
+
+## Phase 26: Final Build & Test
+- [ ] TypeScript 0 hata
+- [ ] Lint 0 hata
+- [ ] Build PASS
+- [ ] Test 0 failed, skipped=0
+- [ ] Final production readiness raporu

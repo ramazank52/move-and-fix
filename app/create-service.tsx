@@ -1,28 +1,94 @@
-import { Text, View, ScrollView, TextInput, Pressable, Platform } from "react-native";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  TextInput,
+  Alert,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { trpc } from "@/lib/trpc";
 import { CATEGORIES } from "@/lib/data/categories";
-import { useRouter } from "expo-router";
-import { PhotoUpload } from "@/components/photo-upload";
+
+const STEPS = ["Hizmet", "Detay", "Zaman", "Konum", "Onay"] as const;
+const URGENCY_OPTIONS = [
+  { id: "emergency", label: "Acil", icon: "bolt.fill", color: "#EF4444" },
+  { id: "today", label: "Bugün", icon: "clock.fill", color: "#F59E0B" },
+  { id: "scheduled", label: "Planlı", icon: "calendar", color: "#10B981" },
+] as const;
 
 export default function CreateServiceScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [description, setDescription] = useState("");
-  const [address, setAddress] = useState("");
-  const [budget, setBudget] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
+  const params = useLocalSearchParams<{ categoryId?: string; categoryLabel?: string }>();
 
-  const totalSteps = 4;
+  const [step, setStep] = useState(0);
+  const [categoryId, setCategoryId] = useState(params.categoryId ? parseInt(params.categoryId, 10) : 0);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [urgency, setUrgency] = useState<string>("today");
+  const [address, setAddress] = useState("");
+  const [budgetMin, setBudgetMin] = useState("");
+  const [budgetMax, setBudgetMax] = useState("");
+
+  const createRequestMutation = trpc.requests.create.useMutation({
+    onSuccess: (data: any) => {
+      Alert.alert(
+        "Talep Oluşturuldu",
+        "Hizmet talebiniz başarıyla oluşturuldu. Ustalardan teklif geldiğinde size bildirim göndereceğiz.",
+        [{ text: "Tamam", onPress: () => router.replace("/(tabs)/my-jobs" as any) }]
+      );
+    },
+    onError: (err: any) => {
+      Alert.alert(
+        "Hata",
+        err.message || "Talep oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.",
+        [{ text: "Tamam" }]
+      );
+    },
+  });
+
+  const canProceed = useCallback(() => {
+    switch (step) {
+      case 0: return categoryId > 0;
+      case 1: return title.trim().length >= 3;
+      case 2: return urgency.length > 0;
+      case 3: return address.trim().length >= 5;
+      case 4: return true;
+      default: return false;
+    }
+  }, [step, categoryId, title, urgency, address]);
 
   const handleSubmit = () => {
-    // In a real app, this would submit to the backend
-    router.back();
+    createRequestMutation.mutate({
+      categoryId,
+      title: title.trim(),
+      description: description.trim() || undefined,
+      address: address.trim() || undefined,
+      budgetMin: budgetMin ? parseInt(budgetMin, 10) : undefined,
+      budgetMax: budgetMax ? parseInt(budgetMax, 10) : undefined,
+    });
   };
+
+  const handleNext = () => {
+    if (step < 4) setStep(step + 1);
+    else handleSubmit();
+  };
+
+  const handleBack = () => {
+    if (step > 0) setStep(step - 1);
+    else router.back();
+  };
+
+  const selectedCategory = CATEGORIES.find((c) => {
+    return c.id === params.categoryId || c.id === String(categoryId);
+  });
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
@@ -32,207 +98,394 @@ export default function CreateServiceScreen() {
           flexDirection: "row",
           alignItems: "center",
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingVertical: 14,
           borderBottomWidth: 0.5,
           borderBottomColor: colors.border,
         }}
       >
-        <Pressable onPress={() => (step > 1 ? setStep(step - 1) : router.back())} style={{ padding: 4 }}>
-          <IconSymbol name="chevron.left.forwardslash.chevron.right" size={20} color={colors.foreground} />
+        <Pressable onPress={handleBack} style={{ padding: 4 }}>
+          <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={{ flex: 1, textAlign: "center", fontSize: 17, fontWeight: "600", color: colors.foreground }}>
-          Hizmet Talebi Oluştur
+        <Text style={{ flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700", color: colors.foreground }}>
+          Hizmet Talebi
         </Text>
-        <Text style={{ fontSize: 14, color: colors.muted }}>{step}/{totalSteps}</Text>
+        <View style={{ width: 28 }} />
       </View>
 
-      {/* Progress Bar */}
-      <View style={{ height: 3, backgroundColor: colors.border }}>
-        <View
-          style={{
-            height: 3,
-            backgroundColor: colors.primary,
-            width: `${(step / totalSteps) * 100}%`,
-          }}
-        />
+      {/* Step Indicator */}
+      <View style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {STEPS.map((label, i) => (
+            <View key={label} style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+              <View
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: i <= step ? colors.primary : colors.card,
+                  borderWidth: 1,
+                  borderColor: i <= step ? colors.primary : colors.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "800",
+                    color: i <= step ? "#FFF" : colors.muted,
+                  }}
+                >
+                  {i + 1}
+                </Text>
+              </View>
+              {i < STEPS.length - 1 && (
+                <View
+                  style={{
+                    flex: 1,
+                    height: 2,
+                    backgroundColor: i < step ? colors.primary : colors.border,
+                    marginHorizontal: 4,
+                  }}
+                />
+              )}
+            </View>
+          ))}
+        </View>
+        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, textAlign: "center", marginTop: 8 }}>
+          Adım {step + 1}: {STEPS[step]}
+        </Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}>
+        {/* Step 0: Hizmet Seç */}
+        {step === 0 && (
+          <View>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
+              Hangi hizmete ihtiyacınız var?
+            </Text>
+            {params.categoryId && selectedCategory && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: colors.primary + "10",
+                  borderRadius: 14,
+                  padding: 14,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: colors.primary + "30",
+                }}
+              >
+                <Text style={{ fontSize: 24 }}>{selectedCategory.icon}</Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primary, marginLeft: 10 }}>
+                  {selectedCategory.name}
+                </Text>
+              </View>
+            )}
+            {!params.categoryId && (
+              <View style={{ gap: 8 }}>
+                {CATEGORIES.map((cat) => (
+                  <Pressable
+                    key={cat.id}
+                    onPress={() => setCategoryId(parseInt(cat.id, 10) || 0)}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: categoryId === parseInt(cat.id, 10) ? colors.primary + "10" : colors.card,
+                        borderRadius: 14,
+                        padding: 14,
+                        borderWidth: 1.5,
+                        borderColor: categoryId === parseInt(cat.id, 10) ? colors.primary : colors.border,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 22 }}>{cat.icon}</Text>
+                    <Text style={{ flex: 1, marginLeft: 12, fontSize: 15, fontWeight: "600", color: colors.foreground }}>
+                      {cat.name}
+                    </Text>
+                    {categoryId === parseInt(cat.id, 10) && (
+                      <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} />
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Step 1: Detay */}
         {step === 1 && (
           <View>
-            <Text style={{ fontSize: 20, fontWeight: "bold", color: colors.foreground, marginBottom: 6 }}>
-              Hizmet Kategorisi Seçin
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
+              Sorunu detaylı açıklayın
             </Text>
-            <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 20 }}>
-              Hangi tür hizmete ihtiyacınız var?
+            <View style={{ gap: 14 }}>
+              <View>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Başlık</Text>
+                <TextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="Örn: Mutfak musluğu su akıyor"
+                  placeholderTextColor={colors.muted}
+                  style={{
+                    backgroundColor: colors.card,
+                    borderRadius: 14,
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    fontSize: 15,
+                    color: colors.foreground,
+                    borderWidth: 0.5,
+                    borderColor: colors.border,
+                  }}
+                />
+              </View>
+              <View>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Açıklama (opsiyonel)</Text>
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="Sorununuzu daha detaylı açıklayın..."
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  numberOfLines={4}
+                  style={{
+                    backgroundColor: colors.card,
+                    borderRadius: 14,
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    fontSize: 15,
+                    color: colors.foreground,
+                    borderWidth: 0.5,
+                    borderColor: colors.border,
+                    textAlignVertical: "top",
+                    minHeight: 100,
+                  }}
+                />
+              </View>
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Min Bütçe (₺)</Text>
+                  <TextInput
+                    value={budgetMin}
+                    onChangeText={setBudgetMin}
+                    placeholder="0"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="numeric"
+                    style={{
+                      backgroundColor: colors.card,
+                      borderRadius: 14,
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      fontSize: 15,
+                      color: colors.foreground,
+                      borderWidth: 0.5,
+                      borderColor: colors.border,
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Max Bütçe (₺)</Text>
+                  <TextInput
+                    value={budgetMax}
+                    onChangeText={setBudgetMax}
+                    placeholder="0"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="numeric"
+                    style={{
+                      backgroundColor: colors.card,
+                      borderRadius: 14,
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      fontSize: 15,
+                      color: colors.foreground,
+                      borderWidth: 0.5,
+                      borderColor: colors.border,
+                    }}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Step 2: Zaman */}
+        {step === 2 && (
+          <View>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
+              Ne zaman ihtiyacınız var?
             </Text>
             <View style={{ gap: 10 }}>
-              {CATEGORIES.map((cat) => (
+              {URGENCY_OPTIONS.map((opt) => (
                 <Pressable
-                  key={cat.id}
-                  onPress={() => setSelectedCategory(cat.id)}
+                  key={opt.id}
+                  onPress={() => setUrgency(opt.id)}
                   style={({ pressed }) => [
                     {
                       flexDirection: "row",
                       alignItems: "center",
-                      padding: 14,
-                      borderRadius: 12,
+                      backgroundColor: urgency === opt.id ? opt.color + "10" : colors.card,
+                      borderRadius: 16,
+                      padding: 18,
                       borderWidth: 1.5,
-                      borderColor: selectedCategory === cat.id ? colors.primary : colors.border,
-                      backgroundColor: selectedCategory === cat.id ? colors.primary + "10" : colors.surface,
-                      opacity: pressed ? 0.9 : 1,
+                      borderColor: urgency === opt.id ? opt.color : colors.border,
+                      opacity: pressed ? 0.85 : 1,
                     },
                   ]}
                 >
-                  <Text style={{ fontSize: 24, marginRight: 12 }}>{cat.icon}</Text>
-                  <Text style={{ fontSize: 15, fontWeight: "500", color: colors.foreground }}>{cat.name}</Text>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: opt.color + "15",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <IconSymbol name={opt.icon as any} size={22} color={opt.color} />
+                  </View>
+                  <Text style={{ flex: 1, marginLeft: 14, fontSize: 16, fontWeight: "700", color: colors.foreground }}>
+                    {opt.label}
+                  </Text>
+                  {urgency === opt.id && (
+                    <IconSymbol name="checkmark.circle.fill" size={22} color={opt.color} />
+                  )}
                 </Pressable>
               ))}
             </View>
           </View>
         )}
 
-        {step === 2 && (
-          <View>
-            <Text style={{ fontSize: 20, fontWeight: "bold", color: colors.foreground, marginBottom: 6 }}>
-              Sorunu Açıklayın
-            </Text>
-            <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 20 }}>
-              Detaylı açıklama yapmanız daha doğru teklifler almanızı sağlar.
-            </Text>
-            <TextInput
-              multiline
-              numberOfLines={6}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Örn: 3 adet split klima bakım ve temizliği yapılacak. Klimalar salon, yatak odası ve çocuk odasında..."
-              placeholderTextColor={colors.muted}
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 15,
-                color: colors.foreground,
-                borderWidth: 1,
-                borderColor: colors.border,
-                minHeight: 140,
-                textAlignVertical: "top",
-              }}
-            />
-            <View style={{ marginTop: 16 }}>
-              <PhotoUpload
-                photos={photos}
-                onPhotosChange={setPhotos}
-                maxPhotos={5}
-                label="Arıza Fotoğrafları"
-              />
-            </View>
-          </View>
-        )}
-
+        {/* Step 3: Konum */}
         {step === 3 && (
           <View>
-            <Text style={{ fontSize: 20, fontWeight: "bold", color: colors.foreground, marginBottom: 6 }}>
-              Konum Bilgisi
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
+              Hizmet nerede verilecek?
             </Text>
-            <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 20 }}>
-              Hizmetin yapılacağı adresi girin.
-            </Text>
-            <TextInput
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Adres girin veya haritadan seçin..."
-              placeholderTextColor={colors.muted}
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 15,
-                color: colors.foreground,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            />
+            <View>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Adres</Text>
+              <TextInput
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Örn: Bağdat Cad. No:123 Kadıköy, İstanbul"
+                placeholderTextColor={colors.muted}
+                multiline
+                numberOfLines={3}
+                style={{
+                  backgroundColor: colors.card,
+                  borderRadius: 14,
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  fontSize: 15,
+                  color: colors.foreground,
+                  borderWidth: 0.5,
+                  borderColor: colors.border,
+                  textAlignVertical: "top",
+                  minHeight: 80,
+                }}
+              />
+            </View>
             <Pressable
               style={({ pressed }) => [
                 {
                   flexDirection: "row",
                   alignItems: "center",
-                  marginTop: 14,
-                  padding: 12,
-                  borderRadius: 10,
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  opacity: pressed ? 0.8 : 1,
+                  justifyContent: "center",
+                  backgroundColor: colors.card,
+                  borderRadius: 14,
+                  paddingVertical: 14,
+                  marginTop: 12,
+                  borderWidth: 1.5,
+                  borderStyle: "dashed",
+                  borderColor: colors.primary + "50",
+                  opacity: pressed ? 0.85 : 1,
                 },
               ]}
             >
-              <IconSymbol name="location.fill" size={20} color={colors.primary} />
-              <Text style={{ marginLeft: 10, color: colors.primary, fontWeight: "500" }}>
-                Mevcut Konumu Kullan
+              <IconSymbol name="location.fill" size={18} color={colors.primary} />
+              <Text style={{ marginLeft: 8, color: colors.primary, fontWeight: "600", fontSize: 14 }}>
+                Konumumu Kullan
               </Text>
             </Pressable>
           </View>
         )}
 
+        {/* Step 4: Onay */}
         {step === 4 && (
           <View>
-            <Text style={{ fontSize: 20, fontWeight: "bold", color: colors.foreground, marginBottom: 6 }}>
-              Bütçe ve Tarih
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
+              Talep Özeti
             </Text>
-            <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 20 }}>
-              Tahmini bütçenizi belirleyin veya teklif isteyin.
-            </Text>
-            <TextInput
-              value={budget}
-              onChangeText={setBudget}
-              placeholder="Tahmini bütçe (₺)"
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-              style={{
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 14,
-                fontSize: 15,
-                color: colors.foreground,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            />
-            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 8 }}>
-              Boş bırakırsanız ustalardan teklif istenir.
-            </Text>
-
-            {/* Summary */}
             <View
               style={{
-                marginTop: 24,
-                padding: 16,
-                borderRadius: 12,
-                backgroundColor: colors.surface,
-                borderWidth: 1,
+                backgroundColor: colors.card,
+                borderRadius: 18,
+                padding: 20,
+                borderWidth: 0.5,
                 borderColor: colors.border,
+                gap: 12,
               }}
             >
-              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 10 }}>
-                Özet
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 4 }}>
-                Kategori: {CATEGORIES.find((c) => c.id === selectedCategory)?.name || "-"}
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 4 }}>
-                Açıklama: {description.substring(0, 50) || "-"}...
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.muted }}>
-                Adres: {address || "-"}
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 14, color: colors.muted }}>Hizmet</Text>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                  {selectedCategory?.name || CATEGORIES.find((c) => c.id === String(categoryId))?.name || "Seçilmedi"}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 14, color: colors.muted }}>Başlık</Text>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>
+                  {title || "—"}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 14, color: colors.muted }}>Aciliyet</Text>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                  {URGENCY_OPTIONS.find((u) => u.id === urgency)?.label || "—"}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 14, color: colors.muted }}>Adres</Text>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>
+                  {address || "—"}
+                </Text>
+              </View>
+              {(budgetMin || budgetMax) && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>Bütçe</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                    {budgetMin && `₺${budgetMin}`}
+                    {budgetMin && budgetMax && " - "}
+                    {budgetMax && `₺${budgetMax}`}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: colors.primary + "08",
+                borderRadius: 14,
+                padding: 14,
+                marginTop: 14,
+                borderWidth: 0.5,
+                borderColor: colors.primary + "20",
+              }}
+            >
+              <IconSymbol name="info.circle.fill" size={18} color={colors.primary} />
+              <Text style={{ flex: 1, marginLeft: 8, fontSize: 12, color: colors.muted, lineHeight: 18 }}>
+                Talebiniz oluşturulduktan sonra size uygun ustalar teklif gönderecektir. Teklifleri "İşlerim" ekranından takip edebilirsiniz.
               </Text>
             </View>
           </View>
         )}
       </ScrollView>
 
-      {/* Bottom Button */}
+      {/* Bottom CTA */}
       <View
         style={{
           position: "absolute",
@@ -247,20 +500,25 @@ export default function CreateServiceScreen() {
         }}
       >
         <Pressable
-          onPress={() => (step < totalSteps ? setStep(step + 1) : handleSubmit())}
+          onPress={handleNext}
+          disabled={!canProceed() || createRequestMutation.isPending}
           style={({ pressed }) => [
             {
-              backgroundColor: colors.primary,
-              borderRadius: 12,
-              paddingVertical: 15,
+              backgroundColor: !canProceed() || createRequestMutation.isPending ? colors.muted : colors.primary,
+              borderRadius: 16,
+              paddingVertical: 17,
               alignItems: "center",
-              opacity: pressed ? 0.9 : 1,
+              opacity: pressed && canProceed() ? 0.9 : 1,
             },
           ]}
         >
-          <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600" }}>
-            {step < totalSteps ? "Devam Et" : "Talebi Gönder"}
-          </Text>
+          {createRequestMutation.isPending ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "700" }}>
+              {step < 4 ? "Devam" : "Talep Oluştur"}
+            </Text>
+          )}
         </Pressable>
       </View>
     </ScreenContainer>

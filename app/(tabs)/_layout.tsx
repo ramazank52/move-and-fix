@@ -33,7 +33,7 @@ export default function TabLayout() {
           elevation: 5,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: "600",
           marginTop: 2,
         },
@@ -43,35 +43,42 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Ana Sayfa",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: "Keşfet",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="magnifyingglass" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="magnifyingglass" color={color} />,
         }}
       />
       <Tabs.Screen
         name="my-jobs"
         options={{
           title: "İşlerim",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="briefcase.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="briefcase.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
           title: "Mesajlar",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="message.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="message.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="wallet"
+        options={{
+          title: "MoveWallet",
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="wallet.pass.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profil",
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="person.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.fill" color={color} />,
         }}
       />
     </Tabs>

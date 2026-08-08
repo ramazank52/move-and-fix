@@ -1,11 +1,31 @@
-import { View, Text, Pressable, ScrollView } from "react-native";
+import { View, Text, Pressable, ScrollView, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { router } from "expo-router";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Çıkış Yap",
+      "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
+      [
+        { text: "İptal", style: "cancel" },
+        {
+          text: "Çıkış Yap",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+            router.replace("/" as any);
+          },
+        },
+      ],
+    );
+  };
 
   const menuGroups = [
     {
@@ -74,8 +94,8 @@ export default function ProfileScreen() {
           >
             <Text style={{ color: "#FFF", fontSize: 34, fontWeight: "800" }}>M</Text>
           </View>
-          <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>Kullanıcı</Text>
-          <Text style={{ fontSize: 14, color: colors.muted, marginTop: 4 }}>kullanici@email.com</Text>
+          <Text style={{ fontSize: 22, fontWeight: "800", color: colors.foreground }}>{user?.name || "Misafir"}</Text>
+          <Text style={{ fontSize: 14, color: colors.muted, marginTop: 4 }}>{user?.email || "Giriş yapın"}</Text>
 
           {/* Verification Badges */}
           <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
@@ -213,7 +233,7 @@ export default function ProfileScreen() {
         {/* Logout */}
         <View style={{ paddingHorizontal: 20, marginTop: 8 }}>
           <Pressable
-            onPress={() => {}}
+            onPress={handleLogout}
             style={({ pressed }) => [
               {
                 alignItems: "center",

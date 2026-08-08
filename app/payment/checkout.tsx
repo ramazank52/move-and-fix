@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { View, Text, Pressable, ScrollView, Alert } from "react-native";
+import { View, Text, Pressable, ScrollView, Alert, ActivityIndicator } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { trpc } from "@/lib/trpc";
 import {
   SAMPLE_CARDS,
   ESCROW_FLOW_STEPS,
@@ -15,7 +16,7 @@ import {
 export default function CheckoutScreen() {
   const colors = useColors();
   const router = useRouter();
-  const params = useLocalSearchParams<{ amount?: string; title?: string }>();
+  const params = useLocalSearchParams<{ amount?: string; title?: string; requestId?: string; providerId?: string; }>();
   const amount = parseInt(params.amount || "0", 10);
   const title = params.title || "Hizmet Ödemesi";
 
@@ -34,16 +35,57 @@ export default function CheckoutScreen() {
     }
   };
 
-  const handlePayment = () => {
-    setProcessing(true);
-    setTimeout(() => {
+  const createPaymentMutation = trpc.payments.create.useMutation({
+    onSuccess: (data: any) => {
+      // Payment created — now update status to "held" (escrow)
+      updatePaymentStatusMutation.mutate({
+        paymentId: typeof data === "number" ? data : (data as any).id,
+        status: "held",
+      });
+    },
+    onError: (err) => {
+      setProcessing(false);
+      Alert.alert(
+        "Ödeme Başarısız",
+        err.message || "Ödeme oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.",
+        [{ text: "Tamam" }]
+      );
+    },
+  });
+
+  const updatePaymentStatusMutation = trpc.payments.updateStatus.useMutation({
+    onSuccess: () => {
       setProcessing(false);
       Alert.alert(
         "Ödeme Başarılı",
         "Ödemeniz emanet hesabına aktarıldı. Hizmet tamamlandığında ustaya ödeme yapılacaktır.",
         [{ text: "Tamam", onPress: () => router.back() }]
       );
-    }, 2000);
+    },
+    onError: (err) => {
+      setProcessing(false);
+      Alert.alert(
+        "Ödeme Başarısız",
+        err.message || "Ödeme durumu güncellenirken bir hata oluştu.",
+        [{ text: "Tamam" }]
+      );
+    },
+  });
+
+  const handlePayment = () => {
+    if (amount <= 0) {
+      Alert.alert("Hata", "Geçersiz ödeme tutarı.");
+      return;
+    }
+    setProcessing(true);
+    // Create payment record via tRPC — requestId and providerId from params
+    const requestId = parseInt(params.requestId || "0", 10);
+    const providerId = parseInt(params.providerId || "0", 10);
+    createPaymentMutation.mutate({
+      requestId,
+      providerId,
+      amount,
+    });
   };
 
   return (

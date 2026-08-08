@@ -51,7 +51,7 @@ export default function AIAssistantScreen() {
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const aiCommandMutation = trpc.owner.aiCommand.useMutation({
+  const aiCommandMutation = trpc.ai.command.useMutation({
     onSuccess: (data: any) => {
       const response: Message = {
         id: Date.now().toString() + "-ai",
@@ -73,7 +73,7 @@ export default function AIAssistantScreen() {
             { text: "Sonra", style: "cancel" },
             {
               text: "Ustaları Gör",
-              onPress: () => router.push(`/category/${data.categoryId || 1}`),
+              onPress: () => router.push(`/category/${data.category || 1}` as any),
             },
           ]
         );
@@ -161,7 +161,7 @@ export default function AIAssistantScreen() {
 
     try {
       // Try backend AI first
-      aiCommandMutation.mutate({ command: messageText });
+      aiCommandMutation.mutate({ message: messageText });
     } catch {
       // Fallback handled in onError
     }

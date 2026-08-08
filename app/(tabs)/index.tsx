@@ -11,6 +11,7 @@ import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { CATEGORIES } from "@/lib/data/categories";
 import { SAMPLE_PROVIDERS } from "@/lib/data/providers";
+import { SAMPLE_JOBS } from "@/lib/data/jobs";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useState, useCallback } from "react";
@@ -28,6 +29,7 @@ export default function HomeScreen() {
 
   const topProviders = SAMPLE_PROVIDERS.filter((p) => p.premium).slice(0, 6);
   const kmCategories = CATEGORIES.filter((c) => c.pricingType === "km_based");
+  const activeJobs = SAMPLE_JOBS.filter((j) => j.status === "active");
 
   const handleSearch = useCallback(() => {
     if (searchQuery.trim()) {
@@ -310,6 +312,128 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Active Job Card — Referans görseldeki aktif iş kartı */}
+        {activeJobs.length > 0 && (
+          <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground, marginBottom: 14 }}>
+              Aktif İş
+            </Text>
+            <Pressable
+              onPress={() => router.push(`/job/${activeJobs[0].id}` as any)}
+              style={({ pressed }) => [
+                {
+                  backgroundColor: colors.card,
+                  borderRadius: 20,
+                  padding: 16,
+                  opacity: pressed ? 0.9 : 1,
+                  borderWidth: 0.5,
+                  borderColor: colors.border,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 10,
+                  elevation: 2,
+                },
+              ]}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    backgroundColor: colors.primary + "15",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <IconSymbol name="wrench.fill" size={22} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
+                    {activeJobs[0].title}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                    {activeJobs[0].providerName} · {activeJobs[0].location}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    backgroundColor: colors.primary + "15",
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>
+                    Yolda
+                  </Text>
+                </View>
+              </View>
+
+              {/* Mini Map Placeholder */}
+              <View
+                style={{
+                  height: 80,
+                  borderRadius: 12,
+                  backgroundColor: colors.surface,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <IconSymbol name="map.fill" size={28} color={colors.muted} />
+                <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>
+                  Tahmini varış: 12 dk
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Pressable
+                  onPress={() => router.push(`/chat/${activeJobs[0].id}` as any)}
+                  style={({ pressed }) => [
+                    {
+                      flex: 1,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: colors.surface,
+                      borderRadius: 12,
+                      paddingVertical: 10,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <IconSymbol name="message.fill" size={16} color={colors.foreground} />
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground, marginLeft: 6 }}>
+                    Mesaj
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push(`/tracking/live` as any)}
+                  style={({ pressed }) => [
+                    {
+                      flex: 1,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: colors.primary,
+                      borderRadius: 12,
+                      paddingVertical: 10,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <IconSymbol name="location.fill" size={16} color="#FFF" />
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#FFF", marginLeft: 6 }}>
+                    Takip Et
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </View>
+        )}
+
         {/* Categories — Clean List */}
         <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
           <View
@@ -436,19 +560,19 @@ export default function HomeScreen() {
                   width: 44,
                   height: 44,
                   borderRadius: 12,
-                  backgroundColor: colors.surface,
+                  backgroundColor: colors.primary + "15",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <IconSymbol name={"car.fill"} size={22} color={colors.primary} />
+                <IconSymbol name="car.fill" size={22} color={colors.primary} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
                   {cat.name}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
-                  {cat.basePrice} başlangıç + {cat.kmRate}/km
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                  {cat.basePrice ? `₺${cat.basePrice} başlangıç` : "Fiyat bilgisi"} + {cat.kmRate ? ` ₺${cat.kmRate}/km` : ""}
                 </Text>
               </View>
               <IconSymbol name="chevron.right" size={16} color={colors.muted} />
