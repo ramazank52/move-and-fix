@@ -274,7 +274,7 @@ export default function ProviderDetailScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.push(`/chat/${provider.id}` as any)}
+          onPress={() => router.push(`/chat/${provider.id}?otherUserId=${provider.id}` as any)}
           style={({ pressed }) => [
             {
               flex: 1,
@@ -290,7 +290,7 @@ export default function ProviderDetailScreen() {
           <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 15 }}>Mesaj Gönder</Text>
         </Pressable>
         <Pressable
-          onPress={() => router.push(`/service-request?provider=${provider.id}` as any)}
+          onPress={() => router.push(`/create-service?providerId=${provider.id}` as any)}
           style={({ pressed }) => [
             {
               flex: 1,

@@ -181,7 +181,7 @@ export default function CategoryDetailScreen() {
               {category.subcategories.map((sub) => (
                 <Pressable
                   key={sub}
-                  onPress={() => router.push(`/service-request?category=${category.id}&sub=${encodeURIComponent(sub)}` as any)}
+                  onPress={() => router.push(`/create-service?categoryId=${category.id}&sub=${encodeURIComponent(sub)}` as any)}
                   style={({ pressed }) => [
                     {
                       paddingHorizontal: 14,
@@ -219,7 +219,7 @@ export default function CategoryDetailScreen() {
                 Bu kategoride henüz usta bulunmuyor
               </Text>
               <Pressable
-                onPress={() => router.push(`/service-request?category=${id}` as any)}
+                onPress={() => router.push(`/create-service?categoryId=${id}` as any)}
                 style={({ pressed }) => [
                   {
                     marginTop: 16,

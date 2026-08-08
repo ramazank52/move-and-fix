@@ -8,7 +8,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 export default function LiveTrackingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const params = useLocalSearchParams<{ providerName?: string; service?: string }>();
+  const params = useLocalSearchParams<{ providerName?: string; service?: string; requestId?: string; providerId?: string }>();
+  const requestId = params.requestId || "";
+  const providerId = params.providerId || "";
   const providerName = params.providerName || "Usta";
   const service = params.service || "Hizmet";
 
@@ -281,7 +283,7 @@ export default function LiveTrackingScreen() {
               <IconSymbol name="phone.fill" size={18} color={colors.primary} />
             </Pressable>
             <Pressable
-              onPress={() => router.push(`/chat/1` as any)}
+              onPress={() => router.push(`/chat/${requestId || "1"}?otherUserId=${providerId || "1"}` as any)}
               style={({ pressed }) => [
                 {
                   width: 40,
@@ -320,7 +322,7 @@ export default function LiveTrackingScreen() {
         {status === "working" && (
           <Pressable
             onPress={() => {
-              router.push(`/review/create?providerId=1&providerName=${providerName}&jobTitle=${service}` as any);
+              router.push(`/review/create?providerId=${providerId || "1"}&providerName=${providerName}&jobTitle=${service}` as any);
             }}
             style={({ pressed }) => [
               {

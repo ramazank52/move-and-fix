@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -41,7 +41,7 @@ export default function AIAssistantScreen() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Merhaba! Ben MoveAI. Size nasıl yardımcı olabilirim? Acil bir sorun mu var, hizmet mi arıyorsunuz?",
+      text: "Merhaba! Ben MoveAI 🤖 Size nasıl yardımcı olabilirim? Acil bir sorun mu var, hizmet mi arıyorsunuz?",
       isUser: false,
       timestamp: new Date().toISOString(),
       suggestions: QUICK_PROMPTS,
@@ -64,7 +64,6 @@ export default function AIAssistantScreen() {
       };
       setMessages((prev) => [...prev, response]);
 
-      // If AI created a service request, offer navigation
       if (data.requestId) {
         Alert.alert(
           "Hizmet Talebi Oluşturuldu",
@@ -79,8 +78,7 @@ export default function AIAssistantScreen() {
         );
       }
     },
-    onError: (err) => {
-      // Fallback: if backend AI is not available, use local keyword matching
+    onError: () => {
       const fallback = getLocalResponse(input);
       setMessages((prev) => [
         ...prev,
@@ -107,28 +105,28 @@ export default function AIAssistantScreen() {
     }
     if (lower.includes("araba") && (lower.includes("kal") || lower.includes("bozul"))) {
       return {
-        text: "Araç arızası için çekici veya yol yardımı gerekiyor. Size en yakın çekici hizmetini buluyorum. Çekici: ₺200 başlangıç + ₺25/km. Yol yardımı: ₺100 başlangıç + ₺18/km.",
+        text: "Araç arızası için çekici veya yol yardımı gerekiyor. Çekici: ₺200 başlangıç + ₺25/km. Yol yardımı: ₺100 başlangıç + ₺18/km.",
         suggestions: ["Çekici çağır", "Yol yardımı çağır", "Fiyat hesapla"],
         category: "towing",
       };
     }
     if (lower.includes("klima") && (lower.includes("soğut") || lower.includes("çalış"))) {
       return {
-        text: "Klima arızası için size en yakın klima servisini buluyorum. Tahmini ücret: ₺600-₺1.200. Klima bakımı mı yoksa onarım mı gerekiyor?",
+        text: "Klima arızası için size en yakın klima servisini buluyorum. Tahmini ücret: ₺600-₺1.200.",
         suggestions: ["Klima servisi çağır", "Fiyat öğren", "Başka bir sorunum var"],
         category: "hvac",
       };
     }
     if (lower.includes("çekici")) {
       return {
-        text: "Çekici hizmeti için konumunuzu paylaşır mısınız? Ücretlendirme: ₺200 başlangıç + ₺25/km. Size en yakın çekici firmalarını öneriyorum.",
+        text: "Çekici hizmeti için konumunuzu paylaşır mısınız? Ücretlendirme: ₺200 başlangıç + ₺25/km.",
         suggestions: ["Çekici çağır", "Fiyat hesapla"],
         category: "towing",
       };
     }
     if (lower.includes("kurye")) {
       return {
-        text: "Kurye hizmeti için paket bilgilerinizi paylaşır mısınız? Ücretlendirme: ₺50 başlangıç + ₺12/km. Size en uygun kurye hizmetini buluyorum.",
+        text: "Kurye hizmeti için paket bilgilerinizi paylaşır mısınız? Ücretlendirme: ₺50 başlangıç + ₺12/km.",
         suggestions: ["Kurye çağır", "Fiyat hesapla"],
         category: "courier",
       };
@@ -136,7 +134,7 @@ export default function AIAssistantScreen() {
     if (lower.includes("fiyat") || lower.includes("ücret") || lower.includes("kaç para")) {
       return {
         text: "Fiyat tahmini için hizmet türünü belirtir misiniz? Örneğin: temizlik (₺300-₺800), elektrik (₺200-₺600), su tesisatı (₺200-₺500), çekici (₺200+₺25/km), kurye (₺50+₺12/km).",
-        suggestions: ["Temizlik", "Elektrik", "Su tesisatı", "Çekici"],
+        suggestions: ["Temizlik", "Elektrik", "Su Tesisatı", "Çekici"],
       };
     }
     return {
@@ -160,7 +158,6 @@ export default function AIAssistantScreen() {
     setLoading(true);
 
     try {
-      // Try backend AI first
       aiCommandMutation.mutate({ message: messageText });
     } catch {
       // Fallback handled in onError
@@ -174,79 +171,166 @@ export default function AIAssistantScreen() {
   };
 
   return (
-    <ScreenContainer className="flex-1 bg-background">
+    <ScreenContainer className="flex-1 bg-background" edges={["top", "bottom", "left", "right"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
-        {/* Header */}
-        <View className="flex-row items-center px-4 py-3 border-b" style={{ borderColor: colors.border }}>
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
+        {/* Header — MoveAI avatar + mor tema */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
             <IconSymbol name="chevron.left" size={24} color={colors.foreground} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className="text-lg font-bold" style={{ color: colors.foreground }}>
-              MoveAI Asistan
-            </Text>
-            <Text className="text-xs" style={{ color: colors.muted }}>
-              Yapay zeka destekli hizmet asistanı
-            </Text>
+          </Pressable>
+
+          {/* MoveAI Avatar — mor gradient container */}
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: colors.accentPurple,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 10,
+            }}
+          >
+            <IconSymbol name="sparkles" size={20} color="#FFFFFF" />
           </View>
-          <View className="w-2 h-2 rounded-full" style={{ backgroundColor: colors.success }} />
+
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>
+              MoveAI
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: colors.success,
+                  marginRight: 4,
+                }}
+              />
+              <Text style={{ fontSize: 11, color: colors.muted }}>Çevrimiçi</Text>
+            </View>
+          </View>
         </View>
 
         {/* Messages */}
         <ScrollView
           ref={scrollViewRef}
-          className="flex-1 px-4 py-4"
+          className="flex-1"
+          style={{ paddingHorizontal: 16, paddingVertical: 12 }}
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
         >
           {messages.map((msg) => (
             <View
               key={msg.id}
-              className={`mb-3 max-w-[85%] ${msg.isUser ? "self-end" : "self-start"}`}
+              style={{
+                marginBottom: 12,
+                maxWidth: "85%",
+                alignSelf: msg.isUser ? "flex-end" : "flex-start",
+              }}
             >
-              <View
-                className="rounded-2xl px-4 py-3"
-                style={{
-                  backgroundColor: msg.isUser ? colors.primary : colors.surface,
-                  borderWidth: msg.isUser ? 0 : 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text
-                  className="text-sm"
-                  style={{ color: msg.isUser ? "#fff" : colors.foreground }}
+              {/* AI avatar for non-user messages */}
+              {!msg.isUser && (
+                <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+                  <View
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: colors.accentPurple,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: 8,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <IconSymbol name="sparkles" size={14} color="#FFFFFF" />
+                  </View>
+                  <View
+                    style={{
+                      flex: 1,
+                      borderRadius: 16,
+                      borderTopLeftRadius: 4,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      backgroundColor: colors.surface,
+                      borderWidth: 0.5,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: colors.foreground, lineHeight: 20 }}>
+                      {msg.text}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* User messages */}
+              {msg.isUser && (
+                <View
+                  style={{
+                    borderRadius: 16,
+                    borderTopRightRadius: 4,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    backgroundColor: colors.primary,
+                  }}
                 >
-                  {msg.text}
-                </Text>
-              </View>
+                  <Text style={{ fontSize: 14, color: "#FFFFFF", lineHeight: 20 }}>
+                    {msg.text}
+                  </Text>
+                </View>
+              )}
 
               {/* Suggestions */}
               {msg.suggestions && msg.suggestions.length > 0 && (
-                <View className="flex-row flex-wrap mt-2">
+                <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8, marginLeft: msg.isUser ? 0 : 36 }}>
                   {msg.suggestions.map((sug, i) => (
-                    <TouchableOpacity
+                    <Pressable
                       key={i}
                       onPress={() => handleSuggestion(sug)}
-                      className="mr-2 mb-2 px-3 py-1.5 rounded-full"
-                      style={{
-                        backgroundColor: colors.surface,
-                        borderWidth: 1,
-                        borderColor: colors.primary,
-                      }}
+                      style={({ pressed }) => [
+                        {
+                          marginRight: 6,
+                          marginBottom: 6,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 16,
+                          backgroundColor: colors.accentPurple + "10",
+                          borderWidth: 1,
+                          borderColor: colors.accentPurple + "40",
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
                     >
-                      <Text className="text-xs font-medium" style={{ color: colors.primary }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.accentPurple }}>
                         {sug}
                       </Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   ))}
                 </View>
               )}
 
               <Text
-                className="text-[10px] mt-1"
-                style={{ color: colors.muted, textAlign: msg.isUser ? "right" : "left" }}
+                style={{
+                  fontSize: 10,
+                  color: colors.muted,
+                  marginTop: 4,
+                  textAlign: msg.isUser ? "right" : "left",
+                  marginLeft: msg.isUser ? 0 : 36,
+                }}
               >
                 {new Date(msg.timestamp).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
               </Text>
@@ -254,13 +338,35 @@ export default function AIAssistantScreen() {
           ))}
 
           {loading && (
-            <View className="self-start mb-3">
+            <View style={{ alignSelf: "flex-start", marginBottom: 12, flexDirection: "row", alignItems: "flex-end" }}>
               <View
-                className="rounded-2xl px-4 py-3 flex-row items-center"
-                style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: colors.accentPurple,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 8,
+                }}
               >
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text className="ml-2 text-sm" style={{ color: colors.muted }}>
+                <IconSymbol name="sparkles" size={14} color="#FFFFFF" />
+              </View>
+              <View
+                style={{
+                  borderRadius: 16,
+                  borderTopLeftRadius: 4,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  backgroundColor: colors.surface,
+                  borderWidth: 0.5,
+                  borderColor: colors.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <ActivityIndicator size="small" color={colors.accentPurple} />
+                <Text style={{ marginLeft: 8, fontSize: 13, color: colors.muted }}>
                   MoveAI düşünüyor...
                 </Text>
               </View>
@@ -268,37 +374,59 @@ export default function AIAssistantScreen() {
           )}
         </ScrollView>
 
-        {/* Input */}
+        {/* Input — Referans yapısı */}
         <View
-          className="flex-row items-center px-4 py-3 border-t"
-          style={{ borderColor: colors.border, backgroundColor: colors.background }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderTopWidth: 0.5,
+            borderTopColor: colors.border,
+            backgroundColor: colors.background,
+          }}
         >
           <TextInput
             value={input}
             onChangeText={setInput}
             placeholder="Sorunuzu yazın..."
             placeholderTextColor={colors.muted}
-            className="flex-1 rounded-full px-4 py-2.5 mr-2"
             style={{
+              flex: 1,
+              borderRadius: 24,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              marginRight: 10,
               backgroundColor: colors.surface,
               color: colors.foreground,
               fontSize: 14,
-              borderWidth: 1,
+              borderWidth: 0.5,
               borderColor: colors.border,
             }}
             returnKeyType="send"
             onSubmitEditing={sendMessage}
           />
-          <TouchableOpacity
+          <Pressable
             onPress={sendMessage}
             disabled={!input.trim() || loading}
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={{
-              backgroundColor: input.trim() ? colors.primary : colors.surface,
-            }}
+            style={({ pressed }) => [
+              {
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: input.trim() ? colors.accentPurple : colors.surface,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
           >
-            <IconSymbol name="paperplane.fill" size={20} color={input.trim() ? "#fff" : colors.muted} />
-          </TouchableOpacity>
+            <IconSymbol
+              name="paperplane.fill"
+              size={20}
+              color={input.trim() ? "#FFFFFF" : colors.muted}
+            />
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </ScreenContainer>

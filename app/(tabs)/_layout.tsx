@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform } from "react-native";
+import { Platform, Dimensions } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -11,6 +11,10 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 60 + bottomPadding;
+  const screenWidth = Dimensions.get("window").width;
+
+  // 6 tab için label font size ekran genişliğine göre ayarla
+  const labelSize = screenWidth < 380 ? 8 : screenWidth < 420 ? 9 : 10;
 
   return (
     <Tabs
@@ -20,7 +24,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          paddingTop: 10,
+          paddingTop: 8,
           paddingBottom: bottomPadding,
           height: tabBarHeight,
           backgroundColor: colors.background,
@@ -33,9 +37,12 @@ export default function TabLayout() {
           elevation: 5,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: labelSize,
           fontWeight: "600",
           marginTop: 2,
+        },
+        tabBarIconStyle: {
+          marginTop: 0,
         },
       }}
     >
@@ -43,35 +50,42 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Ana Sayfa",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={22} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: "Keşfet",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="magnifyingglass" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={22} name="magnifyingglass" color={color} />,
         }}
       />
       <Tabs.Screen
         name="my-jobs"
         options={{
           title: "İşlerim",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="briefcase.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={22} name="briefcase.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
           title: "Mesajlar",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="message.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={22} name="message.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="wallet"
+        options={{
+          title: "MoveWallet",
+          tabBarIcon: ({ color }) => <IconSymbol size={22} name="wallet.pass.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profil",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={22} name="person.fill" color={color} />,
         }}
       />
     </Tabs>

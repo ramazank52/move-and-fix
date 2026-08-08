@@ -5,11 +5,9 @@ import {
   Pressable,
   TextInput,
   FlatList,
-  useWindowDimensions,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
-import { ServiceCategoryCard } from "@/components/service-category-card";
 import { CATEGORIES } from "@/lib/data/categories";
 import { SAMPLE_PROVIDERS, Provider } from "@/lib/data/providers";
 import { useColors } from "@/hooks/use-colors";
@@ -18,6 +16,22 @@ import { useState, useCallback, useMemo } from "react";
 
 type FilterTab = "all" | "emergency" | "km_based" | "providers";
 
+// Kategori ikon mapping — emoji DEĞİL, profesyonel ikonlar
+const CATEGORY_ICONS: Record<string, { icon: string; color: string }> = {
+  plumbing: { icon: "wrench.fill", color: "#3B82F6" },
+  electrical: { icon: "bolt.fill", color: "#F59E0B" },
+  cleaning: { icon: "sparkles", color: "#8A5CFF" },
+  hvac: { icon: "sun.max.fill", color: "#FF6A00" },
+  towing: { icon: "car.fill", color: "#EF4444" },
+  courier: { icon: "shippingbox.fill", color: "#22C55E" },
+  roadside: { icon: "wrench.adjustable.fill", color: "#8A5CFF" },
+  locksmith: { icon: "lock.fill", color: "#EF4444" },
+  painting: { icon: "paintbrush.fill", color: "#3B82F6" },
+  renovation: { icon: "house.fill", color: "#F59E0B" },
+  gardening: { icon: "leaf.fill", color: "#22C55E" },
+  moving: { icon: "shippingbox.fill", color: "#FF6A00" },
+};
+
 export default function ExploreScreen() {
   const colors = useColors();
   const params = useLocalSearchParams<{ q?: string; filter?: string }>();
@@ -25,10 +39,6 @@ export default function ExploreScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>(
     params.filter === "emergency" ? "emergency" : "all"
   );
-
-  const { width } = useWindowDimensions();
-  const CARD_GAP = 12;
-  const CARD_WIDTH = (width - 48 - CARD_GAP) / 2;
 
   const filterTabs: { id: FilterTab; label: string; icon: string }[] = [
     { id: "all", label: "Tümü", icon: "house" },
@@ -71,11 +81,6 @@ export default function ExploreScreen() {
     return result;
   }, [searchQuery]);
 
-  const renderCategory = useCallback(
-    ({ item }: { item: typeof CATEGORIES[0] }) => <ServiceCategoryCard category={item} />,
-    []
-  );
-
   const renderProvider = useCallback(
     ({ item }: { item: Provider }) => (
       <Pressable
@@ -83,97 +88,55 @@ export default function ExploreScreen() {
         style={({ pressed }) => [
           {
             backgroundColor: colors.card,
-            borderRadius: 20,
-            padding: 16,
-            marginBottom: 12,
+            borderRadius: 16,
+            padding: 14,
+            marginBottom: 10,
             opacity: pressed ? 0.9 : 1,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 3 },
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
-            elevation: 2,
             borderWidth: 0.5,
             borderColor: colors.border,
           },
         ]}
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {/* Avatar — profesyonel ikon */}
           <View
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
+              width: 48,
+              height: 48,
+              borderRadius: 14,
               backgroundColor: colors.primary + "15",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <Text style={{ fontSize: 20, fontWeight: "700", color: colors.primary }}>
-              {item.avatarInitials}
-            </Text>
+            <IconSymbol size={22} name="person.fill" color={colors.primary} />
           </View>
-          <View style={{ flex: 1, marginLeft: 14 }}>
+          <View style={{ flex: 1, marginLeft: 12 }}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }} numberOfLines={1}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }} numberOfLines={1}>
                 {item.name}
               </Text>
               {item.verified && (
-                <IconSymbol name="checkmark.seal.fill" size={14} color={colors.primary} style={{ marginLeft: 4 }} />
-              )}
-              {item.premium && (
-                <View
-                  style={{
-                    marginLeft: 6,
-                    backgroundColor: colors.accentPurple + "15",
-                    paddingHorizontal: 6,
-                    paddingVertical: 2,
-                    borderRadius: 6,
-                  }}
-                >
-                  <Text style={{ fontSize: 9, fontWeight: "700", color: colors.accentPurple }}>
-                    PREMIUM
-                  </Text>
-                </View>
+                <IconSymbol name="checkmark.seal.fill" size={12} color={colors.accentBlue} style={{ marginLeft: 4 }} />
               )}
             </View>
-            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 3 }}>
-              {item.categoryName} · {item.location}
+            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+              {item.categoryName}
             </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
-              <IconSymbol name="star.fill" size={12} color="#FFB800" />
-              <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground, marginLeft: 3 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+              <IconSymbol name="star.fill" size={10} color={colors.warning} />
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, marginLeft: 3 }}>
                 {item.rating}
               </Text>
               <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 3 }}>
                 ({item.reviewCount})
               </Text>
-              <View style={{ width: 1, height: 10, backgroundColor: colors.border, marginHorizontal: 8 }} />
-              <IconSymbol name="clock.fill" size={11} color={colors.muted} />
+              <View style={{ width: 1, height: 8, backgroundColor: colors.border, marginHorizontal: 6 }} />
+              <IconSymbol name="location.fill" size={10} color={colors.muted} />
               <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 3 }}>
-                {item.responseTime}
+                {item.distance}
               </Text>
             </View>
-          </View>
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: 12,
-            paddingTop: 12,
-            borderTopWidth: 0.5,
-            borderTopColor: colors.border,
-          }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>
-            {item.price}
-          </Text>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <IconSymbol name="location.fill" size={12} color={colors.muted} />
-            <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 3 }}>
-              {item.distance}
-            </Text>
           </View>
         </View>
       </Pressable>
@@ -184,8 +147,8 @@ export default function ExploreScreen() {
   return (
     <ScreenContainer edges={["top", "left", "right"]}>
       {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
-        <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 14 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 }}>
+        <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 12 }}>
           Keşfet
         </Text>
 
@@ -195,19 +158,14 @@ export default function ExploreScreen() {
             flexDirection: "row",
             alignItems: "center",
             backgroundColor: colors.card,
-            borderRadius: 16,
-            paddingHorizontal: 16,
-            height: 50,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 10,
-            elevation: 2,
+            borderRadius: 14,
+            paddingHorizontal: 14,
+            height: 46,
             borderWidth: 0.5,
             borderColor: colors.border,
           }}
         >
-          <IconSymbol name="magnifyingglass" size={20} color={colors.muted} />
+          <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
           <TextInput
             placeholder="Hizmet veya usta ara..."
             placeholderTextColor={colors.muted}
@@ -216,8 +174,8 @@ export default function ExploreScreen() {
             returnKeyType="search"
             style={{
               flex: 1,
-              marginLeft: 12,
-              fontSize: 15,
+              marginLeft: 10,
+              fontSize: 14,
               color: colors.foreground,
             }}
           />
@@ -230,7 +188,7 @@ export default function ExploreScreen() {
       </View>
 
       {/* Filter Tabs */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+      <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
         <FlatList
           data={filterTabs}
           renderItem={({ item }) => (
@@ -241,30 +199,25 @@ export default function ExploreScreen() {
                   flexDirection: "row",
                   alignItems: "center",
                   backgroundColor: activeFilter === item.id ? colors.primary : colors.card,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderRadius: 14,
-                  marginRight: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 12,
+                  marginRight: 8,
                   opacity: pressed ? 0.9 : 1,
-                  shadowColor: activeFilter === item.id ? colors.primary : "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: activeFilter === item.id ? 0.2 : 0.04,
-                  shadowRadius: 8,
-                  elevation: activeFilter === item.id ? 3 : 1,
                 },
               ]}
             >
               <IconSymbol
                 name={item.icon as any}
-                size={16}
+                size={14}
                 color={activeFilter === item.id ? "#FFF" : colors.muted}
               />
               <Text
                 style={{
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: "700",
                   color: activeFilter === item.id ? "#FFF" : colors.foreground,
-                  marginLeft: 6,
+                  marginLeft: 5,
                 }}
               >
                 {item.label}
@@ -284,46 +237,62 @@ export default function ExploreScreen() {
       >
         {activeFilter !== "providers" ? (
           <>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
               Kategoriler
             </Text>
             <View style={{ gap: 8 }}>
-              {filteredCategories.map((category) => (
-                <Pressable
-                  key={category.id}
-                  onPress={() => router.push(`/category/${category.id}` as any)}
-                  style={({ pressed }) => [{
-                    backgroundColor: colors.card,
-                    borderRadius: 12,
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderWidth: 0.5,
-                    borderColor: colors.border,
-                    opacity: pressed ? 0.9 : 1,
-                  }]}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                    <Text style={{ fontSize: 20, marginRight: 12 }}>📋</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>
-                        {category.name}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                        {Math.floor(Math.random() * 300)} hizmet
-                      </Text>
+              {filteredCategories.map((category) => {
+                const iconData = CATEGORY_ICONS[category.id] || { icon: "house", color: colors.primary };
+                return (
+                  <Pressable
+                    key={category.id}
+                    onPress={() => router.push(`/category/${category.id}` as any)}
+                    style={({ pressed }) => [{
+                      backgroundColor: colors.card,
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 14,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      borderWidth: 0.5,
+                      borderColor: colors.border,
+                      opacity: pressed ? 0.9 : 1,
+                    }]}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                      {/* Profesyonel ikon container */}
+                      <View
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 12,
+                          backgroundColor: iconData.color + "15",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginRight: 12,
+                        }}
+                      >
+                        <IconSymbol size={20} name={iconData.icon as any} color={iconData.color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                          {category.name}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                          {category.subcategories.length} alt kategori
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  <IconSymbol name="chevron.right" size={16} color={colors.muted} />
-                </Pressable>
-              ))}
+                    <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+                  </Pressable>
+                );
+              })}
             </View>
           </>
         ) : (
           <>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
               {filteredProviders.length} usta bulundu
             </Text>
             {filteredProviders.map((p) => (
@@ -339,8 +308,8 @@ export default function ExploreScreen() {
 
         {/* Always show providers at bottom for non-provider tabs */}
         {activeFilter !== "providers" && filteredProviders.length > 0 && (
-          <View style={{ marginTop: 24 }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
+          <View style={{ marginTop: 20 }}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
               Önerilen Ustalar
             </Text>
             {filteredProviders.slice(0, 3).map((p) => (
