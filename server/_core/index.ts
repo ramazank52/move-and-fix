@@ -2,12 +2,16 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import compression from "compression";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { registerOwnerRestRoutes } from "./ownerRestAdapter";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { setupSwaggerDocs } from "./swagger";
+import { healthChecker, healthCheckMiddleware } from "./health";
+import { rateLimiters, requestIdMiddleware, CSRFProtection } from "./security";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -32,6 +36,12 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // Request ID middleware — every request gets a unique ID for tracing
+  app.use(requestIdMiddleware);
+
+  // Response compression
+  app.use(compression());
+
   // Enable CORS for all routes - reflect the request origin to support credentials
   app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -41,7 +51,7 @@ async function startServer() {
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.header(
       "Access-Control-Allow-Headers",
-      "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token",
     );
     res.header("Access-Control-Allow-Credentials", "true");
 
@@ -66,16 +76,65 @@ async function startServer() {
     next();
   });
 
+  // Rate limiting — general API
+  app.use("/api/", rateLimiters.general);
+
+  // Rate limiting — auth endpoints (stricter)
+  app.use("/api/auth/", rateLimiters.login);
+  app.use("/api/owner/login", rateLimiters.login);
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // CSRF protection — token endpoint (for cookie-based web clients like MoveOS)
+  const csrf = new CSRFProtection();
+  app.get("/api/csrf-token", (req, res) => {
+    // Use a session-based ID from cookie or generate a temporary one
+    const sessionId = (req as any).id || req.socket.remoteAddress || "anonymous";
+    const token = csrf.generateToken(sessionId);
+    res.json({ token });
+  });
+
+  // CSRF protection — state-changing routes (cookie-based requests only, not Bearer/mobile)
+  app.use((req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const isBearerAuth = authHeader && authHeader.startsWith("Bearer ");
+    const isStateChanging = ["POST", "PUT", "DELETE", "PATCH"].includes(req.method);
+    const isApiRoute = req.path.startsWith("/api/");
+    const isTrpc = req.path.startsWith("/api/trpc/");
+    const isOAuth = req.path.startsWith("/api/auth/");
+    const isOwner = req.path.startsWith("/api/owner/");
+
+    if (isStateChanging && isApiRoute && !isBearerAuth && !isTrpc && !isOAuth && !isOwner) {
+      const sessionId = (req as any).id || req.socket.remoteAddress || "anonymous";
+      const csrfToken = req.headers["x-csrf-token"] as string;
+      if (!csrfToken || !csrf.verifyToken(sessionId, csrfToken)) {
+        res.status(403).json({ error: "Invalid CSRF token" });
+        return;
+      }
+    }
+    next();
+  });
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerOwnerRestRoutes(app);
 
+  // Health check endpoints
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });
+  app.get("/api/health/detailed", async (_req, res) => {
+    try {
+      const status = await healthChecker.getHealthStatus();
+      res.json(status);
+    } catch (err: unknown) {
+      res.status(503).json({ status: "unhealthy", error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // API documentation (Swagger/OpenAPI)
+  setupSwaggerDocs(app);
 
   app.use(
     "/api/trpc",
