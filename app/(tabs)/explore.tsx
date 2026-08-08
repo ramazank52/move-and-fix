@@ -285,16 +285,41 @@ export default function ExploreScreen() {
         {activeFilter !== "providers" ? (
           <>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
-              {filteredCategories.length} kategori bulundu
+              Kategoriler
             </Text>
-            <FlatList
-              data={filteredCategories}
-              renderItem={renderCategory}
-              keyExtractor={(item) => item.id}
-              numColumns={2}
-              scrollEnabled={false}
-              columnWrapperStyle={{ gap: CARD_GAP, marginBottom: CARD_GAP }}
-            />
+            <View style={{ gap: 8 }}>
+              {filteredCategories.map((category) => (
+                <Pressable
+                  key={category.id}
+                  onPress={() => router.push(`/category/${category.id}` as any)}
+                  style={({ pressed }) => [{
+                    backgroundColor: colors.card,
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderWidth: 0.5,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.9 : 1,
+                  }]}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                    <Text style={{ fontSize: 20, marginRight: 12 }}>📋</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}>
+                        {category.name}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                        {Math.floor(Math.random() * 300)} hizmet
+                      </Text>
+                    </View>
+                  </View>
+                  <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+                </Pressable>
+              ))}
+            </View>
           </>
         ) : (
           <>
