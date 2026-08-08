@@ -15,6 +15,8 @@ export const themeColors: {
   accentGreen: { light: string; dark: string };
   gradientOrange: { light: string; dark: string };
   gradientRed: { light: string; dark: string };
+  gradientPurple: { light: string; dark: string };
+  secondary: { light: string; dark: string };
 };
 
 declare const themeConfig: {

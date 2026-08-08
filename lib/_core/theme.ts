@@ -52,7 +52,7 @@ function buildRuntimePalette(scheme: ColorScheme): RuntimePalette {
     tabIconSelected: base.primary,
     border: base.border,
     card: base.cardElevated,
-    cardShadow: scheme === "light" ? "rgba(255, 107, 0, 0.08)" : "rgba(0, 0, 0, 0.3)",
+    cardShadow: scheme === "light" ? "rgba(0, 0, 0, 0.06)" : "rgba(0, 0, 0, 0.4)",
   };
 }
 
@@ -65,13 +65,9 @@ export type ThemeColorPalette = (typeof Colors)[ColorScheme];
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: "system-ui",
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: "ui-serif",
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: "ui-rounded",
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: "ui-monospace",
   },
   default: {

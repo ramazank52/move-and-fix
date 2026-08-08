@@ -2,6 +2,7 @@ export interface ServiceCategory {
   id: string;
   name: string;
   icon: string;
+  iconName?: string;
   color: string;
   gradientColors: [string, string];
   serviceCount: number;

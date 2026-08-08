@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { registerOwnerRestRoutes } from "./ownerRestAdapter";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 
@@ -52,11 +53,25 @@ async function startServer() {
     next();
   });
 
+  // Security headers
+  app.use((req, res, next) => {
+    res.header("X-Content-Type-Options", "nosniff");
+    res.header("X-Frame-Options", "DENY");
+    res.header("X-XSS-Protection", "1; mode=block");
+    res.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.header(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
+    );
+    next();
+  });
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  registerOwnerRestRoutes(app);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
