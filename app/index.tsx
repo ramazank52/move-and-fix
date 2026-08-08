@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
+import { resolveEntryRoute } from "@/lib/navigation";
 
 /**
  * Root index route — handles authentication redirects
@@ -17,14 +18,7 @@ export default function RootIndexScreen() {
   useEffect(() => {
     if (loading) return;
 
-    // Redirect based on auth state
-    if (user) {
-      // User is authenticated — go to customer home (tabs)
-      router.replace("/(tabs)" as any);
-    } else {
-      // User is not authenticated — go to onboarding
-      router.replace("/onboarding" as any);
-    }
+    router.replace(resolveEntryRoute(user) as any);
   }, [user, loading, router]);
 
   // Show loading screen while checking auth

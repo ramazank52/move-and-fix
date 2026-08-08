@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { ownerRouter } from "./_core/ownerRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { walletService } from "./services/WalletService";
 import { notificationService } from "./services/NotificationService";
@@ -39,8 +40,16 @@ export const appRouter = router({
     }),
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(({ input }) => {
-        return db.getServiceRequestById(input.id);
+      .query(async ({ ctx, input }) => {
+        const request = await db.getServiceRequestById(input.id);
+        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "İş kaydı bulunamadı" });
+
+        const provider = await db.getProviderProfile(ctx.user.id);
+        const canRead =
+          request.userId === ctx.user.id ||
+          (provider != null && request.assignedProviderId === provider.id);
+        if (!canRead) throw new TRPCError({ code: "FORBIDDEN", message: "Bu iş kaydına erişim yetkiniz yok" });
+        return request;
       }),
     create: protectedProcedure
       .input(z.object({
@@ -64,19 +73,48 @@ export const appRouter = router({
   offers: router({
     forRequest: protectedProcedure
       .input(z.object({ requestId: z.number() }))
-      .query(({ input }) => {
+      .query(async ({ ctx, input }) => {
+        const request = await db.getServiceRequestById(input.requestId);
+        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
+
+        const provider = await db.getProviderProfile(ctx.user.id);
+        const providerOffer = provider
+          ? await db.getProviderOfferForRequest(input.requestId, provider.id)
+          : null;
+        const canRead =
+          request.userId === ctx.user.id ||
+          (provider != null && (request.assignedProviderId === provider.id || providerOffer != null));
+        if (!canRead) throw new TRPCError({ code: "FORBIDDEN", message: "Bu tekliflere erişim yetkiniz yok" });
         return db.getOffersForRequest(input.requestId);
       }),
     create: protectedProcedure
       .input(z.object({
-        requestId: z.number(),
-        providerId: z.number(),
-        price: z.number(),
-        message: z.string().optional(),
-        estimatedTime: z.string().optional(),
+        requestId: z.number().int().positive(),
+        price: z.number().int().min(1).max(10_000_000),
+        message: z.string().trim().max(2000).optional(),
+        estimatedTime: z.string().trim().min(1).max(100),
       }))
-      .mutation(({ input }) => {
-        return db.createOffer(input);
+      .mutation(async ({ ctx, input }) => {
+        const provider = await db.getProviderProfile(ctx.user.id);
+        if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Profesyonel profiliniz bulunamadı" });
+
+        const request = await db.getServiceRequestById(input.requestId);
+        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
+        if (request.status !== "pending") {
+          throw new TRPCError({ code: "CONFLICT", message: "Bu hizmet talebi artık teklif kabul etmiyor" });
+        }
+        if (provider.categoryId != null && request.categoryId !== provider.categoryId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Bu hizmet kategorisi için teklif veremezsiniz" });
+        }
+
+        try {
+          return await db.createOffer({ ...input, providerId: provider.id });
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("daha önce")) {
+            throw new TRPCError({ code: "CONFLICT", message: error.message });
+          }
+          throw error;
+        }
       }),
     accept: protectedProcedure
       .input(z.object({ offerId: z.number() }))
@@ -274,6 +312,37 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       }))
       .mutation(({ input }) => {
         return db.updatePaymentStatus(input.paymentId, input.status);
+      }),
+  }),
+
+  // MoveWallet — user-scoped balance, history and withdrawal workflow
+  wallet: router({
+    summary: protectedProcedure.query(({ ctx }) => {
+      return db.getWalletSummary(ctx.user.id);
+    }),
+    transactions: protectedProcedure
+      .input(z.object({
+        limit: z.number().int().min(1).max(100).default(50),
+        offset: z.number().int().min(0).default(0),
+      }).optional())
+      .query(({ ctx, input }) => {
+        return db.getWalletTransactions(ctx.user.id, input?.limit ?? 50, input?.offset ?? 0);
+      }),
+    withdraw: protectedProcedure
+      .input(z.object({
+        amount: z.number().int().min(100).max(1_000_000),
+        bankAccountId: z.string().trim().min(10).max(96).regex(/^[A-Za-z0-9 -]+$/),
+        idempotencyKey: z.string().trim().min(16).max(96),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.requestWalletWithdrawal({ ...input, userId: ctx.user.id });
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("Yetersiz")) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          }
+          throw error;
+        }
       }),
   }),
 });

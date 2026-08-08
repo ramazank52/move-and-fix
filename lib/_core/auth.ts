@@ -8,6 +8,8 @@ export type User = {
   name: string | null;
   email: string | null;
   loginMethod: string | null;
+  role: "user" | "admin";
+  accountType: "customer" | "provider" | "admin";
   lastSignedIn: Date;
 };
 
@@ -85,7 +87,24 @@ export async function getUserInfo(): Promise<User | null> {
       console.log("[Auth] No user info found");
       return null;
     }
-    const user = JSON.parse(info);
+    const stored = JSON.parse(info) as Partial<User> & Pick<User, "id" | "openId">;
+    const role = stored.role === "admin" ? "admin" : "user";
+    const accountType =
+      stored.accountType === "provider" || stored.accountType === "admin"
+        ? stored.accountType
+        : role === "admin"
+          ? "admin"
+          : "customer";
+    const user: User = {
+      id: stored.id,
+      openId: stored.openId,
+      name: stored.name ?? null,
+      email: stored.email ?? null,
+      loginMethod: stored.loginMethod ?? null,
+      role,
+      accountType,
+      lastSignedIn: new Date(stored.lastSignedIn ?? Date.now()),
+    };
     console.log("[Auth] User info retrieved:", user);
     return user;
   } catch (error) {

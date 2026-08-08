@@ -355,7 +355,8 @@ export default function ProviderDashboardScreen() {
                 Yeni İş Fırsatları
               </Text>
               {newRequests.length > 0 && (
-                <View
+                <Pressable
+                  onPress={() => router.push("/provider-opportunities" as any)}
                   style={{
                     minWidth: 24,
                     height: 24,
@@ -367,7 +368,7 @@ export default function ProviderDashboardScreen() {
                   }}
                 >
                   <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "800" }}>{newRequests.length}</Text>
-                </View>
+                </Pressable>
               )}
             </View>
 
@@ -375,7 +376,7 @@ export default function ProviderDashboardScreen() {
               newRequests.slice(0, 5).map((req) => (
                 <Pressable
                   key={req.id}
-                  onPress={() => router.push(`/create-service?requestId=${req.id}` as any)}
+                  onPress={() => router.push(`/provider-opportunities?requestId=${req.id}` as any)}
                   style={({ pressed }) => [
                     {
                       backgroundColor: colors.card,

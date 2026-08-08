@@ -32,7 +32,7 @@ export default function OnboardingScreen() {
     if (currentSlide < slides.length - 1) {
       setCurrentSlide(currentSlide + 1);
     } else {
-      router.replace("/(tabs)" as any);
+      router.replace("/login" as any);
     }
   };
 
@@ -86,7 +86,7 @@ export default function OnboardingScreen() {
         </Pressable>
         {currentSlide < slides.length - 1 && (
           <Pressable
-            onPress={() => router.replace("/(tabs)" as any)}
+            onPress={() => router.replace("/login" as any)}
             style={{ marginTop: 14, alignItems: "center" }}
           >
             <Text style={{ color: colors.muted, fontSize: 14 }}>Atla</Text>

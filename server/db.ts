@@ -1,6 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import {
+  InsertUser,
+  users,
+  walletAccounts,
+  walletTransactions,
+  walletWithdrawals,
+} from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -136,6 +142,12 @@ export async function createOffer(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const existing = await db
+    .select({ id: offers.id })
+    .from(offers)
+    .where(and(eq(offers.requestId, data.requestId), eq(offers.providerId, data.providerId)))
+    .limit(1);
+  if (existing[0]) throw new Error("Bu iş için daha önce teklif verdiniz");
   const result = await db.insert(offers).values(data);
   return result[0].insertId;
 }
@@ -143,7 +155,38 @@ export async function createOffer(data: {
 export async function getOffersForRequest(requestId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(offers).where(eq(offers.requestId, requestId));
+  return db
+    .select({
+      id: offers.id,
+      requestId: offers.requestId,
+      providerId: offers.providerId,
+      providerUserId: providers.userId,
+      providerName: providers.displayName,
+      providerRating: providers.rating,
+      providerCompletedJobs: providers.completedJobs,
+      providerVerified: providers.isVerified,
+      providerPremium: providers.isPremium,
+      price: offers.price,
+      message: offers.message,
+      estimatedTime: offers.estimatedTime,
+      status: offers.status,
+      createdAt: offers.createdAt,
+    })
+    .from(offers)
+    .innerJoin(providers, eq(offers.providerId, providers.id))
+    .where(eq(offers.requestId, requestId))
+    .orderBy(desc(offers.createdAt));
+}
+
+export async function getProviderOfferForRequest(requestId: number, providerId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(offers)
+    .where(and(eq(offers.requestId, requestId), eq(offers.providerId, providerId)))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 // Messages
@@ -377,4 +420,170 @@ export async function getUserPayments(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(payments).where(eq(payments.userId, userId));
+}
+
+export async function ensureWalletAccount(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .insert(walletAccounts)
+    .values({ userId, currency: "TRY" })
+    .onDuplicateKeyUpdate({ set: { userId } });
+
+  const rows = await db
+    .select()
+    .from(walletAccounts)
+    .where(eq(walletAccounts.userId, userId))
+    .limit(1);
+
+  if (!rows[0]) throw new Error("Wallet account could not be initialized");
+  return rows[0];
+}
+
+export async function getWalletSummary(userId: number) {
+  const account = await ensureWalletAccount(userId);
+  return {
+    ...account,
+    totalBalance: account.availableBalance + account.pendingBalance,
+  };
+}
+
+export async function getWalletTransactions(userId: number, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select()
+    .from(walletTransactions)
+    .where(eq(walletTransactions.userId, userId))
+    .orderBy(desc(walletTransactions.createdAt), desc(walletTransactions.id))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function requestWalletWithdrawal(data: {
+  userId: number;
+  amount: number;
+  bankAccountId: string;
+  idempotencyKey: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const scopedKey = `${data.userId}:${data.idempotencyKey}`;
+  const existing = await db
+    .select()
+    .from(walletTransactions)
+    .where(
+      and(
+        eq(walletTransactions.userId, data.userId),
+        eq(walletTransactions.idempotencyKey, scopedKey),
+      ),
+    )
+    .limit(1);
+
+  if (existing[0]) {
+    return { transaction: existing[0], duplicated: true };
+  }
+
+  return db.transaction(async (tx) => {
+    await tx
+      .insert(walletAccounts)
+      .values({ userId: data.userId, currency: "TRY" })
+      .onDuplicateKeyUpdate({ set: { userId: data.userId } });
+
+    const debitResult = await tx
+      .update(walletAccounts)
+      .set({
+        availableBalance: sql`${walletAccounts.availableBalance} - ${data.amount}`,
+      })
+      .where(
+        and(
+          eq(walletAccounts.userId, data.userId),
+          gte(walletAccounts.availableBalance, data.amount),
+        ),
+      );
+
+    const affectedRows = debitResult[0]?.affectedRows ?? 0;
+    if (affectedRows !== 1) {
+      throw new Error("Yetersiz kullanılabilir bakiye");
+    }
+
+    const transactionResult = await tx.insert(walletTransactions).values({
+      userId: data.userId,
+      type: "withdrawal",
+      status: "pending",
+      amount: data.amount,
+      description: "Banka hesabına para çekme talebi",
+      idempotencyKey: scopedKey,
+      metadata: JSON.stringify({ bankAccountId: data.bankAccountId }),
+    });
+    const transactionId = transactionResult[0].insertId;
+
+    await tx.insert(walletWithdrawals).values({
+      userId: data.userId,
+      transactionId,
+      amount: data.amount,
+      bankAccountId: data.bankAccountId,
+      status: "pending",
+    });
+
+    const rows = await tx
+      .select()
+      .from(walletTransactions)
+      .where(eq(walletTransactions.id, transactionId))
+      .limit(1);
+
+    if (!rows[0]) throw new Error("Withdrawal transaction could not be created");
+    return { transaction: rows[0], duplicated: false };
+  });
+}
+
+export async function creditWalletBalance(data: {
+  userId: number;
+  amount: number;
+  type: "deposit" | "provider_payout" | "refund" | "adjustment";
+  description: string;
+  reference?: string;
+  idempotencyKey: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const scopedKey = `${data.userId}:${data.idempotencyKey}`;
+
+  return db.transaction(async (tx) => {
+    const existing = await tx
+      .select()
+      .from(walletTransactions)
+      .where(eq(walletTransactions.idempotencyKey, scopedKey))
+      .limit(1);
+    if (existing[0]) return { transaction: existing[0], duplicated: true };
+
+    await tx
+      .insert(walletAccounts)
+      .values({ userId: data.userId, currency: "TRY" })
+      .onDuplicateKeyUpdate({ set: { userId: data.userId } });
+    await tx
+      .update(walletAccounts)
+      .set({ availableBalance: sql`${walletAccounts.availableBalance} + ${data.amount}` })
+      .where(eq(walletAccounts.userId, data.userId));
+
+    const result = await tx.insert(walletTransactions).values({
+      userId: data.userId,
+      type: data.type,
+      status: "completed",
+      amount: data.amount,
+      description: data.description,
+      reference: data.reference,
+      idempotencyKey: scopedKey,
+    });
+    const rows = await tx
+      .select()
+      .from(walletTransactions)
+      .where(eq(walletTransactions.id, result[0].insertId))
+      .limit(1);
+    if (!rows[0]) throw new Error("Wallet credit could not be recorded");
+    return { transaction: rows[0], duplicated: false };
+  });
 }

@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { RegistrationConsent } from "@/components/registration-consent";
+import { startOAuthLogin } from "@/constants/oauth";
 
 type UserRole = "customer" | "provider";
 
@@ -21,8 +22,13 @@ export default function RegisterScreen() {
     setStep("consent");
   };
 
-  const handleConsentAccepted = () => {
-    router.replace("/(tabs)" as any);
+  const handleConsentAccepted = async () => {
+    try {
+      await startOAuthLogin();
+    } catch (error) {
+      console.error("[Register] OAuth registration could not start:", error);
+      router.replace("/login" as any);
+    }
   };
 
   return (

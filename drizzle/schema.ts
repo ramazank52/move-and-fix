@@ -111,6 +111,52 @@ export const payments = mysqlTable("payments", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+// User wallet balances — amounts are stored in the currency's minor unit.
+export const walletAccounts = mysqlTable("wallet_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+  availableBalance: int("availableBalance").default(0).notNull(),
+  pendingBalance: int("pendingBalance").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const walletTransactions = mysqlTable("wallet_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", [
+    "deposit",
+    "escrow_hold",
+    "commission_deduction",
+    "provider_payout",
+    "withdrawal",
+    "refund",
+    "adjustment",
+  ]).notNull(),
+  status: mysqlEnum("status", ["pending", "processing", "completed", "failed", "cancelled"]).notNull(),
+  amount: int("amount").notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  reference: varchar("reference", { length: 96 }),
+  idempotencyKey: varchar("idempotencyKey", { length: 96 }).unique(),
+  metadata: text("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const walletWithdrawals = mysqlTable("wallet_withdrawals", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  transactionId: int("transactionId").notNull(),
+  amount: int("amount").notNull(),
+  bankAccountId: varchar("bankAccountId", { length: 96 }).notNull(),
+  status: mysqlEnum("status", ["pending", "processing", "completed", "failed", "cancelled"])
+    .default("pending")
+    .notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 // Export types
 export type ServiceCategory = typeof serviceCategories.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
@@ -118,3 +164,6 @@ export type ServiceRequest = typeof serviceRequests.$inferSelect;
 export type Offer = typeof offers.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
+export type WalletAccount = typeof walletAccounts.$inferSelect;
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+export type WalletWithdrawal = typeof walletWithdrawals.$inferSelect;

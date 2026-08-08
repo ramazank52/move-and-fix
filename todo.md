@@ -205,3 +205,10 @@
 - [ ] Build PASS
 - [ ] Test 0 failed, skipped=0
 - [ ] Final production readiness raporu
+
+## Phase 27: Route ve Navigation Bütünlüğü
+- [x] Root route’u customer / provider / admin rolüne göre gerçek oturum verisiyle yönlendir
+- [x] 14 referans ekranın tamamı için geçerli giriş ve çıkış navigation bağlantılarını doğrula
+- [x] Geçersiz wallet alt route’larını çalışan ekran/aksiyonlarla değiştir
+- [x] Profesyonel yeni iş fırsatları ekranını gerçek route ve provider lifecycle’a bağla
+- [x] Auth, tab, nested route, back ve deep-link davranışlarını deterministik testlerle doğrula

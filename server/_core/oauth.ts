@@ -1,6 +1,6 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import type { Express, Request, Response } from "express";
-import { getUserByOpenId, upsertUser } from "../db";
+import { getProviderProfile, getUserByOpenId, upsertUser } from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
@@ -40,7 +40,7 @@ async function syncUser(userInfo: {
   );
 }
 
-function buildUserResponse(
+async function buildUserResponse(
   user:
     | Awaited<ReturnType<typeof getUserByOpenId>>
     | {
@@ -51,12 +51,19 @@ function buildUserResponse(
         lastSignedIn?: Date | null;
       },
 ) {
+  const userId = (user as any)?.id ?? null;
+  const role = (user as any)?.role === "admin" ? "admin" : "user";
+  const provider = userId ? await getProviderProfile(userId) : null;
+  const accountType = role === "admin" ? "admin" : provider ? "provider" : "customer";
+
   return {
-    id: (user as any)?.id ?? null,
+    id: userId,
     openId: user?.openId ?? null,
     name: user?.name ?? null,
     email: user?.email ?? null,
     loginMethod: user?.loginMethod ?? null,
+    role,
+    accountType,
     lastSignedIn: (user?.lastSignedIn ?? new Date()).toISOString(),
   };
 }
@@ -120,7 +127,7 @@ export function registerOAuthRoutes(app: Express) {
 
       res.json({
         app_session_id: sessionToken,
-        user: buildUserResponse(user),
+        user: await buildUserResponse(user),
       });
     } catch (error) {
       console.error("[OAuth] Mobile exchange failed", error);
@@ -138,7 +145,7 @@ export function registerOAuthRoutes(app: Express) {
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     try {
       const user = await sdk.authenticateRequest(req);
-      res.json({ user: buildUserResponse(user) });
+      res.json({ user: await buildUserResponse(user) });
     } catch (error) {
       console.error("[Auth] /api/auth/me failed:", error);
       res.status(401).json({ error: "Not authenticated", user: null });
@@ -165,7 +172,7 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      res.json({ success: true, user: buildUserResponse(user) });
+      res.json({ success: true, user: await buildUserResponse(user) });
     } catch (error) {
       console.error("[Auth] /api/auth/session failed:", error);
       res.status(401).json({ error: "Invalid token" });
