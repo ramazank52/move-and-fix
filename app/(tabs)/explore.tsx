@@ -5,18 +5,21 @@ import {
   Pressable,
   TextInput,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { CATEGORIES } from "@/lib/data/categories";
-import { SAMPLE_PROVIDERS, Provider } from "@/lib/data/providers";
+import { SAMPLE_PROVIDERS } from "@/lib/data/providers";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/hooks/use-auth";
 
-type FilterTab = "all" | "emergency" | "km_based" | "providers";
+type FilterTab = "all" | "emergency" | "km_based";
 
-// Kategori ikon mapping — emoji DEĞİL, profesyonel ikonlar
+// Kategori ikon mapping — referans görsele göre
 const CATEGORY_ICONS: Record<string, { icon: string; color: string }> = {
   cleaning: { icon: "sparkles", color: "#10B981" },
   plumbing: { icon: "wrench.fill", color: "#3B82F6" },
@@ -37,19 +40,26 @@ const CATEGORY_ICONS: Record<string, { icon: string; color: string }> = {
 
 export default function ExploreScreen() {
   const colors = useColors();
+  const { user } = useAuth();
   const params = useLocalSearchParams<{ q?: string; filter?: string }>();
   const [searchQuery, setSearchQuery] = useState(params.q || "");
   const [activeFilter, setActiveFilter] = useState<FilterTab>(
     params.filter === "emergency" ? "emergency" : "all"
   );
 
+  // Fetch providers
+  const { data: providers, isLoading: providersLoading } = trpc.providers.nearby.useQuery(
+    { lat: "41.0082", lng: "28.9784" },
+    { enabled: !!user }
+  );
+
   const filterTabs: { id: FilterTab; label: string; icon: string }[] = [
-    { id: "all", label: "Tümü", icon: "house" },
-    { id: "emergency", label: "Acil", icon: "bolt.fill" },
+    { id: "all", label: "Tümü", icon: "house.fill" },
+    { id: "emergency", label: "Acil", icon: "exclamationmark.triangle.fill" },
     { id: "km_based", label: "Araç", icon: "car.fill" },
-    { id: "providers", label: "Ustalar", icon: "person.fill" },
   ];
 
+  // Filter categories
   const filteredCategories = useMemo(() => {
     let result = CATEGORIES;
     if (activeFilter === "emergency") {
@@ -70,259 +80,331 @@ export default function ExploreScreen() {
     return result;
   }, [activeFilter, searchQuery]);
 
+  // Filter providers
   const filteredProviders = useMemo(() => {
-    let result = SAMPLE_PROVIDERS;
+    let result = providers || [];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.categoryName.toLowerCase().includes(q) ||
-          p.services.some((s) => s.toLowerCase().includes(q))
+          p.displayName.toLowerCase().includes(q)
       );
     }
     return result;
-  }, [searchQuery]);
-
-  const renderProvider = useCallback(
-    ({ item }: { item: Provider }) => (
-      <Pressable
-        onPress={() => router.push(`/provider/${item.id}` as any)}
-        style={({ pressed }) => [
-          {
-            backgroundColor: colors.card,
-            borderRadius: 16,
-            padding: 14,
-            marginBottom: 10,
-            opacity: pressed ? 0.9 : 1,
-            borderWidth: 0.5,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {/* Avatar — profesyonel ikon */}
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 14,
-              backgroundColor: colors.primary + "15",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <IconSymbol size={22} name="person.fill" color={colors.primary} />
-          </View>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }} numberOfLines={1}>
-                {item.name}
-              </Text>
-              {item.verified && (
-                <IconSymbol name="checkmark.seal.fill" size={12} color={colors.accentBlue} style={{ marginLeft: 4 }} />
-              )}
-            </View>
-            <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
-              {item.categoryName}
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
-              <IconSymbol name="star.fill" size={10} color={colors.warning} />
-              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.foreground, marginLeft: 3 }}>
-                {item.rating}
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 3 }}>
-                ({item.reviewCount})
-              </Text>
-              <View style={{ width: 1, height: 8, backgroundColor: colors.border, marginHorizontal: 6 }} />
-              <IconSymbol name="location.fill" size={10} color={colors.muted} />
-              <Text style={{ fontSize: 11, color: colors.muted, marginLeft: 3 }}>
-                {item.distance}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Pressable>
-    ),
-    [colors]
-  );
+  }, [providers, searchQuery]);
 
   return (
-    <ScreenContainer edges={["top", "left", "right"]}>
-      {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 }}>
-        <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground, marginBottom: 12 }}>
-          Keşfet
-        </Text>
-
-        {/* Search */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            backgroundColor: colors.card,
-            borderRadius: 14,
-            paddingHorizontal: 14,
-            height: 46,
-            borderWidth: 0.5,
-            borderColor: colors.border,
-          }}
-        >
-          <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
-          <TextInput
-            placeholder="Hizmet veya usta ara..."
-            placeholderTextColor={colors.muted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-            style={{
-              flex: 1,
-              marginLeft: 10,
-              fontSize: 14,
-              color: colors.foreground,
-            }}
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery("")}>
-              <IconSymbol name="xmark" size={16} color={colors.muted} />
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      {/* Filter Tabs */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-        <FlatList
-          data={filterTabs}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => setActiveFilter(item.id)}
-              style={({ pressed }) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: activeFilter === item.id ? colors.primary : colors.card,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 12,
-                  marginRight: 8,
-                  opacity: pressed ? 0.9 : 1,
-                },
-              ]}
-            >
-              <IconSymbol
-                name={item.icon as any}
-                size={14}
-                color={activeFilter === item.id ? "#FFF" : colors.muted}
-              />
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "700",
-                  color: activeFilter === item.id ? "#FFF" : colors.foreground,
-                  marginLeft: 5,
-                }}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          )}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        />
-      </View>
-
-      {/* Content */}
+    <ScreenContainer className="p-0">
       <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
       >
-        {activeFilter !== "providers" ? (
-          <>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
-              Kategoriler
-            </Text>
-            <View style={{ gap: 8 }}>
-              {filteredCategories.map((category) => {
-                const iconData = CATEGORY_ICONS[category.id] || { icon: "questionmark.circle.fill", color: colors.muted };
-                return (
-                  <Pressable
-                    key={category.id}
-                    onPress={() => router.push(`/category/${category.id}` as any)}
-                    style={({ pressed }) => [{
-                      backgroundColor: colors.card,
-                      borderRadius: 14,
-                      paddingHorizontal: 14,
-                      paddingVertical: 14,
-                      flexDirection: "row",
+        {/* Header */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.foreground, marginBottom: 12 }}>
+            Ne arıyorsun?
+          </Text>
+
+          {/* Search */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 11,
+              borderWidth: 0.5,
+              borderColor: colors.border,
+            }}
+          >
+            <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
+            <TextInput
+              placeholder="Hizmet veya usta ara..."
+              placeholderTextColor={colors.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+              style={{
+                flex: 1,
+                marginLeft: 10,
+                fontSize: 14,
+                color: colors.foreground,
+              }}
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery("")}>
+                <IconSymbol name="xmark" size={14} color={colors.muted} />
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        {/* Filter Tabs */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+          <FlatList
+            data={filterTabs}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => setActiveFilter(item.id)}
+                style={({ pressed }) => [
+                  {
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    backgroundColor:
+                      activeFilter === item.id ? colors.primary : colors.surface,
+                    borderWidth: activeFilter === item.id ? 0 : 0.5,
+                    borderColor: colors.border,
+                    marginRight: 8,
+                    opacity: pressed ? 0.9 : 1,
+                  },
+                ]}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <IconSymbol
+                    name={item.icon as "house.fill"}
+                    size={14}
+                    color={activeFilter === item.id ? "#FFFFFF" : colors.muted}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "700",
+                      color: activeFilter === item.id ? "#FFFFFF" : colors.foreground,
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+            horizontal
+            scrollEnabled={false}
+            keyExtractor={(item) => item.id}
+          />
+        </View>
+
+        {/* Kategoriler Başlığı */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
+            Kategoriler
+          </Text>
+        </View>
+
+        {/* Kategori Listesi — referans görsele göre */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 20, gap: 8 }}>
+          {filteredCategories.map((category) => {
+            const iconData = CATEGORY_ICONS[category.id] || {
+              icon: "questionmark.circle.fill",
+              color: colors.muted,
+            };
+            return (
+              <Pressable
+                key={category.id}
+                onPress={() => router.push(`/category/${category.id}` as any)}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    backgroundColor: colors.surface,
+                    borderWidth: 0.5,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.9 : 1,
+                  },
+                ]}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  {/* Kategori İkonu */}
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 12,
+                      backgroundColor: iconData.color + "15",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      borderWidth: 0.5,
-                      borderColor: colors.border,
-                      opacity: pressed ? 0.9 : 1,
-                    }]}
+                      justifyContent: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    <IconSymbol
+                      name={iconData.icon as "house.fill"}
+                      size={18}
+                      color={iconData.color}
+                    />
+                  </View>
+
+                  {/* Kategori Adı ve Sayı */}
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: colors.foreground,
+                      }}
+                    >
+                      {category.name}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: colors.muted,
+                        marginTop: 2,
+                      }}
+                    >
+                      {Math.floor(Math.random() * 200) + 50} hizmet
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Chevron */}
+                <IconSymbol
+                  name="chevron.right"
+                  size={16}
+                  color={colors.muted}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Ustalar Bölümü */}
+        {filteredProviders.length > 0 && (
+          <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
+                Yakındaki Ustalar
+              </Text>
+              <Pressable>
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>
+                  Tümü
+                </Text>
+              </Pressable>
+            </View>
+
+            {providersLoading ? (
+              <View style={{ alignItems: "center", paddingVertical: 20 }}>
+                <ActivityIndicator color={colors.primary} size="small" />
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {filteredProviders.slice(0, 3).map((provider) => (
+                  <Pressable
+                    key={provider.id}
+                    onPress={() => router.push(`/provider/${provider.id}` as any)}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        borderRadius: 14,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        backgroundColor: colors.surface,
+                        borderWidth: 0.5,
+                        borderColor: colors.border,
+                        opacity: pressed ? 0.9 : 1,
+                      },
+                    ]}
                   >
                     <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                      {/* Profesyonel ikon container */}
                       <View
                         style={{
                           width: 40,
                           height: 40,
-                          borderRadius: 12,
-                          backgroundColor: iconData.color + "15",
+                          borderRadius: 20,
+                          backgroundColor: colors.primary + "15",
                           alignItems: "center",
                           justifyContent: "center",
-                          marginRight: 12,
+                          marginRight: 10,
                         }}
                       >
-                        <IconSymbol size={20} name={iconData.icon as any} color={iconData.color} />
+                        <IconSymbol
+                          size={18}
+                          name="person.fill"
+                          color={colors.primary}
+                        />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                          {category.name}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                          {category.subcategories.length} alt kategori
-                        </Text>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: "700",
+                              color: colors.foreground,
+                            }}
+                          >
+                            {provider.displayName}
+                          </Text>
+                          {provider.isVerified ? (
+                            <IconSymbol
+                              name="checkmark.seal.fill"
+                              size={12}
+                              color={colors.accentBlue}
+                            />
+                          ) : null}
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            marginTop: 4,
+                          }}
+                        >
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 2,
+                            }}
+                          >
+                            <IconSymbol
+                              name="star.fill"
+                              size={10}
+                              color={colors.warning}
+                            />
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: colors.muted,
+                              }}
+                            >
+                              {provider.rating || 0}
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 11, color: colors.muted }}>
+                            • Yakında
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                    <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+                    <IconSymbol
+                      name="chevron.right"
+                      size={16}
+                      color={colors.muted}
+                    />
                   </Pressable>
-                );
-              })}
-            </View>
-          </>
-        ) : (
-          <>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
-              {filteredProviders.length} usta bulundu
-            </Text>
-            {filteredProviders.map((p) => (
-              <Pressable
-                key={p.id}
-                onPress={() => router.push(`/provider/${p.id}` as any)}
-              >
-                {renderProvider({ item: p })}
-              </Pressable>
-            ))}
-          </>
-        )}
-
-        {/* Always show providers at bottom for non-provider tabs */}
-        {activeFilter !== "providers" && filteredProviders.length > 0 && (
-          <View style={{ marginTop: 20 }}>
-            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 12 }}>
-              Önerilen Ustalar
-            </Text>
-            {filteredProviders.slice(0, 3).map((p) => (
-              <Pressable
-                key={p.id}
-                onPress={() => router.push(`/provider/${p.id}` as any)}
-              >
-                {renderProvider({ item: p })}
-              </Pressable>
-            ))}
+                ))}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
