@@ -30,12 +30,22 @@ export const API_BASE_URL = env.apiBaseUrl;
  * URL pattern: https://PORT-sandboxid.region.domain
  */
 export function getApiBaseUrl(): string {
-  // If API_BASE_URL is set, use it
+  // Local Expo web verification must always use the current local API process.
+  // This prevents a bundle-time preview URL from a previous sandbox session
+  // from sending authenticated requests to a stale host.
+  if (ReactNative.Platform.OS === "web" && typeof window !== "undefined" && window.location) {
+    const { protocol, hostname } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") {
+      return `${protocol}//${hostname}:3000`;
+    }
+  }
+
+  // If API_BASE_URL is set, use it for native and hosted web builds.
   if (API_BASE_URL) {
     return API_BASE_URL.replace(/\/$/, "");
   }
 
-  // On web, derive from current hostname by replacing port 8081 with 3000
+  // On hosted web, derive from current hostname by replacing port 8081 with 3000.
   if (ReactNative.Platform.OS === "web" && typeof window !== "undefined" && window.location) {
     const { protocol, hostname } = window.location;
     // Pattern: 8081-sandboxid.region.domain -> 3000-sandboxid.region.domain

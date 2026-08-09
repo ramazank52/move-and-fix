@@ -127,7 +127,7 @@
 - [x] Ödeme checkout ekranını güncelle
 - [x] Sohbet ekranını premium tasarımla güncelle
 - [x] MoveAI asistan ekranını oluştur ve tasarla
-- [ ] Tüm ekranları canlı preview'da doğrula — responsive, tema tutarlılığı, interaksiyon
+- [x] Tüm ekranları canlı preview'da doğrula — responsive, tema tutarlılığı, interaksiyon
 - [ ] Mobil cihazda QR ile test et (Expo Go)
 
 ## Phase 18: Production Setup & Secrets
@@ -138,7 +138,7 @@
 - [ ] Final checkpoint ve yayın hazırlığı
 
 ## Phase 19: Referans Görsel UI Uygulaması
-- [ ] Design System'i referans görselin renk/typography/spacing değerlerine birebir güncelle
+- [x] Design System'i referans görselin renk/typography/spacing değerlerine birebir güncelle
 - [x] Ana Sayfa — referans görsel layout: selamlama, arama, MoveAI banner, hızlı erişim, aktif iş kartı, kategoriler, yakındaki ustalar
 - [x] Keşfet — arama, kategori filtreleri, kategori listesi DB'den
 - [x] MoveAI — gerçek LLM akışı, sıcak/doğal konuşma, service request oluşturma
@@ -154,8 +154,8 @@
 
 ## Phase 20: Profesyonel Uygulama Ekranları
 - [x] Professional Dashboard — bugünkü kazanç, aktif işler, yeni teklifler, müsaitlik toggle, performans, puan
-- [ ] Yeni İş Fırsatları — hizmet, mesafe, bütçe, konum, teklif ver butonu
-- [ ] Provider lifecycle — işi gör, teklif ver, teklif yönet, kabul edilen işi gör, status güncelle, iş tamamla, kazanç, mesaj
+- [x] Yeni İş Fırsatları — hizmet, mesafe, bütçe, konum, teklif ver butonu
+- [x] Provider lifecycle — işi gör, teklif ver, teklif yönet, kabul edilen işi gör, status güncelle, iş tamamla, kazanç, mesaj
 
 ## Phase 21: Loading / Error / Empty States
 - [ ] Her ana ekrana loading state ekle
@@ -229,5 +229,16 @@
 - [x] 11 MoveWallet ekranını 11_movewallet.png referansına göre gerçek API verileriyle uygula ve render doğrula
 - [x] 12 Profil ekranını 12_profil.png referansına göre uygula ve render doğrula
 - [x] 13 Profesyonel Dashboard ekranını 13_profesyonel_dashboard.png referansına göre uygula ve render doğrula
-- [ ] 14 Yeni İş Fırsatları ekranını 14_yeni_is_firsatlari.png referansına göre uygula ve render doğrula
-- [ ] Final TypeScript, lint, build, test, mobil export ve production durum raporunu tamamla
+- [x] 14 Yeni İş Fırsatları ekranını 14_yeni_is_firsatlari.png referansına göre uygula ve render doğrula
+- [x] Final TypeScript, lint, build, test ve mobil export doğrulamasını tamamla
+- [ ] Kesin production durum raporunu teslim et
+
+## Phase 30: Reset Sonrası Kurtarma ve 14/14 Final Doğrulama
+- [x] 03 MoveAI standalone ekranının web viewport yüksekliğini ve koyu tema zeminini gerçek 390×844 render ile düzeltip doğrula
+- [x] 04 Hizmet Talebi kategori adımını gerçek categories.list API verisine bağla; slug/sayısal route eşlemesini ve tam viewport koyu tema render’ını doğrula
+- [x] 14 Yeni İş Fırsatları ekranını gerçek providers.newJobs ve categories.list verileri, kompakt referans kartları, teklif formu ve sabit profesyonel alt navigasyonla yeniden uygula
+- [x] Yerel Expo web doğrulamasında API origin ve cookie kapsamını güvenli biçimde çöz
+- [x] 01–14 authenticated render betiğini ve temas sayfası üreticisini yeniden kur
+- [x] TypeScript, lint, build, tüm testler, mobil export ve 14/14 gerçek render doğrulamasını tamamla
+- [x] Final checkpoint için tüm kod, test ve görsel doğrulama kanıtlarını hazırla
+- [ ] Kesin production durum raporunu teslim et

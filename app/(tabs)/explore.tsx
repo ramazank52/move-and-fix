@@ -12,9 +12,9 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
   cleaning: { icon: "sparkles", color: "#10B981" },
   plumbing: { icon: "wrench.fill", color: "#3B82F6" },
   electrical: { icon: "bolt.fill", color: "#F59E0B" },
-  painting: { icon: "palette.fill", color: "#8B5CF6" },
+  painting: { icon: "paintpalette.fill", color: "#8B5CF6" },
   ac: { icon: "sun.max.fill", color: "#06B6D4" },
-  hvac: { icon: "sun.max.fill", color: "#06B6D4" },
+  hvac: { icon: "thermometer.medium", color: "#F97316" },
   heating: { icon: "flame.fill", color: "#FF6B00" },
   moving: { icon: "shippingbox.fill", color: "#84CC16" },
   locksmith: { icon: "lock.fill", color: "#EF4444" },
@@ -27,6 +27,7 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
   tow_truck: { icon: "car.fill", color: "#EF4444" },
   towing: { icon: "car.fill", color: "#EF4444" },
   roadside: { icon: "wrench.adjustable.fill", color: "#8A5CFF" },
+  appliance: { icon: "refrigerator.fill", color: "#6366F1" },
 };
 
 const EMERGENCY_SLUGS = new Set(["plumbing", "electrical", "locksmith", "roadside", "tow_truck", "towing"]);

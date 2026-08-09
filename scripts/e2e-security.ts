@@ -2,6 +2,10 @@
  * Security Test — Cross-user access, JWT validation, rate limit, input validation
  */
 import "dotenv/config";
+import { eq } from "drizzle-orm";
+
+import { serviceRequests } from "../drizzle/schema";
+import { getDb } from "../server/db";
 
 const API = "http://127.0.0.1:3000";
 const tokens = JSON.parse(require("fs").readFileSync("/tmp/test-tokens.json", "utf8"));
@@ -23,6 +27,13 @@ async function tRPC(procedure: string, method: "GET" | "POST", token: string, bo
 async function rawRequest(path: string, opts: RequestInit = {}) {
   const res = await fetch(`${API}${path}`, opts);
   return { status: res.status, body: await res.text() };
+}
+
+async function cleanupSecurityRequest(requestId: unknown) {
+  if (typeof requestId !== "number" || !Number.isInteger(requestId) || requestId <= 0) return;
+  const database = await getDb();
+  if (!database) throw new Error("Security fixture cleanup için database kullanılamıyor");
+  await database.delete(serviceRequests).where(eq(serviceRequests.id, requestId));
 }
 
 async function main() {
@@ -67,6 +78,7 @@ async function main() {
     description: "1' OR '1'='1",
   });
   record("SQL injection in title handled", sqli.ok, "Drizzle ORM parameterized queries prevent SQL injection");
+  await cleanupSecurityRequest(sqli.data);
 
   // 6. XSS attempt
   console.log("\n=== 6. XSS ===");
@@ -76,6 +88,7 @@ async function main() {
     description: "<img src=x onerror=alert(1)>",
   });
   record("XSS input accepted (sanitized by React)", xss.ok, "React escapes HTML by default");
+  await cleanupSecurityRequest(xss.data);
 
   // 7. Rate limiting — send 15+ login attempts
   console.log("\n=== 7. Rate Limiting ===");
@@ -124,6 +137,7 @@ async function main() {
     description: "B".repeat(50000),
   });
   record("Oversized input handled", bigInput.ok || !bigInput.ok, `ok: ${bigInput.ok}, error: ${bigInput.error || "none"}`);
+  await cleanupSecurityRequest(bigInput.data);
 
   // Summary
   console.log(`\n=== SECURITY TEST SUMMARY ===`);

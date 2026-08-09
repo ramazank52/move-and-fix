@@ -117,6 +117,12 @@ const MAPPING = {
   "envelope.fill": "email",
   "link": "link",
   "copy": "content-copy",
+  "paintpalette.fill": "format-paint",
+  "leaf.fill": "eco",
+  "flame.fill": "local-fire-department",
+  "sofa.fill": "weekend",
+  "thermometer.medium": "thermostat",
+  "refrigerator.fill": "kitchen",
 } as unknown as IconMapping;
 
 /**

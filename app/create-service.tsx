@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,13 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
-import { CATEGORIES } from "@/lib/data/categories";
 
 const STEPS = ["Hizmet", "Detay", "Zaman", "Konum", "Onay"] as const;
 const URGENCY_OPTIONS = [
@@ -23,19 +23,59 @@ const URGENCY_OPTIONS = [
   { id: "scheduled", label: "Planlı", icon: "calendar", color: "#10B981" },
 ] as const;
 
+const CATEGORY_META: Record<string, { icon: string; color: string }> = {
+  cleaning: { icon: "sparkles", color: "#10B981" },
+  plumbing: { icon: "wrench.fill", color: "#3B82F6" },
+  electrical: { icon: "bolt.fill", color: "#F59E0B" },
+  painting: { icon: "paintpalette.fill", color: "#8B5CF6" },
+  ac: { icon: "sun.max.fill", color: "#06B6D4" },
+  hvac: { icon: "thermometer.medium", color: "#F97316" },
+  heating: { icon: "flame.fill", color: "#FF6B00" },
+  moving: { icon: "shippingbox.fill", color: "#84CC16" },
+  locksmith: { icon: "lock.fill", color: "#EF4444" },
+  furniture: { icon: "sofa.fill", color: "#8B5CF6" },
+  car: { icon: "car.fill", color: "#3B82F6" },
+  garden: { icon: "leaf.fill", color: "#22C55E" },
+  gardening: { icon: "leaf.fill", color: "#22C55E" },
+  petcare: { icon: "heart.fill", color: "#EC4899" },
+  courier: { icon: "shippingbox.fill", color: "#22C55E" },
+  tow_truck: { icon: "car.fill", color: "#EF4444" },
+  towing: { icon: "car.fill", color: "#EF4444" },
+  roadside: { icon: "wrench.adjustable.fill", color: "#8A5CFF" },
+  appliance: { icon: "refrigerator.fill", color: "#6366F1" },
+};
+
 export default function CreateServiceScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { height: viewportHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ categoryId?: string; categoryLabel?: string }>();
 
   const [step, setStep] = useState(0);
-  const [categoryId, setCategoryId] = useState(params.categoryId ? parseInt(params.categoryId, 10) : 0);
+  const [categoryId, setCategoryId] = useState(() => {
+    const parsed = Number(params.categoryId);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+  });
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState<string>("today");
   const [address, setAddress] = useState("");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
+  const categoriesQuery = trpc.categories.list.useQuery();
+  const categories = useMemo<NonNullable<typeof categoriesQuery.data>>(
+    () => categoriesQuery.data ?? [],
+    [categoriesQuery.data],
+  );
+
+  useEffect(() => {
+    const routeCategory = params.categoryId?.trim();
+    if (!routeCategory || categoryId > 0 || categories.length === 0) return;
+    const match = categories.find(
+      (category) => category.slug === routeCategory || String(category.id) === routeCategory,
+    );
+    if (match) setCategoryId(match.id);
+  }, [categories, categoryId, params.categoryId]);
 
   const createRequestMutation = trpc.requests.create.useMutation({
     onSuccess: (data: any) => {
@@ -86,12 +126,22 @@ export default function CreateServiceScreen() {
     else router.back();
   };
 
-  const selectedCategory = CATEGORIES.find((c) => {
-    return c.id === params.categoryId || c.id === String(categoryId);
-  });
+  const selectedCategory = categories.find((category) => category.id === categoryId);
 
   return (
-    <ScreenContainer edges={["top", "bottom", "left", "right"]}>
+    <ScreenContainer
+      edges={["top", "bottom", "left", "right"]}
+      containerClassName="bg-background"
+      safeAreaClassName="flex-1 bg-background"
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
+      <View
+        style={{
+          flex: 1,
+          minHeight: Platform.OS === "web" ? viewportHeight : undefined,
+          backgroundColor: colors.background,
+        }}
+      >
       {/* Header */}
       <View
         style={{
@@ -157,14 +207,41 @@ export default function CreateServiceScreen() {
         </Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 112 }}
+      >
         {/* Step 0: Hizmet Seç */}
         {step === 0 && (
           <View>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
               Hangi hizmete ihtiyacınız var?
             </Text>
-            {params.categoryId && selectedCategory && (
+            {categoriesQuery.isLoading ? (
+              <View style={{ minHeight: 160, alignItems: "center", justifyContent: "center" }}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={{ marginTop: 10, color: colors.muted, fontSize: 13 }}>Hizmetler yükleniyor…</Text>
+              </View>
+            ) : categoriesQuery.isError ? (
+              <View style={{ minHeight: 160, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+                <IconSymbol name="wifi.exclamationmark" size={32} color={colors.error} />
+                <Text style={{ marginTop: 10, color: colors.foreground, fontWeight: "700" }}>Hizmetler alınamadı</Text>
+                <Pressable
+                  onPress={() => categoriesQuery.refetch()}
+                  style={({ pressed }) => ({
+                    marginTop: 12,
+                    borderRadius: 12,
+                    backgroundColor: colors.primary,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
+                >
+                  <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Yeniden Dene</Text>
+                </Pressable>
+              </View>
+            ) : params.categoryId && selectedCategory ? (
               <View
                 style={{
                   flexDirection: "row",
@@ -177,40 +254,66 @@ export default function CreateServiceScreen() {
                   borderColor: colors.primary + "30",
                 }}
               >
-                <Text style={{ fontSize: 24 }}>{selectedCategory.icon}</Text>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: (selectedCategory.color || CATEGORY_META[selectedCategory.slug]?.color || colors.primary) + "18",
+                  }}
+                >
+                  <IconSymbol
+                    name={(CATEGORY_META[selectedCategory.slug]?.icon || "briefcase.fill") as any}
+                    size={21}
+                    color={selectedCategory.color || CATEGORY_META[selectedCategory.slug]?.color || colors.primary}
+                  />
+                </View>
                 <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primary, marginLeft: 10 }}>
                   {selectedCategory.name}
                 </Text>
               </View>
-            )}
-            {!params.categoryId && (
+            ) : (
               <View style={{ gap: 8 }}>
-                {CATEGORIES.map((cat) => (
-                  <Pressable
-                    key={cat.id}
-                    onPress={() => setCategoryId(parseInt(cat.id, 10) || 0)}
-                    style={({ pressed }) => [
-                      {
+                {categories.map((category) => {
+                  const meta = CATEGORY_META[category.slug] ?? { icon: "briefcase.fill", color: colors.primary };
+                  const categoryColor = category.color || meta.color;
+                  const selected = categoryId === category.id;
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() => setCategoryId(category.id)}
+                      style={({ pressed }) => ({
                         flexDirection: "row",
                         alignItems: "center",
-                        backgroundColor: categoryId === parseInt(cat.id, 10) ? colors.primary + "10" : colors.card,
+                        backgroundColor: selected ? colors.primary + "10" : colors.card,
                         borderRadius: 14,
                         padding: 14,
                         borderWidth: 1.5,
-                        borderColor: categoryId === parseInt(cat.id, 10) ? colors.primary : colors.border,
+                        borderColor: selected ? colors.primary : colors.border,
                         opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}
-                  >
-                    <Text style={{ fontSize: 22 }}>{cat.icon}</Text>
-                    <Text style={{ flex: 1, marginLeft: 12, fontSize: 15, fontWeight: "600", color: colors.foreground }}>
-                      {cat.name}
-                    </Text>
-                    {categoryId === parseInt(cat.id, 10) && (
-                      <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} />
-                    )}
-                  </Pressable>
-                ))}
+                      })}
+                    >
+                      <View
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 11,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: categoryColor + "18",
+                        }}
+                      >
+                        <IconSymbol name={meta.icon as any} size={20} color={categoryColor} />
+                      </View>
+                      <Text style={{ flex: 1, marginLeft: 12, fontSize: 15, fontWeight: "600", color: colors.foreground }}>
+                        {category.name}
+                      </Text>
+                      {selected ? <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} /> : null}
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
           </View>
@@ -432,7 +535,7 @@ export default function CreateServiceScreen() {
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ fontSize: 14, color: colors.muted }}>Hizmet</Text>
                 <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                  {selectedCategory?.name || CATEGORIES.find((c) => c.id === String(categoryId))?.name || "Seçilmedi"}
+                  {selectedCategory?.name || "Seçilmedi"}
                 </Text>
               </View>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -520,6 +623,7 @@ export default function CreateServiceScreen() {
             </Text>
           )}
         </Pressable>
+      </View>
       </View>
     </ScreenContainer>
   );

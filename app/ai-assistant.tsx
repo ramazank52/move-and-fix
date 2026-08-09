@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -38,6 +39,7 @@ const QUICK_PROMPTS = [
 export default function AIAssistantScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { height: viewportHeight } = useWindowDimensions();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -53,6 +55,7 @@ export default function AIAssistantScreen() {
 
   const aiCommandMutation = trpc.ai.command.useMutation({
     onSuccess: (data: any) => {
+      setLoading(false);
       const response: Message = {
         id: Date.now().toString() + "-ai",
         text: data.response || data.message || "Size yardımcı olmaya çalışıyorum. Lütfen biraz daha açıklayıcı olur musunuz?",
@@ -78,8 +81,9 @@ export default function AIAssistantScreen() {
         );
       }
     },
-    onError: () => {
-      const fallback = getLocalResponse(input);
+    onError: (_error, variables) => {
+      setLoading(false);
+      const fallback = getLocalResponse(variables.message);
       setMessages((prev) => [
         ...prev,
         {
@@ -143,39 +147,44 @@ export default function AIAssistantScreen() {
     };
   };
 
-  const sendMessage = useCallback(async () => {
-    if (!input.trim() || loading) return;
+  const sendMessage = useCallback((textOverride?: string) => {
+    const messageText = (textOverride ?? input).trim();
+    if (!messageText || loading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: input.trim(),
+      text: messageText,
       isUser: true,
       timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMessage]);
-    const messageText = input.trim();
     setInput("");
     setLoading(true);
-
-    try {
-      aiCommandMutation.mutate({ message: messageText });
-    } catch {
-      // Fallback handled in onError
-    }
-    setLoading(false);
+    aiCommandMutation.mutate({ message: messageText });
   }, [input, loading, aiCommandMutation]);
 
   const handleSuggestion = (suggestion: string) => {
-    setInput(suggestion);
-    setTimeout(() => sendMessage(), 100);
+    sendMessage(suggestion);
   };
 
   return (
-    <ScreenContainer className="flex-1 bg-background" edges={["top", "bottom", "left", "right"]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1"
+    <ScreenContainer
+      edges={["top", "bottom", "left", "right"]}
+      containerClassName="bg-background"
+      safeAreaClassName="flex-1 bg-background"
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
+      <View
+        style={{
+          flex: 1,
+          minHeight: Platform.OS === "web" ? viewportHeight : undefined,
+          backgroundColor: colors.background,
+        }}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1, backgroundColor: colors.background }}
+        >
         {/* Header — MoveAI avatar + mor tema */}
         <View
           style={{
@@ -404,10 +413,10 @@ export default function AIAssistantScreen() {
               borderColor: colors.border,
             }}
             returnKeyType="send"
-            onSubmitEditing={sendMessage}
+            onSubmitEditing={() => sendMessage()}
           />
           <Pressable
-            onPress={sendMessage}
+            onPress={() => sendMessage()}
             disabled={!input.trim() || loading}
             style={({ pressed }) => [
               {
@@ -428,7 +437,8 @@ export default function AIAssistantScreen() {
             />
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </ScreenContainer>
   );
 }

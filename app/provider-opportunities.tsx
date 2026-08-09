@@ -3,21 +3,44 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   Pressable,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 
+import { ProviderBottomNav } from "@/components/provider-bottom-nav";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 
+const CATEGORY_META: Record<string, { icon: string; color: string }> = {
+  cleaning: { icon: "sparkles", color: "#10B981" },
+  plumbing: { icon: "wrench.fill", color: "#3B82F6" },
+  electrical: { icon: "bolt.fill", color: "#F59E0B" },
+  painting: { icon: "paintpalette.fill", color: "#8B5CF6" },
+  ac: { icon: "sun.max.fill", color: "#06B6D4" },
+  hvac: { icon: "thermometer.medium", color: "#F97316" },
+  heating: { icon: "flame.fill", color: "#FF6B00" },
+  moving: { icon: "shippingbox.fill", color: "#84CC16" },
+  locksmith: { icon: "lock.fill", color: "#EF4444" },
+  furniture: { icon: "sofa.fill", color: "#8B5CF6" },
+  car: { icon: "car.fill", color: "#3B82F6" },
+  garden: { icon: "leaf.fill", color: "#22C55E" },
+  courier: { icon: "shippingbox.fill", color: "#22C55E" },
+  tow_truck: { icon: "car.fill", color: "#EF4444" },
+  towing: { icon: "car.fill", color: "#EF4444" },
+  roadside: { icon: "wrench.adjustable.fill", color: "#8A5CFF" },
+  appliance: { icon: "refrigerator.fill", color: "#6366F1" },
+};
+
 export default function ProviderOpportunitiesScreen() {
   const colors = useColors();
-  const router = useRouter();
+  const { height: viewportHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ requestId?: string }>();
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(() => {
     const parsed = Number(params.requestId);
@@ -29,7 +52,12 @@ export default function ProviderOpportunitiesScreen() {
 
   const profileQuery = trpc.providers.myProfile.useQuery();
   const jobsQuery = trpc.providers.newJobs.useQuery();
+  const categoriesQuery = trpc.categories.list.useQuery();
   const opportunities = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data]);
+  const categoryById = useMemo(
+    () => new Map((categoriesQuery.data ?? []).map((category) => [category.id, category])),
+    [categoriesQuery.data],
+  );
   const selectedOpportunity = useMemo(
     () => opportunities.find((item) => item.id === selectedRequestId) ?? null,
     [opportunities, selectedRequestId],
@@ -73,27 +101,28 @@ export default function ProviderOpportunitiesScreen() {
     });
   };
 
-  if (jobsQuery.isLoading || profileQuery.isLoading) {
+  if (jobsQuery.isLoading || profileQuery.isLoading || categoriesQuery.isLoading) {
     return (
       <ScreenContainer edges={["top", "bottom", "left", "right"]} className="items-center justify-center">
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text className="mt-3 text-sm text-muted">İş fırsatları yükleniyor…</Text>
+        <Text style={{ marginTop: 12, color: colors.muted, fontSize: 14 }}>İş fırsatları yükleniyor…</Text>
       </ScreenContainer>
     );
   }
 
-  if (jobsQuery.isError || profileQuery.isError) {
+  if (jobsQuery.isError || profileQuery.isError || categoriesQuery.isError) {
     return (
       <ScreenContainer edges={["top", "bottom", "left", "right"]} className="items-center justify-center px-8">
         <IconSymbol name="wifi.exclamationmark" size={42} color={colors.error} />
-        <Text className="mt-4 text-center text-lg font-bold text-foreground">Fırsatlar alınamadı</Text>
-        <Text className="mt-2 text-center text-sm leading-5 text-muted">
+        <Text style={{ marginTop: 16, color: colors.foreground, fontSize: 18, fontWeight: "700", textAlign: "center" }}>Fırsatlar alınamadı</Text>
+        <Text style={{ marginTop: 8, color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: "center" }}>
           Bağlantınızı kontrol edip yeniden deneyin.
         </Text>
         <Pressable
           onPress={() => {
             profileQuery.refetch();
             jobsQuery.refetch();
+            categoriesQuery.refetch();
           }}
           style={({ pressed }) => ({
             marginTop: 18,
@@ -104,110 +133,109 @@ export default function ProviderOpportunitiesScreen() {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text className="font-semibold text-white">Yeniden Dene</Text>
+          <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>Yeniden Dene</Text>
         </Pressable>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer edges={["top", "bottom", "left", "right"]}>
+    <ScreenContainer
+      edges={["top", "bottom", "left", "right"]}
+      containerClassName="bg-background"
+      safeAreaClassName="flex-1 bg-background"
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
       <View
         style={{
-          height: 58,
-          flexDirection: "row",
+          flex: 1,
+          minHeight: Platform.OS === "web" ? viewportHeight : undefined,
+          backgroundColor: colors.background,
+        }}
+      >
+      <View
+        style={{
+          height: 54,
           alignItems: "center",
+          justifyContent: "center",
           paddingHorizontal: 16,
           borderBottomWidth: 0.5,
           borderBottomColor: colors.border,
         }}
       >
-        <Pressable
-          accessibilityLabel="Geri dön"
-          onPress={() => router.back()}
-          style={({ pressed }) => ({ padding: 8, opacity: pressed ? 0.55 : 1 })}
-        >
-          <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
-        </Pressable>
-        <View style={{ flex: 1, marginLeft: 6 }}>
-          <Text className="text-lg font-bold text-foreground">Yeni İş Fırsatları</Text>
-          <Text className="text-xs text-muted">Hizmet bölgenizdeki güncel talepler</Text>
-        </View>
-        <View
-          style={{
-            minWidth: 30,
-            height: 30,
-            borderRadius: 15,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: `${colors.primary}18`,
-          }}
-        >
-          <Text style={{ color: colors.primary, fontWeight: "800" }}>{opportunities.length}</Text>
-        </View>
+        <Text style={{ color: colors.foreground, fontSize: 18, lineHeight: 24, fontWeight: "700" }}>Yeni İş Fırsatları</Text>
       </View>
 
       <FlatList
+        style={{ flex: 1 }}
         data={opportunities}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={{ padding: 16, paddingBottom: 40, flexGrow: opportunities.length ? undefined : 1 }}
+        contentContainerStyle={{ padding: 12, paddingBottom: 18, flexGrow: opportunities.length ? undefined : 1 }}
         ListEmptyComponent={
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 30 }}>
             <IconSymbol name="briefcase.fill" size={44} color={colors.muted} />
-            <Text className="mt-4 text-center text-lg font-bold text-foreground">Yeni fırsat bulunmuyor</Text>
-            <Text className="mt-2 text-center text-sm leading-5 text-muted">
+            <Text style={{ marginTop: 16, color: colors.foreground, fontSize: 18, fontWeight: "700", textAlign: "center" }}>Yeni fırsat bulunmuyor</Text>
+            <Text style={{ marginTop: 8, color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: "center" }}>
               Kategorinize uygun yeni müşteri talepleri burada görünecek.
             </Text>
           </View>
         }
         renderItem={({ item }) => {
           const isSelected = selectedRequestId === item.id;
+          const category = categoryById.get(item.categoryId);
+          const categoryMeta = CATEGORY_META[category?.slug ?? ""] ?? {
+            icon: "briefcase.fill",
+            color: colors.primary,
+          };
           return (
             <View
               style={{
                 backgroundColor: colors.card,
-                borderRadius: 18,
+                borderRadius: 14,
                 borderWidth: isSelected ? 1.5 : 0.5,
                 borderColor: isSelected ? colors.primary : colors.border,
-                padding: 16,
-                marginBottom: 12,
+                padding: 14,
+                marginBottom: 10,
               }}
             >
               <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
                 <View
                   style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 14,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: `${colors.primary}16`,
+                    backgroundColor: `${categoryMeta.color}18`,
                   }}
                 >
-                  <IconSymbol name="briefcase.fill" size={21} color={colors.primary} />
+                  <IconSymbol name={categoryMeta.icon as any} size={20} color={categoryMeta.color} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text className="text-base font-bold text-foreground" numberOfLines={2}>{item.title}</Text>
+                  <Text style={{ color: colors.foreground, fontSize: 14, lineHeight: 19, fontWeight: "700" }} numberOfLines={2}>{item.title}</Text>
+                  <Text style={{ marginTop: 2, color: colors.muted, fontSize: 11 }} numberOfLines={1}>
+                    {category?.name || "Hizmet talebi"}
+                  </Text>
                   <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
                     <IconSymbol name="location.fill" size={13} color={colors.muted} />
-                    <Text className="ml-1 flex-1 text-xs text-muted" numberOfLines={1}>
+                    <Text style={{ flex: 1, marginLeft: 4, color: colors.muted, fontSize: 12, lineHeight: 17 }} numberOfLines={1}>
                       {item.address || "Konum belirtilmedi"}
                     </Text>
                     {item.distanceKm ? (
-                      <Text className="text-xs font-semibold text-muted">{item.distanceKm} km</Text>
+                      <Text style={{ color: colors.muted, fontSize: 12, fontWeight: "600" }}>{item.distanceKm} km</Text>
                     ) : null}
                   </View>
                 </View>
               </View>
 
               {item.description ? (
-                <Text className="mt-3 text-sm leading-5 text-muted" numberOfLines={3}>{item.description}</Text>
+                <Text style={{ marginTop: 12, color: colors.muted, fontSize: 12, lineHeight: 20 }} numberOfLines={2}>{item.description}</Text>
               ) : null}
 
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
                 <View>
-                  <Text className="text-xs text-muted">Müşteri bütçesi</Text>
-                  <Text className="mt-1 text-base font-extrabold text-foreground">
+                  <Text style={{ color: colors.muted, fontSize: 12 }}>Müşteri bütçesi</Text>
+                  <Text style={{ marginTop: 4, color: colors.foreground, fontSize: 16, fontWeight: "800" }}>
                     {item.budgetMin || item.budgetMax
                       ? `₺${item.budgetMin ?? 0} – ₺${item.budgetMax ?? item.budgetMin}`
                       : "Teklife açık"}
@@ -298,7 +326,7 @@ export default function ProviderOpportunitiesScreen() {
                     {createOffer.isPending ? (
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
-                      <Text className="font-bold text-white">Teklifi Gönder</Text>
+                      <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Teklifi Gönder</Text>
                     )}
                   </Pressable>
                 </View>
@@ -307,6 +335,8 @@ export default function ProviderOpportunitiesScreen() {
           );
         }}
       />
+      <ProviderBottomNav active="opportunities" />
+      </View>
     </ScreenContainer>
   );
 }
