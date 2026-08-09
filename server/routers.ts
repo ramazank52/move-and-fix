@@ -43,6 +43,31 @@ async function runTrackingOperation<T>(operation: () => Promise<T>): Promise<T> 
   }
 }
 
+async function runMessageOperation<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "MESSAGE_OPERATION_FAILED";
+    if (message === "MESSAGE_REQUEST_NOT_FOUND") {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
+    }
+    if (
+      message === "MESSAGE_REQUEST_NOT_ASSIGNED" ||
+      message === "MESSAGE_FORBIDDEN" ||
+      message === "MESSAGE_COUNTERPARTY_FORBIDDEN"
+    ) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Bu hizmet görüşmesine erişim yetkiniz yok",
+      });
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Mesajlaşma işlemi tamamlanamadı",
+    });
+  }
+}
+
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -246,20 +271,56 @@ export const appRouter = router({
 
   // Messages
   messages: router({
+    list: protectedProcedure.query(({ ctx }) => {
+      return db.getMessageConversations(ctx.user.id);
+    }),
+    participant: protectedProcedure
+      .input(z.object({
+        requestId: z.number().int().positive(),
+        otherUserId: z.number().int().positive(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const participant = await runMessageOperation(() =>
+          db.getMessageParticipant(input.requestId, ctx.user.id, input.otherUserId),
+        );
+        if (!participant) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Mesaj katılımcısı bulunamadı" });
+        }
+        return participant;
+      }),
     conversation: protectedProcedure
-      .input(z.object({ otherUserId: z.number() }))
-      .query(({ ctx, input }) => {
-        return db.getConversation(ctx.user.id, input.otherUserId);
+      .input(z.object({
+        requestId: z.number().int().positive(),
+        otherUserId: z.number().int().positive(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const conversation = await runMessageOperation(() =>
+          db.getConversation(input.requestId, ctx.user.id, input.otherUserId),
+        );
+        return conversation.map((message) => ({
+          ...message,
+          isOwn: message.senderId === ctx.user.id,
+        }));
       }),
     send: protectedProcedure
       .input(z.object({
-        receiverId: z.number(),
-        content: z.string().min(1),
-        requestId: z.number().optional(),
+        receiverId: z.number().int().positive(),
+        content: z.string().trim().min(1).max(4000),
+        requestId: z.number().int().positive(),
       }))
-      .mutation(({ ctx, input }) => {
-        return db.sendMessage({ ...input, senderId: ctx.user.id });
-      }),
+      .mutation(({ ctx, input }) =>
+        runMessageOperation(() => db.sendMessage({ ...input, senderId: ctx.user.id })),
+      ),
+    markRead: protectedProcedure
+      .input(z.object({
+        requestId: z.number().int().positive(),
+        otherUserId: z.number().int().positive(),
+      }))
+      .mutation(({ ctx, input }) =>
+        runMessageOperation(() =>
+          db.markConversationRead(input.requestId, ctx.user.id, input.otherUserId),
+        ),
+      ),
   }),
 
   // Providers

@@ -1,221 +1,250 @@
-import { useState, useRef, useCallback } from "react";
-import { View, Text, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+
 import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 
-interface ChatMessage {
-  id: string;
-  text: string;
-  isUser: boolean;
-  time: string;
-}
-
 export default function ChatRoomScreen() {
-  const { id, otherUserId } = useLocalSearchParams<{ id: string; otherUserId?: string }>();
+  const { id, requestId: requestIdParam, otherUserId } = useLocalSearchParams<{
+    id: string;
+    requestId?: string;
+    otherUserId?: string;
+  }>();
   const colors = useColors();
   const router = useRouter();
+  const utils = trpc.useUtils();
   const [input, setInput] = useState("");
   const flatListRef = useRef<FlatList>(null);
+  const markedReadForRef = useRef("");
+  const otherUid = Number(otherUserId);
+  const parsedRequestId = Number(requestIdParam ?? id);
+  const requestId = Number.isInteger(parsedRequestId) && parsedRequestId > 0 ? parsedRequestId : undefined;
+  const hasValidConversationContext =
+    requestId != null && Number.isInteger(otherUid) && otherUid > 0;
 
-  // Fetch conversation messages
-  const otherUid = otherUserId ? parseInt(otherUserId, 10) : 0;
-  const messagesQuery = trpc.messages.conversation.useQuery(
-    { otherUserId: otherUid },
-    { enabled: otherUid > 0, refetchInterval: 5000 }
+  const participantQuery = trpc.messages.participant.useQuery(
+    { requestId: requestId ?? 0, otherUserId: otherUid },
+    { enabled: hasValidConversationContext },
   );
-
-  // Send message mutation
+  const messagesQuery = trpc.messages.conversation.useQuery(
+    { requestId: requestId ?? 0, otherUserId: otherUid },
+    {
+      enabled: hasValidConversationContext,
+      refetchInterval: 5_000,
+    },
+  );
+  const markReadMutation = trpc.messages.markRead.useMutation({
+    onSuccess: () => utils.messages.list.invalidate(),
+  });
   const sendMessageMutation = trpc.messages.send.useMutation({
-    onSuccess: () => {
-      messagesQuery.refetch();
+    onSuccess: async () => {
+      setInput("");
+      await Promise.all([messagesQuery.refetch(), utils.messages.list.invalidate()]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
     },
   });
 
-  const dbMessages = ((messagesQuery.data as any[]) || []).map((msg): ChatMessage => ({
-    id: String(msg.id),
-    text: msg.content || msg.text || "",
-    isUser: msg.senderId === undefined ? true : !msg.isProvider,
-    time: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) : "",
-  }));
-
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
-
-  const allMessages = [...dbMessages, ...localMessages];
+  useEffect(() => {
+    if (
+      messagesQuery.data &&
+      requestId != null &&
+      otherUid > 0 &&
+      markedReadForRef.current !== `${requestId}:${otherUid}`
+    ) {
+      markedReadForRef.current = `${requestId}:${otherUid}`;
+      markReadMutation.mutate({ requestId, otherUserId: otherUid });
+    }
+  }, [messagesQuery.data, otherUid, requestId, markReadMutation]);
 
   const sendMessage = useCallback(() => {
-    if (!input.trim() || sendMessageMutation.isPending) return;
-    const text = input.trim();
-    const newMsg: ChatMessage = {
-      id: `local-${Date.now()}`,
-      text,
-      isUser: true,
-      time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
-    };
-    setLocalMessages((prev) => [...prev, newMsg]);
-    setInput("");
-    setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
-
+    const content = input.trim();
+    if (!content || !hasValidConversationContext || sendMessageMutation.isPending) return;
     sendMessageMutation.mutate({
-      requestId: parseInt(id, 10) || 0,
-      content: text,
       receiverId: otherUid,
+      content,
+      requestId,
     });
-  }, [input, sendMessageMutation, id, otherUid]);
+  }, [hasValidConversationContext, input, otherUid, requestId, sendMessageMutation]);
+
+  const participantName = participantQuery.data?.displayName ?? "Profesyonel";
+  const participantInitial = participantName.charAt(0).toLocaleUpperCase("tr-TR");
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
-      {/* Header */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           paddingHorizontal: 16,
-          paddingVertical: 14,
+          paddingVertical: 12,
           borderBottomWidth: 0.5,
           borderBottomColor: colors.border,
         }}
       >
-        <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
+        <Pressable onPress={() => router.back()} style={({ pressed }) => ({ padding: 5, opacity: pressed ? 0.6 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
         <View
           style={{
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             borderRadius: 14,
-            backgroundColor: colors.primary + "15",
+            backgroundColor: colors.primary + "18",
             alignItems: "center",
             justifyContent: "center",
             marginHorizontal: 10,
           }}
         >
-          <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 16 }}>U</Text>
+          <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 17 }}>
+            {participantInitial}
+          </Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}>Usta</Text>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#22C55E", marginRight: 6 }} />
-            <Text style={{ fontSize: 12, color: colors.muted }}>Çevrimiçi</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 16, fontWeight: "800", color: colors.foreground }}>
+              {participantName}
+            </Text>
+            {participantQuery.data?.isVerified ? (
+              <IconSymbol name="checkmark.seal.fill" size={14} color={colors.primary} />
+            ) : null}
           </View>
+          <Text style={{ marginTop: 2, fontSize: 12, color: colors.muted }}>
+            {participantQuery.data?.isProvider
+              ? participantQuery.data.rating
+                ? `Profesyonel · ${Number(participantQuery.data.rating).toFixed(1)} puan`
+                : "Profesyonel"
+              : "Move&Fix kullanıcısı"}
+          </Text>
         </View>
-        <Pressable style={{ padding: 4 }}>
-          <IconSymbol name="phone.fill" size={18} color={colors.primary} />
-        </Pressable>
       </View>
 
-      {/* Messages */}
-      <FlatList
-        ref={flatListRef}
-        data={allMessages}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 80 }}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-        ListEmptyComponent={
-          messagesQuery.isLoading ? (
-            <View style={{ alignItems: "center", paddingVertical: 40 }}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={{ fontSize: 14, color: colors.muted, marginTop: 12 }}>Mesajlar yükleniyor...</Text>
-            </View>
-          ) : messagesQuery.isError ? (
-            <View style={{ alignItems: "center", paddingVertical: 40 }}>
-              <IconSymbol name="wifi.exclamationmark" size={30} color={colors.error} />
-              <Text style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>Mesajlar yüklenemedi</Text>
-            </View>
-          ) : (
-            <View style={{ alignItems: "center", paddingVertical: 40 }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
+        <FlatList
+          ref={flatListRef}
+          data={messagesQuery.data ?? []}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={{ flexGrow: 1, padding: 16, gap: 10, paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          ListEmptyComponent={
+            !hasValidConversationContext ? (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
+                <IconSymbol name="exclamationmark.shield.fill" size={30} color={colors.error} />
+                <Text style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>
+                  Bu sohbet için geçerli bir hizmet kaydı gerekli.
+                </Text>
+              </View>
+            ) : messagesQuery.isLoading ? (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ fontSize: 14, color: colors.muted, marginTop: 12 }}>Mesajlar yükleniyor...</Text>
+              </View>
+            ) : messagesQuery.isError ? (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
+                <IconSymbol name="wifi.exclamationmark" size={30} color={colors.error} />
+                <Text style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>Mesajlar yüklenemedi</Text>
+              </View>
+            ) : (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
+                <View
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 20,
+                    backgroundColor: colors.card,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 12,
+                  }}
+                >
+                  <IconSymbol name="message.fill" size={26} color={colors.muted} />
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>Henüz mesaj yok</Text>
+                <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>İlk mesajı gönderin</Text>
+              </View>
+            )
+          }
+          renderItem={({ item }) => (
+            <View style={{ flexDirection: "row", justifyContent: item.isOwn ? "flex-end" : "flex-start" }}>
+              {!item.isOwn ? (
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 11,
+                    backgroundColor: colors.primary + "18",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 8,
+                    marginTop: 4,
+                  }}
+                >
+                  <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>{participantInitial}</Text>
+                </View>
+              ) : null}
               <View
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 20,
-                  backgroundColor: colors.card,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 12,
+                  maxWidth: "78%",
+                  backgroundColor: item.isOwn ? colors.primary : colors.card,
+                  borderRadius: 18,
+                  borderBottomRightRadius: item.isOwn ? 6 : 18,
+                  borderBottomLeftRadius: item.isOwn ? 18 : 6,
+                  paddingHorizontal: 15,
+                  paddingVertical: 10,
+                  borderWidth: 0.5,
+                  borderColor: item.isOwn ? colors.primary : colors.border,
                 }}
               >
-                <IconSymbol name="message.fill" size={26} color={colors.muted} />
+                <Text style={{ fontSize: 14, color: item.isOwn ? "#FFFFFF" : colors.foreground, lineHeight: 20 }}>
+                  {item.content}
+                </Text>
+                <View style={{ marginTop: 4, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                  <Text style={{ fontSize: 10, color: item.isOwn ? "#FFFFFFB3" : colors.muted }}>
+                    {item.createdAt
+                      ? new Date(item.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+                      : ""}
+                  </Text>
+                  {item.isOwn ? (
+                    <Text style={{ fontSize: 10, color: item.isRead === 1 ? "#D8E5FF" : "#FFFFFF8C" }}>
+                      {item.isRead === 1 ? "✓✓" : "✓"}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>Henüz mesaj yok</Text>
-              <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>İlk mesajı gönderin</Text>
             </View>
-          )
-        }
-        renderItem={({ item }) => (
-          <View style={{ flexDirection: "row", justifyContent: item.isUser ? "flex-end" : "flex-start" }}>
-            {!item.isUser && (
-              <View
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 12,
-                  backgroundColor: colors.primary + "15",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginRight: 8,
-                  marginTop: 4,
-                }}
-              >
-                <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>U</Text>
-              </View>
-            )}
-            <View
-              style={{
-                maxWidth: "75%",
-                backgroundColor: item.isUser ? colors.primary : colors.card,
-                borderRadius: 18,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderWidth: 0.5,
-                borderColor: item.isUser ? colors.primary : colors.border,
-              }}
-            >
-              <Text style={{ fontSize: 14, color: item.isUser ? "#FFF" : colors.foreground, lineHeight: 20 }}>
-                {item.text}
-              </Text>
-              <Text style={{ fontSize: 11, color: item.isUser ? "#FFFFFF80" : colors.muted, marginTop: 4, textAlign: "right" }}>
-                {item.time}
-              </Text>
-            </View>
-          </View>
-        )}
-      />
+          )}
+        />
 
-      {/* Input */}
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {sendMessageMutation.isError ? (
+          <Text style={{ paddingHorizontal: 16, paddingBottom: 6, color: colors.error, fontSize: 12 }}>
+            Mesaj gönderilemedi. Lütfen tekrar deneyin.
+          </Text>
+        ) : null}
         <View
           style={{
             flexDirection: "row",
-            alignItems: "center",
-            padding: 12,
-            paddingBottom: Platform.OS === "web" ? 12 : 24,
+            alignItems: "flex-end",
+            paddingHorizontal: 12,
+            paddingTop: 10,
+            paddingBottom: Platform.OS === "web" ? 12 : 8,
             backgroundColor: colors.background,
             borderTopWidth: 0.5,
             borderTopColor: colors.border,
             gap: 10,
           }}
         >
-          <Pressable
-            style={({ pressed }) => [
-              {
-                width: 40,
-                height: 40,
-                borderRadius: 14,
-                backgroundColor: colors.card,
-                alignItems: "center",
-                justifyContent: "center",
-                borderWidth: 0.5,
-                borderColor: colors.border,
-                opacity: pressed ? 0.85 : 1,
-              },
-            ]}
-          >
-            <IconSymbol name="plus" size={18} color={colors.muted} />
-          </Pressable>
           <TextInput
             value={input}
             onChangeText={setInput}
@@ -223,8 +252,12 @@ export default function ChatRoomScreen() {
             placeholderTextColor={colors.muted}
             returnKeyType="send"
             onSubmitEditing={sendMessage}
+            multiline
+            maxLength={4000}
             style={{
               flex: 1,
+              minHeight: 42,
+              maxHeight: 104,
               backgroundColor: colors.card,
               borderRadius: 20,
               paddingHorizontal: 16,
@@ -233,25 +266,29 @@ export default function ChatRoomScreen() {
               color: colors.foreground,
               borderWidth: 0.5,
               borderColor: colors.border,
-              maxHeight: 100,
             }}
           />
           <Pressable
             onPress={sendMessage}
-            disabled={!input.trim() || sendMessageMutation.isPending}
-            style={({ pressed }) => [
-              {
-                width: 40,
-                height: 40,
-                borderRadius: 14,
-                backgroundColor: !input.trim() || sendMessageMutation.isPending ? colors.muted : colors.primary,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: pressed && input.trim() ? 0.85 : 1,
-              },
-            ]}
+            disabled={!input.trim() || sendMessageMutation.isPending || otherUid <= 0}
+            style={({ pressed }) => ({
+              width: 42,
+              height: 42,
+              borderRadius: 15,
+              backgroundColor:
+                !input.trim() || sendMessageMutation.isPending || otherUid <= 0
+                  ? colors.muted
+                  : colors.primary,
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: pressed && input.trim() ? 0.82 : 1,
+            })}
           >
-            <IconSymbol name="paperplane.fill" size={18} color="#FFF" />
+            {sendMessageMutation.isPending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <IconSymbol name="paperplane.fill" size={18} color="#FFFFFF" />
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>

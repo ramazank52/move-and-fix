@@ -1,264 +1,344 @@
-import { useState } from "react";
-import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator } from "react-native";
-import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { trpc } from "@/lib/trpc";
+import { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { router } from "expo-router";
 
-type TabType = "active" | "pending" | "completed" | "cancelled";
+import { ScreenContainer } from "@/components/screen-container";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useColors } from "@/hooks/use-colors";
+import { trpc } from "@/lib/trpc";
+
+type FilterKey = "active" | "offers" | "scheduled" | "completed";
+type LifecycleStatus =
+  | "scheduled"
+  | "on_the_way"
+  | "arrived"
+  | "in_progress"
+  | "completed"
+  | "cancelled"
+  | null;
+
+type FilterableJob = {
+  status: string;
+  lifecycleStatus: LifecycleStatus;
+};
+
+const FILTERS: readonly { key: FilterKey; label: string }[] = [
+  { key: "active", label: "Aktif" },
+  { key: "offers", label: "Teklifler" },
+  { key: "scheduled", label: "Planlanan" },
+  { key: "completed", label: "Tamamlanan" },
+];
+
+const STATUS_META: Record<
+  Exclude<LifecycleStatus, null> | "offers",
+  { label: string; color: string; background: string }
+> = {
+  offers: { label: "Teklif Bekliyor", color: "#F59E0B", background: "#F59E0B1F" },
+  scheduled: { label: "Planlandı", color: "#8A5CFF", background: "#8A5CFF1F" },
+  on_the_way: { label: "Yolda", color: "#3B82F6", background: "#3B82F61F" },
+  arrived: { label: "Geldi", color: "#06B6D4", background: "#06B6D41F" },
+  in_progress: { label: "İş Başladı", color: "#22C55E", background: "#22C55E1F" },
+  completed: { label: "Tamamlandı", color: "#22C55E", background: "#22C55E1F" },
+  cancelled: { label: "İptal", color: "#EF4444", background: "#EF44441F" },
+};
+
+function formatMoney(value: number | string | null | undefined) {
+  if (value == null) return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? `₺${numeric.toLocaleString("tr-TR")}` : null;
+}
+
+function getLifecycle(job: FilterableJob): Exclude<LifecycleStatus, null> | "offers" {
+  if (job.status === "pending") return "offers";
+  if (job.status === "completed") return "completed";
+  if (job.status === "cancelled") return "cancelled";
+  return job.lifecycleStatus ?? "scheduled";
+}
+
+function matchesFilter(job: FilterableJob, filter: FilterKey) {
+  const lifecycle = getLifecycle(job);
+  if (filter === "offers") return job.status === "pending";
+  if (filter === "scheduled") return job.status === "active" && lifecycle === "scheduled";
+  if (filter === "completed") return lifecycle === "completed" || lifecycle === "cancelled";
+  return job.status === "active" && lifecycle !== "scheduled";
+}
 
 export default function MyJobsScreen() {
   const colors = useColors();
-  const [activeTab, setActiveTab] = useState<TabType>("active");
+  const [activeFilter, setActiveFilter] = useState<FilterKey>("active");
   const [refreshing, setRefreshing] = useState(false);
+  const requestsQuery = trpc.requests.list.useQuery(undefined, { refetchOnMount: true });
 
-  const requestsQuery = trpc.requests.list.useQuery(undefined, {
-    refetchOnMount: true,
-  });
-
-  const tabs: { key: TabType; label: string; icon: string }[] = [
-    { key: "active", label: "Aktif", icon: "bolt.fill" },
-    { key: "pending", label: "Teklifler", icon: "clock.fill" },
-    { key: "completed", label: "Tamamlanan", icon: "checkmark.circle.fill" },
-    { key: "cancelled", label: "İptal", icon: "xmark.circle.fill" },
-  ];
-
-  const allRequests = (requestsQuery.data as any[]) || [];
-  const filteredJobs = allRequests.filter((job) => job.status === activeTab);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await requestsQuery.refetch();
-    setRefreshing(false);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active": return colors.primary;
-      case "pending": return "#F59E0B";
-      case "completed": return "#10B981";
-      case "cancelled": return "#EF4444";
-      default: return colors.muted;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "active": return "Aktif";
-      case "pending": return "Bekleyen";
-      case "completed": return "Tamamlandı";
-      case "cancelled": return "İptal";
-      default: return status;
-    }
-  };
-
-  const renderJob = ({ item }: { item: any }) => (
-    <Pressable
-      onPress={() => router.push(`/job/${item.id}` as any)}
-      style={({ pressed }) => [
-        {
-          backgroundColor: colors.card,
-          borderRadius: 16,
-          padding: 16,
-          borderWidth: 0.5,
-          borderColor: colors.border,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground, flex: 1 }} numberOfLines={1}>
-          {item.title || "Hizmet Talebi"}
-        </Text>
-        <View
-          style={{
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: 8,
-            backgroundColor: getStatusColor(item.status) + "15",
-          }}
-        >
-          <Text style={{ fontSize: 11, fontWeight: "700", color: getStatusColor(item.status) }}>
-            {getStatusLabel(item.status)}
-          </Text>
-        </View>
-      </View>
-      {item.description && (
-        <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }} numberOfLines={2}>
-          {item.description}
-        </Text>
-      )}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <IconSymbol name="location.fill" size={12} color={colors.muted} />
-          <Text style={{ fontSize: 12, color: colors.muted, marginLeft: 4 }} numberOfLines={1}>
-            {item.address || "Konum belirtilmedi"}
-          </Text>
-        </View>
-        {item.budgetMax && (
-          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
-            ₺{item.budgetMin || 0} - ₺{item.budgetMax}
-          </Text>
-        )}
-      </View>
-    </Pressable>
+  const jobs = useMemo(() => requestsQuery.data ?? [], [requestsQuery.data]);
+  const counts = useMemo(
+    () =>
+      Object.fromEntries(
+        FILTERS.map((filter) => [
+          filter.key,
+          jobs.filter((job) => matchesFilter(job, filter.key)).length,
+        ]),
+      ) as Record<FilterKey, number>,
+    [jobs],
+  );
+  const filteredJobs = useMemo(
+    () => jobs.filter((job) => matchesFilter(job, activeFilter)),
+    [activeFilter, jobs],
   );
 
-  return (
-    <ScreenContainer className="px-5 pt-6">
-      {/* Title */}
-      <Text style={{ fontSize: 28, fontWeight: "800", color: colors.foreground, marginBottom: 20 }}>
-        İşlerim
-      </Text>
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await requestsQuery.refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-      {/* Tab Pills */}
-      <View style={{ flexDirection: "row", marginBottom: 20, gap: 8 }}>
-        {tabs.map((tab) => (
-          <Pressable
-            key={tab.key}
-            onPress={() => setActiveTab(tab.key)}
-            style={({ pressed }) => [
-              {
-                flexDirection: "row",
-                alignItems: "center",
-                paddingHorizontal: 14,
-                paddingVertical: 9,
-                borderRadius: 16,
-                backgroundColor: activeTab === tab.key ? colors.primary : colors.card,
-                borderWidth: 0.5,
-                borderColor: activeTab === tab.key ? colors.primary : colors.border,
-                opacity: pressed ? 0.85 : 1,
-                shadowColor: activeTab === tab.key ? colors.primary : "transparent",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.15,
-                shadowRadius: 8,
-                elevation: activeTab === tab.key ? 2 : 0,
-              },
-            ]}
-          >
-            <IconSymbol
-              name={tab.icon as any}
-              size={13}
-              color={activeTab === tab.key ? "#FFF" : colors.muted}
-            />
-            <Text
-              style={{
-                color: activeTab === tab.key ? "#FFFFFF" : colors.muted,
-                fontWeight: "700",
-                fontSize: 13,
-                marginLeft: 5,
-              }}
-            >
-              {tab.label}
+  const openJob = (job: (typeof jobs)[number]) => {
+    if (job.status === "active") {
+      router.push(`/tracking/live?requestId=${job.id}` as never);
+      return;
+    }
+    router.push(`/job/${job.id}` as never);
+  };
+
+  const renderJob = ({ item: job }: { item: (typeof jobs)[number] }) => {
+    const lifecycle = getLifecycle(job);
+    const status = STATUS_META[lifecycle];
+    const acceptedPrice = formatMoney(job.acceptedPrice);
+    const budget =
+      job.budgetMin != null && job.budgetMax != null
+        ? `${formatMoney(job.budgetMin)} – ${formatMoney(job.budgetMax)}`
+        : null;
+    const actionLabel =
+      job.status === "pending"
+        ? "Teklifleri Gör"
+        : job.status === "active"
+          ? "İşi Takip Et"
+          : "Detayı Gör";
+
+    return (
+      <Pressable
+        onPress={() => openJob(job)}
+        style={({ pressed }) => [
+          styles.card,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            opacity: pressed ? 0.78 : 1,
+          },
+        ]}
+      >
+        <View style={styles.cardTopRow}>
+          <View style={[styles.serviceIcon, { backgroundColor: `${colors.primary}18` }]}>
+            <IconSymbol name="wrench.and.screwdriver.fill" size={22} color={colors.primary} />
+          </View>
+          <View style={styles.cardHeading}>
+            <Text style={[styles.category, { color: colors.primary }]}>
+              {job.categoryName ?? "Hizmet"}
             </Text>
-          </Pressable>
-        ))}
+            <Text style={[styles.jobTitle, { color: colors.foreground }]} numberOfLines={2}>
+              {job.title}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: status.background }]}>
+            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+          </View>
+        </View>
+
+        {job.providerName ? (
+          <View style={[styles.providerRow, { borderColor: colors.border }]}>
+            <View style={[styles.avatar, { backgroundColor: `${colors.primary}1F` }]}>
+              <IconSymbol name="person.fill" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.providerCopy}>
+              <Text style={[styles.metaLabel, { color: colors.muted }]}>Profesyonel</Text>
+              <Text style={[styles.providerName, { color: colors.foreground }]} numberOfLines={1}>
+                {job.providerName}
+              </Text>
+            </View>
+            {job.etaMinutes != null ? (
+              <View style={styles.etaRow}>
+                <IconSymbol name="clock.fill" size={14} color={colors.muted} />
+                <Text style={[styles.etaText, { color: colors.muted }]}>{job.etaMinutes} dk</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={styles.metaGrid}>
+          <View style={styles.metaItem}>
+            <IconSymbol name="calendar" size={16} color={colors.muted} />
+            <Text style={[styles.metaValue, { color: colors.muted }]}>
+              {new Date(job.createdAt).toLocaleDateString("tr-TR")}
+            </Text>
+          </View>
+          {job.address ? (
+            <View style={styles.metaItem}>
+              <IconSymbol name="location.fill" size={16} color={colors.muted} />
+              <Text style={[styles.metaValue, { color: colors.muted }]} numberOfLines={1}>
+                {job.address}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={[styles.cardBottom, { borderTopColor: colors.border }]}>
+          <View style={styles.priceCopy}>
+            <Text style={[styles.metaLabel, { color: colors.muted }]}>
+              {acceptedPrice ? "Kabul Edilen Teklif" : "Bütçe"}
+            </Text>
+            <Text style={[styles.price, { color: colors.foreground }]}>
+              {acceptedPrice ?? budget ?? "Teklif bekleniyor"}
+            </Text>
+          </View>
+          <View style={styles.actionRow}>
+            {job.providerUserId ? (
+              <Pressable
+                accessibilityLabel={`${job.providerName ?? "Profesyonel"} ile mesajlaş`}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  router.push(
+                    `/chat/${job.id}?otherUserId=${job.providerUserId}` as never,
+                  );
+                }}
+                style={({ pressed }) => [
+                  styles.messageButton,
+                  { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <IconSymbol name="message.fill" size={17} color={colors.foreground} />
+              </Pressable>
+            ) : null}
+            <View style={[styles.primaryAction, { backgroundColor: colors.primary }]}>
+              <Text style={styles.primaryActionText}>{actionLabel}</Text>
+              <IconSymbol name="chevron.right" size={15} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
+  return (
+    <ScreenContainer>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.foreground }]}>İşlerim</Text>
+        <Text style={[styles.subtitle, { color: colors.muted }]}>Tüm hizmetlerini tek yerden takip et</Text>
       </View>
 
-      {/* Loading State */}
-      {requestsQuery.isLoading && (
-        <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 60 }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ fontSize: 14, color: colors.muted, marginTop: 12 }}>Yükleniyor...</Text>
-        </View>
-      )}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filtersContent}
+        style={styles.filters}
+      >
+        {FILTERS.map((filter) => {
+          const selected = activeFilter === filter.key;
+          return (
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              key={filter.key}
+              onPress={() => setActiveFilter(filter.key)}
+              style={({ pressed }) => [
+                styles.filter,
+                {
+                  backgroundColor: selected ? colors.primary : colors.card,
+                  borderColor: selected ? colors.primary : colors.border,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.filterText, { color: selected ? "#FFFFFF" : colors.muted }]}>
+                {filter.label}
+              </Text>
+              <View
+                style={[
+                  styles.filterCount,
+                  { backgroundColor: selected ? "#FFFFFF24" : colors.background },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterCountText,
+                    { color: selected ? "#FFFFFF" : colors.foreground },
+                  ]}
+                >
+                  {counts[filter.key]}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
-      {/* Error State */}
-      {requestsQuery.isError && (
-        <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 60 }}>
-          <View
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 22,
-              backgroundColor: colors.error + "10",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 16,
-            }}
-          >
-            <IconSymbol name="wifi.exclamationmark" size={30} color={colors.error} />
-          </View>
-          <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
-            Bir şeyler ters gitti
-          </Text>
-          <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center", marginBottom: 16 }}>
-            İşlemler yüklenemedi. Lütfen tekrar deneyin.
+      {requestsQuery.isLoading ? (
+        <View style={styles.centerState}>
+          <ActivityIndicator color={colors.primary} size="large" />
+          <Text style={[styles.stateDescription, { color: colors.muted }]}>İşlerin yükleniyor...</Text>
+        </View>
+      ) : requestsQuery.error ? (
+        <View style={styles.centerState}>
+          <IconSymbol name="wifi.exclamationmark" size={42} color={colors.error} />
+          <Text style={[styles.stateTitle, { color: colors.foreground }]}>İşlerin alınamadı</Text>
+          <Text style={[styles.stateDescription, { color: colors.muted }]}>
+            {requestsQuery.error.message}
           </Text>
           <Pressable
             onPress={() => requestsQuery.refetch()}
             style={({ pressed }) => [
-              {
-                paddingHorizontal: 20,
-                paddingVertical: 10,
-                borderRadius: 12,
-                backgroundColor: colors.primary,
-                opacity: pressed ? 0.85 : 1,
-              },
+              styles.retryButton,
+              { backgroundColor: colors.primary, opacity: pressed ? 0.76 : 1 },
             ]}
           >
-            <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 14 }}>Tekrar Dene</Text>
+            <Text style={styles.retryText}>Tekrar Dene</Text>
           </Pressable>
         </View>
-      )}
-
-      {/* Job List */}
-      {requestsQuery.isSuccess && (
+      ) : (
         <FlatList
           data={filteredJobs}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
           renderItem={renderJob}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />
           }
           ListEmptyComponent={
-            <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 60 }}>
+            <View style={styles.emptyState}>
               <View
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 22,
-                  backgroundColor: colors.card,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 16,
-                  borderWidth: 0.5,
-                  borderColor: colors.border,
-                }}
-              >
-                <IconSymbol name="briefcase.fill" size={30} color={colors.muted} />
-              </View>
-              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 6 }}>
-                {activeTab === "active" && "Aktif işiniz yok"}
-                {activeTab === "pending" && "Bekleyen teklif yok"}
-                {activeTab === "completed" && "Tamamlanan iş yok"}
-                {activeTab === "cancelled" && "İptal edilen iş yok"}
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.muted, textAlign: "center", marginBottom: 16 }}>
-                Yeni bir hizmet talebi oluşturarak başlayın
-              </Text>
-              <Pressable
-                onPress={() => router.push("/create-service" as any)}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingHorizontal: 20,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    backgroundColor: colors.primary,
-                    opacity: pressed ? 0.85 : 1,
-                  },
+                style={[
+                  styles.emptyIcon,
+                  { backgroundColor: colors.card, borderColor: colors.border },
                 ]}
               >
-                <IconSymbol name="plus" size={16} color="#FFF" />
-                <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 14, marginLeft: 6 }}>
-                  Hizmet Talebi Oluştur
-                </Text>
-              </Pressable>
+                <IconSymbol name="briefcase.fill" size={32} color={colors.muted} />
+              </View>
+              <Text style={[styles.stateTitle, { color: colors.foreground }]}>Bu bölümde iş yok</Text>
+              <Text style={[styles.stateDescription, { color: colors.muted }]}>
+                Durumu değişen hizmetlerin burada otomatik olarak görünür.
+              </Text>
+              {activeFilter === "offers" ? (
+                <Pressable
+                  onPress={() => router.push("/create-service" as never)}
+                  style={({ pressed }) => [
+                    styles.retryButton,
+                    { backgroundColor: colors.primary, opacity: pressed ? 0.76 : 1 },
+                  ]}
+                >
+                  <Text style={styles.retryText}>Yeni Talep Oluştur</Text>
+                </Pressable>
+              ) : null}
             </View>
           }
         />
@@ -266,3 +346,126 @@ export default function MyJobsScreen() {
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: "800", letterSpacing: -0.5 },
+  subtitle: { fontSize: 14, lineHeight: 20, marginTop: 3 },
+  filters: { flexGrow: 0 },
+  filtersContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
+  filter: {
+    minHeight: 40,
+    paddingHorizontal: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  filterText: { fontSize: 13, lineHeight: 18, fontWeight: "700" },
+  filterCount: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterCountText: { fontSize: 11, lineHeight: 15, fontWeight: "800" },
+  centerState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 30 },
+  emptyState: { alignItems: "center", paddingTop: 50, paddingHorizontal: 26 },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  stateTitle: { fontSize: 18, lineHeight: 24, fontWeight: "800", textAlign: "center", marginTop: 12 },
+  stateDescription: { fontSize: 14, lineHeight: 20, textAlign: "center", marginTop: 7 },
+  retryButton: {
+    minHeight: 44,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 18,
+  },
+  retryText: { color: "#FFFFFF", fontSize: 14, lineHeight: 19, fontWeight: "800" },
+  listContent: { paddingHorizontal: 16, paddingBottom: 112 },
+  card: { borderWidth: 1, borderRadius: 20, padding: 15, marginBottom: 12 },
+  cardTopRow: { flexDirection: "row", alignItems: "flex-start" },
+  serviceIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 11,
+  },
+  cardHeading: { flex: 1, minWidth: 0, paddingRight: 8 },
+  category: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.35,
+  },
+  jobTitle: { fontSize: 17, lineHeight: 22, fontWeight: "800", marginTop: 2 },
+  statusBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9 },
+  statusText: { fontSize: 10, lineHeight: 14, fontWeight: "800" },
+  providerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderTopWidth: 1,
+    marginTop: 14,
+    paddingTop: 13,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  providerCopy: { flex: 1, minWidth: 0 },
+  providerName: { fontSize: 14, lineHeight: 19, fontWeight: "700", marginTop: 1 },
+  etaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  etaText: { fontSize: 12, lineHeight: 17, fontWeight: "600" },
+  metaGrid: { marginTop: 12, gap: 7 },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 7 },
+  metaValue: { flex: 1, minWidth: 0, fontSize: 12, lineHeight: 17 },
+  cardBottom: {
+    borderTopWidth: 1,
+    marginTop: 13,
+    paddingTop: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  priceCopy: { flexShrink: 1 },
+  metaLabel: { fontSize: 10, lineHeight: 14, fontWeight: "600" },
+  price: { fontSize: 15, lineHeight: 20, fontWeight: "800", marginTop: 2 },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  messageButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryAction: {
+    minHeight: 38,
+    paddingHorizontal: 11,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  primaryActionText: { color: "#FFFFFF", fontSize: 11, lineHeight: 15, fontWeight: "800" },
+});

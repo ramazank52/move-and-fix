@@ -147,8 +147,8 @@
 - [x] Teklifler — gerçek teklif kartları, karşılaştırma, kabul/reddet sahiplik kontrolü ve durum yönetimi
 - [x] Ödeme — gerçek hizmet/profesyonel özeti, ücret/toplam, MoveWallet durumu, Stripe/iyzico ve fail-closed güvenlik akışı
 - [x] Aktif İş / Canlı Takip — gerçek durum, native harita/web fallback, rota/ETA, mesaj, provider-only konum paylaşımı ve sıralı lifecycle
-- [ ] İşlerim — sekmeler: Aktif, Teklifler, Planlanan, Tamamlanan + empty/loading/error states
-- [ ] Mesajlar — conversation list, chat screen, timestamp, okunma durumu, online/müsaitlik
+- [x] İşlerim — gerçek lifecycle sekmeleri: Aktif, Teklifler, Planlanan, Tamamlanan + empty/loading/error states
+- [x] Mesajlar — gerçek conversation list, chat screen, katılımcı/rol, timestamp, unread/okundu durumu ve son mesaj
 - [ ] MoveWallet — bakiye, para ekle, gönder, işlem geçmişi, ödeme, iade
 - [ ] Profil — profil bilgileri, adresler, ödeme yöntemleri, MoveWallet, favoriler, ayarlar, güvenlik, bildirimler, çıkış
 
@@ -221,3 +221,13 @@
 - [x] Eksik credential, kullanıcı iptali ve SDK/gateway hatalarını dürüst BLOCKER durumlarıyla göster
 - [x] TypeScript, lint, build ve tüm testleri çalıştır; hata ve skipped test bırakma
 - [ ] Final production status raporunu doğrulanmış sonuçlarla hazırla
+
+## Phase 29: Mesaj Güvenliği ve Kalan Referans Ekranlar
+- [x] Mesaj gönderme, konuşma okuma, katılımcı bilgisi ve okundu işlemlerini requestId üzerinden gerçek müşteri–atanmış profesyonel çiftiyle sınırla
+- [x] Mesajlaşma IDOR regresyon testlerini ekle ve anonim/üçüncü taraf/geçerli taraf senaryolarını doğrula
+- [ ] 09 İşlerim + 10 Mesajlar + mesaj güvenliği değişikliklerini TypeScript, lint ve test sonrası checkpoint’e al
+- [ ] 11 MoveWallet ekranını 11_movewallet.png referansına göre gerçek API verileriyle uygula ve render doğrula
+- [ ] 12 Profil ekranını 12_profil.png referansına göre uygula ve render doğrula
+- [ ] 13 Profesyonel Dashboard ekranını 13_profesyonel_dashboard.png referansına göre uygula ve render doğrula
+- [ ] 14 Yeni İş Fırsatları ekranını 14_yeni_is_firsatlari.png referansına göre uygula ve render doğrula
+- [ ] Final TypeScript, lint, build, test, mobil export ve production durum raporunu tamamla

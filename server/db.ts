@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -173,7 +173,92 @@ export async function createServiceRequest(data: {
 export async function getUserServiceRequests(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(serviceRequests).where(eq(serviceRequests.userId, userId));
+  const requestRows = await db
+    .select()
+    .from(serviceRequests)
+    .where(eq(serviceRequests.userId, userId))
+    .orderBy(desc(serviceRequests.updatedAt), desc(serviceRequests.id));
+
+  if (requestRows.length === 0) return [];
+
+  const categoryIds = [...new Set(requestRows.map((row) => row.categoryId))];
+  const providerIds = [
+    ...new Set(
+      requestRows
+        .map((row) => row.assignedProviderId)
+        .filter((id): id is number => id != null),
+    ),
+  ];
+  const requestIds = requestRows.map((row) => row.id);
+
+  const [categoryRows, providerRows, acceptedOfferRows, trackingRows] = await Promise.all([
+    db
+      .select({ id: serviceCategories.id, name: serviceCategories.name })
+      .from(serviceCategories)
+      .where(inArray(serviceCategories.id, categoryIds)),
+    providerIds.length
+      ? db
+          .select({
+            id: providers.id,
+            userId: providers.userId,
+            displayName: providers.displayName,
+          })
+          .from(providers)
+          .where(inArray(providers.id, providerIds))
+      : Promise.resolve([]),
+    db
+      .select({
+        requestId: offers.requestId,
+        price: offers.price,
+        estimatedTime: offers.estimatedTime,
+      })
+      .from(offers)
+      .where(and(inArray(offers.requestId, requestIds), eq(offers.status, "accepted"))),
+    db
+      .select({
+        requestId: jobTracking.requestId,
+        lifecycleStatus: jobTracking.lifecycleStatus,
+        etaMinutes: jobTracking.etaMinutes,
+      })
+      .from(jobTracking)
+      .where(inArray(jobTracking.requestId, requestIds)),
+  ]);
+
+  const categoryById = new Map(categoryRows.map((row) => [row.id, row.name]));
+  const providerById = new Map(providerRows.map((row) => [row.id, row]));
+  const offerByRequestId = new Map(
+    acceptedOfferRows.map((row) => [row.requestId, row]),
+  );
+  const trackingByRequestId = new Map(
+    trackingRows.map((row) => [row.requestId, row]),
+  );
+
+  return requestRows.map((request) => {
+    const acceptedOffer = offerByRequestId.get(request.id);
+    const tracking = trackingByRequestId.get(request.id);
+    return {
+      ...request,
+      categoryName: categoryById.get(request.categoryId) ?? null,
+      providerName: request.assignedProviderId
+        ? providerById.get(request.assignedProviderId)?.displayName ?? null
+        : null,
+      providerUserId: request.assignedProviderId
+        ? providerById.get(request.assignedProviderId)?.userId ?? null
+        : null,
+      acceptedPrice: acceptedOffer?.price ?? null,
+      estimatedTime: acceptedOffer?.estimatedTime ?? null,
+      lifecycleStatus:
+        tracking?.lifecycleStatus ??
+        (request.status === "completed"
+          ? "completed"
+          : request.status === "cancelled"
+            ? "cancelled"
+            : request.status === "active"
+              ? "scheduled"
+              : null),
+      etaMinutes: tracking?.etaMinutes ?? null,
+    };
+  });
 }
 
 export async function getServiceRequestById(id: number) {
@@ -246,28 +331,241 @@ export async function getProviderOfferForRequest(requestId: number, providerId: 
 }
 
 // Messages
+export async function assertMessageParticipant(
+  database: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  requestId: number,
+  userId: number,
+  otherUserId?: number,
+): Promise<void> {
+  const rows = await database
+    .select({
+      customerUserId: serviceRequests.userId,
+      providerUserId: providers.userId,
+    })
+    .from(serviceRequests)
+    .leftJoin(providers, eq(serviceRequests.assignedProviderId, providers.id))
+    .where(eq(serviceRequests.id, requestId))
+    .limit(1);
+  const participants = rows[0];
+
+  if (!participants) throw new Error("MESSAGE_REQUEST_NOT_FOUND");
+  if (participants.providerUserId == null) throw new Error("MESSAGE_REQUEST_NOT_ASSIGNED");
+
+  const participantUserIds = new Set([
+    participants.customerUserId,
+    participants.providerUserId,
+  ]);
+  if (!participantUserIds.has(userId)) throw new Error("MESSAGE_FORBIDDEN");
+  if (
+    otherUserId != null &&
+    (!participantUserIds.has(otherUserId) || otherUserId === userId)
+  ) {
+    throw new Error("MESSAGE_COUNTERPARTY_FORBIDDEN");
+  }
+}
+
 export async function sendMessage(data: {
   senderId: number;
   receiverId: number;
-  requestId?: number;
+  requestId: number;
   content: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  await assertMessageParticipant(db, data.requestId, data.senderId, data.receiverId);
   const result = await db.insert(messages).values(data);
   return result[0].insertId;
 }
 
-export async function getConversation(userId1: number, userId2: number) {
+export async function getConversation(requestId: number, userId1: number, userId2: number) {
   const db = await getDb();
   if (!db) return [];
+  await assertMessageParticipant(db, requestId, userId1, userId2);
   const { or, and } = await import("drizzle-orm");
-  return db.select().from(messages).where(
-    or(
-      and(eq(messages.senderId, userId1), eq(messages.receiverId, userId2)),
-      and(eq(messages.senderId, userId2), eq(messages.receiverId, userId1))
-    )!
-  );
+  return db
+    .select()
+    .from(messages)
+    .where(
+      and(
+        eq(messages.requestId, requestId),
+        or(
+          and(eq(messages.senderId, userId1), eq(messages.receiverId, userId2)),
+          and(eq(messages.senderId, userId2), eq(messages.receiverId, userId1)),
+        )!,
+      ),
+    )
+    .orderBy(messages.createdAt, messages.id);
+}
+
+export async function getMessageConversations(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const { or } = await import("drizzle-orm");
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(or(eq(messages.senderId, userId), eq(messages.receiverId, userId))!)
+    .orderBy(desc(messages.createdAt), desc(messages.id));
+
+  const requestIds = [
+    ...new Set(
+      rows
+        .map((row) => row.requestId)
+        .filter((requestId): requestId is number => requestId != null),
+    ),
+  ];
+  if (requestIds.length === 0) return [];
+
+  const requestRows = await db
+    .select({
+      id: serviceRequests.id,
+      title: serviceRequests.title,
+      customerUserId: serviceRequests.userId,
+      providerUserId: providers.userId,
+    })
+    .from(serviceRequests)
+    .leftJoin(providers, eq(serviceRequests.assignedProviderId, providers.id))
+    .where(inArray(serviceRequests.id, requestIds));
+  const requestById = new Map(requestRows.map((row) => [row.id, row]));
+
+  type MessageRow = (typeof rows)[number];
+  const grouped = new Map<
+    string,
+    { otherUserId: number; lastMessage: MessageRow; unreadCount: number }
+  >();
+
+  for (const row of rows) {
+    if (row.requestId == null) continue;
+    const request = requestById.get(row.requestId);
+    if (!request || request.providerUserId == null) continue;
+
+    const otherUserId = row.senderId === userId ? row.receiverId : row.senderId;
+    const isValidPair =
+      (request.customerUserId === userId && request.providerUserId === otherUserId) ||
+      (request.providerUserId === userId && request.customerUserId === otherUserId);
+    if (!isValidPair) continue;
+
+    const conversationKey = `${row.requestId}:${otherUserId}`;
+    const existing = grouped.get(conversationKey);
+    const unreadIncrement = row.receiverId === userId && row.isRead !== 1 ? 1 : 0;
+    if (existing) {
+      existing.unreadCount += unreadIncrement;
+    } else {
+      grouped.set(conversationKey, {
+        otherUserId,
+        lastMessage: row,
+        unreadCount: unreadIncrement,
+      });
+    }
+  }
+
+  const otherUserIds = [...new Set([...grouped.values()].map((state) => state.otherUserId))];
+  if (otherUserIds.length === 0) return [];
+
+  const [participantRows, providerRows] = await Promise.all([
+    db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(inArray(users.id, otherUserIds)),
+    db
+      .select({
+        userId: providers.userId,
+        displayName: providers.displayName,
+        isVerified: providers.isVerified,
+        rating: providers.rating,
+      })
+      .from(providers)
+      .where(inArray(providers.userId, otherUserIds)),
+  ]);
+
+  const participantById = new Map(participantRows.map((row) => [row.id, row]));
+  const providerByUserId = new Map(providerRows.map((row) => [row.userId, row]));
+
+  return [...grouped.values()].map((state) => {
+    const { otherUserId } = state;
+    const participant = participantById.get(otherUserId);
+    const provider = providerByUserId.get(otherUserId);
+    const request = state.lastMessage.requestId
+      ? requestById.get(state.lastMessage.requestId)
+      : undefined;
+
+    return {
+      otherUserId,
+      displayName:
+        provider?.displayName ?? participant?.name ?? `Kullanıcı #${otherUserId}`,
+      email: participant?.email ?? null,
+      isProvider: provider != null,
+      isVerified: provider?.isVerified === 1,
+      rating: provider?.rating ?? null,
+      requestId: state.lastMessage.requestId ?? null,
+      requestTitle: request?.title ?? null,
+      lastMessage: state.lastMessage.content,
+      lastMessageAt: state.lastMessage.createdAt,
+      unreadCount: state.unreadCount,
+    };
+  });
+}
+
+export async function getMessageParticipant(
+  requestId: number,
+  userId: number,
+  otherUserId: number,
+) {
+  const db = await getDb();
+  if (!db) return null;
+  await assertMessageParticipant(db, requestId, userId, otherUserId);
+
+  const participantRows = await db
+    .select({ id: users.id, name: users.name, email: users.email })
+    .from(users)
+    .where(eq(users.id, otherUserId))
+    .limit(1);
+  const participant = participantRows[0];
+  if (!participant) return null;
+
+  const providerRows = await db
+    .select({
+      displayName: providers.displayName,
+      isVerified: providers.isVerified,
+      rating: providers.rating,
+    })
+    .from(providers)
+    .where(eq(providers.userId, otherUserId))
+    .limit(1);
+  const provider = providerRows[0];
+
+  return {
+    id: participant.id,
+    displayName: provider?.displayName ?? participant.name ?? `Kullanıcı #${participant.id}`,
+    email: participant.email,
+    isProvider: provider != null,
+    isVerified: provider?.isVerified === 1,
+    rating: provider?.rating ?? null,
+  };
+}
+
+export async function markConversationRead(
+  requestId: number,
+  userId: number,
+  otherUserId: number,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await assertMessageParticipant(db, requestId, userId, otherUserId);
+
+  await db
+    .update(messages)
+    .set({ isRead: 1 })
+    .where(
+      and(
+        eq(messages.requestId, requestId),
+        eq(messages.receiverId, userId),
+        eq(messages.senderId, otherUserId),
+        eq(messages.isRead, 0),
+      ),
+    );
+  return { success: true } as const;
 }
 
 // Providers

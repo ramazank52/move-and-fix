@@ -285,7 +285,22 @@ export default function ProviderDetailScreen() {
 
       <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", padding: 16, paddingBottom: 30, backgroundColor: colors.background, borderTopWidth: 0.5, borderTopColor: colors.border, gap: 12 }}>
         <Pressable
-          onPress={() => router.push(`/chat/${provider.providerUserId}?otherUserId=${provider.providerUserId}` as never)}
+          onPress={() =>
+            Alert.alert(
+              "Mesajlaşma hizmete özeldir",
+              "Güvenli mesajlaşma, profesyonel bir hizmet talebinize atandıktan sonra açılır.",
+              [
+                { text: "Vazgeç", style: "cancel" },
+                {
+                  text: "Talep Oluştur",
+                  onPress: () =>
+                    router.push(
+                      `/create-service?providerId=${provider.id}&categoryId=${provider.categoryId ?? ""}` as never,
+                    ),
+                },
+              ],
+            )
+          }
           style={({ pressed }) => ({ flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.primary, alignItems: "center", opacity: pressed ? 0.8 : 1 })}
         >
           <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 15 }}>Mesaj Gönder</Text>
