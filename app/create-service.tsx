@@ -11,10 +11,119 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
+import { File } from "expo-file-system";
 import { ScreenContainer } from "@/components/screen-container";
+import { RequestRouteMap } from "@/components/request-route-map";
+import type { RequestRouteCoordinate } from "@/components/request-route-map.types";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
+
+type ServiceType =
+  | "generic"
+  | "painting"
+  | "electrical"
+  | "plumbing"
+  | "cleaning"
+  | "moving"
+  | "courier"
+  | "tow_truck"
+  | "roadside";
+
+type RequestAttributeValue = string | number | boolean | null;
+
+type AllowedRequestMediaMime =
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/heic"
+  | "image/heif"
+  | "video/mp4"
+  | "video/quicktime";
+
+type PendingMedia = {
+  id: string;
+  uri: string;
+  originalName: string;
+  mimeType?: AllowedRequestMediaMime;
+  kind: "image" | "video";
+  sizeBytes?: number;
+};
+
+const SERVICE_TYPE_BY_SLUG: Record<string, ServiceType> = {
+  painting: "painting",
+  electrical: "electrical",
+  plumbing: "plumbing",
+  cleaning: "cleaning",
+  moving: "moving",
+  courier: "courier",
+  towing: "tow_truck",
+  tow_truck: "tow_truck",
+  roadside: "roadside",
+};
+
+const ROUTE_SERVICE_TYPES = new Set<ServiceType>(["moving", "courier", "tow_truck"]);
+const REQUEST_MEDIA_LIMIT = 8;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+
+const MIME_BY_EXTENSION: Record<string, AllowedRequestMediaMime> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+};
+
+function isAllowedRequestMediaMime(value: string): value is AllowedRequestMediaMime {
+  return Object.values(MIME_BY_EXTENSION).includes(value as AllowedRequestMediaMime);
+}
+
+function resolveMediaMime(asset: ImagePicker.ImagePickerAsset): AllowedRequestMediaMime | undefined {
+  if (asset.mimeType && isAllowedRequestMediaMime(asset.mimeType)) return asset.mimeType;
+  const extension = (asset.fileName ?? asset.uri).split("?")[0]?.split(".").pop()?.toLowerCase();
+  return extension ? MIME_BY_EXTENSION[extension] : undefined;
+}
+
+function parseOptionalInteger(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function calculateStraightLineDistanceKm(
+  pickup: RequestRouteCoordinate,
+  destination: RequestRouteCoordinate,
+): number {
+  const earthRadiusKm = 6371;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const latitudeDelta = toRadians(destination.latitude - pickup.latitude);
+  const longitudeDelta = toRadians(destination.longitude - pickup.longitude);
+  const pickupLatitude = toRadians(pickup.latitude);
+  const destinationLatitude = toRadians(destination.latitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(pickupLatitude) * Math.cos(destinationLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+async function readUriAsBase64(uri: string): Promise<string> {
+  if (Platform.OS !== "web") return new File(uri).base64();
+  const response = await fetch(uri);
+  if (!response.ok) throw new Error("Seçilen medya okunamadı");
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return globalThis.btoa(binary);
+}
 
 const STEPS = ["Hizmet", "Detay", "Zaman", "Konum", "Onay"] as const;
 const URGENCY_OPTIONS = [
@@ -62,11 +171,38 @@ export default function CreateServiceScreen() {
   const [address, setAddress] = useState("");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState<number | undefined>();
+  const [latitude, setLatitude] = useState<string | undefined>();
+  const [longitude, setLongitude] = useState<string | undefined>();
+  const [isLocating, setIsLocating] = useState(false);
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [destinationAddress, setDestinationAddress] = useState("");
+  const [pickupFloor, setPickupFloor] = useState("");
+  const [destinationFloor, setDestinationFloor] = useState("");
+  const [pickupHasElevator, setPickupHasElevator] = useState(false);
+  const [destinationHasElevator, setDestinationHasElevator] = useState(false);
+  const [distanceKm, setDistanceKm] = useState("");
+  const [pickupCoordinate, setPickupCoordinate] = useState<RequestRouteCoordinate | null>(null);
+  const [destinationCoordinate, setDestinationCoordinate] = useState<RequestRouteCoordinate | null>(null);
+  const [isResolvingRoute, setIsResolvingRoute] = useState(false);
+  const [attributes, setAttributes] = useState<Record<string, RequestAttributeValue>>({});
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const categoriesQuery = trpc.categories.list.useQuery();
   const categories = useMemo<NonNullable<typeof categoriesQuery.data>>(
     () => categoriesQuery.data ?? [],
     [categoriesQuery.data],
   );
+  const selectedCategory = categories.find((category) => category.id === categoryId);
+  const serviceType = selectedCategory ? (SERVICE_TYPE_BY_SLUG[selectedCategory.slug] ?? "generic") : "generic";
+  const subcategoriesQuery = trpc.categories.subcategories.useQuery(
+    { categoryId },
+    { enabled: categoryId > 0 },
+  );
+  const subcategories = subcategoriesQuery.data ?? [];
+
+  const updateAttribute = useCallback((key: string, value: RequestAttributeValue) => {
+    setAttributes((current) => ({ ...current, [key]: value }));
+  }, []);
 
   useEffect(() => {
     const routeCategory = params.categoryId?.trim();
@@ -77,19 +213,167 @@ export default function CreateServiceScreen() {
     if (match) setCategoryId(match.id);
   }, [categories, categoryId, params.categoryId]);
 
-  const createRequestMutation = trpc.requests.create.useMutation({
-    onSuccess: (data: any) => {
+  useEffect(() => {
+    setSubcategoryId(undefined);
+    setAttributes({});
+  }, [categoryId]);
+
+  const uploadMediaMutation = trpc.requests.uploadMedia.useMutation();
+
+  const handleUseCurrentLocation = useCallback(async () => {
+    setIsLocating(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== Location.PermissionStatus.GRANTED) {
+        Alert.alert("Konum İzni Gerekli", "Yakındaki profesyonellerle eşleşmek için konum izni vermelisiniz.");
+        return;
+      }
+      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const nextLatitude = current.coords.latitude.toFixed(7);
+      const nextLongitude = current.coords.longitude.toFixed(7);
+      setLatitude(nextLatitude);
+      setLongitude(nextLongitude);
+      if (ROUTE_SERVICE_TYPES.has(serviceType)) {
+        setPickupCoordinate({ latitude: current.coords.latitude, longitude: current.coords.longitude });
+      }
+
+      if (!address.trim()) {
+        try {
+          const places = await Location.reverseGeocodeAsync(current.coords);
+          const place = places[0];
+          const formatted = place
+            ? [place.street, place.streetNumber, place.district, place.city].filter(Boolean).join(", ")
+            : "";
+          if (formatted) {
+            if (ROUTE_SERVICE_TYPES.has(serviceType) && !pickupAddress.trim()) setPickupAddress(formatted);
+            else if (!address.trim()) setAddress(formatted);
+          }
+        } catch {
+          // Coordinates remain usable even if reverse geocoding is unavailable.
+        }
+      }
+    } catch (error) {
+      Alert.alert("Konum Alınamadı", error instanceof Error ? error.message : "Konum bilgisi okunamadı.");
+    } finally {
+      setIsLocating(false);
+    }
+  }, [address, pickupAddress, serviceType]);
+
+  const handleResolveRoute = useCallback(async () => {
+    if (pickupAddress.trim().length < 3 || destinationAddress.trim().length < 3) {
+      Alert.alert("Adres Bilgisi Eksik", "Rota oluşturmak için başlangıç ve varış adreslerini girin.");
+      return;
+    }
+
+    setIsResolvingRoute(true);
+    try {
+      const [pickupResults, destinationResults] = await Promise.all([
+        Location.geocodeAsync(pickupAddress.trim()),
+        Location.geocodeAsync(destinationAddress.trim()),
+      ]);
+      const pickup = pickupResults[0];
+      const destination = destinationResults[0];
+      if (!pickup || !destination) {
+        throw new Error("Adreslerden en az biri haritada bulunamadı. İlçe ve şehir bilgilerini ekleyip tekrar deneyin.");
+      }
+
+      const nextPickup = { latitude: pickup.latitude, longitude: pickup.longitude };
+      const nextDestination = { latitude: destination.latitude, longitude: destination.longitude };
+      setPickupCoordinate(nextPickup);
+      setDestinationCoordinate(nextDestination);
+      setLatitude(pickup.latitude.toFixed(7));
+      setLongitude(pickup.longitude.toFixed(7));
+      setDistanceKm(String(Math.max(1, Math.round(calculateStraightLineDistanceKm(nextPickup, nextDestination)))));
+    } catch (error) {
       Alert.alert(
-        "Talep Oluşturuldu",
-        "Hizmet talebiniz başarıyla oluşturuldu. Ustalardan teklif geldiğinde size bildirim göndereceğiz.",
-        [{ text: "Tamam", onPress: () => router.replace("/(tabs)/my-jobs" as any) }]
+        "Rota Oluşturulamadı",
+        error instanceof Error ? error.message : "Adresler haritada çözümlenemedi.",
       );
+    } finally {
+      setIsResolvingRoute(false);
+    }
+  }, [destinationAddress, pickupAddress]);
+
+  const handlePickMedia = useCallback(async () => {
+    const remaining = REQUEST_MEDIA_LIMIT - pendingMedia.length;
+    if (remaining <= 0) {
+      Alert.alert("Medya Sınırı", `Bir talebe en fazla ${REQUEST_MEDIA_LIMIT} fotoğraf veya video eklenebilir.`);
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Galeri İzni Gerekli", "Fotoğraf veya video eklemek için galeri erişimine izin vermelisiniz.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.85,
+      videoMaxDuration: 60,
+    });
+    if (result.canceled) return;
+
+    const accepted: PendingMedia[] = [];
+    const rejected: string[] = [];
+    result.assets.slice(0, remaining).forEach((asset, index) => {
+      const mimeType = resolveMediaMime(asset);
+      const kind = asset.type === "video" ? "video" : "image";
+      const maxBytes = kind === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+      if (!mimeType || (asset.fileSize != null && asset.fileSize > maxBytes)) {
+        rejected.push(asset.fileName ?? `Dosya ${index + 1}`);
+        return;
+      }
+      accepted.push({
+        id: `${Date.now()}-${index}-${asset.assetId ?? "local"}`,
+        uri: asset.uri,
+        originalName: asset.fileName ?? `talep-medya-${Date.now()}-${index}.${kind === "video" ? "mp4" : "jpg"}`,
+        mimeType,
+        kind,
+        sizeBytes: asset.fileSize,
+      });
+    });
+    setPendingMedia((current) => [...current, ...accepted].slice(0, REQUEST_MEDIA_LIMIT));
+    if (rejected.length > 0) {
+      Alert.alert("Bazı Dosyalar Eklenmedi", "Desteklenmeyen türde veya izin verilen boyuttan büyük dosyalar seçildi.");
+    }
+  }, [pendingMedia.length]);
+
+  const createRequestMutation = trpc.requests.create.useMutation({
+    onSuccess: async (requestId) => {
+      let failedUploads = 0;
+      for (const media of pendingMedia) {
+        if (!media.mimeType) {
+          failedUploads += 1;
+          continue;
+        }
+        try {
+          const base64 = await readUriAsBase64(media.uri);
+          await uploadMediaMutation.mutateAsync({
+            requestId,
+            originalName: media.originalName,
+            mimeType: media.mimeType,
+            base64,
+          });
+        } catch {
+          failedUploads += 1;
+        }
+      }
+
+      const message = failedUploads > 0
+        ? `Hizmet talebiniz oluşturuldu; ${failedUploads} medya dosyası yüklenemedi. Talep detayından tekrar deneyebilirsiniz.`
+        : "Hizmet talebiniz başarıyla oluşturuldu. Ustalardan teklif geldiğinde size bildirim göndereceğiz.";
+      Alert.alert("Talep Oluşturuldu", message, [
+        { text: "Tamam", onPress: () => router.replace("/(tabs)/my-jobs" as never) },
+      ]);
     },
-    onError: (err: any) => {
+    onError: (error) => {
       Alert.alert(
         "Hata",
-        err.message || "Talep oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.",
-        [{ text: "Tamam" }]
+        error.message || "Talep oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.",
+        [{ text: "Tamam" }],
       );
     },
   });
@@ -99,20 +383,55 @@ export default function CreateServiceScreen() {
       case 0: return categoryId > 0;
       case 1: return title.trim().length >= 3;
       case 2: return urgency.length > 0;
-      case 3: return address.trim().length >= 5;
+      case 3:
+        return ROUTE_SERVICE_TYPES.has(serviceType)
+          ? pickupAddress.trim().length >= 3 && destinationAddress.trim().length >= 3
+          : address.trim().length >= 5;
       case 4: return true;
       default: return false;
     }
-  }, [step, categoryId, title, urgency, address]);
+  }, [step, categoryId, title, urgency, address, pickupAddress, destinationAddress, serviceType]);
 
   const handleSubmit = () => {
+    const normalizedAttributes = Object.fromEntries(
+      Object.entries({ ...attributes, urgency }).filter(([, value]) => value !== "" && value != null),
+    );
     createRequestMutation.mutate({
       categoryId,
       title: title.trim(),
       description: description.trim() || undefined,
-      address: address.trim() || undefined,
-      budgetMin: budgetMin ? parseInt(budgetMin, 10) : undefined,
-      budgetMax: budgetMax ? parseInt(budgetMax, 10) : undefined,
+      address: ROUTE_SERVICE_TYPES.has(serviceType)
+        ? pickupAddress.trim()
+        : address.trim() || undefined,
+      latitude,
+      longitude,
+      budgetMin: parseOptionalInteger(budgetMin),
+      budgetMax: parseOptionalInteger(budgetMax),
+      distanceKm: parseOptionalInteger(distanceKm),
+      details: {
+        subcategoryId,
+        serviceType,
+        pickupAddress: ROUTE_SERVICE_TYPES.has(serviceType) ? pickupAddress.trim() : undefined,
+        destinationAddress: ROUTE_SERVICE_TYPES.has(serviceType) ? destinationAddress.trim() : undefined,
+        pickupLatitude: ROUTE_SERVICE_TYPES.has(serviceType) && pickupCoordinate
+          ? pickupCoordinate.latitude.toFixed(7)
+          : undefined,
+        pickupLongitude: ROUTE_SERVICE_TYPES.has(serviceType) && pickupCoordinate
+          ? pickupCoordinate.longitude.toFixed(7)
+          : undefined,
+        destinationLatitude: ROUTE_SERVICE_TYPES.has(serviceType) && destinationCoordinate
+          ? destinationCoordinate.latitude.toFixed(7)
+          : undefined,
+        destinationLongitude: ROUTE_SERVICE_TYPES.has(serviceType) && destinationCoordinate
+          ? destinationCoordinate.longitude.toFixed(7)
+          : undefined,
+        pickupFloor: serviceType === "moving" ? parseOptionalInteger(pickupFloor) : undefined,
+        destinationFloor: serviceType === "moving" ? parseOptionalInteger(destinationFloor) : undefined,
+        pickupHasElevator: serviceType === "moving" ? pickupHasElevator : undefined,
+        destinationHasElevator: serviceType === "moving" ? destinationHasElevator : undefined,
+        distanceKm: parseOptionalInteger(distanceKm),
+        attributes: normalizedAttributes,
+      },
     });
   };
 
@@ -125,8 +444,6 @@ export default function CreateServiceScreen() {
     if (step > 0) setStep(step - 1);
     else router.back();
   };
-
-  const selectedCategory = categories.find((category) => category.id === categoryId);
 
   return (
     <ScreenContainer
@@ -316,6 +633,58 @@ export default function CreateServiceScreen() {
                 })}
               </View>
             )}
+
+            {categoryId > 0 ? (
+              <View style={{ marginTop: 18 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
+                  Alt kategori
+                </Text>
+                {subcategoriesQuery.isLoading ? (
+                  <ActivityIndicator color={colors.primary} style={{ alignSelf: "flex-start" }} />
+                ) : subcategoriesQuery.isError ? (
+                  <Pressable
+                    onPress={() => subcategoriesQuery.refetch()}
+                    style={({ pressed }) => ({
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: colors.error + "55",
+                      backgroundColor: colors.error + "10",
+                      padding: 12,
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    <Text style={{ color: colors.error, fontWeight: "700" }}>Alt kategoriler alınamadı — yeniden dene</Text>
+                  </Pressable>
+                ) : subcategories.length > 0 ? (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {subcategories.map((subcategory) => {
+                      const selected = subcategoryId === subcategory.id;
+                      return (
+                        <Pressable
+                          key={subcategory.id}
+                          onPress={() => setSubcategoryId(selected ? undefined : subcategory.id)}
+                          style={({ pressed }) => ({
+                            paddingHorizontal: 13,
+                            paddingVertical: 9,
+                            borderRadius: 999,
+                            borderWidth: 1,
+                            borderColor: selected ? colors.primary : colors.border,
+                            backgroundColor: selected ? colors.primary + "16" : colors.card,
+                            opacity: pressed ? 0.78 : 1,
+                          })}
+                        >
+                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>
+                            {subcategory.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text style={{ color: colors.muted, fontSize: 13 }}>Bu hizmet için alt kategori seçimi gerekmiyor.</Text>
+                )}
+              </View>
+            ) : null}
           </View>
         )}
 
@@ -368,6 +737,181 @@ export default function CreateServiceScreen() {
                   }}
                 />
               </View>
+
+              {serviceType === "painting" ? (
+                <View style={{ gap: 12 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Boya & Badana Detayları</Text>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Alan (m²)</Text>
+                      <TextInput
+                        value={attributes.areaSqm == null ? "" : String(attributes.areaSqm)}
+                        onChangeText={(value) => updateAttribute("areaSqm", parseOptionalInteger(value) ?? null)}
+                        placeholder="Örn: 90"
+                        placeholderTextColor={colors.muted}
+                        keyboardType="numeric"
+                        style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Oda Sayısı</Text>
+                      <TextInput
+                        value={attributes.roomCount == null ? "" : String(attributes.roomCount)}
+                        onChangeText={(value) => updateAttribute("roomCount", parseOptionalInteger(value) ?? null)}
+                        placeholder="Örn: 3"
+                        placeholderTextColor={colors.muted}
+                        keyboardType="numeric"
+                        style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
+                      />
+                    </View>
+                  </View>
+                  <Pressable
+                    onPress={() => updateAttribute("paintIncluded", attributes.paintIncluded !== true)}
+                    style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: colors.border, opacity: pressed ? 0.82 : 1 })}
+                  >
+                    <Text style={{ color: colors.foreground, fontWeight: "700" }}>Boyayı profesyonel getirsin</Text>
+                    <IconSymbol name={attributes.paintIncluded === true ? "checkmark.circle.fill" : "circle"} size={21} color={attributes.paintIncluded === true ? colors.primary : colors.muted} />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {serviceType === "electrical" || serviceType === "plumbing" ? (
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, marginBottom: 9 }}>
+                    {serviceType === "electrical" ? "Elektrik İşlemi" : "Tesisat İşlemi"}
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {(serviceType === "electrical"
+                      ? ["Arıza", "Montaj", "Tesisat", "Sigorta / Pano"]
+                      : ["Su Kaçağı", "Tıkanıklık", "Montaj", "Tesisat Yenileme"]
+                    ).map((option) => {
+                      const selected = attributes.issueType === option;
+                      return (
+                        <Pressable
+                          key={option}
+                          onPress={() => updateAttribute("issueType", option)}
+                          style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "16" : colors.card, opacity: pressed ? 0.8 : 1 })}
+                        >
+                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{option}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              {serviceType === "cleaning" ? (
+                <View style={{ gap: 12 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Temizlik Detayları</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {["Ev", "Ofis", "İnşaat Sonrası", "Boş Daire"].map((option) => {
+                      const selected = attributes.placeType === option;
+                      return (
+                        <Pressable key={option} onPress={() => updateAttribute("placeType", option)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "16" : colors.card, opacity: pressed ? 0.8 : 1 })}>
+                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{option}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <TextInput
+                    value={attributes.roomCount == null ? "" : String(attributes.roomCount)}
+                    onChangeText={(value) => updateAttribute("roomCount", parseOptionalInteger(value) ?? null)}
+                    placeholder="Oda sayısı"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="numeric"
+                    style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
+                  />
+                </View>
+              ) : null}
+
+              {serviceType === "moving" ? (
+                <View style={{ gap: 10 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Taşınacak Eşyalar</Text>
+                  <TextInput
+                    value={typeof attributes.inventorySummary === "string" ? attributes.inventorySummary : ""}
+                    onChangeText={(value) => updateAttribute("inventorySummary", value)}
+                    placeholder="Büyük eşyaları ve yaklaşık koli sayısını yazın"
+                    placeholderTextColor={colors.muted}
+                    multiline
+                    style={{ minHeight: 82, textAlignVertical: "top", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
+                  />
+                  <Pressable onPress={() => updateAttribute("packingAssistance", attributes.packingAssistance !== true)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: colors.border, opacity: pressed ? 0.82 : 1 })}>
+                    <Text style={{ color: colors.foreground, fontWeight: "700" }}>Paketleme desteği istiyorum</Text>
+                    <IconSymbol name={attributes.packingAssistance === true ? "checkmark.circle.fill" : "circle"} size={21} color={attributes.packingAssistance === true ? colors.primary : colors.muted} />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {serviceType === "courier" ? (
+                <View style={{ gap: 10 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Kurye Gönderisi</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {["Evrak", "Küçük Paket", "Koli", "Hassas Ürün"].map((option) => {
+                      const selected = attributes.parcelType === option;
+                      return (
+                        <Pressable key={option} onPress={() => updateAttribute("parcelType", option)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "16" : colors.card, opacity: pressed ? 0.8 : 1 })}>
+                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{option}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <TextInput
+                    value={attributes.weightKg == null ? "" : String(attributes.weightKg)}
+                    onChangeText={(value) => updateAttribute("weightKg", Number(value.replace(",", ".")) || null)}
+                    placeholder="Yaklaşık ağırlık (kg)"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="decimal-pad"
+                    style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
+                  />
+                </View>
+              ) : null}
+
+              {serviceType === "tow_truck" || serviceType === "roadside" ? (
+                <View style={{ gap: 10 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>
+                    {serviceType === "tow_truck" ? "Çekici Detayları" : "Yol Yardım Detayları"}
+                  </Text>
+                  <TextInput
+                    value={typeof attributes.vehicle === "string" ? attributes.vehicle : ""}
+                    onChangeText={(value) => updateAttribute("vehicle", value)}
+                    placeholder="Araç marka / model / plaka"
+                    placeholderTextColor={colors.muted}
+                    style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
+                  />
+                  <TextInput
+                    value={typeof attributes.problem === "string" ? attributes.problem : ""}
+                    onChangeText={(value) => updateAttribute("problem", value)}
+                    placeholder="Arıza veya yardım ihtiyacını açıklayın"
+                    placeholderTextColor={colors.muted}
+                    style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
+                  />
+                </View>
+              ) : null}
+
+              <View style={{ gap: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Fotoğraf / Video</Text>
+                    <Text style={{ marginTop: 3, fontSize: 12, lineHeight: 17, color: colors.muted }}>
+                      En fazla {REQUEST_MEDIA_LIMIT} dosya; fotoğraf 8 MB, video 25 MB.
+                    </Text>
+                  </View>
+                  <Pressable onPress={handlePickMedia} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.primary + "16", opacity: pressed ? 0.78 : 1 })}>
+                    <IconSymbol name="photo.fill" size={18} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 13 }}>Ekle</Text>
+                  </Pressable>
+                </View>
+                {pendingMedia.map((media) => (
+                  <View key={media.id} style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.card, borderRadius: 12, padding: 11, borderWidth: 0.5, borderColor: colors.border }}>
+                    <IconSymbol name={media.kind === "video" ? "play.circle.fill" : "photo.fill"} size={20} color={colors.primary} />
+                    <Text numberOfLines={1} style={{ flex: 1, marginHorizontal: 9, color: colors.foreground, fontSize: 13, fontWeight: "600" }}>{media.originalName}</Text>
+                    <Pressable onPress={() => setPendingMedia((current) => current.filter((item) => item.id !== media.id))} style={{ padding: 4 }}>
+                      <IconSymbol name="trash.fill" size={18} color={colors.error} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Min Bütçe (₺)</Text>
@@ -466,51 +1010,99 @@ export default function CreateServiceScreen() {
         {step === 3 && (
           <View>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
-              Hizmet nerede verilecek?
+              {ROUTE_SERVICE_TYPES.has(serviceType) ? "Rota bilgilerini girin" : "Hizmet nerede verilecek?"}
             </Text>
-            <View>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Adres</Text>
-              <TextInput
-                value={address}
-                onChangeText={setAddress}
-                placeholder="Örn: Bağdat Cad. No:123 Kadıköy, İstanbul"
-                placeholderTextColor={colors.muted}
-                multiline
-                numberOfLines={3}
-                style={{
-                  backgroundColor: colors.card,
-                  borderRadius: 14,
-                  paddingHorizontal: 16,
-                  paddingVertical: 14,
-                  fontSize: 15,
-                  color: colors.foreground,
-                  borderWidth: 0.5,
-                  borderColor: colors.border,
-                  textAlignVertical: "top",
-                  minHeight: 80,
-                }}
-              />
-            </View>
+            {ROUTE_SERVICE_TYPES.has(serviceType) ? (
+              <View style={{ gap: 13 }}>
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Nereden alınacak?</Text>
+                  <TextInput value={pickupAddress} onChangeText={(value) => { setPickupAddress(value); setPickupCoordinate(null); }} placeholder="Başlangıç adresi" placeholderTextColor={colors.muted} multiline style={{ minHeight: 72, textAlignVertical: "top", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Nereye götürülecek?</Text>
+                  <TextInput value={destinationAddress} onChangeText={(value) => { setDestinationAddress(value); setDestinationCoordinate(null); }} placeholder="Varış adresi" placeholderTextColor={colors.muted} multiline style={{ minHeight: 72, textAlignVertical: "top", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
+                </View>
+                <Pressable
+                  onPress={handleResolveRoute}
+                  disabled={isResolvingRoute}
+                  style={({ pressed }) => ({
+                    alignItems: "center",
+                    backgroundColor: colors.primary + "18",
+                    borderColor: colors.primary + "55",
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    opacity: pressed || isResolvingRoute ? 0.7 : 1,
+                    paddingVertical: 13,
+                  })}
+                >
+                  {isResolvingRoute ? (
+                    <ActivityIndicator color={colors.primary} size="small" />
+                  ) : (
+                    <IconSymbol name="map.fill" size={18} color={colors.primary} />
+                  )}
+                  <Text style={{ color: colors.primary, fontSize: 14, fontWeight: "700", marginLeft: 8 }}>
+                    {isResolvingRoute ? "Rota hazırlanıyor…" : "Adresleri Haritada Göster"}
+                  </Text>
+                </Pressable>
+                <View style={{ borderColor: colors.border, borderRadius: 16, borderWidth: 0.5, height: 210, overflow: "hidden" }}>
+                  <RequestRouteMap
+                    pickupCoordinate={pickupCoordinate}
+                    destinationCoordinate={destinationCoordinate}
+                    pickupLabel={pickupAddress || "Başlangıç"}
+                    destinationLabel={destinationAddress || "Varış"}
+                    primaryColor={colors.primary}
+                    surfaceColor={colors.card}
+                    borderColor={colors.border}
+                    foregroundColor={colors.foreground}
+                    mutedColor={colors.muted}
+                  />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Yaklaşık Mesafe (km)</Text>
+                  <TextInput value={distanceKm} onChangeText={setDistanceKm} placeholder="Örn: 12" placeholderTextColor={colors.muted} keyboardType="numeric" style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
+                  <Text style={{ color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 5 }}>
+                    Harita değeri kuş uçuşu yaklaşık mesafedir; gerçek yol mesafesini gerekirse düzenleyin.
+                  </Text>
+                </View>
+                {serviceType === "moving" ? (
+                  <View style={{ gap: 12 }}>
+                    <View style={{ flexDirection: "row", gap: 12 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Alınacak Kat</Text>
+                        <TextInput value={pickupFloor} onChangeText={setPickupFloor} placeholder="0" placeholderTextColor={colors.muted} keyboardType="number-pad" style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Varış Katı</Text>
+                        <TextInput value={destinationFloor} onChangeText={setDestinationFloor} placeholder="0" placeholderTextColor={colors.muted} keyboardType="number-pad" style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
+                      </View>
+                    </View>
+                    <Pressable onPress={() => setPickupHasElevator((value) => !value)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: colors.border, opacity: pressed ? 0.82 : 1 })}>
+                      <Text style={{ color: colors.foreground, fontWeight: "700" }}>Alınacak adreste asansör var</Text>
+                      <IconSymbol name={pickupHasElevator ? "checkmark.circle.fill" : "circle"} size={21} color={pickupHasElevator ? colors.primary : colors.muted} />
+                    </Pressable>
+                    <Pressable onPress={() => setDestinationHasElevator((value) => !value)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: colors.border, opacity: pressed ? 0.82 : 1 })}>
+                      <Text style={{ color: colors.foreground, fontWeight: "700" }}>Varış adresinde asansör var</Text>
+                      <IconSymbol name={destinationHasElevator ? "checkmark.circle.fill" : "circle"} size={21} color={destinationHasElevator ? colors.primary : colors.muted} />
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <View>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Adres</Text>
+                <TextInput value={address} onChangeText={setAddress} placeholder="Örn: Bağdat Cad. No:123 Kadıköy, İstanbul" placeholderTextColor={colors.muted} multiline numberOfLines={3} style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border, textAlignVertical: "top", minHeight: 80 }} />
+              </View>
+            )}
             <Pressable
-              style={({ pressed }) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: colors.card,
-                  borderRadius: 14,
-                  paddingVertical: 14,
-                  marginTop: 12,
-                  borderWidth: 1.5,
-                  borderStyle: "dashed",
-                  borderColor: colors.primary + "50",
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
+              onPress={handleUseCurrentLocation}
+              disabled={isLocating}
+              style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: colors.card, borderRadius: 14, paddingVertical: 14, marginTop: 12, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.primary + "50", opacity: pressed || isLocating ? 0.7 : 1 })}
             >
-              <IconSymbol name="location.fill" size={18} color={colors.primary} />
+              {isLocating ? <ActivityIndicator color={colors.primary} size="small" /> : <IconSymbol name="location.fill" size={18} color={colors.primary} />}
               <Text style={{ marginLeft: 8, color: colors.primary, fontWeight: "600", fontSize: 14 }}>
-                Konumumu Kullan
+                {isLocating ? "Konum alınıyor…" : latitude && longitude ? "Konum Güncellendi" : "Konumumu Kullan"}
               </Text>
             </Pressable>
           </View>
@@ -538,6 +1130,14 @@ export default function CreateServiceScreen() {
                   {selectedCategory?.name || "Seçilmedi"}
                 </Text>
               </View>
+              {subcategoryId ? (
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>Alt Kategori</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
+                    {subcategories.find((item) => item.id === subcategoryId)?.name ?? "—"}
+                  </Text>
+                </View>
+              ) : null}
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ fontSize: 14, color: colors.muted }}>Başlık</Text>
                 <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>
@@ -550,12 +1150,35 @@ export default function CreateServiceScreen() {
                   {URGENCY_OPTIONS.find((u) => u.id === urgency)?.label || "—"}
                 </Text>
               </View>
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ fontSize: 14, color: colors.muted }}>Adres</Text>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>
-                  {address || "—"}
-                </Text>
-              </View>
+              {ROUTE_SERVICE_TYPES.has(serviceType) ? (
+                <>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 14, color: colors.muted }}>Nereden</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>{pickupAddress || "—"}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 14, color: colors.muted }}>Nereye</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>{destinationAddress || "—"}</Text>
+                  </View>
+                  {distanceKm ? (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 14, color: colors.muted }}>Mesafe</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{distanceKm} km</Text>
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>Adres</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>{address || "—"}</Text>
+                </View>
+              )}
+              {pendingMedia.length > 0 ? (
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>Medya</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{pendingMedia.length} dosya</Text>
+                </View>
+              ) : null}
               {(budgetMin || budgetMax) && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 14, color: colors.muted }}>Bütçe</Text>
@@ -604,10 +1227,10 @@ export default function CreateServiceScreen() {
       >
         <Pressable
           onPress={handleNext}
-          disabled={!canProceed() || createRequestMutation.isPending}
+          disabled={!canProceed() || createRequestMutation.isPending || uploadMediaMutation.isPending}
           style={({ pressed }) => [
             {
-              backgroundColor: !canProceed() || createRequestMutation.isPending ? colors.muted : colors.primary,
+              backgroundColor: !canProceed() || createRequestMutation.isPending || uploadMediaMutation.isPending ? colors.muted : colors.primary,
               borderRadius: 16,
               paddingVertical: 17,
               alignItems: "center",
@@ -615,7 +1238,7 @@ export default function CreateServiceScreen() {
             },
           ]}
         >
-          {createRequestMutation.isPending ? (
+          {createRequestMutation.isPending || uploadMediaMutation.isPending ? (
             <ActivityIndicator color="#FFF" />
           ) : (
             <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "700" }}>

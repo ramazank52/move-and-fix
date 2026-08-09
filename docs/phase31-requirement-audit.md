@@ -1,0 +1,85 @@
+# Phase 31 — 51 Gereksinim İzlenebilirlik Denetimi
+
+**Kaynak gereksinim:** `/home/ubuntu/upload/Pasted_content_34.txt`  
+**Denetim tarihi:** 2026-08-09  
+**Başlangıç checkpoint’i:** `40794a16`  
+**İlke:** Mevcut çalışan özellikleri değiştirme veya kopyalama; yalnızca kanıtlanmış eksik, yarım, mock veya güvensiz alanları tamamla.
+
+## Doğrulanmış Mevcut Temel
+
+| Alan | Mevcut gerçek kanıt |
+|---|---|
+| Kimlik ve rol yönlendirme | `users`, `providers`; `app/index.tsx`; `lib/navigation.ts`; OAuth tabanlı oturum; müşteri/provider/admin route yönlendirmesi |
+| Hizmet talebi ve teklifler | `service_requests`, `offers`; `requests.*`, `offers.*`; müşteri oluşturma ve profesyonel fırsat/teklif ekranları |
+| Takip | `job_tracking`; owner-or-assigned-provider yetkilendirmesi; native harita ve lifecycle prosedürleri |
+| Mesajlaşma | `messages`; `assertMessageParticipant`; konuşma/gönderme/okundu işlemlerinde fail-closed IDOR koruması |
+| Yorum | `reviews`; tamamlanmış talep başına tek yorum; provider yorum API/UI |
+| Ödeme | `payments`, `payment_webhook_events`; Stripe/iyzico gateway, server-side quote, webhook imza doğrulama ve event idempotency |
+| Wallet | `wallet_accounts`, `wallet_transactions`, `wallet_withdrawals`; gerçek DB-backed summary/history/withdraw API ve UI |
+| Güvenlik | CSRF, rate limit, RBAC, IDOR testleri, merkezi ENV sözleşmesi, webhook doğrulama, secret bundle taraması |
+| Kalite | Başlangıçta TypeScript/lint/build temiz; 254/254 test PASS; iOS/Android Expo export PASS; 14/14 authenticated render PASS |
+
+## Mevcut Şemanın Sınırları
+
+`drizzle/schema.ts` şu tabloları içeriyor: `users`, `service_categories`, `providers`, `provider_favorites`, `service_requests`, `offers`, `job_tracking`, `messages`, `payments`, `payment_webhook_events`, `reviews`, `wallet_accounts`, `wallet_transactions`, `wallet_withdrawals`.
+
+Aşağıdaki production alanları için henüz ayrı ve kalıcı model bulunmuyor: alt kategori; hizmete özgü talep alanları; talep medya ekleri; profesyonel belgeleri; doğrulama/kurtarma challenge’ları; iş kanıtı; müşteri onayı; dispute; kalıcı audit log; sistem/ülke/para birimi ayarları; dinamik komisyon politikası.
+
+## Gereksinim Alanı Durum Özeti
+
+| Gereksinimler | Durum | Doğrulanmış sonuç |
+|---|---|---|
+| 1–4 | **IMPLEMENTED** | Müşteri/profesyonel, talep oluşturma, profesyonele fırsat düşmesi ve teklif akışı gerçek API/DB ile mevcut |
+| 5–6 | **PARTIAL** | MoveAI metin akışı mevcut; sesli kayıt/transkripsiyon UI→API zinciri eksik. Kategoriler mevcut fakat alt kategori modeli yok |
+| 7–13 | **MISSING/PARTIAL** | Genel talep alanları var; boya, elektrik, tesisat, temizlik, nakliye, kurye ve çekiciye özgü alanlar tek kalıcı sözleşmede tutulmuyor |
+| 14–15 | **PARTIAL** | Provider konumları ve tracking mesafe hesabı mevcut; profesyonel eşleştirmede gerçek koordinata göre sıralama/filtre tam değil |
+| 16 | **IMPLEMENTED** | Harita ve aktif iş mesafe/ETA görünümü mevcut; web fallback native harita değildir |
+| 17–18 | **PARTIAL** | Kurye/çekici için başlangıç-hedef UI’ları var; genel nakliye kat/asansör/eşya modeli ve backend persist sözleşmesi eksik |
+| 19 | **MISSING** | Talep/iş kanıtı için güvenli çoklu fotoğraf-video ek modeli ve owner-scoped storage API yok |
+| 20–21 | **MISSING** | Profesyonel belge yükleme, tür, doğrulama durumu, admin karar ve audit altyapısı yok |
+| 22 | **IMPLEMENTED** | Yıldız/puan/yorum modeli ve tamamlanmış iş doğrulaması mevcut |
+| 23 | **IMPLEMENTED** | Hizmet bağlamlı, katılımcı doğrulamalı mesajlaşma mevcut |
+| 24 | **PARTIAL/EXTERNAL_BLOCKER** | Telefon maskeleme yardımcısı var; gerçek proxy numara/call relay telekom sağlayıcısı yok |
+| 25 | **EXTERNAL_BLOCKER** | Gerçek zamanlı sesli görüşme/call relay sağlayıcısı ve credential gerekir; mevcut voice transcriber sesli arama değildir |
+| 26 | **PARTIAL/EXTERNAL_BLOCKER** | Expo token alma ve notification servis iskeletleri var; gerçek FCM/APNs credential ve teslimat doğrulaması gerekir |
+| 27–28 | **MISSING/PARTIAL** | E-posta/telefon UI ekranları bulunuyor; kalıcı challenge, expiry, attempt limit, token hash, şifre sıfırlama ve hesap kurtarma backend’i yok |
+| 29–30 | **IMPLEMENTED** | Provider lifecycle ile iş başlangıç/bitiş ve `completeJob` mevcut; kanıt zorunluluğu yok |
+| 31–35 | **MISSING** | İş fotoğraf/kanıtı, multimodal AI analizi, müşteri onayı, dispute ve güvenilir 48 saat otomatik serbest bırakma yok |
+| 36 | **IMPLEMENTED** | Ödeme gateway ve escrow tabloları/akışları mevcut; canlı başarı credential olmadan fail-closed |
+| 37 | **PARTIAL** | Standart komisyon şu an %15, premium %10; kullanıcının istediği genel %10 ve admin-dinamik politika uygulanmamış |
+| 38–39 | **IMPLEMENTED** | DB-backed provider wallet, bakiye/işlem geçmişi ve para çekme mevcut |
+| 40–41 | **IMPLEMENTED** | Server-side ücret, imza doğrulama, webhook event ledger, idempotency ve double-payment korumaları mevcut |
+| 42–43 | **PARTIAL** | Aynı server içinde owner API adapter/router var; ayrı `moveos/` frontend klasörü yok, `app/admin.tsx` var; owner tarafında mock token/TODO CRUD ve mock AI komut yolları mevcut |
+| 44–45 | **PARTIAL** | `lib/i18n.ts` tr/en/de/fr/ar için sınırlı anahtar seti içeriyor; Rusça yok, ekranların çoğu hardcoded Türkçe, RTL uygulanmamış |
+| 46–47 | **MISSING/PARTIAL** | TRY/Turkey hardcoded; ülke, çoklu para birimi, locale tarih-saat/ölçü ve ödeme currency policy genel değil |
+| 48 | **PARTIAL** | Temel güvenlik var; rate limit ve audit log in-memory, fraud/abuse kuralları sınırlı |
+| 49 | **IMPLEMENTED/PARTIAL** | 254 test mevcut ve temel akışlar güçlü; yeni alanlar için testler henüz yok |
+| 50 | **PARTIAL** | Merkezi hata sınıfları ve logger var; kalıcı/harici gözlemleme backend’i yok |
+| 51 | **PARTIAL** | Expo iOS/Android export ve production start scripti var; Docker/CI görünmüyor, gerçek credential/domain/fiziksel cihaz dış blocker |
+
+## Mock veya Production Dışı Yollar
+
+| Dosya | Bulgular |
+|---|---|
+| `server/_core/ownerRestAdapter.ts` | Development mock owner token; kullanıcı/kategori/hizmet CRUD içinde TODO yolları |
+| `server/_core/ownerRouter.ts` | Mock login/2FA/users/AI response |
+| `server/services/AIService.ts` | Bazı provider/approval yollarında mock implementasyon |
+| `server/services/NotificationService.ts` ve `NotificationServiceV2.ts` | Gerçek push/SMS/e-posta teslimat sağlayıcıları tamamlanmamış |
+| `server/services/PaymentGatewayService.ts` | Bazı raporlama/bakiye yardımcıları mock; gerçek checkout yolu ayrı `server/payments/*` modüllerinde |
+| `server/services/WalletService.ts` | Eski servis katmanında mock yollar; mobil wallet’ın gerçek yolu `server/db.ts` ve `routers.ts` üzerinden çalışıyor |
+| `lib/notifications.ts` | Geliştirme ortamında mock Expo push token fallback’i |
+
+## Dış Bağımlılık Blocker’ları
+
+Gerçek Stripe/iyzico, FCM/APNs, SMS, e-posta, telekom proxy/voice, production domain/callback URL ve fiziksel cihaz erişimi sağlanmadan canlı teslimat veya ödeme başarısı üretilmeyecek. Bu bağımlılıklar kod eksikliğiyle karıştırılmayacak; sandbox içinde adapter, fail-closed sözleşme ve test-double doğrulamaları tamamlanacak.
+
+## Uygulama Sırası
+
+1. Additive şema/migration: alt kategori, request detail/media, provider document, verification challenge, job evidence, completion approval/dispute, audit/settings/country/currency.
+2. Owner-scoped storage ve service-specific request sözleşmeleri; konum bazlı eşleştirme.
+3. Belge doğrulama ve hesap recovery API/UI.
+4. Kanıt → AI analiz → müşteri onayı/dispute → 48 saat idempotent release lifecycle.
+5. Dinamik komisyon, owner CRUD ve mock production yollarının fail-closed gerçek DB uygulamaları.
+6. i18n/RTL/locale/currency altyapısı ve ekran göçü.
+7. Kalıcı audit/fraud, performans/operasyon hardening.
+8. Yeni unit/integration/security/E2E testleri; eski 254 test, 14 render ve iki mobil export regresyonu.

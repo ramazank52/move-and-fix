@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "../shared/const.js";
+import { createHash, randomUUID } from "node:crypto";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { ownerRouter } from "./_core/ownerRouter";
@@ -11,6 +12,7 @@ import { notificationService } from "./services/NotificationService";
 import { notificationServiceV2 } from "./services/NotificationServiceV2";
 import { aiService } from "./services/AIService";
 import { eventService } from "./services/EventService";
+import { storagePut } from "./storage";
 import {
   gatewayCheckoutService,
   GatewayCheckoutError,
@@ -21,6 +23,92 @@ import {
 eventService.setNotificationSender(notificationService);
 eventService.setWalletService(walletService);
 notificationServiceV2.setEventPublisher(eventService);
+
+const serviceRequestTypeSchema = z.enum([
+  "generic",
+  "painting",
+  "electrical",
+  "plumbing",
+  "cleaning",
+  "moving",
+  "courier",
+  "tow_truck",
+  "roadside",
+]);
+
+const coordinateSchema = z
+  .string()
+  .trim()
+  .regex(/^-?\d{1,3}(?:\.\d{1,12})$/, "Geçerli bir koordinat girin");
+
+const requestAttributeValueSchema = z.union([
+  z.string().trim().max(1000),
+  z.number().finite().min(-1_000_000).max(1_000_000),
+  z.boolean(),
+  z.null(),
+]);
+
+const serviceRequestDetailsSchema = z.object({
+  subcategoryId: z.number().int().positive().optional(),
+  serviceType: serviceRequestTypeSchema,
+  pickupAddress: z.string().trim().min(3).max(500).optional(),
+  destinationAddress: z.string().trim().min(3).max(500).optional(),
+  pickupLatitude: coordinateSchema.optional(),
+  pickupLongitude: coordinateSchema.optional(),
+  destinationLatitude: coordinateSchema.optional(),
+  destinationLongitude: coordinateSchema.optional(),
+  pickupFloor: z.number().int().min(-5).max(200).optional(),
+  destinationFloor: z.number().int().min(-5).max(200).optional(),
+  pickupHasElevator: z.boolean().optional(),
+  destinationHasElevator: z.boolean().optional(),
+  distanceKm: z.number().int().min(0).max(5000).optional(),
+  attributes: z
+    .record(z.string().trim().min(1).max(80), requestAttributeValueSchema)
+    .refine((attributes) => Object.keys(attributes).length <= 30, "En fazla 30 hizmet alanı gönderilebilir"),
+});
+
+const allowedRequestMedia = {
+  "image/jpeg": { kind: "image", extension: "jpg", maxBytes: 8 * 1024 * 1024 },
+  "image/png": { kind: "image", extension: "png", maxBytes: 8 * 1024 * 1024 },
+  "image/webp": { kind: "image", extension: "webp", maxBytes: 8 * 1024 * 1024 },
+  "image/heic": { kind: "image", extension: "heic", maxBytes: 8 * 1024 * 1024 },
+  "image/heif": { kind: "image", extension: "heif", maxBytes: 8 * 1024 * 1024 },
+  "video/mp4": { kind: "video", extension: "mp4", maxBytes: 25 * 1024 * 1024 },
+  "video/quicktime": { kind: "video", extension: "mov", maxBytes: 25 * 1024 * 1024 },
+} as const;
+
+type AllowedRequestMime = keyof typeof allowedRequestMedia;
+
+function hasExpectedMediaSignature(buffer: Buffer, mimeType: AllowedRequestMime): boolean {
+  if (buffer.length < 12) return false;
+  if (mimeType === "image/jpeg") return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  if (mimeType === "image/png") {
+    return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  }
+  if (mimeType === "image/webp") {
+    return buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP";
+  }
+  const isoBrand = buffer.subarray(4, 12).toString("ascii");
+  if (mimeType === "image/heic" || mimeType === "image/heif") {
+    return /^ftyp(?:heic|heix|hevc|hevx|heim|heis|mif1|msf1)/.test(isoBrand);
+  }
+  return isoBrand.startsWith("ftyp");
+}
+
+function decodeStrictBase64(value: string): Buffer {
+  const compact = value.replace(/\s/g, "");
+  if (compact.length === 0 || compact.length % 4 !== 0) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Geçersiz medya verisi" });
+  }
+  const buffer = Buffer.from(compact, "base64");
+  if (
+    buffer.length === 0 ||
+    buffer.toString("base64").replace(/=+$/, "") !== compact.replace(/=+$/, "")
+  ) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Geçersiz medya verisi" });
+  }
+  return buffer;
+}
 
 async function runTrackingOperation<T>(operation: () => Promise<T>): Promise<T> {
   try {
@@ -99,23 +187,139 @@ export const appRouter = router({
           request.userId === ctx.user.id ||
           (provider != null && request.assignedProviderId === provider.id);
         if (!canRead) throw new TRPCError({ code: "FORBIDDEN", message: "Bu iş kaydına erişim yetkiniz yok" });
-        return request;
+        const [details, media] = await Promise.all([
+          db.getServiceRequestDetails(input.id),
+          db.getServiceRequestMedia(input.id),
+        ]);
+        return { ...request, details, media };
       }),
     create: protectedProcedure
       .input(z.object({
-        categoryId: z.number(),
-        title: z.string().min(1).max(255),
-        description: z.string().optional(),
-        address: z.string().optional(),
-        latitude: z.string().optional(),
-        longitude: z.string().optional(),
-        budgetMin: z.number().optional(),
-        budgetMax: z.number().optional(),
-        distanceKm: z.number().optional(),
-        estimatedPrice: z.number().optional(),
+        categoryId: z.number().int().positive(),
+        title: z.string().trim().min(1).max(255),
+        description: z.string().trim().max(5000).optional(),
+        address: z.string().trim().max(500).optional(),
+        latitude: coordinateSchema.optional(),
+        longitude: coordinateSchema.optional(),
+        budgetMin: z.number().int().min(0).max(10_000_000).optional(),
+        budgetMax: z.number().int().min(0).max(10_000_000).optional(),
+        distanceKm: z.number().int().min(0).max(5000).optional(),
+        estimatedPrice: z.number().int().min(0).max(10_000_000).optional(),
+        details: serviceRequestDetailsSchema.optional(),
       }))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
+        if (input.budgetMin != null && input.budgetMax != null && input.budgetMin > input.budgetMax) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Minimum bütçe maksimum bütçeden büyük olamaz" });
+        }
+
+        const categories = await db.getActiveServiceCategories();
+        const category = categories.find((item) => item.id === input.categoryId);
+        if (!category) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Aktif hizmet kategorisi bulunamadı" });
+        }
+
+        if (input.details?.subcategoryId != null) {
+          const subcategory = category.subcategories.find(
+            (item) => item.id === input.details?.subcategoryId,
+          );
+          if (!subcategory) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Alt kategori bu hizmete ait değil" });
+          }
+        }
+
+        if (input.details) {
+          const categoryTypeMap: Record<string, db.ServiceRequestType> = {
+            painting: "painting",
+            electrical: "electrical",
+            plumbing: "plumbing",
+            cleaning: "cleaning",
+            moving: "moving",
+            courier: "courier",
+            towing: "tow_truck",
+            tow_truck: "tow_truck",
+            roadside: "roadside",
+          };
+          const expectedType = categoryTypeMap[category.slug] ?? "generic";
+          if (input.details.serviceType !== "generic" && input.details.serviceType !== expectedType) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Hizmet ayrıntıları seçilen kategoriyle uyuşmuyor" });
+          }
+          if (["moving", "courier", "tow_truck"].includes(input.details.serviceType)) {
+            if (!input.details.pickupAddress || !input.details.destinationAddress) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Başlangıç ve varış adresleri zorunludur" });
+            }
+          }
+        }
         return db.createServiceRequest({ ...input, userId: ctx.user.id });
+      }),
+    uploadMedia: protectedProcedure
+      .input(z.object({
+        requestId: z.number().int().positive(),
+        originalName: z
+          .string()
+          .trim()
+          .min(1)
+          .max(255)
+          .regex(/^[^\\/\u0000-\u001f]+$/, "Geçersiz dosya adı"),
+        mimeType: z.enum([
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "image/heic",
+          "image/heif",
+          "video/mp4",
+          "video/quicktime",
+        ]),
+        base64: z.string().min(4).max(36_000_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const request = await db.getServiceRequestById(input.requestId);
+        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
+        if (request.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Bu talebe medya ekleme yetkiniz yok" });
+        }
+        if (request.status !== "pending") {
+          throw new TRPCError({ code: "CONFLICT", message: "Yalnız bekleyen taleplere medya eklenebilir" });
+        }
+
+        const existingMedia = await db.getServiceRequestMedia(input.requestId);
+        if (existingMedia.length >= 8) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Bir talebe en fazla 8 medya eklenebilir" });
+        }
+
+        const policy = allowedRequestMedia[input.mimeType];
+        const buffer = decodeStrictBase64(input.base64);
+        if (buffer.length > policy.maxBytes) {
+          throw new TRPCError({
+            code: "PAYLOAD_TOO_LARGE",
+            message: policy.kind === "image" ? "Görsel en fazla 8 MB olabilir" : "Video en fazla 25 MB olabilir",
+          });
+        }
+        if (!hasExpectedMediaSignature(buffer, input.mimeType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Dosya içeriği medya türüyle uyuşmuyor" });
+        }
+
+        const sha256 = createHash("sha256").update(buffer).digest("hex");
+        const relKey = `service-requests/${input.requestId}/${ctx.user.id}/${randomUUID()}.${policy.extension}`;
+        const uploaded = await storagePut(relKey, buffer, input.mimeType);
+        const mediaId = await db.createServiceRequestMedia({
+          requestId: input.requestId,
+          ownerUserId: ctx.user.id,
+          purpose: "request",
+          kind: policy.kind,
+          storageKey: uploaded.key,
+          originalName: input.originalName,
+          mimeType: input.mimeType,
+          sizeBytes: buffer.length,
+          sha256,
+        });
+        return {
+          id: mediaId,
+          kind: policy.kind,
+          mimeType: input.mimeType,
+          sizeBytes: buffer.length,
+          sha256,
+          url: uploaded.url,
+        };
       }),
   }),
 
@@ -264,6 +468,9 @@ export const appRouter = router({
   // Service categories — shared by customer discovery and service request flows
   categories: router({
     list: publicProcedure.query(() => db.getActiveServiceCategories()),
+    subcategories: publicProcedure
+      .input(z.object({ categoryId: z.number().int().positive().optional() }).optional())
+      .query(({ input }) => db.getActiveServiceSubcategories(input?.categoryId)),
     bySlug: publicProcedure
       .input(z.object({ slug: z.string().trim().min(1).max(100) }))
       .query(({ input }) => db.getServiceCategoryBySlug(input.slug)),

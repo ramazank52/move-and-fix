@@ -123,6 +123,8 @@ const MAPPING = {
   "sofa.fill": "weekend",
   "thermometer.medium": "thermostat",
   "refrigerator.fill": "kitchen",
+  "circle": "radio-button-unchecked",
+  "play.circle.fill": "play-circle-filled",
 } as unknown as IconMapping;
 
 /**

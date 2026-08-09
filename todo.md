@@ -242,3 +242,20 @@
 - [x] TypeScript, lint, build, tüm testler, mobil export ve 14/14 gerçek render doğrulamasını tamamla
 - [x] Final checkpoint için tüm kod, test ve görsel doğrulama kanıtlarını hazırla
 - [x] Kesin production durum raporunu teslim et
+
+## Phase 31: Mevcut Sistemi Koruyarak Nihai Kapsamı Tamamlama
+- [x] 51 gereksinimi mobil ekran, MoveOS, API, veritabanı, migration ve test kanıtlarıyla izlenebilirlik matrisine dönüştür
+- [x] Müşteri ve profesyonel sistemleri ile iş ilanı oluşturma/ilgili profesyonele düşme akışlarında eksik veya kopya uygulama bulunmadığını denetle
+- [x] Hizmet kategorileri, alt kategoriler ve boya/elektrik/tesisat/temizlik/nakliye/kurye/çekici hizmetlerine özgü talep alanlarını tamamla
+- [x] Konum bazlı eşleştirme, harita, mesafe, nakliye nereden-nereye rotası, kat/asansör/eşya ayrıntıları ve fotoğraf/video yüklemeyi production standardında doğrula
+- [ ] Profesyonel belge doğrulama ile kimlik/ehliyet/SRC/psikoteknik belge altyapısını yetkilendirme ve audit kayıtlarıyla tamamla
+- [ ] Puan/yorum, güvenli mesajlaşma, numara gizleme, sesli iletişim, push, e-posta/SMS doğrulama, şifre sıfırlama ve hesap kurtarma kapsamını tamamla
+- [ ] İş başlangıç/bitiş, İşi Bitirdim, fotoğraf/kanıt, AI kanıt analizi, müşteri onayı, dispute ve 48 saatlik otomatik serbest bırakma yaşam döngüsünü tamamla
+- [ ] Escrow, yüzde 10 komisyon, profesyonel cüzdanı, para çekme, ödeme güvenliği, webhook doğrulama, idempotency ve double-payment korumasını production standardında doğrula
+- [ ] MoveOS içinde içerik, kategori, ücret, komisyon, kullanıcı, hizmet ve sistem ayarlarının gerçek ortak API üzerinden yönetimini tamamla
+- [ ] Türkçe, İngilizce, Almanca, Fransızca, Arapça ve Rusça; RTL; ülke, para birimi, tarih/saat ve ölçü yerelleştirme altyapısını tamamla
+- [ ] Yetkilendirme, fraud/abuse, rate-limit, audit log, hata yönetimi, performans ve deployment hazırlığını denetleyip eksikleri gider
+- [ ] Her yeni/değişen kapsam için unit, integration, E2E, authorization, hata ve edge-case testleri ekle
+- [ ] Önceden PASS olan tüm testleri, 14/14 gerçek render’ı, TypeScript, lint, build ve iOS/Android export’u yeniden doğrula
+- [ ] Yeni dış bağımlılıkları sahte PASS üretmeden BLOCKER olarak kaydet
+- [ ] Tüm tamamlamaları geri yüklenebilir checkpoint’e al ve gereksinim bazlı production raporunu teslim et

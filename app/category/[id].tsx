@@ -73,9 +73,9 @@ export default function CategoryDetailScreen() {
     return rows.sort((left, right) => Number(right.moveScore ?? 0) - Number(left.moveScore ?? 0));
   }, [providersQuery.data, sortKey]);
 
-  if (id === "courier") return <Redirect href="/service/courier" />;
-  if (id === "tow_truck") return <Redirect href="/service/tow-truck" />;
-  if (id === "roadside") return <Redirect href="/service/roadside" />;
+  if (id === "courier") return <Redirect href={"/create-service?categoryId=courier" as never} />;
+  if (id === "tow_truck") return <Redirect href={"/create-service?categoryId=tow_truck" as never} />;
+  if (id === "roadside") return <Redirect href={"/create-service?categoryId=roadside" as never} />;
 
   const meta = CATEGORY_META[id] ?? {
     icon: "questionmark.circle.fill",

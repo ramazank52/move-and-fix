@@ -14,6 +14,7 @@ import {
   commissionRateForProvider,
   type EscrowPaymentStatus,
 } from "./payments/policy";
+import { rankServiceOpportunitiesByLocation } from "./matching/location";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -105,7 +106,10 @@ export async function getUserByOpenId(openId: string) {
 
 import {
   serviceCategories,
+  serviceSubcategories,
   serviceRequests,
+  serviceRequestDetails,
+  serviceRequestMedia,
   providers,
   offers,
   messages,
@@ -120,7 +124,8 @@ import {
 export async function getActiveServiceCategories() {
   const db = await getDb();
   if (!db) return [];
-  return db
+  const [categories, subcategories] = await Promise.all([
+    db
     .select({
       id: serviceCategories.id,
       name: serviceCategories.name,
@@ -130,13 +135,40 @@ export async function getActiveServiceCategories() {
       pricingType: serviceCategories.pricingType,
       kmRate: serviceCategories.kmRate,
       basePrice: serviceCategories.basePrice,
+      sortOrder: serviceCategories.sortOrder,
       createdAt: serviceCategories.createdAt,
       professionalCount: sql<number>`count(${providers.id})`,
     })
     .from(serviceCategories)
     .leftJoin(providers, eq(providers.categoryId, serviceCategories.id))
+    .where(eq(serviceCategories.isActive, 1))
     .groupBy(serviceCategories.id)
-    .orderBy(serviceCategories.id);
+    .orderBy(serviceCategories.sortOrder, serviceCategories.id),
+    db
+      .select({
+        id: serviceSubcategories.id,
+        categoryId: serviceSubcategories.categoryId,
+        name: serviceSubcategories.name,
+        slug: serviceSubcategories.slug,
+        description: serviceSubcategories.description,
+        sortOrder: serviceSubcategories.sortOrder,
+      })
+      .from(serviceSubcategories)
+      .where(eq(serviceSubcategories.isActive, 1))
+      .orderBy(serviceSubcategories.categoryId, serviceSubcategories.sortOrder, serviceSubcategories.id),
+  ]);
+
+  const subcategoriesByCategory = new Map<number, typeof subcategories>();
+  for (const subcategory of subcategories) {
+    const current = subcategoriesByCategory.get(subcategory.categoryId) ?? [];
+    current.push(subcategory);
+    subcategoriesByCategory.set(subcategory.categoryId, current);
+  }
+
+  return categories.map((category) => ({
+    ...category,
+    subcategories: subcategoriesByCategory.get(category.id) ?? [],
+  }));
 }
 
 export async function getServiceCategoryBySlug(slug: string) {
@@ -145,12 +177,56 @@ export async function getServiceCategoryBySlug(slug: string) {
   const rows = await db
     .select()
     .from(serviceCategories)
-    .where(eq(serviceCategories.slug, slug))
+    .where(and(eq(serviceCategories.slug, slug), eq(serviceCategories.isActive, 1)))
     .limit(1);
   return rows[0] ?? null;
 }
 
+export async function getActiveServiceSubcategories(categoryId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const condition = categoryId == null
+    ? eq(serviceSubcategories.isActive, 1)
+    : and(
+        eq(serviceSubcategories.categoryId, categoryId),
+        eq(serviceSubcategories.isActive, 1),
+      );
+  return db
+    .select()
+    .from(serviceSubcategories)
+    .where(condition)
+    .orderBy(serviceSubcategories.categoryId, serviceSubcategories.sortOrder, serviceSubcategories.id);
+}
+
 // Service Requests
+export type ServiceRequestType =
+  | "generic"
+  | "painting"
+  | "electrical"
+  | "plumbing"
+  | "cleaning"
+  | "moving"
+  | "courier"
+  | "tow_truck"
+  | "roadside";
+
+export type ServiceRequestDetailsInput = {
+  subcategoryId?: number;
+  serviceType: ServiceRequestType;
+  pickupAddress?: string;
+  destinationAddress?: string;
+  pickupLatitude?: string;
+  pickupLongitude?: string;
+  destinationLatitude?: string;
+  destinationLongitude?: string;
+  pickupFloor?: number;
+  destinationFloor?: number;
+  pickupHasElevator?: boolean;
+  destinationHasElevator?: boolean;
+  distanceKm?: number;
+  attributes: Record<string, string | number | boolean | null>;
+};
+
 export async function createServiceRequest(data: {
   userId: number;
   categoryId: number;
@@ -163,10 +239,98 @@ export async function createServiceRequest(data: {
   budgetMax?: number;
   distanceKm?: number;
   estimatedPrice?: number;
+  details?: ServiceRequestDetailsInput;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(serviceRequests).values(data);
+  const { details, ...requestData } = data;
+  return db.transaction(async (tx) => {
+    const result = await tx.insert(serviceRequests).values(requestData);
+    const requestId = result[0].insertId;
+    if (details) {
+      await tx.insert(serviceRequestDetails).values({
+        requestId,
+        subcategoryId: details.subcategoryId,
+        serviceType: details.serviceType,
+        pickupAddress: details.pickupAddress,
+        destinationAddress: details.destinationAddress,
+        pickupLatitude: details.pickupLatitude,
+        pickupLongitude: details.pickupLongitude,
+        destinationLatitude: details.destinationLatitude,
+        destinationLongitude: details.destinationLongitude,
+        pickupFloor: details.pickupFloor,
+        destinationFloor: details.destinationFloor,
+        pickupHasElevator: details.pickupHasElevator == null ? undefined : Number(details.pickupHasElevator),
+        destinationHasElevator:
+          details.destinationHasElevator == null ? undefined : Number(details.destinationHasElevator),
+        distanceKm: details.distanceKm,
+        attributesJson: JSON.stringify(details.attributes),
+      });
+    }
+    return requestId;
+  });
+}
+
+function parseRequestAttributes(value: string): Record<string, string | number | boolean | null> {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, string | number | boolean | null>;
+    }
+  } catch {
+    // Legacy or externally modified data is returned as an empty, safe object.
+  }
+  return {};
+}
+
+export async function getServiceRequestDetails(requestId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(serviceRequestDetails)
+    .where(eq(serviceRequestDetails.requestId, requestId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    ...row,
+    pickupHasElevator: row.pickupHasElevator == null ? null : row.pickupHasElevator === 1,
+    destinationHasElevator:
+      row.destinationHasElevator == null ? null : row.destinationHasElevator === 1,
+    attributes: parseRequestAttributes(row.attributesJson),
+    attributesJson: undefined,
+  };
+}
+
+export async function getServiceRequestMedia(requestId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select()
+    .from(serviceRequestMedia)
+    .where(eq(serviceRequestMedia.requestId, requestId))
+    .orderBy(serviceRequestMedia.createdAt, serviceRequestMedia.id);
+  return rows.map((row) => ({
+    ...row,
+    url: `/manus-storage/${row.storageKey}`,
+  }));
+}
+
+export async function createServiceRequestMedia(data: {
+  requestId: number;
+  ownerUserId: number;
+  purpose: "request" | "before" | "after" | "completion" | "dispute";
+  kind: "image" | "video" | "document";
+  storageKey: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(serviceRequestMedia).values(data);
   return result[0].insertId;
 }
 
@@ -1188,14 +1352,28 @@ export async function getNewJobsForProvider(providerId: number) {
   const categoryId = provider.categoryId;
   if (!categoryId || provider.isAvailable !== 1) return [];
 
-  // Only unassigned pending requests are genuine opportunities.
-  return db.select().from(serviceRequests).where(
-    and(
-      eq(serviceRequests.categoryId, categoryId),
-      eq(serviceRequests.status, "pending"),
-      isNull(serviceRequests.assignedProviderId),
+  // Only unassigned pending requests in the provider's category are genuine
+  // opportunities. Fetch a bounded candidate set, then apply deterministic
+  // proximity filtering when both sides have valid coordinates. Legacy rows
+  // without coordinates remain visible instead of being silently lost.
+  const candidates = await db
+    .select()
+    .from(serviceRequests)
+    .where(
+      and(
+        eq(serviceRequests.categoryId, categoryId),
+        eq(serviceRequests.status, "pending"),
+        isNull(serviceRequests.assignedProviderId),
+      ),
     )
-  ).limit(20);
+    .orderBy(desc(serviceRequests.createdAt))
+    .limit(100);
+
+  return rankServiceOpportunitiesByLocation(
+    candidates,
+    provider.latitude,
+    provider.longitude,
+  ).slice(0, 20);
 }
 
 export async function getPaymentQuote(requestId: number, userId: number) {

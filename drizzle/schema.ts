@@ -35,8 +35,34 @@ export const serviceCategories = mysqlTable("service_categories", {
   pricingType: mysqlEnum("pricingType", ["fixed", "km_based", "hourly"]).default("fixed").notNull(),
   kmRate: int("kmRate"),
   basePrice: int("basePrice"),
+  isActive: int("isActive").default(1).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+// Optional child services managed under a top-level category.
+export const serviceSubcategories = mysqlTable(
+  "service_subcategories",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    categoryId: int("categoryId").notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull(),
+    description: text("description"),
+    isActive: int("isActive").default(1).notNull(),
+    sortOrder: int("sortOrder").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("service_subcategories_category_slug_unique").on(table.categoryId, table.slug),
+    index("service_subcategories_category_active_sort_idx").on(
+      table.categoryId,
+      table.isActive,
+      table.sortOrder,
+    ),
+  ],
+);
 
 // Provider profiles
 export const providers = mysqlTable("providers", {
@@ -89,6 +115,72 @@ export const serviceRequests = mysqlTable("service_requests", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+// Structured, service-specific information kept outside the legacy request row.
+export const serviceRequestDetails = mysqlTable(
+  "service_request_details",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    subcategoryId: int("subcategoryId"),
+    serviceType: mysqlEnum("serviceType", [
+      "generic",
+      "painting",
+      "electrical",
+      "plumbing",
+      "cleaning",
+      "moving",
+      "courier",
+      "tow_truck",
+      "roadside",
+    ])
+      .default("generic")
+      .notNull(),
+    pickupAddress: text("pickupAddress"),
+    destinationAddress: text("destinationAddress"),
+    pickupLatitude: varchar("pickupLatitude", { length: 20 }),
+    pickupLongitude: varchar("pickupLongitude", { length: 20 }),
+    destinationLatitude: varchar("destinationLatitude", { length: 20 }),
+    destinationLongitude: varchar("destinationLongitude", { length: 20 }),
+    pickupFloor: int("pickupFloor"),
+    destinationFloor: int("destinationFloor"),
+    pickupHasElevator: int("pickupHasElevator"),
+    destinationHasElevator: int("destinationHasElevator"),
+    distanceKm: int("distanceKm"),
+    attributesJson: text("attributesJson").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("service_request_details_request_unique").on(table.requestId),
+    index("service_request_details_type_idx").on(table.serviceType),
+  ],
+);
+
+// Immutable metadata for request images/videos uploaded through the authenticated API.
+export const serviceRequestMedia = mysqlTable(
+  "service_request_media",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    ownerUserId: int("ownerUserId").notNull(),
+    purpose: mysqlEnum("purpose", ["request", "before", "after", "completion", "dispute"])
+      .default("request")
+      .notNull(),
+    kind: mysqlEnum("kind", ["image", "video", "document"]).notNull(),
+    storageKey: varchar("storageKey", { length: 500 }).notNull(),
+    originalName: varchar("originalName", { length: 255 }).notNull(),
+    mimeType: varchar("mimeType", { length: 100 }).notNull(),
+    sizeBytes: int("sizeBytes").notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("service_request_media_storage_key_unique").on(table.storageKey),
+    index("service_request_media_request_purpose_idx").on(table.requestId, table.purpose),
+    index("service_request_media_owner_idx").on(table.ownerUserId),
+  ],
+);
 
 // Offers from providers
 export const offers = mysqlTable("offers", {
