@@ -50,6 +50,7 @@ export const providers = mysqlTable("providers", {
   moveScore: int("moveScore").default(50),
   isVerified: int("isVerified").default(0),
   isPremium: int("isPremium").default(0),
+  isAvailable: int("isAvailable").default(1).notNull(),
   latitude: varchar("latitude", { length: 20 }),
   longitude: varchar("longitude", { length: 20 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

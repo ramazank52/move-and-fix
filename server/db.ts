@@ -572,8 +572,50 @@ export async function markConversationRead(
 export async function getProviderProfile(userId: number) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(providers).where(eq(providers.userId, userId));
+  const rows = await db
+    .select({
+      id: providers.id,
+      userId: providers.userId,
+      displayName: providers.displayName,
+      bio: providers.bio,
+      categoryId: providers.categoryId,
+      rating: providers.rating,
+      completedJobs: providers.completedJobs,
+      moveScore: providers.moveScore,
+      isVerified: providers.isVerified,
+      isPremium: providers.isPremium,
+      isAvailable: providers.isAvailable,
+      latitude: providers.latitude,
+      longitude: providers.longitude,
+      createdAt: providers.createdAt,
+      updatedAt: providers.updatedAt,
+      reviewCount: sql<number>`(
+        SELECT COUNT(*) FROM ${reviews}
+        WHERE ${reviews.providerId} = ${providers.id}
+      )`,
+    })
+    .from(providers)
+    .where(eq(providers.userId, userId));
   return rows[0] ?? null;
+}
+
+export async function updateProviderAvailability(userId: number, isAvailable: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const providerRows = await db
+    .select({ id: providers.id })
+    .from(providers)
+    .where(eq(providers.userId, userId))
+    .limit(1);
+  if (!providerRows[0]) throw new Error("PROVIDER_NOT_FOUND");
+
+  await db
+    .update(providers)
+    .set({ isAvailable: isAvailable ? 1 : 0 })
+    .where(eq(providers.userId, userId));
+
+  return { isAvailable } as const;
 }
 
 export async function getNearbyProviders(lat?: string, lng?: string) {
@@ -1103,25 +1145,32 @@ export async function getProviderJobs(providerId: number) {
 // Get provider earnings
 export async function getProviderEarnings(providerId: number) {
   const db = await getDb();
-  if (!db) return { totalEarnings: 0, pendingPayments: 0, completedJobs: 0 };
+  if (!db) return { totalEarnings: 0, todayEarnings: 0, pendingPayments: 0, completedJobs: 0 };
 
   const providerRows = await db.select().from(providers).where(eq(providers.userId, providerId)).limit(1);
-  if (providerRows.length === 0) return { totalEarnings: 0, pendingPayments: 0, completedJobs: 0 };
+  if (providerRows.length === 0) return { totalEarnings: 0, todayEarnings: 0, pendingPayments: 0, completedJobs: 0 };
 
   const providerRecordId = providerRows[0].id;
 
   // Get all payments for this provider
   const paymentRows = await db.select().from(payments).where(eq(payments.providerId, providerRecordId));
 
-  const totalEarnings = paymentRows
-    .filter(p => p.status === "released")
-    .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  const releasedPayments = paymentRows.filter((payment) => payment.status === "released");
+  const providerNetAmount = (payment: (typeof paymentRows)[number]) =>
+    payment.providerPayout ?? Math.max(0, (payment.amount ?? 0) - (payment.commissionAmount ?? 0));
+  const totalEarnings = releasedPayments.reduce((sum, payment) => sum + providerNetAmount(payment), 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayEarnings = releasedPayments
+    .filter((payment) => payment.updatedAt >= today)
+    .reduce((sum, payment) => sum + providerNetAmount(payment), 0);
   const pendingPayments = paymentRows
     .filter(p => p.status === "pending" || p.status === "held")
     .reduce((sum, p) => sum + (p.amount ?? 0), 0);
 
   return {
     totalEarnings,
+    todayEarnings,
     pendingPayments,
     completedJobs: providerRows[0].completedJobs ?? 0,
   };
@@ -1135,12 +1184,17 @@ export async function getNewJobsForProvider(providerId: number) {
   const providerRows = await db.select().from(providers).where(eq(providers.userId, providerId)).limit(1);
   if (providerRows.length === 0) return [];
 
-  const categoryId = providerRows[0].categoryId;
-  if (!categoryId) return [];
+  const provider = providerRows[0];
+  const categoryId = provider.categoryId;
+  if (!categoryId || provider.isAvailable !== 1) return [];
 
-  // Get pending requests in the provider's category
+  // Only unassigned pending requests are genuine opportunities.
   return db.select().from(serviceRequests).where(
-    eq(serviceRequests.categoryId, categoryId)
+    and(
+      eq(serviceRequests.categoryId, categoryId),
+      eq(serviceRequests.status, "pending"),
+      isNull(serviceRequests.assignedProviderId),
+    )
   ).limit(20);
 }
 

@@ -30,6 +30,11 @@ const customer = {
   name: "Ahmet Müşteri",
 };
 
+const provider = {
+  openId: "test-provider-open-id",
+  name: "Mehmet Usta",
+};
+
 const connect = async (targetUrl: string) => {
   const createResponse = await fetch(
     `http://127.0.0.1:9334/json/new?${encodeURIComponent(targetUrl)}`,
@@ -107,13 +112,21 @@ const waitForContent = async (
   );
 };
 
-const capture = async (path: string, expected: string, outputName: string) => {
+const capture = async (
+  path: string,
+  expected: string,
+  outputName: string,
+  sessionUser = customer,
+) => {
   const targetUrl = new URL(path, previewUrl).toString();
   const { socket, send } = await connect("about:blank");
   try {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Network.enable");
+    await send("Emulation.setEmulatedMedia", {
+      features: [{ name: "prefers-color-scheme", value: "dark" }],
+    });
     await send("Emulation.setDeviceMetricsOverride", {
       width: 390,
       height: 844,
@@ -121,8 +134,8 @@ const capture = async (path: string, expected: string, outputName: string) => {
       mobile: true,
     });
 
-    const token = await sessionSdk.createSessionToken(customer.openId, {
-      name: customer.name,
+    const token = await sessionSdk.createSessionToken(sessionUser.openId, {
+      name: sessionUser.name,
       expiresInMs: 10 * 60 * 1000,
     });
     const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -136,6 +149,10 @@ const capture = async (path: string, expected: string, outputName: string) => {
     }
     const host = new URL(previewUrl).hostname;
     const cookieDomain = `.${host.split(".").slice(-3).join(".")}`;
+    await send("Storage.clearDataForOrigin", {
+      origin: new URL(previewUrl).origin,
+      storageTypes: "local_storage",
+    });
     await send("Network.setCookie", {
       name: COOKIE_NAME,
       value: token,
@@ -148,20 +165,15 @@ const capture = async (path: string, expected: string, outputName: string) => {
 
     await send("Page.navigate", { url: targetUrl });
     await waitForContent(send, expected);
-    await new Promise((resolve) => setTimeout(resolve, 750));
-
-    const dimensions = await send<{
-      result: { value: { width: number; height: number } };
-    }>("Runtime.evaluate", {
-      expression:
-        "({ width: Math.max(document.documentElement.scrollWidth, 390), height: Math.max(document.documentElement.scrollHeight, 844) })",
-      returnByValue: true,
+    await send("Runtime.evaluate", {
+      expression: "document.fonts?.ready ?? Promise.resolve()",
+      awaitPromise: true,
     });
-    const { width, height } = dimensions.result.value;
+    await new Promise((resolve) => setTimeout(resolve, 750));
     const screenshot = await send<{ data: string }>("Page.captureScreenshot", {
       format: "png",
-      captureBeyondViewport: true,
-      clip: { x: 0, y: 0, width, height, scale: 1 },
+      captureBeyondViewport: false,
+      clip: { x: 0, y: 0, width: 390, height: 844, scale: 1 },
     });
     await writeFile(outputName, Buffer.from(screenshot.data, "base64"));
   } finally {
@@ -175,7 +187,15 @@ const main = async () => {
   await mkdir(".verification", { recursive: true });
   await capture("/my-jobs", "İşlerim", ".verification/09-my-jobs.png");
   await capture("/messages", "Mesajlar", ".verification/10-messages.png");
-  console.log("09–10 authenticated render görselleri oluşturuldu.");
+  await capture("/wallet", "MoveWallet", ".verification/11-wallet.png");
+  await capture("/profile", "Kişisel Bilgiler", ".verification/12-profile.png");
+  await capture(
+    "/provider-dashboard",
+    "Bugünkü Kazanç",
+    ".verification/13-provider-dashboard.png",
+    provider,
+  );
+  console.log("09–13 authenticated render görselleri oluşturuldu.");
 };
 
 main().catch((error) => {

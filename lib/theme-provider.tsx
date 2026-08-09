@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Appearance, View, useColorScheme as useSystemColorScheme } from "react-native";
 import { colorScheme as nativewindColorScheme, vars } from "nativewind";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
 
@@ -10,10 +11,12 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+const THEME_STORAGE_KEY = "movefix:color-scheme";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useSystemColorScheme() ?? "light";
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>(systemScheme);
+  const [hasStoredPreference, setHasStoredPreference] = useState(false);
 
   const applyScheme = useCallback((scheme: ColorScheme) => {
     nativewindColorScheme.set(scheme);
@@ -30,9 +33,33 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setColorScheme = useCallback((scheme: ColorScheme) => {
+    setHasStoredPreference(true);
     setColorSchemeState(scheme);
     applyScheme(scheme);
+    void AsyncStorage.setItem(THEME_STORAGE_KEY, scheme);
   }, [applyScheme]);
+
+  useEffect(() => {
+    let active = true;
+    void AsyncStorage.getItem(THEME_STORAGE_KEY).then((stored) => {
+      if (!active) return;
+      if (stored === "light" || stored === "dark") {
+        setHasStoredPreference(true);
+        setColorSchemeState(stored);
+      } else {
+        setColorSchemeState(systemScheme);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasStoredPreference) {
+      setColorSchemeState(systemScheme);
+    }
+  }, [hasStoredPreference, systemScheme]);
 
   useEffect(() => {
     applyScheme(colorScheme);
@@ -61,8 +88,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }),
     [colorScheme, setColorScheme],
   );
-  console.log(value, themeVariables)
-
   return (
     <ThemeContext.Provider value={value}>
       <View style={[{ flex: 1 }, themeVariables]}>{children}</View>

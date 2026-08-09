@@ -349,6 +349,18 @@ export const appRouter = router({
     myProfile: protectedProcedure.query(({ ctx }) => {
       return db.getProviderProfile(ctx.user.id);
     }),
+    updateAvailability: protectedProcedure
+      .input(z.object({ isAvailable: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.updateProviderAvailability(ctx.user.id, input.isAvailable);
+        } catch (error) {
+          if (error instanceof Error && error.message === "PROVIDER_NOT_FOUND") {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Profesyonel profili bulunamadı" });
+          }
+          throw error;
+        }
+      }),
     myJobs: protectedProcedure.query(({ ctx }) => {
       return db.getProviderJobs(ctx.user.id);
     }),

@@ -1,5 +1,14 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { router } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -7,6 +16,19 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { WalletTransactionCard } from "@/components/wallet-transaction-card";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
+
+const QUICK_ACTIONS = [
+  { label: "Para Ekle", icon: "plus", route: "/wallet/add-money" },
+  { label: "Para Çek", icon: "arrow.up.right", route: "/wallet/withdraw" },
+  { label: "İşlem Geçmişi", icon: "creditcard.fill", route: "/wallet/transactions" },
+] as const;
+
+function formatMoney(value: number) {
+  return `₺${value.toLocaleString("tr-TR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 export default function WalletScreen() {
   const colors = useColors();
@@ -16,39 +38,47 @@ export default function WalletScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([summaryQuery.refetch(), transactionsQuery.refetch()]);
-    setRefreshing(false);
+    try {
+      await Promise.all([summaryQuery.refetch(), transactionsQuery.refetch()]);
+    } finally {
+      setRefreshing(false);
+    }
   }, [summaryQuery, transactionsQuery]);
+
+  const screenStyle = { flex: 1, backgroundColor: colors.background } as const;
 
   if (summaryQuery.isLoading || transactionsQuery.isLoading) {
     return (
-      <ScreenContainer edges={["top", "left", "right"]} className="items-center justify-center">
+      <ScreenContainer
+        edges={["top", "left", "right"]}
+        className="flex-1 items-center justify-center"
+        safeAreaClassName="flex-1"
+        style={screenStyle}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text className="mt-3 text-sm text-muted">MoveWallet yükleniyor…</Text>
+        <Text style={[styles.stateBody, { color: colors.muted }]}>MoveWallet yükleniyor…</Text>
       </ScreenContainer>
     );
   }
 
   if (summaryQuery.isError || transactionsQuery.isError || !summaryQuery.data) {
     return (
-      <ScreenContainer edges={["top", "left", "right"]} className="items-center justify-center px-8">
-        <IconSymbol name="wifi.exclamationmark" size={42} color={colors.error} />
-        <Text className="mt-4 text-lg font-bold text-foreground">Cüzdan bilgileri alınamadı</Text>
-        <Text className="mt-2 text-center text-sm leading-5 text-muted">
-          Güvenli bağlantınızı kontrol edip yeniden deneyin.
-        </Text>
+      <ScreenContainer
+        edges={["top", "left", "right"]}
+        className="flex-1 items-center justify-center px-8"
+        safeAreaClassName="flex-1"
+        style={screenStyle}
+      >
+        <IconSymbol name="wifi.exclamationmark" size={40} color={colors.error} />
+        <Text style={[styles.stateTitle, { color: colors.foreground }]}>Cüzdan bilgileri alınamadı</Text>
+        <Text style={[styles.stateDescription, { color: colors.muted }]}>Güvenli bağlantınızı kontrol edip yeniden deneyin.</Text>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cüzdan bilgilerini yeniden yükle"
           onPress={onRefresh}
-          style={({ pressed }) => ({
-            marginTop: 18,
-            borderRadius: 12,
-            backgroundColor: colors.primary,
-            paddingHorizontal: 20,
-            paddingVertical: 12,
-            opacity: pressed ? 0.8 : 1,
-          })}
+          style={({ pressed }) => [styles.retryButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}
         >
-          <Text className="font-bold text-white">Yeniden Dene</Text>
+          <Text style={styles.retryText}>Yeniden Dene</Text>
         </Pressable>
       </ScreenContainer>
     );
@@ -58,147 +88,256 @@ export default function WalletScreen() {
   const pendingBalance = summaryQuery.data.pendingBalance;
 
   return (
-    <ScreenContainer edges={["top", "left", "right"]}>
+    <ScreenContainer
+      edges={["top", "left", "right"]}
+      className="flex-1"
+      safeAreaClassName="flex-1"
+      style={screenStyle}
+    >
       <FlatList
+        style={screenStyle}
+        contentContainerStyle={styles.listContent}
         data={transactionsQuery.data ?? []}
         keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => <WalletTransactionCard transaction={item} />}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        renderItem={({ item }) => (
+          <View style={styles.transactionWrapper}>
+            <WalletTransactionCard transaction={item} />
+          </View>
+        )}
+        ItemSeparatorComponent={() => <View style={styles.transactionSeparator} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListHeaderComponent={
-          <>
-            <View style={{ paddingHorizontal: 20, paddingTop: Platform.OS === "web" ? 20 : 12, paddingBottom: 16 }}>
-              <Text style={{ fontSize: 24, fontWeight: "800", color: colors.foreground }}>MoveWallet</Text>
-              <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>Bakiyeniz ve güvenli işlemleriniz</Text>
+          <View>
+            <View style={[styles.header, Platform.OS === "web" && styles.webHeader]}>
+              <Text style={[styles.screenTitle, { color: colors.foreground }]}>MoveWallet</Text>
             </View>
 
-            <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-              <View
-                style={{
-                  borderRadius: 24,
-                  padding: 24,
-                  backgroundColor: colors.accentPurple,
-                  shadowColor: colors.accentPurple,
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 20,
-                  elevation: 6,
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <IconSymbol name="wallet.pass.fill" size={20} color="#FFFFFF" />
-                  </View>
-                  <View style={{ marginLeft: 10 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: "rgba(255,255,255,0.85)" }}>Kullanılabilir Bakiye</Text>
-                    {pendingBalance > 0 ? (
-                      <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.70)", marginTop: 2 }}>
-                        Bekleyen: ₺{pendingBalance.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-                <Text style={{ fontSize: 36, fontWeight: "800", color: "#FFFFFF", marginBottom: 20 }}>
-                  ₺{balance.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Text>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <Pressable
-                    onPress={() => router.push("/wallet/add-money" as any)}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                      borderRadius: 14,
-                      paddingVertical: 12,
-                      opacity: pressed ? 0.82 : 1,
-                    })}
-                  >
-                    <IconSymbol name="plus" size={18} color="#FFFFFF" />
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF", marginLeft: 6 }}>Para Ekle</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => router.push("/wallet/withdraw" as any)}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                      borderRadius: 14,
-                      paddingVertical: 12,
-                      opacity: pressed ? 0.82 : 1,
-                    })}
-                  >
-                    <IconSymbol name="arrow.up.right" size={18} color="#FFFFFF" />
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF", marginLeft: 6 }}>Para Çek</Text>
-                  </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="MoveWallet işlem geçmişini aç"
+              onPress={() => router.push("/wallet/transactions" as never)}
+              style={({ pressed }) => [
+                styles.balanceCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={styles.balanceCopy}>
+                <Text style={[styles.balanceLabel, { color: colors.muted }]}>Bakiye</Text>
+                <Text style={[styles.balanceAmount, { color: colors.foreground }]}>{formatMoney(balance)}</Text>
+                <View style={styles.pendingRow}>
+                  <View style={[styles.pendingDot, { backgroundColor: colors.warning }]} />
+                  <Text style={[styles.pendingText, { color: colors.muted }]}>Emanette bekleyen {formatMoney(pendingBalance)}</Text>
                 </View>
               </View>
-            </View>
+              <IconSymbol name="chevron.right" size={20} color={colors.muted} />
+            </Pressable>
 
-            <View style={{ paddingHorizontal: 20, marginBottom: 24, flexDirection: "row", gap: 10 }}>
-              {[
-                { label: "Ödemeler", icon: "creditcard.fill", color: colors.primary, route: "/payment/history" },
-                { label: "İşlemler", icon: "text.bubble.fill", color: colors.accentBlue, route: "/wallet/transactions" },
-                { label: "Kartlar", icon: "creditcard", color: colors.accentGreen, route: "/settings/payments" },
-              ].map((action) => (
+            <View style={styles.quickActions}>
+              {QUICK_ACTIONS.map((action) => (
                 <Pressable
                   key={action.label}
-                  onPress={() => router.push(action.route as any)}
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    alignItems: "center",
-                    backgroundColor: colors.card,
-                    borderRadius: 14,
-                    paddingVertical: 14,
-                    opacity: pressed ? 0.82 : 1,
-                    borderWidth: 0.5,
-                    borderColor: colors.border,
-                  })}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
+                  onPress={() => router.push(action.route as never)}
+                  style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}
                 >
-                  <IconSymbol name={action.icon as any} size={22} color={action.color} />
-                  <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground, marginTop: 6 }}>{action.label}</Text>
+                  <View style={[styles.quickActionIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <IconSymbol name={action.icon} size={21} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.quickActionLabel, { color: colors.foreground }]}>{action.label}</Text>
                 </Pressable>
               ))}
             </View>
 
-            <View style={{ paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.foreground }}>Son İşlemler</Text>
-              <Pressable onPress={() => router.push("/wallet/transactions" as any)}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>Tümü</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Son İşlemler</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Tüm cüzdan işlemlerini görüntüle"
+                onPress={() => router.push("/wallet/transactions" as never)}
+                style={({ pressed }) => pressed && styles.pressed}
+              >
+                <Text style={[styles.allLink, { color: colors.primary }]}>Tümü</Text>
               </Pressable>
             </View>
-          </>
-        }
-        ListEmptyComponent={
-          <View style={{ marginHorizontal: 20, alignItems: "center", borderRadius: 16, borderWidth: 0.5, borderColor: colors.border, padding: 26 }}>
-            <IconSymbol name="wallet.pass.fill" size={30} color={colors.muted} />
-            <Text className="mt-3 font-bold text-foreground">Henüz cüzdan işlemi yok</Text>
-            <Text className="mt-1 text-center text-xs text-muted">Ödeme, iade ve para çekme kayıtları burada görüntülenecek.</Text>
           </View>
         }
-        ListFooterComponent={<View style={{ height: 8 }} />}
-        style={{ paddingHorizontal: 0 }}
-        columnWrapperStyle={undefined}
-        ItemSeparatorComponent={undefined}
-        renderScrollComponent={undefined}
-        ListFooterComponentStyle={{ paddingHorizontal: 20 }}
-        ListHeaderComponentStyle={undefined}
-        CellRendererComponent={({ children, style, ...props }) => (
-          <View {...props} style={[style, { paddingHorizontal: 20 }]}>{children}</View>
-        )}
+        ListEmptyComponent={
+          <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <IconSymbol name="wallet.pass.fill" size={28} color={colors.muted} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Henüz cüzdan işlemi yok</Text>
+            <Text style={[styles.emptyBody, { color: colors.muted }]}>Ödeme, iade ve para çekme kayıtları burada görüntülenecek.</Text>
+          </View>
+        }
+        ListFooterComponent={<View style={styles.footerSpace} />}
       />
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  listContent: {
+    flexGrow: 1,
+    paddingBottom: 104,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
+  },
+  webHeader: {
+    paddingTop: 18,
+  },
+  screenTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  balanceCard: {
+    marginHorizontal: 16,
+    minHeight: 116,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 18,
+    paddingVertical: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  balanceCopy: {
+    flex: 1,
+  },
+  balanceLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 16,
+  },
+  balanceAmount: {
+    marginTop: 7,
+    fontSize: 24,
+    fontWeight: "800",
+    lineHeight: 30,
+  },
+  pendingRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  pendingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  pendingText: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  quickActions: {
+    marginTop: 14,
+    marginHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  quickAction: {
+    width: "31%",
+    alignItems: "center",
+  },
+  quickActionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionLabel: {
+    marginTop: 7,
+    fontSize: 10,
+    fontWeight: "600",
+    lineHeight: 14,
+    textAlign: "center",
+  },
+  sectionHeader: {
+    marginTop: 24,
+    marginBottom: 10,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  allLink: {
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+  transactionWrapper: {
+    paddingHorizontal: 16,
+  },
+  transactionSeparator: {
+    height: 3,
+  },
+  emptyState: {
+    marginHorizontal: 16,
+    minHeight: 150,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  emptyBody: {
+    marginTop: 4,
+    maxWidth: 240,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  footerSpace: {
+    height: 12,
+  },
+  stateTitle: {
+    marginTop: 14,
+    fontSize: 17,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  stateBody: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  stateDescription: {
+    marginTop: 7,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 18,
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+  },
+  retryText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  pressed: {
+    opacity: 0.75,
+  },
+});

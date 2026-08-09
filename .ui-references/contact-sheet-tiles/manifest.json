@@ -1,0 +1,51 @@
+{
+  "source": "/home/ubuntu/upload/C1BB1587-88FA-4132-A980-2CF22E63D533.png",
+  "pixel_width": 1536,
+  "pixel_height": 1024,
+  "aspect_ratio": "3:2",
+  "aspect_ratio_decimal_width_over_height": 1.5,
+  "orientation": "landscape",
+  "tiled": true,
+  "mode": "grid",
+  "overlap_fraction_requested_target": 0.12,
+  "overlap_fraction_actual_minimum": {
+    "horizontal": 0.182249,
+    "vertical": 0.181172
+  },
+  "reading_order": "row-major: top-to-bottom rows, left-to-right within each row",
+  "tile_count": 4,
+  "tiles": [
+    {
+      "index": 1,
+      "path": "/home/ubuntu/move-and-fix/.ui-references/contact-sheet-tiles/tile_001_x000000_y000000.png",
+      "x": 0,
+      "y": 0,
+      "pixel_width": 845,
+      "pixel_height": 563
+    },
+    {
+      "index": 2,
+      "path": "/home/ubuntu/move-and-fix/.ui-references/contact-sheet-tiles/tile_002_x000691_y000000.png",
+      "x": 691,
+      "y": 0,
+      "pixel_width": 845,
+      "pixel_height": 563
+    },
+    {
+      "index": 3,
+      "path": "/home/ubuntu/move-and-fix/.ui-references/contact-sheet-tiles/tile_003_x000000_y000461.png",
+      "x": 0,
+      "y": 461,
+      "pixel_width": 845,
+      "pixel_height": 563
+    },
+    {
+      "index": 4,
+      "path": "/home/ubuntu/move-and-fix/.ui-references/contact-sheet-tiles/tile_004_x000691_y000461.png",
+      "x": 691,
+      "y": 461,
+      "pixel_width": 845,
+      "pixel_height": 563
+    }
+  ]
+}

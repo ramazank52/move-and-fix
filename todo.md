@@ -149,11 +149,11 @@
 - [x] Aktif İş / Canlı Takip — gerçek durum, native harita/web fallback, rota/ETA, mesaj, provider-only konum paylaşımı ve sıralı lifecycle
 - [x] İşlerim — gerçek lifecycle sekmeleri: Aktif, Teklifler, Planlanan, Tamamlanan + empty/loading/error states
 - [x] Mesajlar — gerçek conversation list, chat screen, katılımcı/rol, timestamp, unread/okundu durumu ve son mesaj
-- [ ] MoveWallet — bakiye, para ekle, gönder, işlem geçmişi, ödeme, iade
-- [ ] Profil — profil bilgileri, adresler, ödeme yöntemleri, MoveWallet, favoriler, ayarlar, güvenlik, bildirimler, çıkış
+- [x] MoveWallet — bakiye, para ekle, gönder, işlem geçmişi, ödeme, iade
+- [x] Profil — profil bilgileri, adresler, ödeme yöntemleri, MoveWallet, favoriler, ayarlar, güvenlik, bildirimler, çıkış
 
 ## Phase 20: Profesyonel Uygulama Ekranları
-- [ ] Professional Dashboard — bugünkü kazanç, aktif işler, yeni teklifler, müsaitlik toggle, performans, puan
+- [x] Professional Dashboard — bugünkü kazanç, aktif işler, yeni teklifler, müsaitlik toggle, performans, puan
 - [ ] Yeni İş Fırsatları — hizmet, mesafe, bütçe, konum, teklif ver butonu
 - [ ] Provider lifecycle — işi gör, teklif ver, teklif yönet, kabul edilen işi gör, status güncelle, iş tamamla, kazanç, mesaj
 
@@ -225,9 +225,9 @@
 ## Phase 29: Mesaj Güvenliği ve Kalan Referans Ekranlar
 - [x] Mesaj gönderme, konuşma okuma, katılımcı bilgisi ve okundu işlemlerini requestId üzerinden gerçek müşteri–atanmış profesyonel çiftiyle sınırla
 - [x] Mesajlaşma IDOR regresyon testlerini ekle ve anonim/üçüncü taraf/geçerli taraf senaryolarını doğrula
-- [ ] 09 İşlerim + 10 Mesajlar + mesaj güvenliği değişikliklerini TypeScript, lint ve test sonrası checkpoint’e al
-- [ ] 11 MoveWallet ekranını 11_movewallet.png referansına göre gerçek API verileriyle uygula ve render doğrula
-- [ ] 12 Profil ekranını 12_profil.png referansına göre uygula ve render doğrula
-- [ ] 13 Profesyonel Dashboard ekranını 13_profesyonel_dashboard.png referansına göre uygula ve render doğrula
+- [x] 09 İşlerim + 10 Mesajlar + mesaj güvenliği değişikliklerini TypeScript, lint ve test sonrası checkpoint’e al
+- [x] 11 MoveWallet ekranını 11_movewallet.png referansına göre gerçek API verileriyle uygula ve render doğrula
+- [x] 12 Profil ekranını 12_profil.png referansına göre uygula ve render doğrula
+- [x] 13 Profesyonel Dashboard ekranını 13_profesyonel_dashboard.png referansına göre uygula ve render doğrula
 - [ ] 14 Yeni İş Fırsatları ekranını 14_yeni_is_firsatlari.png referansına göre uygula ve render doğrula
 - [ ] Final TypeScript, lint, build, test, mobil export ve production durum raporunu tamamla
