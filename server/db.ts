@@ -213,6 +213,11 @@ export async function getOffersForRequest(requestId: number) {
       providerUserId: providers.userId,
       providerName: providers.displayName,
       providerRating: providers.rating,
+      providerReviewCount: sql<number>`(
+        SELECT COUNT(*)
+        FROM ${reviews}
+        WHERE ${reviews.providerId} = ${providers.id}
+      )`,
       providerCompletedJobs: providers.completedJobs,
       providerVerified: providers.isVerified,
       providerPremium: providers.isPremium,
@@ -316,9 +321,36 @@ export async function getProvidersByCategory(categoryId: number) {
   const db = await getDb();
   if (!db) return [];
   return db
-    .select()
+    .select({
+      id: providers.id,
+      userId: providers.userId,
+      displayName: providers.displayName,
+      bio: providers.bio,
+      categoryId: providers.categoryId,
+      rating: providers.rating,
+      completedJobs: providers.completedJobs,
+      moveScore: providers.moveScore,
+      isVerified: providers.isVerified,
+      isPremium: providers.isPremium,
+      latitude: providers.latitude,
+      longitude: providers.longitude,
+      createdAt: providers.createdAt,
+      updatedAt: providers.updatedAt,
+      reviewCount: sql<number>`(
+        SELECT COUNT(*)
+        FROM ${reviews}
+        WHERE ${reviews.providerId} = ${providers.id}
+      )`,
+      hasActiveJob: sql<number>`EXISTS(
+        SELECT 1
+        FROM ${serviceRequests}
+        WHERE ${serviceRequests.assignedProviderId} = ${providers.id}
+          AND ${serviceRequests.status} = 'active'
+      )`,
+    })
     .from(providers)
     .where(eq(providers.categoryId, categoryId))
+    .orderBy(desc(providers.moveScore), desc(providers.rating))
     .limit(100);
 }
 
@@ -393,8 +425,16 @@ export async function acceptOffer(offerId: number, userId: number) {
   const requestRows = await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.requestId)).limit(1);
   if (requestRows.length === 0) throw new Error("Service request not found");
   if (requestRows[0].userId !== userId) throw new Error("Not authorized to accept this offer");
+  if (requestRows[0].status !== "pending") throw new Error("Service request is not accepting offers");
+  if (offer.status !== "pending") throw new Error("Offer is not pending");
 
-  // Update offer status to accepted
+  // Close competing pending offers before accepting the selected offer.
+  await db
+    .update(offers)
+    .set({ status: "rejected" })
+    .where(and(eq(offers.requestId, offer.requestId), eq(offers.status, "pending")));
+
+  // Update selected offer status to accepted
   await db.update(offers).set({ status: "accepted" }).where(eq(offers.id, offerId));
 
   // Update service request: assign provider and set status to active
@@ -402,6 +442,28 @@ export async function acceptOffer(offerId: number, userId: number) {
     .set({ assignedProviderId: offer.providerId, status: "active" })
     .where(eq(serviceRequests.id, offer.requestId));
 
+  return { success: true, offerId, requestId: offer.requestId };
+}
+
+export async function rejectOffer(offerId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const offerRows = await db.select().from(offers).where(eq(offers.id, offerId)).limit(1);
+  if (offerRows.length === 0) throw new Error("Offer not found");
+  const offer = offerRows[0];
+
+  const requestRows = await db
+    .select()
+    .from(serviceRequests)
+    .where(eq(serviceRequests.id, offer.requestId))
+    .limit(1);
+  if (requestRows.length === 0) throw new Error("Service request not found");
+  if (requestRows[0].userId !== userId) throw new Error("Not authorized to reject this offer");
+  if (requestRows[0].status !== "pending") throw new Error("Service request is not accepting offers");
+  if (offer.status !== "pending") throw new Error("Offer is not pending");
+
+  await db.update(offers).set({ status: "rejected" }).where(eq(offers.id, offerId));
   return { success: true, offerId, requestId: offer.requestId };
 }
 

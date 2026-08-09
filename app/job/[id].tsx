@@ -50,6 +50,12 @@ export default function JobDetailScreen() {
     },
     onError: (error) => Alert.alert("Teklif Kabul Edilemedi", error.message || "Lütfen yeniden deneyin."),
   });
+  const rejectOffer = trpc.offers.reject.useMutation({
+    onSuccess: async () => {
+      await utils.offers.forRequest.invalidate({ requestId });
+    },
+    onError: (error) => Alert.alert("Teklif Reddedilemedi", error.message || "Lütfen yeniden deneyin."),
+  });
 
   const confirmOffer = (offerId: number, providerName: string, price: number) => {
     Alert.alert(
@@ -58,6 +64,17 @@ export default function JobDetailScreen() {
       [
         { text: "Vazgeç", style: "cancel" },
         { text: "Kabul Et", onPress: () => acceptOffer.mutate({ offerId }) },
+      ],
+    );
+  };
+
+  const confirmReject = (offerId: number, providerName: string) => {
+    Alert.alert(
+      "Teklifi Reddet",
+      `${providerName} adlı profesyonelin teklifini reddetmek istiyor musunuz?`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        { text: "Reddet", style: "destructive", onPress: () => rejectOffer.mutate({ offerId }) },
       ],
     );
   };
@@ -112,7 +129,7 @@ export default function JobDetailScreen() {
         <Pressable onPress={() => router.back()} accessibilityLabel="Geri dön" style={({ pressed }) => ({ padding: 8, opacity: pressed ? 0.55 : 1 })}>
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
-        <Text className="ml-2 flex-1 text-lg font-bold text-foreground">İş ve Teklifler</Text>
+        <Text className="ml-2 flex-1 text-lg font-bold text-foreground">Teklifler</Text>
         <View style={{ borderRadius: 9, backgroundColor: `${statusColor}18`, paddingHorizontal: 9, paddingVertical: 5 }}>
           <Text style={{ color: statusColor, fontSize: 11, fontWeight: "700" }}>{STATUS_LABELS[request.status]}</Text>
         </View>
@@ -173,9 +190,29 @@ export default function JobDetailScreen() {
           </View>
         ) : null}
 
-        <View className="mb-3 mt-7 flex-row items-center justify-between">
-          <Text className="text-lg font-extrabold text-foreground">Teklifler</Text>
-          <Text className="text-xs font-semibold text-muted">{offers.length} teklif</Text>
+        <View style={{ marginBottom: 12, marginTop: 26, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View>
+            <Text className="text-lg font-extrabold text-foreground">Gelen Teklifler</Text>
+            <Text className="mt-1 text-xs font-semibold text-muted">{offers.length} profesyonel yanıt verdi</Text>
+          </View>
+          {offers.length > 1 ? (
+            <Pressable
+              onPress={() => router.push(`/compare-providers?requestId=${requestId}` as any)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: colors.primary,
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <IconSymbol name="sparkles" size={14} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "800", marginLeft: 5 }}>Karşılaştır</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {offers.length === 0 ? (
@@ -189,32 +226,60 @@ export default function JobDetailScreen() {
             const offerColor = offer.status === "accepted" ? colors.success : offer.status === "rejected" ? colors.error : colors.primary;
             return (
               <View key={offer.id} style={{ marginBottom: 12, borderRadius: 18, backgroundColor: colors.card, borderWidth: 0.5, borderColor: offer.status === "accepted" ? `${colors.success}60` : colors.border, padding: 16 }}>
-                <View className="flex-row items-center">
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <View style={{ width: 46, height: 46, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: `${offerColor}15` }}>
                     <Text style={{ color: offerColor, fontSize: 17, fontWeight: "800" }}>{offer.providerName.charAt(0).toUpperCase()}</Text>
                   </View>
-                  <View className="ml-3 flex-1">
-                    <View className="flex-row items-center">
-                      <Text className="text-base font-bold text-foreground">{offer.providerName}</Text>
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={{ color: colors.foreground, fontSize: 15, lineHeight: 20, fontWeight: "800", flexShrink: 1 }} numberOfLines={1}>{offer.providerName}</Text>
                       {offer.providerVerified ? <IconSymbol name="checkmark.seal.fill" size={14} color={colors.primary} style={{ marginLeft: 5 }} /> : null}
                     </View>
-                    <Text className="mt-1 text-xs text-muted">★ {displayRating(offer.providerRating)} · {offer.providerCompletedJobs ?? 0} tamamlanan iş</Text>
+                    <Text style={{ color: colors.muted, fontSize: 11, lineHeight: 15, marginTop: 3 }}>
+                      ★ {displayRating(offer.providerRating)} · {offer.providerReviewCount ?? 0} yorum · {offer.providerCompletedJobs ?? 0} iş
+                    </Text>
                   </View>
-                  <View className="items-end">
-                    <Text className="text-lg font-extrabold text-foreground">₺{offer.price.toLocaleString("tr-TR")}</Text>
+                  <View style={{ alignItems: "flex-end", marginLeft: 8 }}>
+                    <Text style={{ color: colors.foreground, fontSize: 17, lineHeight: 22, fontWeight: "900" }}>₺{offer.price.toLocaleString("tr-TR")}</Text>
                     <Text style={{ marginTop: 3, fontSize: 10, fontWeight: "700", color: offerColor }}>{offer.status === "accepted" ? "KABUL EDİLDİ" : offer.status === "rejected" ? "REDDEDİLDİ" : "BEKLİYOR"}</Text>
                   </View>
                 </View>
                 {offer.estimatedTime ? <Text className="mt-3 text-sm font-semibold text-foreground">Tahmini süre: {offer.estimatedTime}</Text> : null}
                 {offer.message ? <Text className="mt-2 text-sm leading-5 text-muted">{offer.message}</Text> : null}
                 {request.status === "pending" && offer.status === "pending" ? (
-                  <Pressable
-                    disabled={acceptOffer.isPending}
-                    onPress={() => confirmOffer(offer.id, offer.providerName, offer.price)}
-                    style={({ pressed }) => ({ marginTop: 14, minHeight: 46, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary, opacity: acceptOffer.isPending ? 0.55 : pressed ? 0.82 : 1 })}
-                  >
-                    {acceptOffer.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text className="font-bold text-white">Teklifi Kabul Et</Text>}
-                  </Pressable>
+                  <View style={{ flexDirection: "row", gap: 9, marginTop: 14 }}>
+                    <Pressable
+                      disabled={acceptOffer.isPending || rejectOffer.isPending}
+                      onPress={() => confirmReject(offer.id, offer.providerName)}
+                      style={({ pressed }) => ({
+                        flex: 0.42,
+                        minHeight: 44,
+                        borderRadius: 12,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        opacity: acceptOffer.isPending || rejectOffer.isPending ? 0.5 : pressed ? 0.72 : 1,
+                      })}
+                    >
+                      <Text style={{ color: colors.muted, fontWeight: "800" }}>Reddet</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={acceptOffer.isPending || rejectOffer.isPending}
+                      onPress={() => confirmOffer(offer.id, offer.providerName, offer.price)}
+                      style={({ pressed }) => ({
+                        flex: 1,
+                        minHeight: 44,
+                        borderRadius: 12,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: colors.primary,
+                        opacity: acceptOffer.isPending || rejectOffer.isPending ? 0.55 : pressed ? 0.82 : 1,
+                      })}
+                    >
+                      {acceptOffer.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text className="font-bold text-white">Teklifi Kabul Et</Text>}
+                    </Pressable>
+                  </View>
                 ) : null}
               </View>
             );

@@ -143,8 +143,8 @@
 - [x] Keşfet — arama, kategori filtreleri, kategori listesi DB'den
 - [x] MoveAI — gerçek LLM akışı, sıcak/doğal konuşma, service request oluşturma
 - [x] Hizmet Talebi — 5 adımlı stepper (Hizmet→Detay→Zaman→Konum→Onay), fotoğraf yükleme, aciliyet, konum
-- [ ] Profesyonel Listesi — kart: avatar, isim, kategori, puan, yorum, mesafe, müsaitlik, ETA, fiyat
-- [ ] Teklifler — teklif kartları, karşılaştır, kabul et, reddet
+- [x] Profesyonel Listesi — gerçek kimlik/avatar, kategori, puan, yorum sayısı, konum durumu, müsaitlik, ETA ve fiyat
+- [x] Teklifler — gerçek teklif kartları, karşılaştırma, kabul/reddet sahiplik kontrolü ve durum yönetimi
 - [ ] Ödeme — premium tasarım, hizmet/profesyonel/bedel/toplam/ödeme yöntemi/MoveWallet/güvenlik
 - [ ] Aktif İş / Canlı Takip — harita, rota, ETA, mesaj, konum paylaşımı, status lifecycle
 - [ ] İşlerim — sekmeler: Aktif, Teklifler, Planlanan, Tamamlanan + empty/loading/error states

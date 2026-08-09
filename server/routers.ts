@@ -121,9 +121,14 @@ export const appRouter = router({
         }
       }),
     accept: protectedProcedure
-      .input(z.object({ offerId: z.number() }))
+      .input(z.object({ offerId: z.number().int().positive() }))
       .mutation(({ ctx, input }) => {
         return db.acceptOffer(input.offerId, ctx.user.id);
+      }),
+    reject: protectedProcedure
+      .input(z.object({ offerId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => {
+        return db.rejectOffer(input.offerId, ctx.user.id);
       }),
   }),
 
