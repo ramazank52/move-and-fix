@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -100,6 +100,36 @@ export const offers = mysqlTable("offers", {
   status: mysqlEnum("status", ["pending", "accepted", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+// Active-job lifecycle and the assigned provider's latest foreground location.
+export const jobTracking = mysqlTable(
+  "job_tracking",
+  {
+    requestId: int("requestId").primaryKey(),
+    lifecycleStatus: mysqlEnum("lifecycleStatus", [
+      "scheduled",
+      "on_the_way",
+      "arrived",
+      "in_progress",
+      "completed",
+      "cancelled",
+    ])
+      .default("scheduled")
+      .notNull(),
+    providerLatitude: varchar("providerLatitude", { length: 20 }),
+    providerLongitude: varchar("providerLongitude", { length: 20 }),
+    accuracyMeters: int("accuracyMeters"),
+    etaMinutes: int("etaMinutes"),
+    lastLocationAt: timestamp("lastLocationAt"),
+    updatedByUserId: int("updatedByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("job_tracking_status_idx").on(table.lifecycleStatus),
+    index("job_tracking_updated_at_idx").on(table.updatedAt),
+  ],
+);
 
 // Messages
 export const messages = mysqlTable("messages", {
@@ -216,6 +246,7 @@ export type Provider = typeof providers.$inferSelect;
 export type ProviderFavorite = typeof providerFavorites.$inferSelect;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;
 export type Offer = typeof offers.$inferSelect;
+export type JobTracking = typeof jobTracking.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type PaymentWebhookEvent = typeof paymentWebhookEvents.$inferSelect;

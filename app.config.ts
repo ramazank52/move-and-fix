@@ -93,6 +93,13 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "Move&Fix, aktif hizmet sırasında konumunuzu canlı takip ve varış bilgisi için kullanır.",
+      },
+    ],
+    [
       "@stripe/stripe-react-native",
       {
         merchantIdentifier: "merchant.space.manus.moveandfix",

@@ -113,6 +113,7 @@ import {
   paymentWebhookEvents,
   providerFavorites,
   reviews,
+  jobTracking,
 } from "../drizzle/schema";
 
 // Service Categories
@@ -407,6 +408,199 @@ export async function removeFavoriteProvider(userId: number, providerId: number)
     .delete(providerFavorites)
     .where(and(eq(providerFavorites.userId, userId), eq(providerFavorites.providerId, providerId)));
   return { success: true };
+}
+
+export type JobLifecycleStatus =
+  | "scheduled"
+  | "on_the_way"
+  | "arrived"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
+
+const TRACKING_TRANSITIONS: Record<JobLifecycleStatus, readonly JobLifecycleStatus[]> = {
+  scheduled: ["on_the_way"],
+  on_the_way: ["arrived"],
+  arrived: ["in_progress"],
+  in_progress: ["completed"],
+  completed: [],
+  cancelled: [],
+};
+
+async function getTrackingAccessContext(requestId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const rows = await db
+    .select({
+      requestId: serviceRequests.id,
+      customerUserId: serviceRequests.userId,
+      requestStatus: serviceRequests.status,
+      title: serviceRequests.title,
+      description: serviceRequests.description,
+      address: serviceRequests.address,
+      customerLatitude: serviceRequests.latitude,
+      customerLongitude: serviceRequests.longitude,
+      assignedProviderId: serviceRequests.assignedProviderId,
+      categoryName: serviceCategories.name,
+      providerUserId: providers.userId,
+      providerName: providers.displayName,
+      providerRating: providers.rating,
+      providerVerified: providers.isVerified,
+      providerCompletedJobs: providers.completedJobs,
+      acceptedPrice: offers.price,
+      estimatedTime: offers.estimatedTime,
+    })
+    .from(serviceRequests)
+    .leftJoin(serviceCategories, eq(serviceRequests.categoryId, serviceCategories.id))
+    .leftJoin(providers, eq(serviceRequests.assignedProviderId, providers.id))
+    .leftJoin(
+      offers,
+      and(eq(offers.requestId, serviceRequests.id), eq(offers.status, "accepted")),
+    )
+    .where(eq(serviceRequests.id, requestId))
+    .limit(1);
+
+  const context = rows[0];
+  if (!context) throw new Error("Service request not found");
+  return { db, context };
+}
+
+export async function getJobTracking(requestId: number, userId: number) {
+  const { db, context } = await getTrackingAccessContext(requestId);
+  const isCustomer = context.customerUserId === userId;
+  const isAssignedProvider = context.providerUserId === userId;
+  if (!isCustomer && !isAssignedProvider) {
+    throw new Error("Not authorized to view this job tracking");
+  }
+
+  const rows = await db
+    .select()
+    .from(jobTracking)
+    .where(eq(jobTracking.requestId, requestId))
+    .limit(1);
+  const tracking = rows[0] ?? null;
+  const fallbackLifecycle: JobLifecycleStatus =
+    context.requestStatus === "completed"
+      ? "completed"
+      : context.requestStatus === "cancelled"
+        ? "cancelled"
+        : "scheduled";
+
+  return {
+    ...context,
+    viewerRole: isAssignedProvider ? ("provider" as const) : ("customer" as const),
+    lifecycleStatus: tracking?.lifecycleStatus ?? fallbackLifecycle,
+    providerLatitude: tracking?.providerLatitude ?? null,
+    providerLongitude: tracking?.providerLongitude ?? null,
+    accuracyMeters: tracking?.accuracyMeters ?? null,
+    etaMinutes: tracking?.etaMinutes ?? null,
+    lastLocationAt: tracking?.lastLocationAt ?? null,
+    trackingUpdatedAt: tracking?.updatedAt ?? null,
+  };
+}
+
+export async function publishJobLocation(data: {
+  requestId: number;
+  userId: number;
+  latitude: string;
+  longitude: string;
+  accuracyMeters?: number;
+}) {
+  const { db, context } = await getTrackingAccessContext(data.requestId);
+  if (context.providerUserId !== data.userId) {
+    throw new Error("Only the assigned provider can publish job location");
+  }
+  if (context.requestStatus !== "active") {
+    throw new Error("Location can only be shared for an active job");
+  }
+
+  const now = new Date();
+  await db
+    .insert(jobTracking)
+    .values({
+      requestId: data.requestId,
+      providerLatitude: data.latitude,
+      providerLongitude: data.longitude,
+      accuracyMeters: data.accuracyMeters,
+      lastLocationAt: now,
+      updatedByUserId: data.userId,
+    })
+    .onDuplicateKeyUpdate({
+      set: {
+        providerLatitude: data.latitude,
+        providerLongitude: data.longitude,
+        accuracyMeters: data.accuracyMeters,
+        lastLocationAt: now,
+        updatedByUserId: data.userId,
+      },
+    });
+
+  return { success: true, requestId: data.requestId, lastLocationAt: now };
+}
+
+export async function updateJobLifecycle(data: {
+  requestId: number;
+  userId: number;
+  status: JobLifecycleStatus;
+  etaMinutes?: number;
+}) {
+  const { db, context } = await getTrackingAccessContext(data.requestId);
+  if (context.providerUserId !== data.userId) {
+    throw new Error("Only the assigned provider can update job lifecycle");
+  }
+  if (context.requestStatus !== "active" && context.requestStatus !== "completed") {
+    throw new Error("Job lifecycle can only be updated for an active job");
+  }
+
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(jobTracking)
+      .where(eq(jobTracking.requestId, data.requestId))
+      .limit(1);
+    const current: JobLifecycleStatus =
+      rows[0]?.lifecycleStatus ??
+      (context.requestStatus === "completed" ? "completed" : "scheduled");
+
+    if (current === data.status) {
+      return { success: true, requestId: data.requestId, status: current, idempotent: true };
+    }
+    if (!TRACKING_TRANSITIONS[current].includes(data.status)) {
+      throw new Error(`Invalid job lifecycle transition: ${current} -> ${data.status}`);
+    }
+
+    await tx
+      .insert(jobTracking)
+      .values({
+        requestId: data.requestId,
+        lifecycleStatus: data.status,
+        etaMinutes: data.etaMinutes,
+        updatedByUserId: data.userId,
+      })
+      .onDuplicateKeyUpdate({
+        set: {
+          lifecycleStatus: data.status,
+          etaMinutes: data.etaMinutes,
+          updatedByUserId: data.userId,
+        },
+      });
+
+    if (data.status === "completed") {
+      await tx
+        .update(serviceRequests)
+        .set({ status: "completed" })
+        .where(eq(serviceRequests.id, data.requestId));
+      if (context.assignedProviderId) {
+        await tx
+          .update(providers)
+          .set({ completedJobs: sql`${providers.completedJobs} + 1` })
+          .where(eq(providers.id, context.assignedProviderId));
+      }
+    }
+
+    return { success: true, requestId: data.requestId, status: data.status, idempotent: false };
+  });
 }
 
 // ── Job Lifecycle Functions ──

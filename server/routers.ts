@@ -22,6 +22,27 @@ eventService.setNotificationSender(notificationService);
 eventService.setWalletService(walletService);
 notificationServiceV2.setEventPublisher(eventService);
 
+async function runTrackingOperation<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Canlı takip işlemi başarısız";
+    if (message.includes("not found")) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Aktif iş bulunamadı" });
+    }
+    if (message.includes("Not authorized") || message.includes("Only the assigned provider")) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Bu canlı takip işlemine yetkiniz yok" });
+    }
+    if (message.includes("active job") || message.includes("transition")) {
+      throw new TRPCError({ code: "CONFLICT", message });
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Canlı takip işlemi tamamlanamadı",
+    });
+  }
+}
+
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -165,6 +186,54 @@ export const appRouter = router({
           });
         }
       }),
+  }),
+
+  // Active job tracking — customer reads; only the assigned provider writes.
+  tracking: router({
+    get: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        runTrackingOperation(() => db.getJobTracking(input.requestId, ctx.user.id)),
+      ),
+    publishLocation: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number().int().positive(),
+          latitude: z.number().finite().min(-90).max(90),
+          longitude: z.number().finite().min(-180).max(180),
+          accuracyMeters: z.number().finite().min(0).max(10_000).optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        runTrackingOperation(() =>
+          db.publishJobLocation({
+            requestId: input.requestId,
+            userId: ctx.user.id,
+            latitude: input.latitude.toFixed(7),
+            longitude: input.longitude.toFixed(7),
+            accuracyMeters:
+              input.accuracyMeters == null ? undefined : Math.round(input.accuracyMeters),
+          }),
+        ),
+      ),
+    updateLifecycle: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number().int().positive(),
+          status: z.enum([
+            "scheduled",
+            "on_the_way",
+            "arrived",
+            "in_progress",
+            "completed",
+            "cancelled",
+          ]),
+          etaMinutes: z.number().int().min(0).max(24 * 60).optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        runTrackingOperation(() => db.updateJobLifecycle({ ...input, userId: ctx.user.id })),
+      ),
   }),
 
   // Service categories — shared by customer discovery and service request flows

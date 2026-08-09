@@ -146,7 +146,7 @@
 - [x] Profesyonel Listesi — gerçek kimlik/avatar, kategori, puan, yorum sayısı, konum durumu, müsaitlik, ETA ve fiyat
 - [x] Teklifler — gerçek teklif kartları, karşılaştırma, kabul/reddet sahiplik kontrolü ve durum yönetimi
 - [x] Ödeme — gerçek hizmet/profesyonel özeti, ücret/toplam, MoveWallet durumu, Stripe/iyzico ve fail-closed güvenlik akışı
-- [ ] Aktif İş / Canlı Takip — harita, rota, ETA, mesaj, konum paylaşımı, status lifecycle
+- [x] Aktif İş / Canlı Takip — gerçek durum, native harita/web fallback, rota/ETA, mesaj, provider-only konum paylaşımı ve sıralı lifecycle
 - [ ] İşlerim — sekmeler: Aktif, Teklifler, Planlanan, Tamamlanan + empty/loading/error states
 - [ ] Mesajlar — conversation list, chat screen, timestamp, okunma durumu, online/müsaitlik
 - [ ] MoveWallet — bakiye, para ekle, gönder, işlem geçmişi, ödeme, iade
