@@ -20,6 +20,7 @@ const MAPPING = {
   "chevron.right": "chevron-right",
   "magnifyingglass": "search",
   "briefcase.fill": "work",
+  "wrench.and.screwdriver.fill": "handyman",
   "message.fill": "chat",
   "person.fill": "person",
   "map.fill": "map",

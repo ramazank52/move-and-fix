@@ -145,7 +145,7 @@
 - [x] Hizmet Talebi — 5 adımlı stepper (Hizmet→Detay→Zaman→Konum→Onay), fotoğraf yükleme, aciliyet, konum
 - [x] Profesyonel Listesi — gerçek kimlik/avatar, kategori, puan, yorum sayısı, konum durumu, müsaitlik, ETA ve fiyat
 - [x] Teklifler — gerçek teklif kartları, karşılaştırma, kabul/reddet sahiplik kontrolü ve durum yönetimi
-- [ ] Ödeme — premium tasarım, hizmet/profesyonel/bedel/toplam/ödeme yöntemi/MoveWallet/güvenlik
+- [x] Ödeme — gerçek hizmet/profesyonel özeti, ücret/toplam, MoveWallet durumu, Stripe/iyzico ve fail-closed güvenlik akışı
 - [ ] Aktif İş / Canlı Takip — harita, rota, ETA, mesaj, konum paylaşımı, status lifecycle
 - [ ] İşlerim — sekmeler: Aktif, Teklifler, Planlanan, Tamamlanan + empty/loading/error states
 - [ ] Mesajlar — conversation list, chat screen, timestamp, okunma durumu, online/müsaitlik

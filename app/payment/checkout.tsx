@@ -107,6 +107,7 @@ export default function CheckoutScreen() {
     { requestId },
     { enabled: Number.isInteger(requestId) && requestId > 0, retry: 1 },
   );
+  const walletSummaryQuery = trpc.wallet.summary.useQuery();
   const createPayment = trpc.payments.create.useMutation();
   const initializeGateway = trpc.payments.initializeGateway.useMutation();
 
@@ -254,6 +255,22 @@ export default function CheckoutScreen() {
     setBuyerForm((current) => ({ ...current, [field]: value }));
   };
 
+  const showWalletStatus = () => {
+    const availableBalance = walletSummaryQuery.data?.availableBalance;
+    const balanceText =
+      typeof availableBalance === "number"
+        ? `Kullanılabilir bakiyeniz ₺${availableBalance.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. `
+        : "MoveWallet bakiyesi şu anda doğrulanamadı. ";
+    Alert.alert(
+      "MoveWallet Ödeme BLOCKER",
+      `${balanceText}Mevcut güvenli ödeme sözleşmesi yalnızca imzalı Stripe veya iyzico sonucu ile emanet bakiyesi oluşturur. Sunucu tarafı cüzdandan tahsilat ve iade muhasebesi tamamlanmadan sahte ödeme başarısı üretilmez.`,
+      [
+        { text: "Kapat", style: "cancel" },
+        { text: "MoveWallet’a Git", onPress: () => router.push("/(tabs)/wallet") },
+      ],
+    );
+  };
+
   const renderContent = () => {
     if (!Number.isInteger(requestId) || requestId <= 0) {
       return (
@@ -299,10 +316,17 @@ export default function CheckoutScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Hizmet Özeti</Text>
-          <SummaryRow label={quote.requestTitle} value={`₺${quote.amount.toLocaleString("tr-TR")}`} colors={colors} />
-          <SummaryRow label="Profesyonel" value={quote.providerName} colors={colors} />
+          <View style={[styles.infoHeader, { marginBottom: 12 }]}> 
+            <View style={[styles.infoIcon, { backgroundColor: `${colors.primary}18` }]}> 
+              <IconSymbol name="wrench.and.screwdriver.fill" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.flowCopy}>
+              <Text style={[styles.flowTitle, { color: colors.foreground }]}>{quote.requestTitle}</Text>
+              <Text style={[styles.flowDescription, { color: colors.muted }]}>Profesyonel: {quote.providerName}</Text>
+            </View>
+          </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryRow}>
             <Text style={[styles.totalLabel, { color: colors.foreground }]}>Toplam</Text>
@@ -331,13 +355,34 @@ export default function CheckoutScreen() {
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Ücret Dökümü</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <SummaryRow label="Hizmet bedeli" value={`₺${quote.amount.toLocaleString("tr-TR")}`} colors={colors} />
           <SummaryRow label={`Platform komisyonu (%${commissionPercent})`} value={`₺${quote.commissionAmount.toLocaleString("tr-TR")}`} colors={colors} />
           <Text style={[styles.helperText, { color: colors.muted }]}>Komisyon hizmet bedelinden kesilir; müşteriye ayrıca yansıtılmaz.</Text>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <View style={styles.summaryRow}>
+            <Text style={[styles.totalLabel, { color: colors.foreground }]}>Ödenecek Toplam</Text>
+            <Text style={[styles.totalValue, { color: colors.primary }]}>₺{quote.amount.toLocaleString("tr-TR")}</Text>
+          </View>
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Ödeme Yöntemi</Text>
+        <ProviderOption
+          title="MoveWallet"
+          subtitle={
+            walletSummaryQuery.isLoading
+              ? "Bakiye doğrulanıyor…"
+              : walletSummaryQuery.isError || !walletSummaryQuery.data
+                ? "Bakiye alınamadı · Ödeme BLOCKER"
+                : `Kullanılabilir: ₺${walletSummaryQuery.data.availableBalance.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · Ödeme BLOCKER`
+          }
+          icon="wallet.pass.fill"
+          selected={false}
+          disabled={processing}
+          onPress={showWalletStatus}
+          colors={colors}
+          warning
+        />
         <ProviderOption
           title="iyzico"
           subtitle="Türkiye için güvenli hosted checkout"
@@ -399,7 +444,9 @@ export default function CheckoutScreen() {
             {processing ? (
               <View style={styles.processingRow}><ActivityIndicator color="#FFFFFF" /><Text style={styles.processingText}>Güvenli oturum hazırlanıyor…</Text></View>
             ) : (
-              <Text style={styles.primaryButtonText}>{provider === "iyzico" ? "iyzico ile Öde" : "Stripe ile Öde"}</Text>
+              <Text style={styles.primaryButtonText}>
+                {provider === "iyzico" ? "iyzico" : "Stripe"} ile ₺{quoteQuery.data.amount.toLocaleString("tr-TR")} Öde
+              </Text>
             )}
           </Pressable>
         </View>
