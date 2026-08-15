@@ -1248,6 +1248,65 @@ export const walletWithdrawals = mysqlTable("wallet_withdrawals", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+// Device-bound Expo push tokens. Tokens are owned by exactly one user at a time
+// and can be safely revoked after an Expo delivery receipt reports an invalid device.
+export const userPushTokens = mysqlTable(
+  "user_push_tokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    token: varchar("token", { length: 255 }).notNull(),
+    platform: mysqlEnum("platform", ["ios", "android"]).notNull(),
+    deviceId: varchar("deviceId", { length: 160 }),
+    active: int("active").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_push_tokens_token_unique").on(table.token),
+    index("user_push_tokens_user_active_idx").on(table.userId, table.active),
+  ],
+);
+
+// A durable, owner-scoped in-app notification timeline. Payload JSON is limited
+// by the application layer before persistence and is never trusted for authorization.
+export const inAppNotifications = mysqlTable(
+  "in_app_notifications",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    type: varchar("type", { length: 80 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    body: text("body").notNull(),
+    dataJson: text("dataJson"),
+    status: mysqlEnum("status", ["pending", "sent", "failed", "read"]).default("sent").notNull(),
+    readAt: timestamp("readAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("in_app_notifications_user_created_idx").on(table.userId, table.createdAt),
+    index("in_app_notifications_user_read_idx").on(table.userId, table.readAt),
+  ],
+);
+
+// User-owned notification routing preferences. JSON payloads are validated by
+// the application layer and allow new channels/types without schema churn.
+export const userNotificationPreferences = mysqlTable(
+  "user_notification_preferences",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    channelsJson: text("channelsJson").notNull(),
+    notificationTypesJson: text("notificationTypesJson").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_notification_preferences_user_unique").on(table.userId),
+  ],
+);
+
 // Export types
 export type ServiceCategory = typeof serviceCategories.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
@@ -1268,3 +1327,5 @@ export type Review = typeof reviews.$inferSelect;
 export type WalletAccount = typeof walletAccounts.$inferSelect;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
 export type WalletWithdrawal = typeof walletWithdrawals.$inferSelect;
+export type UserPushToken = typeof userPushTokens.$inferSelect;
+export type InAppNotification = typeof inAppNotifications.$inferSelect;

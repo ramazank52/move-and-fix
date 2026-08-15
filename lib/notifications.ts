@@ -1,3 +1,5 @@
+import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 // Notification types for Move&Fix
@@ -70,19 +72,27 @@ export const NOTIFICATION_CHANNELS = {
 // Register for push notifications
 export async function registerForPushNotifications(): Promise<string | null> {
   if (Platform.OS === "web") {
-    console.log("Push notifications not supported on web");
     return null;
   }
 
   try {
-    // In production, this would use expo-notifications
-    // const { status } = await Notifications.requestPermissionsAsync();
-    // if (status !== 'granted') return null;
-    // const token = await Notifications.getExpoPushTokenAsync();
-    // return token.data;
-    return "ExponentPushToken[mock-token]";
-  } catch (error) {
-    console.error("Failed to register for push notifications:", error);
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "Move&Fix bildirimleri",
+        importance: Notifications.AndroidImportance.DEFAULT,
+      });
+    }
+    const existing = await Notifications.getPermissionsAsync();
+    const permission = existing.status === "granted"
+      ? existing
+      : await Notifications.requestPermissionsAsync();
+    if (permission.status !== "granted") return null;
+
+    const projectId = Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) return null;
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
+    return token.data;
+  } catch {
     return null;
   }
 }
@@ -94,12 +104,11 @@ export async function scheduleLocalNotification(
   data?: Record<string, string>,
   delaySeconds?: number
 ) {
-  // In production:
-  // await Notifications.scheduleNotificationAsync({
-  //   content: { title, body, data },
-  //   trigger: delaySeconds ? { seconds: delaySeconds } : null,
-  // });
-  console.log(`[Notification] ${title}: ${body}`);
+  if (Platform.OS === "web") return null;
+  return Notifications.scheduleNotificationAsync({
+    content: { title, body, data },
+    trigger: delaySeconds ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: delaySeconds } : null,
+  });
 }
 
 // Sample notifications for demo

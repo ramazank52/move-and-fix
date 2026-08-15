@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
@@ -19,9 +19,37 @@ import { StripeAppProvider } from "@/lib/stripe-sdk";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { createTRPCClient, trpc } from "@/lib/trpc";
 import { LocalizationProvider } from "@/lib/i18n";
+import { registerForPushNotifications } from "@/lib/notifications";
+import { useAuth } from "@/hooks/use-auth";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
+
+function PushRegistration() {
+  const { user, loading } = useAuth();
+  const { mutateAsync: registerPushToken } = trpc.notifications.registerPushToken.useMutation();
+  const registeredUserId = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (loading || !user || Platform.OS === "web" || registeredUserId.current === user.id) return;
+    const platform = Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : null;
+    if (!platform) return;
+    let disposed = false;
+
+    void (async () => {
+      const token = await registerForPushNotifications();
+      if (!token || disposed) return;
+      await registerPushToken({ token, platform });
+      if (!disposed) registeredUserId.current = user.id;
+    })().catch(() => {
+      // Kullanıcıya sahte teslimat başarısı gösterilmez; sonraki uygulama açılışında tekrar denenir.
+    });
+
+    return () => { disposed = true; };
+  }, [loading, registerPushToken, user]);
+
+  return null;
+}
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -79,8 +107,10 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
+          <PushRegistration />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="privacy-policy" />
             <Stack.Screen name="oauth/callback" />
           </Stack>
           <StatusBar style="auto" />

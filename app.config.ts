@@ -93,10 +93,11 @@ const config: ExpoConfig = {
     favicon: "./assets/images/favicon.png",
   },
   extra: {
-    privacyPolicyUrl: "https://moveandfix.app/legal/privacy",
+    privacyPolicyUrl: "https://moveandfix.app/privacy-policy",
   },
   plugins: [
     "expo-router",
+    "expo-notifications",
     [
       "expo-location",
       {

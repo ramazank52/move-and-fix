@@ -21,7 +21,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { walletService } from "./services/WalletService";
-import { notificationService } from "./services/NotificationService";
+import { notificationService, NotificationType as AppNotificationType } from "./services/NotificationService";
 import {
   NotificationChannel,
   notificationServiceV2,
@@ -29,6 +29,7 @@ import {
 import { aiService } from "./services/AIService";
 import { eventService } from "./services/EventService";
 import { storagePut } from "./storage";
+import * as pushStore from "./notifications/push-store";
 import { analyzeCompletionEvidence } from "./services/CompletionEvidenceAnalysisService";
 import {
   gatewayCheckoutService,
@@ -1579,6 +1580,47 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           countryCode: input.countryCode?.toUpperCase(),
         }),
       })),
+  }),
+
+  notifications: router({
+    registerPushToken: protectedProcedure
+      .input(z.object({
+        token: z.string().trim().regex(/^(?:Expo|Exponent)PushToken\[[A-Za-z0-9_-]+\]$/, "Geçerli bir Expo push tokenı gönderin"),
+        platform: z.enum(["ios", "android"]),
+        deviceId: z.string().trim().min(1).max(160).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await pushStore.upsertPushToken({ ...input, userId: ctx.user.id });
+        return { registered: true };
+      }),
+    list: protectedProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).optional())
+      .query(({ ctx, input }) => pushStore.listInAppNotifications(ctx.user.id, input?.limit ?? 50)),
+    preferences: protectedProcedure.query(({ ctx }) =>
+      notificationService.getUserPreferences(String(ctx.user.id))),
+    updatePreferences: protectedProcedure
+      .input(z.object({
+        channels: z.partialRecord(z.nativeEnum(NotificationChannel), z.object({
+          enabled: z.boolean(),
+          quietHours: z.object({
+            start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+            end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+          }).optional(),
+        })).optional(),
+        notificationTypes: z.partialRecord(z.nativeEnum(AppNotificationType), z.object({
+          enabled: z.boolean(),
+          channels: z.array(z.nativeEnum(NotificationChannel)).min(1).optional(),
+        })).optional(),
+      }).refine((input) => input.channels || input.notificationTypes, {
+        message: "En az bir bildirim tercihi gönderin",
+      }))
+      .mutation(({ ctx, input }) => notificationService.updateUserPreferences(String(ctx.user.id), input)),
+    markRead: protectedProcedure
+      .input(z.object({ notificationId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await pushStore.markInAppNotificationRead(ctx.user.id, input.notificationId);
+        return { updated: true };
+      }),
   }),
 
   admin: router({

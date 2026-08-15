@@ -120,6 +120,12 @@ function asNotificationError(error: unknown, context: Record<string, unknown>): 
   );
 }
 
+function normalizeNetgsmRecipient(destination: string): string | null {
+  const digits = destination.replace(/\D/g, "");
+  const domesticNumber = digits.startsWith("90") ? digits.slice(2) : digits;
+  return /^5\d{9}$/.test(domesticNumber) ? domesticNumber : null;
+}
+
 export class NotificationServiceV2 {
   private templates: Map<string, NotificationTemplate> = new Map();
   private notificationQueue: Notification[] = [];
@@ -174,6 +180,44 @@ export class NotificationServiceV2 {
         throw new ExternalServiceError('SendGrid', 'Doğrulama e-postası teslim edilemedi', {
           retryable: response.status >= 500,
           context: { status: response.status, purpose: data.purpose },
+        });
+      }
+      return { deliveryStatus: 'delivered' };
+    }
+
+    const hasNetgsmCredentials = Boolean(ENV.netgsmUsername && ENV.netgsmPassword && ENV.netgsmMsgHeader);
+    if (hasNetgsmCredentials) {
+      const recipient = normalizeNetgsmRecipient(data.destination);
+      if (!recipient) {
+        return { deliveryStatus: 'blocked', blocker: 'NETGSM_RECIPIENT_INVALID' };
+      }
+
+      const credentials = Buffer.from(`${ENV.netgsmUsername}:${ENV.netgsmPassword}`).toString('base64');
+      const response = await fetch('https://api.netgsm.com.tr/sms/rest/v2/send', {
+        method: 'POST',
+        headers: {
+          authorization: `Basic ${credentials}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          msgheader: ENV.netgsmMsgHeader,
+          messages: [{ msg: body, no: recipient }],
+          encoding: 'TR',
+          iysfilter: '0',
+          appname: 'MoveFix',
+        }),
+      });
+
+      let result: { code?: string; description?: string } | null = null;
+      try {
+        result = await response.json() as { code?: string; description?: string };
+      } catch {
+        // Sağlayıcı yanıtı sözleşmeye uymuyorsa başarı olarak kabul edilmez.
+      }
+      if (!response.ok || result?.code !== '00') {
+        throw new ExternalServiceError('NetGSM', 'Doğrulama SMS’i teslimat için kabul edilmedi', {
+          retryable: response.status >= 500,
+          context: { status: response.status, providerCode: result?.code, purpose: data.purpose },
         });
       }
       return { deliveryStatus: 'delivered' };

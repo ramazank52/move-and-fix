@@ -348,3 +348,20 @@
 - [x] Faz 6 kritik mobil yüzeylerde erişilebilirlik etiketleri, rolleri ve eylem ipuçlarını denetle
 - [x] Faz 6 mağaza gizlilik URL’si ve konum/bildirim izin açıklamalarını üretim öncesi yapılandırmaya ekle
 - [x] Faz 6 yetki, canary, kill-switch, hata ve edge-case regresyonları ile kalite kapılarını tamamla
+- [ ] Faz 6 sonrası KVKK/GDPR hukuk belgesini değiştirmeden /privacy-policy public rotasında TR/EN erişilebilir kıl
+- [ ] Faz 6 sonrası ödeme credential, fail-closed ve Git/istemci secret maruziyeti durumunu doğrula
+- [ ] Faz 6 sonrası SMS, e-posta ve FCM credential erişimi ile fail-closed sağlayıcı davranışını doğrula
+- [ ] Faz 6 sonrası Expo Go/development build uygunluğunu ve fiziksel cihaz E2E erişim sınırını doğrula
+- [ ] Faz 6 sonrası kalite kapıları, public gizlilik route kontrolü ve kesin blocker GO/NO-GO raporunu tamamla
+- [x] Sır giriş kartında yalnız iyzico anahtarları girildiğinde kaydetmenin engellenmesi kök nedenini düzelt ve kısmi sağlayıcı yapılandırmasını doğrula
+- [ ] EXTERNAL BLOCKER — NetGSM production credential’ları sağlandığında gerçek SMS kabul ve teslimat doğrulamasını çalıştır
+- [ ] SendGrid teslimatını gerçek credential olmadan fail-closed, credential sağlandığında sandbox doğrulamalı olacak şekilde tamamla
+- [ ] Expo/FCM push token kaydı, uygulama içi geçmiş ve sağlayıcı kabulünü fiziksel cihaz/EAS kimliğiyle doğrula
+- [ ] FINAL EXTERNAL INTEGRATION GATE — Gerçek iyzico/Stripe, NetGSM, SendGrid ve Expo/FCM credential’ları takıldığında canlı sağlayıcı kabulü ve cihaz E2E çalıştır
+- [x] Dış credential olmadan tamamlanabilir tüm frontend, backend, veritabanı, MoveOS, güvenlik, uyum ve regresyon işlerini otonom kapat
+- [x] Bildirim tercihlerini, geçmişini ve okunma durumunu sahiplik denetimli kalıcı veri modeli ve gerçek tRPC prosedürleriyle tamamla
+- [x] NetGSM, SendGrid ve Expo/FCM kod yollarını credential yokken fail-closed; credential sağlandığında gerçek sağlayıcı çağrısına hazır hale getir ve sözleşme testleriyle doğrula
+- [x] iyzico sandbox checkout başlangıcını gerçek credential ile tahsilatsız doğrula; eksik/geçersiz credential yollarının fail-closed kaldığını doğrula
+- [x] İstemci dışa aktarımları ve izlenen Git geçmişinde sağlayıcı sırrı/private key bulunmadığını değer göstermeden doğrula
+- [ ] EXTERNAL BLOCKER — Onaylı İngilizce KVKK/GDPR gizlilik politikası metni sağlandığında /privacy-policy TR/EN public rotasında metni değiştirmeden yayınla
+- [ ] EXTERNAL BLOCKER — moveandfix.app için DNS ve HTTPS yayınlaması tamamlandığında app.config.ts içindeki privacyPolicyUrl altında public gizlilik rotasını doğrula

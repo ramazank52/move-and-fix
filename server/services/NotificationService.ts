@@ -21,6 +21,24 @@ import {
   NotFoundError,
   normalizeError,
 } from '../_core/errors';
+import { ENV } from "../_core/env";
+import { getUserById } from "../db";
+import {
+  deactivatePushToken,
+  getActivePushTokens,
+  getStoredNotificationPreferences,
+  listInAppNotifications,
+  markInAppNotificationRead,
+  saveNotificationPreferences,
+  saveInAppNotification as persistInAppNotification,
+} from "../notifications/push-store";
+
+function normalizeTurkishPhone(destination?: string | null): string | null {
+  if (!destination) return null;
+  const digits = destination.replace(/\D/g, "");
+  const domesticNumber = digits.startsWith("90") ? digits.slice(2) : digits;
+  return /^5\d{9}$/.test(domesticNumber) ? domesticNumber : null;
+}
 
 export enum NotificationChannel {
   PUSH = 'push',
@@ -186,7 +204,9 @@ export class NotificationService {
       createdAt: new Date(),
     };
 
-    // Her kanala gönder
+    // Her kanala gönder. Bir kanalın başarısızlığı diğer kanalı engellemez;
+    // ancak hiçbiri teslim edilemezse işlem başarı olarak raporlanmaz.
+    let deliveredChannelCount = 0;
     for (const channel of channels) {
       try {
         switch (channel) {
@@ -203,6 +223,7 @@ export class NotificationService {
             await this.saveInAppNotification(userId, message);
             break;
         }
+        deliveredChannelCount += 1;
       } catch (error: unknown) {
         const channelError = normalizeError(error, {
           code: 'NOTIFICATION_CHANNEL_ERROR',
@@ -215,8 +236,8 @@ export class NotificationService {
       }
     }
 
-    message.status = 'sent';
-    message.sentAt = new Date();
+    message.status = deliveredChannelCount > 0 ? 'sent' : 'failed';
+    if (deliveredChannelCount > 0) message.sentAt = new Date();
 
     return message;
   }
@@ -225,48 +246,128 @@ export class NotificationService {
    * Push Notification gönder (Expo)
    */
   private async sendPushNotification(userId: string, message: NotificationMessage) {
-    // Expo Push Notification API'sine gönder
-    // const expoPushToken = await this.getExpoPushToken(userId);
-    // await fetch('https://exp.host/--/api/v2/push/send', { ... })
-    console.log(`📱 Push: ${message.title} → ${userId}`);
+    const numericUserId = Number(userId);
+    if (!Number.isSafeInteger(numericUserId) || numericUserId <= 0) throw new Error("PUSH_RECIPIENT_INVALID");
+    const tokens = await getActivePushTokens(numericUserId);
+    if (tokens.length === 0) throw new Error("PUSH_TOKEN_NOT_REGISTERED");
+
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify(tokens.map(({ token }) => ({
+        to: token,
+        sound: "default",
+        title: message.title,
+        body: message.body,
+        data: message.data ?? {},
+      }))),
+    });
+    if (!response.ok) throw new Error("EXPO_PUSH_PROVIDER_REJECTED");
+    const payload = await response.json() as { data?: Array<{ status?: string; details?: { error?: string } }> };
+    const tickets = payload.data ?? [];
+    await Promise.all(tickets.map(async (ticket, index) => {
+      if (ticket.status === "error" && ticket.details?.error === "DeviceNotRegistered" && tokens[index]) {
+        await deactivatePushToken(tokens[index].token);
+      }
+    }));
+    if (tickets.length !== tokens.length || tickets.every((ticket) => ticket.status !== "ok")) {
+      throw new Error("EXPO_PUSH_DELIVERY_REJECTED");
+    }
   }
 
   /**
    * SMS gönder (Twilio vb.)
    */
   private async sendSMS(userId: string, message: NotificationMessage) {
-    // Twilio API'sine gönder
-    // const phoneNumber = await this.getUserPhoneNumber(userId);
-    // await twilio.messages.create({ ... })
-    console.log(`📱 SMS: ${message.title} → ${userId}`);
+    const user = await this.getRecipient(userId);
+    const recipient = normalizeTurkishPhone(user.phone);
+    if (!recipient) throw new Error("SMS_RECIPIENT_INVALID");
+    const body = `${message.title}: ${message.body}`.slice(0, 900);
+
+    if (ENV.netgsmUsername && ENV.netgsmPassword && ENV.netgsmMsgHeader) {
+      const credentials = Buffer.from(`${ENV.netgsmUsername}:${ENV.netgsmPassword}`).toString("base64");
+      const response = await fetch("https://api.netgsm.com.tr/sms/rest/v2/send", {
+        method: "POST",
+        headers: { authorization: `Basic ${credentials}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          msgheader: ENV.netgsmMsgHeader,
+          messages: [{ msg: body, no: recipient }],
+          encoding: "TR",
+          iysfilter: "0",
+          appname: "MoveFix",
+        }),
+      });
+      const result = await response.json().catch(() => null) as { code?: string } | null;
+      if (!response.ok || result?.code !== "00") throw new Error("NETGSM_SMS_REJECTED");
+      return;
+    }
+
+    if (!ENV.twilioAccountSid || !ENV.twilioAuthToken || !ENV.twilioFromNumber) {
+      throw new Error("SMS_PROVIDER_NOT_CONFIGURED");
+    }
+    const credentials = Buffer.from(`${ENV.twilioAccountSid}:${ENV.twilioAuthToken}`).toString("base64");
+    const form = new URLSearchParams({ To: user.phone!, From: ENV.twilioFromNumber, Body: body });
+    const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${ENV.twilioAccountSid}/Messages.json`, {
+      method: "POST",
+      headers: { authorization: `Basic ${credentials}`, "content-type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    if (!response.ok) throw new Error("TWILIO_SMS_REJECTED");
   }
 
   /**
    * E-posta gönder (SendGrid vb.)
    */
   private async sendEmail(userId: string, message: NotificationMessage) {
-    // SendGrid API'sine gönder
-    // const email = await this.getUserEmail(userId);
-    // await sendgrid.send({ ... })
-    console.log(`📧 Email: ${message.title} → ${userId}`);
+    const user = await this.getRecipient(userId);
+    if (!user.email || !ENV.sendgridApiKey || !ENV.verificationEmailFrom) {
+      throw new Error("EMAIL_PROVIDER_NOT_CONFIGURED");
+    }
+    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: { authorization: `Bearer ${ENV.sendgridApiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: user.email }] }],
+        from: { email: ENV.verificationEmailFrom, name: "Move&Fix" },
+        subject: message.title,
+        content: [{ type: "text/plain", value: message.body }],
+      }),
+    });
+    if (!response.ok) throw new Error("SENDGRID_EMAIL_REJECTED");
   }
 
   /**
    * Uygulama içi bildirim kaydet
    */
   private async saveInAppNotification(userId: string, message: NotificationMessage) {
-    // Veritabanına kaydet
-    // await db.saveInAppNotification(message);
-    console.log(`🔔 In-App: ${message.title} → ${userId}`);
+    const numericUserId = Number(userId);
+    if (!Number.isSafeInteger(numericUserId) || numericUserId <= 0) throw new Error("IN_APP_RECIPIENT_INVALID");
+    await persistInAppNotification({
+      userId: numericUserId,
+      type: message.type,
+      title: message.title,
+      body: message.body,
+      data: message.data,
+    });
+  }
+
+  private async getRecipient(userId: string) {
+    const numericUserId = Number(userId);
+    if (!Number.isSafeInteger(numericUserId) || numericUserId <= 0) throw new Error("NOTIFICATION_RECIPIENT_INVALID");
+    const user = await getUserById(numericUserId);
+    if (!user) throw new Error("NOTIFICATION_RECIPIENT_NOT_FOUND");
+    return user;
   }
 
   /**
    * Kullanıcı tercihlerini getir
    */
   async getUserPreferences(userId: string): Promise<NotificationPreference> {
-    // Veritabanından getir
-    // Mock implementasyon
-    return {
+    const numericUserId = Number(userId);
+    if (!Number.isSafeInteger(numericUserId) || numericUserId <= 0) {
+      throw new Error("NOTIFICATION_RECIPIENT_INVALID");
+    }
+    const defaults: NotificationPreference = {
       userId,
       channels: {
         [NotificationChannel.PUSH]: { enabled: true },
@@ -280,6 +381,13 @@ export class NotificationService {
         [NotificationType.PROMOTION]: { enabled: false },
       },
     };
+    const stored = await getStoredNotificationPreferences(numericUserId);
+    if (!stored) return defaults;
+    return {
+      userId,
+      channels: { ...defaults.channels, ...stored.channels },
+      notificationTypes: { ...defaults.notificationTypes, ...stored.notificationTypes },
+    } as NotificationPreference;
   }
 
   /**
@@ -287,15 +395,29 @@ export class NotificationService {
    */
   async updateUserPreferences(
     userId: string,
-    preferences: Partial<NotificationPreference>
+    preferences: {
+      channels?: Partial<Record<NotificationChannel, { enabled: boolean; quietHours?: { start: string; end: string } }>>;
+      notificationTypes?: Partial<Record<NotificationType, { enabled: boolean; channels?: NotificationChannel[] }>>;
+    }
   ): Promise<NotificationPreference> {
-    // Veritabanına kaydet
-    // await db.updateUserPreferences(userId, preferences);
-    return {
+    const numericUserId = Number(userId);
+    if (!Number.isSafeInteger(numericUserId) || numericUserId <= 0) {
+      throw new Error("NOTIFICATION_RECIPIENT_INVALID");
+    }
+    const current = await this.getUserPreferences(userId);
+    const updated: NotificationPreference = {
       userId,
-      channels: preferences.channels || {},
-      notificationTypes: preferences.notificationTypes || {},
+      channels: { ...current.channels, ...preferences.channels },
+      notificationTypes: { ...current.notificationTypes, ...preferences.notificationTypes },
     };
+    await saveNotificationPreferences({
+      userId: numericUserId,
+      preferences: {
+        channels: updated.channels,
+        notificationTypes: updated.notificationTypes,
+      },
+    });
+    return updated;
   }
 
   /**
@@ -349,18 +471,42 @@ export class NotificationService {
       offset?: number;
     }
   ): Promise<NotificationMessage[]> {
-    // Veritabanından getir
-    // Mock implementasyon
-    return [];
+    const numericUserId = Number(userId);
+    if (!Number.isSafeInteger(numericUserId) || numericUserId <= 0) {
+      throw new Error("NOTIFICATION_RECIPIENT_INVALID");
+    }
+    const safeLimit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
+    const rows = await listInAppNotifications(numericUserId, safeLimit);
+    return rows
+      .filter((row) => !filters?.type || row.type === filters.type)
+      .filter((row) => !filters?.status || row.status === filters.status)
+      .slice(Math.max(filters?.offset ?? 0, 0))
+      .map((row) => ({
+        id: String(row.id),
+        userId,
+        type: row.type as NotificationType,
+        channels: [NotificationChannel.IN_APP],
+        title: row.title,
+        body: row.body,
+        data: row.dataJson ? JSON.parse(row.dataJson) as Record<string, unknown> : undefined,
+        status: row.status as NotificationMessage["status"],
+        sentAt: row.status === "sent" ? row.createdAt : undefined,
+        readAt: row.readAt ?? undefined,
+        createdAt: row.createdAt,
+      }));
   }
 
   /**
    * Bildirimi okundu olarak işaretle
    */
-  async markAsRead(notificationId: string): Promise<NotificationMessage | null> {
-    // Veritabanında güncelle
-    // Mock implementasyon
-    return null;
+  async markAsRead(userId: string, notificationId: string): Promise<boolean> {
+    const numericUserId = Number(userId);
+    const numericNotificationId = Number(notificationId);
+    if (!Number.isSafeInteger(numericUserId) || numericUserId <= 0 || !Number.isSafeInteger(numericNotificationId) || numericNotificationId <= 0) {
+      throw new Error("NOTIFICATION_IDENTIFIER_INVALID");
+    }
+    await markInAppNotificationRead(numericUserId, numericNotificationId);
+    return true;
   }
 
   /**
