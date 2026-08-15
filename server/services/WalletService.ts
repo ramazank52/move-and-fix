@@ -76,7 +76,16 @@ export interface EscrowTransaction {
   refundedAt?: Date;
 }
 
+/**
+ * @deprecated The authoritative escrow/wallet implementation is the database
+ * ledger in server/db.ts. This compatibility class is deliberately disabled
+ * so no in-memory balance or transaction can be mistaken for a real movement.
+ */
 export class WalletService {
+  private legacyServiceDisabled(): never {
+    throw new Error("Legacy WalletService is disabled; use the database-backed wallet procedures");
+  }
+
   /**
    * Müşteri ödemesini Escrow'a koy
    */
@@ -230,14 +239,14 @@ export class WalletService {
    * Bakiye getir
    */
   async getBalance(userId: string): Promise<WalletBalance> {
-    // Veritabanından bakiye bilgisini getir
-    // Mock implementasyon
+    // Deprecated compatibility path: zero is intentionally fail-closed. Real
+    // balances are sourced from the immutable ledger in the active domain.
     return {
       userId,
       userType: 'customer',
-      availableBalance: 5000,
-      pendingBalance: 1500,
-      totalBalance: 6500,
+      availableBalance: 0,
+      pendingBalance: 0,
+      totalBalance: 0,
       lastUpdated: new Date(),
     };
   }
@@ -255,6 +264,7 @@ export class WalletService {
     relatedJobId?: string;
     metadata?: Record<string, unknown>;
   }): Promise<WalletTransaction> {
+    return this.legacyServiceDisabled();
     const transaction: WalletTransaction = {
       id: `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       userId: data.userId,
@@ -331,31 +341,7 @@ export class WalletService {
       offset?: number;
     }
   ): Promise<WalletTransaction[]> {
-    // Veritabanından işlem geçmişini getir
-    // Mock implementasyon
-    return [
-      {
-        id: 'TXN-001',
-        userId,
-        type: WalletTransactionType.DEPOSIT,
-        amount: 5000,
-        status: WalletTransactionStatus.COMPLETED,
-        description: 'Kart ile para yatırma',
-        createdAt: new Date('2024-08-01'),
-        updatedAt: new Date('2024-08-01'),
-      },
-      {
-        id: 'TXN-002',
-        userId,
-        type: WalletTransactionType.ESCROW_HOLD,
-        amount: 1500,
-        status: WalletTransactionStatus.COMPLETED,
-        description: 'Sipariş #123 için ödeme',
-        relatedOrderId: '123',
-        createdAt: new Date('2024-08-02'),
-        updatedAt: new Date('2024-08-02'),
-      },
-    ];
+    return [];
   }
 
   /**
@@ -374,9 +360,9 @@ export class WalletService {
     return {
       userId: 'company',
       userType: 'owner',
-      availableBalance: 125000,
-      pendingBalance: 45000,
-      totalBalance: 170000,
+      availableBalance: 0,
+      pendingBalance: 0,
+      totalBalance: 0,
       lastUpdated: new Date(),
     };
   }

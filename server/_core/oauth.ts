@@ -1,7 +1,8 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import type { Express, Request, Response } from "express";
-import { getProviderProfile, getUserByOpenId, upsertUser } from "../db";
-import { clearSessionCookie, getSessionCookieOptions } from "./cookies";
+import { createHash } from "crypto";
+import { getLocalAuthSessionByTokenHash, getProviderProfile, getUserByOpenId, revokeLocalAuthSession, upsertUser } from "../db";
+import { clearSessionCookie, getCookieValue, getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
 function getQueryParam(req: Request, key: string): string | undefined {
@@ -135,9 +136,26 @@ export function registerOAuthRoutes(app: Express) {
     }
   });
 
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
-    clearSessionCookie(req, res);
-    res.json({ success: true });
+  app.post("/api/auth/logout", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = getCookieValue(req, COOKIE_NAME);
+      if (sessionToken) {
+        const tokenHash = createHash("sha256").update(sessionToken).digest("hex");
+        const session = await getLocalAuthSessionByTokenHash(tokenHash);
+        if (session) {
+          await revokeLocalAuthSession({
+            userId: session.userId,
+            sessionId: session.id,
+            reason: "legacy_rest_logout",
+          });
+        }
+      }
+      clearSessionCookie(req, res);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Auth] /api/auth/logout failed:", error);
+      res.status(503).json({ error: "Logout could not invalidate the server session" });
+    }
   });
 
   // Get current authenticated user - works with both cookie (web) and Bearer token (mobile)

@@ -3,7 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import path from "path";
-import { timingSafeEqual } from "crypto";
+import { randomUUID, timingSafeEqual } from "crypto";
 import compression from "compression";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -13,9 +13,19 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { setupSwaggerDocs } from "./swagger";
 import { healthChecker, healthCheckMiddleware } from "./health";
-import { rateLimiters, requestIdMiddleware, CSRFProtection } from "./security";
+import {
+  CSRF_SESSION_COOKIE_NAME,
+  CSRFProtection,
+  getCsrfSessionId,
+  isAllowedCorsOrigin,
+  rateLimiters,
+  requestIdMiddleware,
+  requiresCsrfProtection,
+} from "./security";
 import { registerPaymentWebhookRoutes } from "../payments/registerPaymentWebhookRoutes";
 import { ENV } from "./env";
+import { getCookieValue, getSessionCookieOptions } from "./cookies";
+import { COOKIE_NAME } from "../../shared/const";
 import { createCompletionAutoReleaseResponse } from "./completion-auto-release-response";
 import * as db from "../db";
 import { runFinancialReconciliation } from "../payments/FinancialReconciliationService";
@@ -49,22 +59,38 @@ async function startServer() {
   // Response compression
   app.use(compression());
 
-  // Enable CORS for all routes - reflect the request origin to support credentials
+  // Same-origin requests are allowed. Every cross-origin browser caller must
+  // be configured explicitly, apart from the development-only hosted preview.
   app.use((req, res, next) => {
     const origin = req.headers.origin;
+    const requestHost = req.get("host");
+    let originHost: string | undefined;
+    try {
+      originHost = origin ? new URL(origin).host : undefined;
+    } catch {
+      originHost = undefined;
+    }
+    const isSameOrigin = Boolean(originHost && requestHost && originHost === requestHost);
+
+    if (origin && !isSameOrigin && !isAllowedCorsOrigin(origin)) {
+      res.status(403).json({ error: "Origin is not allowed" });
+      return;
+    }
+
     if (origin) {
       res.header("Access-Control-Allow-Origin", origin);
+      res.header("Vary", "Origin");
+      res.header("Access-Control-Allow-Credentials", "true");
     }
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     res.header(
       "Access-Control-Allow-Headers",
       "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token",
     );
-    res.header("Access-Control-Allow-Credentials", "true");
 
     // Handle preflight requests
     if (req.method === "OPTIONS") {
-      res.sendStatus(200);
+      res.sendStatus(204);
       return;
     }
     next();
@@ -244,26 +270,32 @@ async function startServer() {
   // CSRF protection — token endpoint (for cookie-based web clients like MoveOS)
   const csrf = new CSRFProtection();
   app.get("/api/csrf-token", (req, res) => {
-    // Use a session-based ID from cookie or generate a temporary one
-    const sessionId = (req as any).id || req.socket.remoteAddress || "anonymous";
+    let sessionId = getCsrfSessionId(req);
+    if (!sessionId) {
+      sessionId = randomUUID();
+      res.cookie(CSRF_SESSION_COOKIE_NAME, sessionId, {
+        ...getSessionCookieOptions(req),
+        maxAge: 60 * 60 * 1000,
+      });
+    }
     const token = csrf.generateToken(sessionId);
+    res.setHeader("Cache-Control", "no-store");
     res.json({ token });
   });
 
-  // CSRF protection — state-changing routes (cookie-based requests only, not Bearer/mobile)
+  // CSRF applies to every cookie-authenticated state change, including tRPC
+  // and MoveOS. Signed raw-body webhooks and bearer-token native calls use
+  // their own verification model and are intentionally excluded.
   app.use((req, res, next) => {
-    const authHeader = req.headers.authorization;
-    const isBearerAuth = authHeader && authHeader.startsWith("Bearer ");
-    const isStateChanging = ["POST", "PUT", "DELETE", "PATCH"].includes(req.method);
-    const isApiRoute = req.path.startsWith("/api/");
-    const isTrpc = req.path.startsWith("/api/trpc/");
-    const isOAuth = req.path.startsWith("/api/auth/");
-    const isOwner = req.path.startsWith("/api/owner/");
-
-    if (isStateChanging && isApiRoute && !isBearerAuth && !isTrpc && !isOAuth && !isOwner) {
-      const sessionId = (req as any).id || req.socket.remoteAddress || "anonymous";
+    if (requiresCsrfProtection({
+      method: req.method,
+      path: req.path,
+      authorization: typeof req.headers.authorization === "string" ? req.headers.authorization : undefined,
+      hasCookieSession: Boolean(getCookieValue(req, COOKIE_NAME)),
+    })) {
+      const sessionId = getCsrfSessionId(req);
       const csrfToken = req.headers["x-csrf-token"] as string;
-      if (!csrfToken || !csrf.verifyToken(sessionId, csrfToken)) {
+      if (!sessionId || !csrfToken || !csrf.verifyToken(sessionId, csrfToken)) {
         res.status(403).json({ error: "Invalid CSRF token" });
         return;
       }

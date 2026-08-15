@@ -96,7 +96,7 @@ export interface AIProviderConfig {
 }
 
 export interface AIExecutionResult {
-  success: true;
+  success: boolean;
   message: string;
   result: Record<string, unknown>;
 }
@@ -142,11 +142,11 @@ export class AIService {
     // Local LLM (Ollama vb.)
     this.providers.set(AIProvider.LOCAL, {
       name: AIProvider.LOCAL,
-      endpoint: process.env.LOCAL_LLM_ENDPOINT || 'http://localhost:11434',
+      endpoint: process.env.LOCAL_LLM_ENDPOINT ?? '',
       model: 'llama2',
       temperature: 0.7,
       maxTokens: 2000,
-      enabled: true, // Local her zaman aktif
+      enabled: Boolean(process.env.LOCAL_LLM_ENDPOINT),
     });
   }
 
@@ -323,34 +323,20 @@ export class AIService {
     provider: AIProviderConfig,
     messages: AIProviderMessage[]
   ): Promise<string> {
-    // Mock implementasyon
-    console.log(`🤖 AI Provider: ${provider.name}`);
-
-    // Gerçek implementasyon:
-    // switch (provider.name) {
-    //   case AIProvider.OPENAI:
-    //     return await this.callOpenAI(provider, messages);
-    //   case AIProvider.GEMINI:
-    //     return await this.callGemini(provider, messages);
-    //   case AIProvider.LOCAL:
-    //     return await this.callLocalLLM(provider, messages);
-    // }
-
-    return 'Mock AI response';
+    throw new ExternalServiceError(
+      'AI',
+      `Legacy AIService provider adapter is not configured for ${provider.name}; use the verified MoveAI command pipeline`,
+      { retryable: false },
+    );
   }
 
   /**
    * Komutu parse et
    */
   private parseCommand(response: string): AICommand {
-    // Mock implementasyon
-    return {
-      id: `CMD-${Date.now()}`,
-      type: AICommandType.CREATE_CATEGORY,
-      input: response,
-      parameters: {},
-      requiredPermissions: ['categories:manage'],
-    };
+    throw new ExternalServiceError('AI', 'Legacy AIService cannot parse commands without a verified provider response', {
+      retryable: false,
+    });
   }
 
   /**
@@ -472,11 +458,10 @@ export class AIService {
    * AI Komutunu onayla ve çalıştır
    */
   async approveAndExecute(responseId: string): Promise<AIExecutionResult> {
-    // Mock implementasyon
     return {
-      success: true,
-      message: 'Komut başarıyla çalıştırıldı',
-      result: {},
+      success: false,
+      message: 'Legacy AI executor devre dışı. İşlem uygulanmadı; doğrulanmış MoveOS komut yürütücüsünü kullanın.',
+      result: { responseId, status: 'not_executed' },
     };
   }
 
@@ -485,20 +470,17 @@ export class AIService {
    */
   async getAIStats() {
     return {
-      totalCommands: 1250,
-      successfulCommands: 1180,
-      failedCommands: 70,
-      successRate: 94.4,
-      averageConfidence: 0.82,
-      topCommands: [
-        { type: 'CREATE_CATEGORY', count: 350 },
-        { type: 'UPDATE_COMMISSION', count: 280 },
-        { type: 'CREATE_CAMPAIGN', count: 200 },
-      ],
+      available: false,
+      totalCommands: 0,
+      successfulCommands: 0,
+      failedCommands: 0,
+      successRate: 0,
+      averageConfidence: null,
+      topCommands: [],
       providers: {
-        openai: { used: 600, success: 595 },
-        gemini: { used: 400, success: 390 },
-        local: { used: 250, success: 195 },
+        openai: { used: 0, success: 0 },
+        gemini: { used: 0, success: 0 },
+        local: { used: 0, success: 0 },
       },
     };
   }

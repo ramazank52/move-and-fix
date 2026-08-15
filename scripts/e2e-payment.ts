@@ -123,10 +123,10 @@ async function main() {
   log("Payment credential check");
   const iyzicoKey = process.env.IYZICO_API_KEY ? "SET" : "NOT SET";
   const iyzicoSecret = process.env.IYZICO_SECRET_KEY ? "SET" : "NOT SET";
-  const stripeKey = process.env.STRIPE_API_KEY ? "SET" : "NOT SET";
+  const stripeKey = process.env.STRIPE_SECRET_KEY ? "SET" : "NOT SET";
   console.log(`IYZICO_API_KEY: ${iyzicoKey}`);
   console.log(`IYZICO_SECRET_KEY: ${iyzicoSecret}`);
-  console.log(`STRIPE_API_KEY: ${stripeKey}`);
+  console.log(`STRIPE_SECRET_KEY: ${stripeKey}`);
 
   if (iyzicoKey === "NOT SET" || iyzicoSecret === "NOT SET") {
     console.log("⚠️ BLOCKER: iyzico API credentials not configured — real payment flow cannot be tested");

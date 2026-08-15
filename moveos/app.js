@@ -11,8 +11,27 @@ class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
 
+let csrfTokenPromise = null;
+
+async function getCsrfToken() {
+  csrfTokenPromise ??= fetch("/api/csrf-token", { credentials: "include" })
+    .then(async (response) => {
+      if (!response.ok) return null;
+      const body = await response.json();
+      return typeof body.token === "string" ? body.token : null;
+    })
+    .catch(() => null);
+  return csrfTokenPromise;
+}
+
 async function api(path, options = {}) {
-  const response = await fetch(path, { credentials: "include", headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+  const method = (options.method || "GET").toUpperCase();
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && !headers.Authorization) {
+    const csrfToken = await getCsrfToken();
+    if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+  }
+  const response = await fetch(path, { credentials: "include", ...options, headers });
   const body = await response.json().catch(() => ({ error: "Yanıt okunamadı" }));
   if (!response.ok) throw new ApiError(body.error || `İstek başarısız: ${response.status}`, response.status);
   return body;

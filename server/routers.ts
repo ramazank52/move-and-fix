@@ -26,7 +26,6 @@ import {
   NotificationChannel,
   notificationServiceV2,
 } from "./services/NotificationServiceV2";
-import { aiService } from "./services/AIService";
 import { eventService } from "./services/EventService";
 import { storagePut } from "./storage";
 import * as pushStore from "./notifications/push-store";
@@ -523,8 +522,14 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Kod geçersiz, süresi dolmuş veya deneme sınırına ulaşmış" });
         }
         await db.updateLocalCredentialPassword(local.user.id, hashPassword(input.password));
+        const revokedSessions = await db.revokeOtherLocalAuthSessions({
+          userId: local.user.id,
+          currentSessionId: null,
+          reason: "password_reset",
+        });
+        await db.revokeAdminMfaGrantsForUser(local.user.id);
         await db.markAuthChallengeUsed(validChallenge.id);
-        return { success: true as const };
+        return { success: true as const, revokedSessions };
       }),
     logout: publicProcedure.mutation(async ({ ctx }) => {
       if (ctx.user && ctx.localSessionId) {

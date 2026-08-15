@@ -10,6 +10,11 @@ vi.mock("../server/db", async () => {
     listLocalAuthSessions: vi.fn(),
     revokeLocalAuthSession: vi.fn(),
     revokeOtherLocalAuthSessions: vi.fn(),
+    revokeAdminMfaGrantsForUser: vi.fn(),
+    getActiveAuthChallenge: vi.fn(),
+    getLatestActiveAuthChallenge: vi.fn(),
+    updateLocalCredentialPassword: vi.fn(),
+    markAuthChallengeUsed: vi.fn(),
   };
 });
 
@@ -72,6 +77,33 @@ describe("local authentication security", () => {
     await expect(caller.auth.requestPasswordReset({ email: "missing@example.com" })).resolves.toEqual({ accepted: true });
   });
 
+  it("revokes every local session and active admin MFA grant after a successful password reset", async () => {
+    const local = {
+      user: { ...createContext().user!, id: 71 },
+      credential: { userId: 71 },
+    };
+    vi.mocked(authDb.getUserByEmailNormalized).mockResolvedValue(local as never);
+    vi.mocked(authDb.getActiveAuthChallenge).mockResolvedValue({ id: 901 } as never);
+    vi.mocked(authDb.updateLocalCredentialPassword).mockResolvedValue(undefined);
+    vi.mocked(authDb.revokeOtherLocalAuthSessions).mockResolvedValue(3);
+    vi.mocked(authDb.revokeAdminMfaGrantsForUser).mockResolvedValue(2);
+    vi.mocked(authDb.markAuthChallengeUsed).mockResolvedValue(undefined);
+
+    const caller = appRouter.createCaller(createContext({ user: null }));
+    await expect(caller.auth.resetPassword({
+      email: "local-auth-71@example.com",
+      code: "123456",
+      password: "NewSecurePassword123",
+    })).resolves.toEqual({ success: true, revokedSessions: 3 });
+
+    expect(authDb.revokeOtherLocalAuthSessions).toHaveBeenCalledWith({
+      userId: 71,
+      currentSessionId: null,
+      reason: "password_reset",
+    });
+    expect(authDb.revokeAdminMfaGrantsForUser).toHaveBeenCalledWith(71);
+  });
+
   it("requires a signed-in session for verification and refuses phone verification without a stored phone", async () => {
     const anonymous = appRouter.createCaller(createContext({ user: null }));
     await expect(anonymous.auth.verifyCode({ purpose: "verify_email", code: "123456" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
@@ -120,6 +152,18 @@ describe("local authentication security", () => {
 
     await expect(appRouter.createCaller(createContext()).auth.revokeSession({
       sessionId: "5f7d5d9e-35dd-4140-a5cc-938c98ce7c30",
-    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("revokes all other server-side sessions only for the authenticated owner", async () => {
+    const context = { ...createContext(), localSessionId: "0a5170df-e5c8-43b8-a89c-914bd99850f8" };
+    vi.mocked(authDb.revokeOtherLocalAuthSessions).mockResolvedValue(2);
+
+    await expect(appRouter.createCaller(context).auth.revokeOtherSessions()).resolves.toEqual({ revokedCount: 2 });
+    expect(authDb.revokeOtherLocalAuthSessions).toHaveBeenCalledWith({
+      userId: 71,
+      currentSessionId: context.localSessionId,
+      reason: "user_revoked_others",
+    });
   });
 });

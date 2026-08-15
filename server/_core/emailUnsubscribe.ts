@@ -8,6 +8,7 @@
  */
 
 import crypto from 'crypto';
+import { ENV } from './env';
 
 interface UnsubscribePreferences {
   userId: string;
@@ -24,6 +25,13 @@ interface UnsubscribePreferences {
   tokenExpiresAt: Date;
 }
 
+export function requireUnsubscribeSigningSecret(secret = ENV.unsubscribeSecret): string {
+  if (!secret) {
+    throw new Error('UNSUBSCRIBE_SECRET must be configured before unsubscribe links can be issued');
+  }
+  return secret;
+}
+
 /**
  * Email Unsubscribe Service
  */
@@ -37,7 +45,7 @@ export class EmailUnsubscribeService {
   generateUnsubscribeToken(userId: string, email: string): string {
     const tokenData = `${userId}:${email}:${Date.now()}`;
     const token = crypto
-      .createHmac('sha256', process.env.UNSUBSCRIBE_SECRET || 'default-secret')
+      .createHmac('sha256', requireUnsubscribeSigningSecret())
       .update(tokenData)
       .digest('hex');
 

@@ -1,3 +1,11 @@
+function requiredInProduction(name: string): string {
+  const value = process.env[name]?.trim() ?? "";
+  if (process.env.NODE_ENV === "production" && !value) {
+    throw new Error(`${name} must be configured in production`);
+  }
+  return value;
+}
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
@@ -19,7 +27,7 @@ export const ENV = {
   iyzicoBaseUrl: process.env.IYZICO_BASE_URL ?? "https://sandbox-api.iyzipay.com",
   iyzicoWebhookSecret:
     process.env.IYZICO_WEBHOOK_SECRET ?? process.env.IYZICO_SECRET_KEY ?? "",
-  stripeSecretKey: process.env.STRIPE_API_KEY ?? process.env.STRIPE_SECRET_KEY ?? "",
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   sendgridApiKey: process.env.SENDGRID_API_KEY ?? "",
   verificationEmailFrom: process.env.VERIFICATION_EMAIL_FROM ?? "",
@@ -33,4 +41,6 @@ export const ENV = {
     process.env.ESCROW_RELEASE_CRON_SECRET ?? process.env.COMPLETION_AUTO_RELEASE_SECRET ?? "",
   financialReconciliationSecret: process.env.FINANCIAL_RECONCILIATION_CRON_SECRET ?? "",
   complianceReverificationSecret: process.env.COMPLIANCE_REVERIFICATION_CRON_SECRET ?? "",
+  encryptionKey: requiredInProduction("ENCRYPTION_KEY"),
+  unsubscribeSecret: requiredInProduction("UNSUBSCRIBE_SECRET"),
 };

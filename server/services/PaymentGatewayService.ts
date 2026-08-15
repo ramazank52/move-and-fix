@@ -125,35 +125,14 @@ function asPaymentOperationError(error: unknown, operation: string): AppError {
   });
 }
 
+/**
+ * @deprecated Production payments use GatewayCheckoutService, verified webhook
+ * processing and the immutable ledger. This retained compatibility shell must
+ * never synthesize gateway identifiers or financial success.
+ */
 export class PaymentGatewayService {
-  private iyzico?: unknown; // iyzico SDK adapter'ı
-  private stripe?: unknown; // Stripe SDK adapter'ı
-
-  constructor() {
-    this.initializeProviders();
-  }
-
-  /**
-   * Ödeme sağlayıcılarını başlat
-   */
-  private initializeProviders() {
-    // iyzico initialization
-    if (process.env.IYZICO_API_KEY && process.env.IYZICO_SECRET_KEY) {
-      // const Iyzipay = require('iyzipay');
-      // this.iyzico = new Iyzipay({
-      //   apiKey: process.env.IYZICO_API_KEY,
-      //   secretKey: process.env.IYZICO_SECRET_KEY,
-      //   uri: 'https://api.iyzipay.com'
-      // });
-      console.log('✅ iyzico initialized');
-    }
-
-    // Stripe initialization
-    if (process.env.STRIPE_API_KEY) {
-      // const stripe = require('stripe');
-      // this.stripe = stripe(process.env.STRIPE_API_KEY);
-      console.log('✅ Stripe initialized');
-    }
+  private legacyServiceDisabled(): never {
+    throw new Error("Legacy PaymentGatewayService is disabled; use GatewayCheckoutService and verified callbacks");
   }
 
   /**
@@ -244,29 +223,7 @@ export class PaymentGatewayService {
     card: PaymentCard,
     orderId: string
   ): Promise<string> {
-    // Mock implementasyon
-    // Gerçek implementasyon:
-    // const request = {
-    //   locale: 'tr',
-    //   conversationId: orderId,
-    //   price: amount,
-    //   paidPrice: amount,
-    //   currency: 'TRY',
-    //   installment: '1',
-    //   basketId: orderId,
-    //   paymentChannel: 'WEB',
-    //   paymentGroup: 'PRODUCT',
-    //   cardUserKey: card.providerCardId,
-    //   cardToken: card.providerCardId,
-    //   buyer: { ... },
-    //   billingAddress: { ... },
-    //   shippingAddress: { ... },
-    //   basketItems: [ ... ]
-    // };
-    // const response = await this.iyzico.payment.create(request);
-
-    console.log(`💳 iyzico: ${amount}₺ ödeme işleniyor...`);
-    return `IYZ-${Date.now()}`;
+    return this.legacyServiceDisabled();
   }
 
   /**
@@ -278,18 +235,7 @@ export class PaymentGatewayService {
     card: PaymentCard,
     orderId: string
   ): Promise<string> {
-    // Mock implementasyon
-    // Gerçek implementasyon:
-    // const charge = await this.stripe.charges.create({
-    //   amount: Math.round(amount * 100),
-    //   currency: 'try',
-    //   source: card.providerCardId,
-    //   description: `Order #${orderId}`,
-    //   metadata: { orderId, customerId }
-    // });
-
-    console.log(`💳 Stripe: ${amount}₺ ödeme işleniyor...`);
-    return `STRIPE-${Date.now()}`;
+    return this.legacyServiceDisabled();
   }
 
   /**
@@ -368,8 +314,7 @@ export class PaymentGatewayService {
     amount: number,
     bankAccountId: string
   ): Promise<string> {
-    console.log(`🏦 iyzico: ${amount}₺ para çekme işleniyor...`);
-    return `IYZ-WD-${Date.now()}`;
+    return this.legacyServiceDisabled();
   }
 
   /**
@@ -380,8 +325,7 @@ export class PaymentGatewayService {
     amount: number,
     bankAccountId: string
   ): Promise<string> {
-    console.log(`🏦 Stripe: ${amount}₺ para çekme işleniyor...`);
-    return `STRIPE-WD-${Date.now()}`;
+    return this.legacyServiceDisabled();
   }
 
   /**
@@ -525,8 +469,7 @@ export class PaymentGatewayService {
     expiryYear: number,
     cvv: string
   ): Promise<string> {
-    console.log(`💳 iyzico: Kart ekleniyor...`);
-    return `IYZ-CARD-${Date.now()}`;
+    return this.legacyServiceDisabled();
   }
 
   /**
@@ -540,8 +483,7 @@ export class PaymentGatewayService {
     expiryYear: number,
     cvv: string
   ): Promise<string> {
-    console.log(`💳 Stripe: Kart ekleniyor...`);
-    return `STRIPE-CARD-${Date.now()}`;
+    return this.legacyServiceDisabled();
   }
 
   /**
@@ -564,8 +506,10 @@ export class PaymentGatewayService {
    * Kullanıcı bakiyesi getir
    */
   async getUserBalance(userId: string): Promise<number> {
-    // Veritabanından getir
-    return 5000; // Mock
+    // Deprecated compatibility path: returning zero prevents a legacy caller
+    // from treating an unverified balance as spendable. Real balances come from
+    // the immutable ledger via the active wallet domain.
+    return 0;
   }
 
   /**

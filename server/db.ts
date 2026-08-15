@@ -376,6 +376,16 @@ export async function revokeAdminMfaGrantsForSession(data: { userId: number; ses
     .where(and(eq(adminMfaGrants.userId, data.userId), eq(adminMfaGrants.sessionFingerprint, data.sessionFingerprint), isNull(adminMfaGrants.revokedAt)));
 }
 
+export async function revokeAdminMfaGrantsForUser(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(adminMfaGrants)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(adminMfaGrants.userId, userId), isNull(adminMfaGrants.revokedAt)));
+  return result[0]?.affectedRows ?? 0;
+}
+
 export async function createAuthChallenge(data: {
   userId: number;
   purpose: AuthChallengePurpose;

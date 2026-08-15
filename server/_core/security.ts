@@ -15,6 +15,84 @@
 import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 
+const DEFAULT_DEVELOPMENT_ORIGINS = ['http://localhost:3000', 'http://localhost:8081'] as const;
+export const CSRF_SESSION_COOKIE_NAME = 'movefix_csrf_session';
+
+type SecurityEnvironment = {
+  ALLOWED_ORIGINS?: string;
+  ENCRYPTION_KEY?: string;
+  NODE_ENV?: string;
+};
+
+function getConfiguredOrigins(environment: SecurityEnvironment): string[] {
+  return (environment.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+/** Production accepts only explicitly configured browser origins. */
+export function resolveAllowedOrigins(environment: SecurityEnvironment = process.env): string[] {
+  const configuredOrigins = getConfiguredOrigins(environment);
+  if (configuredOrigins.length > 0) return configuredOrigins;
+  return environment.NODE_ENV === 'production' ? [] : [...DEFAULT_DEVELOPMENT_ORIGINS];
+}
+
+function isTrustedDevelopmentPreviewOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return url.protocol === 'https:' && /^8081-[a-z0-9-]+\.sg1\.manus\.computer$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Hosted preview is development-only; production still requires ALLOWED_ORIGINS. */
+export function isAllowedCorsOrigin(origin: string, environment: SecurityEnvironment = process.env): boolean {
+  return (
+    resolveAllowedOrigins(environment).includes(origin) ||
+    (environment.NODE_ENV !== 'production' && isTrustedDevelopmentPreviewOrigin(origin))
+  );
+}
+
+/** Missing production material is fatal; development never uses a static fallback key. */
+export function resolveEncryptionKey(environment: SecurityEnvironment = process.env): string {
+  const configuredKey = environment.ENCRYPTION_KEY?.trim();
+  if (configuredKey) return configuredKey;
+  if (environment.NODE_ENV === 'production') {
+    throw new Error('ENCRYPTION_KEY must be configured in production');
+  }
+  return crypto.randomBytes(32).toString('hex');
+}
+
+export function getCsrfSessionId(req: Request): string | null {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const prefix = `${CSRF_SESSION_COOKIE_NAME}=`;
+  const part = cookieHeader.split(';').map((value) => value.trim()).find((value) => value.startsWith(prefix));
+  if (!part) return null;
+  try {
+    return decodeURIComponent(part.slice(prefix.length)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function requiresCsrfProtection(input: {
+  method: string;
+  path: string;
+  authorization?: string | undefined;
+  hasCookieSession?: boolean | undefined;
+}): boolean {
+  const method = input.method.toUpperCase();
+  const isStateChanging = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+  const isApiRoute = input.path.startsWith('/api/');
+  const isBearerAuth = input.authorization?.trim().startsWith('Bearer ') ?? false;
+  const isSignedWebhook = input.path.startsWith('/api/payment/webhooks/');
+  const isSignedScheduledCallback = input.path.startsWith('/api/scheduled/');
+  return isStateChanging && isApiRoute && input.hasCookieSession === true && !isBearerAuth && !isSignedWebhook && !isSignedScheduledCallback;
+}
+
 /**
  * In-Memory Rate Limiter
  *
@@ -74,16 +152,11 @@ export const rateLimiters = {
  * CORS Konfigürasyonu
  */
 export const corsOptions = {
-  origin: (process.env.ALLOWED_ORIGINS || '').split(',') || [
-    'http://localhost:3000',
-    'http://localhost:8081',
-    'https://movefix.com',
-    'https://os.movefix.com',
-  ],
+  origin: resolveAllowedOrigins(),
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-CSRF-Token'],
 };
 
 /**
@@ -186,10 +259,11 @@ export class InputSanitizer {
  */
 export class EncryptionService {
   private algorithm = 'aes-256-gcm';
-  private encryptionKey = crypto
-    .createHash('sha256')
-    .update(process.env.ENCRYPTION_KEY || 'default-key')
-    .digest();
+  private encryptionKey: Buffer;
+
+  constructor(encryptionKeyMaterial = resolveEncryptionKey()) {
+    this.encryptionKey = crypto.createHash('sha256').update(encryptionKeyMaterial).digest();
+  }
 
   /**
    * Veriyi şifrele
@@ -277,7 +351,8 @@ export class CSRFProtection {
       return false;
     }
 
-    return stored.token === token;
+    if (stored.token.length !== token.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(stored.token), Buffer.from(token));
   }
 }
 

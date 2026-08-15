@@ -366,8 +366,8 @@
 - [ ] EXTERNAL BLOCKER — Onaylı İngilizce KVKK/GDPR gizlilik politikası metni sağlandığında /privacy-policy TR/EN public rotasında metni değiştirmeden yayınla
 - [ ] EXTERNAL BLOCKER — moveandfix.app için DNS ve HTTPS yayınlaması tamamlandığında app.config.ts içindeki privacyPolicyUrl altında public gizlilik rotasını doğrula
 - [x] Salt-okunur denetim dışa aktarımı: tam kaynak kod ZIP’ini .env, sır, token, credential ve çalışma çıktıları hariç oluşturup içerik taramasıyla doğrula
-- [ ] Master Phase A — CORS allowlist, CSRF kapsamı, env doğrulaması, legacy Wallet/AI kaynakları, Stripe tutarlılığı ve oturum iptalini P0 güvenlik sınırında denetle/düzelt
-- [ ] Master Phase A — P0 güvenlik, yetki, oturum, webhook ve secret regresyonlarını çalıştır; PASS olmadan finansal/kimlik özelliklerini değiştirme
+- [x] Master Phase A — CORS allowlist, CSRF kapsamı, env doğrulaması, legacy Wallet/AI kaynakları, Stripe tutarlılığı ve oturum iptalini P0 güvenlik sınırında denetle/düzelt
+- [x] Master Phase A — P0 güvenlik, yetki, oturum, webhook ve secret regresyonlarını çalıştır; PASS olmadan finansal/kimlik özelliklerini değiştirme
 - [ ] Master Phase B — Consent ledger, TR/EN privacy, IYS iletişim tercihleri, provider retention, ülke/sağlayıcı regülasyon takibi ve dayanıklı scheduler altyapısını tamamla
 - [ ] Master Phase B — Kısmi iade ve payout yaşam döngüsünü gerçek gateway callback’ine idempotent, uzlaştırılabilir ve fail-closed bağla
 - [ ] Master Phase C — Organization/corporate account, RBAC/Super Admin, uluslararasılaştırma, çoklu para birimi ve branding source-of-truth işlerini tamamla
@@ -375,3 +375,5 @@
 - [ ] Master Phase D — Corporate Fleet/Facility ve MoveOS Operations Control yüzeylerini ortak API/DB/MFA güvenlik modeliyle tamamla
 - [ ] Master Phase E — SBOM/SCA, gözlemlenebilirlik, dead/legacy code temizliği, OpenAPI, tam regresyon, Android/iOS/web doğrulaması ve mock/fake final taramasını tamamla
 - [ ] Master final — Her faz için gerçek PASS/PARTIAL/BLOCKED raporu, checkpoint ve production-readiness kararını yalnız doğrulanmış bulgularla sun
+- [x] Master Phase A P0 — CORS allowlist’i fail-closed uygula; cookie tabanlı tRPC ve MoveOS mutasyonlarında CSRF’yi gerçek oturum bağlamıyla zorunlu kıl
+- [x] Master Phase A P0 — ENCRYPTION_KEY üretimde zorunlu, legacy REST logout oturum iptalli, token rotasyonu ve Stripe/Wallet kaynakları denetlenmiş hale getir

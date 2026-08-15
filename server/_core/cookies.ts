@@ -68,3 +68,16 @@ export function getSessionCookieOptions(
 export function clearSessionCookie(req: Request, res: Response) {
   res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(req), maxAge: -1 });
 }
+
+export function getCookieValue(req: Request, name: string): string | null {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const prefix = `${name}=`;
+  const value = cookieHeader.split(";").map((entry) => entry.trim()).find((entry) => entry.startsWith(prefix));
+  if (!value) return null;
+  try {
+    return decodeURIComponent(value.slice(prefix.length)) || null;
+  } catch {
+    return null;
+  }
+}
