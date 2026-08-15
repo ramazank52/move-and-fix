@@ -1,5 +1,9 @@
 # Move&Fix Project TODO
 
+## Rollback
+- [x] aa48dc5e geri alma talebi kullanıcı tarafından iptal edildi; geri alma uygulanmadı
+- [x] Phase 6 otomatik escrow callback sırrının test/servis ortamına yüklenmesini kök neden düzeyinde doğrula
+
 ## Phase 1: Foundation
 - [x] Configure theme colors (brand orange)
 - [x] Set up tab navigation structure (customer tabs)
@@ -254,7 +258,13 @@
 - [x] Phase 5 yerel auth, belge yetkilendirme ve sesli mesaj güvenlik testlerini ekle
 - [ ] Phase 5 kalite kapıları, mobil export ve render regresyonunu tekrar doğrula
 - [x] Phase 5 TypeScript, lint, sunucu build, 273 testlik regresyon paketi ve iOS/Android Expo export kalite kapılarını doğrula
-- [ ] İş başlangıç/bitiş, İşi Bitirdim, fotoğraf/kanıt, AI kanıt analizi, müşteri onayı, dispute ve 48 saatlik otomatik serbest bırakma yaşam döngüsünü tamamla
+- [x] İş başlangıç/bitiş, İşi Bitirdim, fotoğraf/kanıt, AI kanıt analizi, müşteri onayı, dispute ve 48 saatlik otomatik serbest bırakma yaşam döngüsünü tamamla
+- [x] Phase 6 iş kanıtı, müşteri onayı, itiraz ve 48 saatlik emanet serbest bırakma veri modelini migration ile ekle
+- [x] Phase 6 yaşam döngüsü API’lerini fail-closed rol, durum geçişi ve işlem idempotency kurallarıyla uygula
+- [x] Phase 6 iş kanıtı, müşteri onayı ve itiraz mobil arayüzlerini gerçek API akışlarına bağla
+- [x] Phase 6 AI kanıt analizinin yardımcı niteliğini canlı takipte şeffaf biçimde göster
+- [x] Phase 6 yetki, geçersiz durum, kanıt medya ve escrow süre testlerini ekle
+- [x] Phase 6 TypeScript, lint, build, test ve iOS/Android export kalite kapılarını doğrula
 - [ ] Escrow, yüzde 10 komisyon, profesyonel cüzdanı, para çekme, ödeme güvenliği, webhook doğrulama, idempotency ve double-payment korumasını production standardında doğrula
 - [ ] MoveOS içinde içerik, kategori, ücret, komisyon, kullanıcı, hizmet ve sistem ayarlarının gerçek ortak API üzerinden yönetimini tamamla
 - [ ] Türkçe, İngilizce, Almanca, Fransızca, Arapça ve Rusça; RTL; ülke, para birimi, tarih/saat ve ölçü yerelleştirme altyapısını tamamla

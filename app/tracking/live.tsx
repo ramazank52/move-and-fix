@@ -1,5 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -12,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +22,7 @@ import { JobTrackingMap } from "@/components/job-tracking-map";
 import type { TrackingCoordinate } from "@/components/job-tracking-map.types";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { readUriAsBase64 } from "@/lib/file-to-base64";
 import { trpc } from "@/lib/trpc";
 
 type LifecycleStatus =
@@ -29,6 +32,36 @@ type LifecycleStatus =
   | "in_progress"
   | "completed"
   | "cancelled";
+
+type PendingCompletionMedia = {
+  id: string;
+  uri: string;
+  originalName: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif" | "video/mp4" | "video/quicktime";
+  kind: "image" | "video";
+  sizeBytes?: number;
+};
+
+const COMPLETION_MEDIA_LIMIT = 4;
+const MAX_COMPLETION_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_COMPLETION_VIDEO_BYTES = 25 * 1024 * 1024;
+const ALLOWED_COMPLETION_MIME_TYPES = new Set<PendingCompletionMedia["mimeType"]>([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "video/mp4",
+  "video/quicktime",
+]);
+
+function resolveCompletionMime(asset: ImagePicker.ImagePickerAsset): PendingCompletionMedia["mimeType"] | null {
+  if (asset.mimeType && ALLOWED_COMPLETION_MIME_TYPES.has(asset.mimeType as PendingCompletionMedia["mimeType"])) {
+    return asset.mimeType as PendingCompletionMedia["mimeType"];
+  }
+  if (asset.type === "video") return "video/mp4";
+  return "image/jpeg";
+}
 
 const TIMELINE: readonly {
   status: Exclude<LifecycleStatus, "cancelled">;
@@ -105,6 +138,23 @@ function formatUpdatedAt(value: Date | string | null | undefined) {
   return `Son güncelleme ${date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+function parseAiAnalysisFlags(value: string | null | undefined): string[] {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatAiConfidence(value: string | number | null | undefined) {
+  const confidence = Number(value);
+  return Number.isFinite(confidence) && confidence >= 0 && confidence <= 1
+    ? `%${Math.round(confidence * 100)}`
+    : null;
+}
+
 export default function LiveTrackingScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -114,6 +164,10 @@ export default function LiveTrackingScreen() {
   const hasValidRequestId = Number.isInteger(requestId) && requestId > 0;
   const utils = trpc.useUtils();
   const [isSharingLocation, setIsSharingLocation] = useState(false);
+  const [proofSummary, setProofSummary] = useState("");
+  const [pendingProofMedia, setPendingProofMedia] = useState<PendingCompletionMedia[]>([]);
+  const [isDisputeComposerOpen, setIsDisputeComposerOpen] = useState(false);
+  const [disputeDescription, setDisputeDescription] = useState("");
   const locationSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
   const locationMutationPendingRef = useRef(false);
 
@@ -132,6 +186,33 @@ export default function LiveTrackingScreen() {
     onSuccess: async () => {
       await utils.tracking.get.invalidate({ requestId });
       await trackingQuery.refetch();
+    },
+  });
+  const completionQuery = trpc.completion.workflow.useQuery(
+    { requestId },
+    { enabled: hasValidRequestId, refetchInterval: 15_000, retry: 1 },
+  );
+  const refreshCompletion = async () => {
+    await Promise.all([
+      utils.completion.workflow.invalidate({ requestId }),
+      utils.tracking.get.invalidate({ requestId }),
+      completionQuery.refetch(),
+      trackingQuery.refetch(),
+    ]);
+  };
+  const submitProof = trpc.completion.submitProof.useMutation({
+    onSuccess: async () => {
+      setProofSummary("");
+      setPendingProofMedia([]);
+      await refreshCompletion();
+    },
+  });
+  const approveCompletion = trpc.completion.approve.useMutation({ onSuccess: refreshCompletion });
+  const openDispute = trpc.completion.dispute.useMutation({
+    onSuccess: async () => {
+      setDisputeDescription("");
+      setIsDisputeComposerOpen(false);
+      await refreshCompletion();
     },
   });
 
@@ -227,6 +308,100 @@ export default function LiveTrackingScreen() {
         "Durum güncellenemedi",
         error instanceof Error ? error.message : "İş durumu güncellenirken hata oluştu.",
       );
+    }
+  };
+
+  const handlePickProofMedia = async () => {
+    const remaining = COMPLETION_MEDIA_LIMIT - pendingProofMedia.length;
+    if (remaining <= 0) {
+      Alert.alert("Kanıt medya sınırı", `En fazla ${COMPLETION_MEDIA_LIMIT} fotoğraf veya video ekleyebilirsiniz.`);
+      return;
+    }
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Galeri izni gerekli", "İş kanıtı eklemek için galeri erişimine izin vermelisiniz.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.85,
+      videoMaxDuration: 60,
+    });
+    if (result.canceled) return;
+
+    const rejected: string[] = [];
+    const accepted = result.assets.slice(0, remaining).flatMap((asset, index) => {
+      const mimeType = resolveCompletionMime(asset);
+      const kind = asset.type === "video" ? "video" : "image";
+      const maxBytes = kind === "video" ? MAX_COMPLETION_VIDEO_BYTES : MAX_COMPLETION_IMAGE_BYTES;
+      if (!mimeType || (asset.fileSize != null && asset.fileSize > maxBytes)) {
+        rejected.push(asset.fileName ?? `Dosya ${index + 1}`);
+        return [];
+      }
+      return [{
+        id: `${Date.now()}-${index}-${asset.assetId ?? "local"}`,
+        uri: asset.uri,
+        originalName: asset.fileName ?? `iş-kaniti-${Date.now()}-${index}.${kind === "video" ? "mp4" : "jpg"}`,
+        mimeType,
+        kind,
+        sizeBytes: asset.fileSize,
+      } satisfies PendingCompletionMedia];
+    });
+    setPendingProofMedia((current) => [...current, ...accepted].slice(0, COMPLETION_MEDIA_LIMIT));
+    if (rejected.length > 0) {
+      Alert.alert("Bazı dosyalar eklenmedi", "Desteklenmeyen türde veya izin verilen boyuttan büyük medya seçildi.");
+    }
+  };
+
+  const handleSubmitProof = async () => {
+    if (proofSummary.trim().length < 10) {
+      Alert.alert("Açıklama gerekli", "Yapılan işi en az 10 karakterle açıklayın.");
+      return;
+    }
+    if (pendingProofMedia.length === 0) {
+      Alert.alert("Kanıt gerekli", "En az bir fotoğraf veya video ekleyin.");
+      return;
+    }
+    try {
+      const media = await Promise.all(
+        pendingProofMedia.map(async (item) => ({
+          originalName: item.originalName,
+          mimeType: item.mimeType,
+          base64: await readUriAsBase64(item.uri),
+        })),
+      );
+      await submitProof.mutateAsync({ requestId, summary: proofSummary.trim(), media });
+      Alert.alert("Kanıt gönderildi", "Müşterinin 48 saat içinde onay veya itiraz yanıtı vermesi bekleniyor.");
+    } catch (error) {
+      Alert.alert("Kanıt gönderilemedi", error instanceof Error ? error.message : "İş kanıtı yüklenemedi.");
+    }
+  };
+
+  const handleApproveCompletion = async () => {
+    try {
+      await approveCompletion.mutateAsync({ requestId });
+      Alert.alert("İş onaylandı", "Emanet tutarı güvenli biçimde profesyonel cüzdanına aktarıldı.");
+    } catch (error) {
+      Alert.alert("Onay tamamlanamadı", error instanceof Error ? error.message : "İş onaylanamadı.");
+    }
+  };
+
+  const handleOpenDispute = async () => {
+    if (disputeDescription.trim().length < 10) {
+      Alert.alert("Açıklama gerekli", "İtiraz nedeninizi en az 10 karakterle açıklayın.");
+      return;
+    }
+    try {
+      await openDispute.mutateAsync({
+        requestId,
+        reasonCode: "quality_issue",
+        description: disputeDescription.trim(),
+      });
+      Alert.alert("İtiraz kaydedildi", "Emanet çözümü yönetici incelemesine gönderildi.");
+    } catch (error) {
+      Alert.alert("İtiraz açılamadı", error instanceof Error ? error.message : "İtiraz kaydedilemedi.");
     }
   };
 
@@ -402,7 +577,7 @@ export default function LiveTrackingScreen() {
           </View>
         </View>
 
-        <View style={[styles.timelineCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.timelineCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>İş Durumu</Text>
           <View style={styles.timelineRow}>
             {TIMELINE.map((step, index) => {
@@ -422,6 +597,114 @@ export default function LiveTrackingScreen() {
             })}
           </View>
         </View>
+
+        {completionQuery.data?.canProviderSubmitProof ? (
+          <View style={[styles.completionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+            <View style={styles.completionTitleRow}>
+              <MaterialIcons name="verified-user" size={20} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>İş Kanıtı</Text>
+            </View>
+            <Text style={[styles.completionHint, { color: colors.muted }]}>İşi bitirdiğinizi fotoğraf veya video ile belgeleyin. Müşterinin yanıt süresi 48 saattir.</Text>
+            <Text style={[styles.aiDisclosure, { color: colors.muted }]}>Gönderdiğiniz görseller, yalnız incelemeyi desteklemek üzere MoveAI tarafından analiz edilebilir. Analiz onay veya ödeme kararı vermez.</Text>
+            <TextInput
+              value={proofSummary}
+              onChangeText={setProofSummary}
+              placeholder="Yapılan işlemi açıklayın"
+              placeholderTextColor={colors.muted}
+              multiline
+              maxLength={2000}
+              style={[styles.completionInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+            />
+            <Pressable onPress={handlePickProofMedia} style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.72 : 1 }]}> 
+              <MaterialIcons name="add-photo-alternate" size={19} color={colors.primary} />
+              <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Fotoğraf veya Video Ekle</Text>
+            </Pressable>
+            {pendingProofMedia.map((item) => (
+              <View key={item.id} style={[styles.proofMediaRow, { borderColor: colors.border }]}> 
+                <MaterialIcons name={item.kind === "video" ? "videocam" : "image"} size={18} color={colors.primary} />
+                <Text style={[styles.proofMediaName, { color: colors.foreground }]} numberOfLines={1}>{item.originalName}</Text>
+                <Pressable onPress={() => setPendingProofMedia((current) => current.filter((media) => media.id !== item.id))} hitSlop={10}>
+                  <MaterialIcons name="close" size={18} color={colors.muted} />
+                </Pressable>
+              </View>
+            ))}
+            <Pressable disabled={submitProof.isPending} onPress={handleSubmitProof} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary, opacity: pressed || submitProof.isPending ? 0.72 : 1 }]}> 
+              {submitProof.isPending ? <ActivityIndicator color="#FFFFFF" /> : <MaterialIcons name="upload-file" size={20} color="#FFFFFF" />}
+              <Text style={styles.primaryButtonText}>İş Kanıtını Gönder</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {completionQuery.data?.proof ? (
+          <View style={[styles.completionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+            <View style={styles.completionTitleRow}>
+              <MaterialIcons name={completionQuery.data.dispute ? "gavel" : "fact-check"} size={20} color={completionQuery.data.dispute ? colors.warning : colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>İş Kanıtı Durumu</Text>
+            </View>
+            <Text style={[styles.proofSummary, { color: colors.foreground }]}>{completionQuery.data.proof.summary}</Text>
+            <Text style={[styles.completionHint, { color: colors.muted }]}> 
+              {completionQuery.data.dispute
+                ? "İtiraz açık. Emanet tutarı yönetici çözümünü bekliyor."
+                : completionQuery.data.responseExpired
+                  ? "Müşteri yanıt süresi doldu; emanet serbest bırakma işlemi sıraya alındı."
+                  : completionQuery.data.canCustomerRespond
+                    ? "Kanıtı inceleyip işi onaylayın veya itiraz oluşturun."
+                    : "İş kanıtı kaydedildi."}
+            </Text>
+            {completionQuery.data.proof.aiAnalysisStatus === "completed" ? (
+              <View style={[styles.aiAnalysisCard, { backgroundColor: colors.background, borderColor: colors.border }]}> 
+                <View style={styles.completionTitleRow}>
+                  <MaterialIcons name="auto-awesome" size={17} color={colors.primary} />
+                  <Text style={[styles.aiAnalysisTitle, { color: colors.foreground }]}>MoveAI inceleme notu</Text>
+                  {formatAiConfidence(completionQuery.data.proof.aiAnalysisConfidence) ? (
+                    <Text style={[styles.aiConfidence, { color: colors.primary }]}>
+                      Güven {formatAiConfidence(completionQuery.data.proof.aiAnalysisConfidence)}
+                    </Text>
+                  ) : null}
+                </View>
+                {completionQuery.data.proof.aiAnalysisSummary ? (
+                  <Text style={[styles.aiAnalysisCopy, { color: colors.foreground }]}>{completionQuery.data.proof.aiAnalysisSummary}</Text>
+                ) : null}
+                {parseAiAnalysisFlags(completionQuery.data.proof.aiAnalysisFlags).map((flag) => (
+                  <View key={flag} style={styles.aiFlagRow}>
+                    <MaterialIcons name="info-outline" size={15} color={colors.warning} />
+                    <Text style={[styles.aiFlagText, { color: colors.muted }]}>{flag}</Text>
+                  </View>
+                ))}
+                <Text style={[styles.aiDisclosure, { color: colors.muted }]}>Bu otomatik değerlendirme yalnız karar desteğidir; müşteri onayı, itiraz veya yönetici kararı yerine geçmez.</Text>
+              </View>
+            ) : null}
+            {completionQuery.data.canCustomerRespond ? (
+              <View style={styles.completionActions}>
+                <Pressable disabled={approveCompletion.isPending} onPress={handleApproveCompletion} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.success, opacity: pressed || approveCompletion.isPending ? 0.72 : 1 }]}> 
+                  {approveCompletion.isPending ? <ActivityIndicator color="#FFFFFF" /> : <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />}
+                  <Text style={styles.primaryButtonText}>İşi Onayla</Text>
+                </Pressable>
+                <Pressable onPress={() => setIsDisputeComposerOpen((open) => !open)} style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.error, opacity: pressed ? 0.72 : 1 }]}> 
+                  <MaterialIcons name="report-problem" size={19} color={colors.error} />
+                  <Text style={[styles.secondaryButtonText, { color: colors.error }]}>İtiraz Oluştur</Text>
+                </Pressable>
+                {isDisputeComposerOpen ? (
+                  <View style={styles.disputeComposer}>
+                    <TextInput
+                      value={disputeDescription}
+                      onChangeText={setDisputeDescription}
+                      placeholder="İtiraz nedeninizi açıklayın"
+                      placeholderTextColor={colors.muted}
+                      multiline
+                      maxLength={2000}
+                      style={[styles.completionInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+                    />
+                    <Pressable disabled={openDispute.isPending} onPress={handleOpenDispute} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.error, opacity: pressed || openDispute.isPending ? 0.72 : 1 }]}> 
+                      {openDispute.isPending ? <ActivityIndicator color="#FFFFFF" /> : <MaterialIcons name="gavel" size={20} color="#FFFFFF" />}
+                      <Text style={styles.primaryButtonText}>İtirazı Gönder</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {tracking.viewerRole === "provider" ? (
           <View style={styles.providerActions}>
@@ -462,6 +745,13 @@ export default function LiveTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
+  aiAnalysisCard: { borderRadius: 12, borderWidth: 1, gap: 7, padding: 11 },
+  aiAnalysisCopy: { fontSize: 12, lineHeight: 18 },
+  aiAnalysisTitle: { flex: 1, fontSize: 12, fontWeight: "700" },
+  aiConfidence: { fontSize: 10, fontWeight: "700" },
+  aiDisclosure: { fontSize: 11, lineHeight: 16 },
+  aiFlagRow: { alignItems: "flex-start", flexDirection: "row", gap: 6 },
+  aiFlagText: { flex: 1, fontSize: 11, lineHeight: 16 },
   avatar: { alignItems: "center", borderRadius: 25, height: 50, justifyContent: "center", width: 50 },
   avatarText: { fontSize: 19, fontWeight: "800" },
   detailCard: { borderRadius: 18, borderWidth: 1, gap: 14, padding: 16 },
@@ -470,6 +760,12 @@ const styles = StyleSheet.create({
   detailLabel: { fontSize: 11, marginBottom: 2 },
   detailRow: { alignItems: "flex-start", flexDirection: "row", gap: 10 },
   detailValue: { fontSize: 14, fontWeight: "600", lineHeight: 20 },
+  completionActions: { gap: 9 },
+  completionCard: { borderRadius: 18, borderWidth: 1, gap: 12, padding: 16 },
+  completionHint: { fontSize: 12, lineHeight: 18 },
+  completionInput: { borderRadius: 12, borderWidth: 1, fontSize: 14, lineHeight: 20, minHeight: 86, padding: 12, textAlignVertical: "top" },
+  completionTitleRow: { alignItems: "center", flexDirection: "row", gap: 8 },
+  disputeComposer: { gap: 9, marginTop: 2 },
   etaPill: { alignItems: "center", borderRadius: 12, minWidth: 48, paddingHorizontal: 9, paddingVertical: 7 },
   etaUnit: { fontSize: 9, fontWeight: "600" },
   etaValue: { fontSize: 17, fontWeight: "800", lineHeight: 19 },
@@ -485,6 +781,9 @@ const styles = StyleSheet.create({
   priceText: { fontSize: 17, fontWeight: "800" },
   primaryButton: { alignItems: "center", borderRadius: 15, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 52, paddingHorizontal: 16 },
   primaryButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  proofMediaName: { flex: 1, fontSize: 12, fontWeight: "600" },
+  proofMediaRow: { alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", gap: 9, paddingBottom: 8 },
+  proofSummary: { fontSize: 14, fontWeight: "600", lineHeight: 20 },
   providerActions: { gap: 10 },
   providerCard: { alignItems: "center", borderRadius: 18, borderWidth: 1, flexDirection: "row", padding: 14 },
   providerCopy: { flex: 1, marginLeft: 12, minWidth: 0 },

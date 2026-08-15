@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import { timingSafeEqual } from "crypto";
 import compression from "compression";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -13,6 +14,9 @@ import { setupSwaggerDocs } from "./swagger";
 import { healthChecker, healthCheckMiddleware } from "./health";
 import { rateLimiters, requestIdMiddleware, CSRFProtection } from "./security";
 import { registerPaymentWebhookRoutes } from "../payments/registerPaymentWebhookRoutes";
+import { ENV } from "./env";
+import { createCompletionAutoReleaseResponse } from "./completion-auto-release-response";
+import * as db from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -89,6 +93,52 @@ async function startServer() {
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // The database transition is idempotent; this endpoint is still protected so
+  // only the configured scheduler can start automatic escrow resolution.
+  app.post("/api/scheduled/completion-auto-release", async (req, res) => {
+    const configuredSecret = ENV.completionAutoReleaseSecret;
+    const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
+    const actualAuthorization = String(req.headers.authorization ?? "");
+    const callbackToken = String(req.body?.token ?? "");
+    const hasBearerMatch =
+      expectedAuthorization.length > 0 &&
+      actualAuthorization.length === expectedAuthorization.length &&
+      timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
+    const hasPayloadMatch =
+      configuredSecret.length > 0 &&
+      callbackToken.length === configuredSecret.length &&
+      timingSafeEqual(Buffer.from(callbackToken), Buffer.from(configuredSecret));
+    const matches = hasBearerMatch || hasPayloadMatch;
+    if (!matches) {
+      res.status(configuredSecret ? 401 : 503).json({
+        error: configuredSecret ? "Unauthorized scheduled callback" : "Scheduled callback is not configured",
+      });
+      return;
+    }
+
+    const requestedLimit = Number(req.body?.limit ?? 25);
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 100) {
+      res.status(400).json({ error: "limit must be an integer between 1 and 100" });
+      return;
+    }
+
+    try {
+      const results = await db.autoReleaseDueCompletionProofs(new Date(), requestedLimit);
+      const response = createCompletionAutoReleaseResponse(results);
+      console.info("[completion-auto-release] processed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        ...response.summary,
+      });
+      res.status(200).json(response);
+    } catch (error) {
+      console.error("[completion-auto-release] failed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        error,
+      });
+      res.status(500).json({ error: "Completion auto-release processing failed" });
+    }
+  });
 
   // CSRF protection — token endpoint (for cookie-based web clients like MoveOS)
   const csrf = new CSRFProtection();

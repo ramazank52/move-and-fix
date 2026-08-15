@@ -26,4 +26,6 @@ export const ENV = {
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID ?? "",
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? "",
   twilioFromNumber: process.env.TWILIO_FROM_NUMBER ?? "",
+  completionAutoReleaseSecret:
+    process.env.ESCROW_RELEASE_CRON_SECRET ?? process.env.COMPLETION_AUTO_RELEASE_SECRET ?? "",
 };

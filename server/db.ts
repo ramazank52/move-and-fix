@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -465,6 +465,10 @@ import {
   providerFavorites,
   reviews,
   jobTracking,
+  jobCompletionProofs,
+  jobCompletionProofMedia,
+  completionDisputes,
+  escrowReleaseEvents,
 } from "../drizzle/schema";
 
 // Service Categories
@@ -1519,6 +1523,463 @@ export async function updateJobLifecycle(data: {
 
     return { success: true, requestId: data.requestId, status: data.status, idempotent: false };
   });
+}
+
+type DatabaseClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type DatabaseTransaction = Parameters<Parameters<DatabaseClient["transaction"]>[0]>[0];
+type CompletionReleaseReason = "customer_approval" | "auto_release" | "admin_resolution";
+
+async function releaseHeldEscrowInTransaction(
+  tx: DatabaseTransaction,
+  data: {
+    requestId: number;
+    completionProofId: number;
+    paymentId: number;
+    providerUserId: number;
+    providerPayout: number | null;
+    reason: CompletionReleaseReason;
+    actorUserId?: number;
+  },
+) {
+  const existingEvents = await tx
+    .select()
+    .from(escrowReleaseEvents)
+    .where(eq(escrowReleaseEvents.paymentId, data.paymentId))
+    .limit(1);
+  if (existingEvents[0]) {
+    return { released: true, duplicated: true, event: existingEvents[0] };
+  }
+
+  if (!data.providerPayout || data.providerPayout < 1) {
+    throw new Error("ESCROW_PROVIDER_PAYOUT_INVALID");
+  }
+
+  const paymentRows = await tx
+    .select()
+    .from(payments)
+    .where(eq(payments.id, data.paymentId))
+    .limit(1);
+  const payment = paymentRows[0];
+  if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+  if (payment.requestId !== data.requestId) throw new Error("ESCROW_REQUEST_MISMATCH");
+  if (payment.status !== "held") {
+    throw new Error(payment.status === "released" ? "ESCROW_RELEASE_EVENT_MISSING" : "ESCROW_NOT_HELD");
+  }
+
+  const idempotencyKey = `escrow-release:${data.paymentId}`;
+  const eventResult = await tx.insert(escrowReleaseEvents).values({
+    requestId: data.requestId,
+    paymentId: data.paymentId,
+    completionProofId: data.completionProofId,
+    reason: data.reason,
+    actorUserId: data.actorUserId,
+    idempotencyKey,
+  });
+
+  const paymentUpdate = await tx
+    .update(payments)
+    .set({ status: "released" })
+    .where(and(eq(payments.id, data.paymentId), eq(payments.status, "held")));
+  if ((paymentUpdate[0]?.affectedRows ?? 0) !== 1) {
+    throw new Error("ESCROW_RELEASE_CONFLICT");
+  }
+
+  await tx
+    .insert(walletAccounts)
+    .values({ userId: data.providerUserId, currency: "TRY" })
+    .onDuplicateKeyUpdate({ set: { userId: data.providerUserId } });
+  await tx
+    .update(walletAccounts)
+    .set({ availableBalance: sql`${walletAccounts.availableBalance} + ${data.providerPayout}` })
+    .where(eq(walletAccounts.userId, data.providerUserId));
+  await tx.insert(walletTransactions).values({
+    userId: data.providerUserId,
+    type: "provider_payout",
+    status: "completed",
+    amount: data.providerPayout,
+    description: "İş tamamlanması sonrası emanet ödemesi",
+    reference: `payment:${data.paymentId}`,
+    idempotencyKey,
+    metadata: JSON.stringify({
+      requestId: data.requestId,
+      completionProofId: data.completionProofId,
+      releaseReason: data.reason,
+    }),
+  });
+
+  const eventRows = await tx
+    .select()
+    .from(escrowReleaseEvents)
+    .where(eq(escrowReleaseEvents.id, eventResult[0].insertId))
+    .limit(1);
+  if (!eventRows[0]) throw new Error("ESCROW_RELEASE_EVENT_CREATE_FAILED");
+  return { released: true, duplicated: false, event: eventRows[0] };
+}
+
+export async function getCompletionWorkflow(requestId: number, userId: number) {
+  const tracking = await getJobTracking(requestId, userId);
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [proofRows, disputeRows, paymentRows] = await Promise.all([
+    db.select().from(jobCompletionProofs).where(eq(jobCompletionProofs.requestId, requestId)).limit(1),
+    db.select().from(completionDisputes).where(eq(completionDisputes.requestId, requestId)).limit(1),
+    db.select().from(payments).where(eq(payments.requestId, requestId)).limit(1),
+  ]);
+  const proof = proofRows[0] ?? null;
+  const media = proof
+    ? await db
+        .select({
+          id: serviceRequestMedia.id,
+          kind: serviceRequestMedia.kind,
+          storageKey: serviceRequestMedia.storageKey,
+          originalName: serviceRequestMedia.originalName,
+          mimeType: serviceRequestMedia.mimeType,
+          sizeBytes: serviceRequestMedia.sizeBytes,
+          createdAt: serviceRequestMedia.createdAt,
+        })
+        .from(jobCompletionProofMedia)
+        .innerJoin(serviceRequestMedia, eq(jobCompletionProofMedia.mediaId, serviceRequestMedia.id))
+        .where(eq(jobCompletionProofMedia.completionProofId, proof.id))
+    : [];
+  const now = new Date();
+  const dispute = disputeRows[0] ?? null;
+
+  return {
+    ...tracking,
+    proof,
+    proofMedia: media,
+    dispute,
+    payment: paymentRows[0] ?? null,
+    canProviderSubmitProof:
+      tracking.viewerRole === "provider" && tracking.lifecycleStatus === "completed" && !proof,
+    canCustomerRespond:
+      tracking.viewerRole === "customer" &&
+      proof?.status === "submitted" &&
+      proof.responseDueAt > now &&
+      !dispute,
+    responseExpired: Boolean(proof?.status === "submitted" && proof.responseDueAt <= now),
+  };
+}
+
+export async function submitCompletionProof(data: {
+  requestId: number;
+  userId: number;
+  summary: string;
+  aiAnalysis?: {
+    status: "completed" | "unavailable" | "failed";
+    summary: string | null;
+    confidence: number | null;
+    flags: string[];
+  };
+  media: Array<{
+    storageKey: string;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    kind: "image" | "video";
+  }>;
+}) {
+  const { db, context } = await getTrackingAccessContext(data.requestId);
+  const providerUserId = context.providerUserId;
+  if (!providerUserId || providerUserId !== data.userId) {
+    throw new Error("COMPLETION_PROOF_FORBIDDEN");
+  }
+  if (context.requestStatus !== "completed") throw new Error("COMPLETION_PROOF_JOB_NOT_COMPLETED");
+  const providerId = context.assignedProviderId;
+  if (!providerId) throw new Error("COMPLETION_PROOF_PROVIDER_NOT_ASSIGNED");
+  if (data.media.length < 1) throw new Error("COMPLETION_PROOF_MEDIA_REQUIRED");
+
+  const now = new Date();
+  const responseDueAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  return db.transaction(async (tx) => {
+    const existing = await tx
+      .select()
+      .from(jobCompletionProofs)
+      .where(eq(jobCompletionProofs.requestId, data.requestId))
+      .limit(1);
+    if (existing[0]) return { proof: existing[0], duplicated: true };
+
+    const proofResult = await tx.insert(jobCompletionProofs).values({
+      requestId: data.requestId,
+      providerId,
+      submittedByUserId: data.userId,
+      summary: data.summary.trim(),
+      status: "submitted",
+      responseDueAt,
+      aiAnalysisStatus: data.aiAnalysis?.status ?? "unavailable",
+      aiAnalysisSummary: data.aiAnalysis?.summary ?? null,
+      aiAnalysisConfidence: data.aiAnalysis?.confidence ?? null,
+      aiAnalysisFlags: data.aiAnalysis ? JSON.stringify(data.aiAnalysis.flags) : null,
+      aiAnalyzedAt: data.aiAnalysis ? now : null,
+    });
+    const proofId = proofResult[0].insertId;
+    for (const item of data.media) {
+      const mediaResult = await tx.insert(serviceRequestMedia).values({
+        requestId: data.requestId,
+        ownerUserId: data.userId,
+        purpose: "completion",
+        kind: item.kind,
+        storageKey: item.storageKey,
+        originalName: item.originalName,
+        mimeType: item.mimeType,
+        sizeBytes: item.sizeBytes,
+        sha256: item.sha256,
+      });
+      await tx.insert(jobCompletionProofMedia).values({
+        completionProofId: proofId,
+        mediaId: mediaResult[0].insertId,
+      });
+    }
+    const rows = await tx
+      .select()
+      .from(jobCompletionProofs)
+      .where(eq(jobCompletionProofs.id, proofId))
+      .limit(1);
+    if (!rows[0]) throw new Error("COMPLETION_PROOF_CREATE_FAILED");
+    return { proof: rows[0], duplicated: false };
+  });
+}
+
+export async function approveCompletionProof(data: { requestId: number; userId: number }) {
+  const { db, context } = await getTrackingAccessContext(data.requestId);
+  if (context.customerUserId !== data.userId) throw new Error("COMPLETION_APPROVAL_FORBIDDEN");
+  const providerUserId = context.providerUserId;
+  if (!providerUserId) throw new Error("COMPLETION_APPROVAL_PROVIDER_MISSING");
+
+  return db.transaction(async (tx) => {
+    const proofRows = await tx
+      .select()
+      .from(jobCompletionProofs)
+      .where(eq(jobCompletionProofs.requestId, data.requestId))
+      .limit(1);
+    const proof = proofRows[0];
+    if (!proof) throw new Error("COMPLETION_PROOF_NOT_FOUND");
+    if (proof.status === "approved" || proof.status === "auto_approved") {
+      const eventRows = await tx
+        .select()
+        .from(escrowReleaseEvents)
+        .where(eq(escrowReleaseEvents.completionProofId, proof.id))
+        .limit(1);
+      return { proof, released: Boolean(eventRows[0]), duplicated: true };
+    }
+    if (proof.status !== "submitted") throw new Error("COMPLETION_PROOF_INVALID_STATUS");
+    if (proof.responseDueAt <= new Date()) throw new Error("COMPLETION_RESPONSE_EXPIRED");
+
+    const disputes = await tx
+      .select()
+      .from(completionDisputes)
+      .where(eq(completionDisputes.requestId, data.requestId))
+      .limit(1);
+    if (disputes[0]) throw new Error("COMPLETION_DISPUTE_OPEN");
+
+    const paymentRows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.requestId, data.requestId))
+      .limit(1);
+    const payment = paymentRows[0];
+    if (!payment || payment.status !== "held") throw new Error("ESCROW_NOT_HELD");
+    const release = await releaseHeldEscrowInTransaction(tx, {
+      requestId: data.requestId,
+      completionProofId: proof.id,
+      paymentId: payment.id,
+      providerUserId,
+      providerPayout: payment.providerPayout,
+      reason: "customer_approval",
+      actorUserId: data.userId,
+    });
+    const now = new Date();
+    await tx
+      .update(jobCompletionProofs)
+      .set({
+        status: "approved",
+        customerApprovedAt: now,
+        releasedAt: now,
+        releaseReason: "customer_approval",
+      })
+      .where(and(eq(jobCompletionProofs.id, proof.id), eq(jobCompletionProofs.status, "submitted")));
+    const updated = await tx
+      .select()
+      .from(jobCompletionProofs)
+      .where(eq(jobCompletionProofs.id, proof.id))
+      .limit(1);
+    if (!updated[0]) throw new Error("COMPLETION_PROOF_NOT_FOUND");
+    return { proof: updated[0], released: release.released, duplicated: release.duplicated };
+  });
+}
+
+export async function openCompletionDispute(data: {
+  requestId: number;
+  userId: number;
+  reasonCode: "incomplete_work" | "quality_issue" | "damage" | "wrong_service" | "other";
+  description: string;
+}) {
+  const { db, context } = await getTrackingAccessContext(data.requestId);
+  if (context.customerUserId !== data.userId) throw new Error("COMPLETION_DISPUTE_FORBIDDEN");
+  return db.transaction(async (tx) => {
+    const proofRows = await tx
+      .select()
+      .from(jobCompletionProofs)
+      .where(eq(jobCompletionProofs.requestId, data.requestId))
+      .limit(1);
+    const proof = proofRows[0];
+    if (!proof) throw new Error("COMPLETION_PROOF_NOT_FOUND");
+    if (proof.status === "disputed") {
+      const existing = await tx
+        .select()
+        .from(completionDisputes)
+        .where(eq(completionDisputes.requestId, data.requestId))
+        .limit(1);
+      if (!existing[0]) throw new Error("COMPLETION_DISPUTE_INCONSISTENT");
+      return { dispute: existing[0], duplicated: true };
+    }
+    if (proof.status !== "submitted") throw new Error("COMPLETION_PROOF_INVALID_STATUS");
+    if (proof.responseDueAt <= new Date()) throw new Error("COMPLETION_RESPONSE_EXPIRED");
+    const result = await tx.insert(completionDisputes).values({
+      requestId: data.requestId,
+      completionProofId: proof.id,
+      openedByUserId: data.userId,
+      reasonCode: data.reasonCode,
+      description: data.description.trim(),
+      status: "open",
+    });
+    await tx
+      .update(jobCompletionProofs)
+      .set({ status: "disputed" })
+      .where(and(eq(jobCompletionProofs.id, proof.id), eq(jobCompletionProofs.status, "submitted")));
+    const disputes = await tx
+      .select()
+      .from(completionDisputes)
+      .where(eq(completionDisputes.id, result[0].insertId))
+      .limit(1);
+    if (!disputes[0]) throw new Error("COMPLETION_DISPUTE_CREATE_FAILED");
+    return { dispute: disputes[0], duplicated: false };
+  });
+}
+
+export async function resolveCompletionDispute(data: {
+  requestId: number;
+  adminUserId: number;
+  resolution: "customer" | "provider";
+  resolutionNote: string;
+}) {
+  const { db, context } = await getTrackingAccessContext(data.requestId);
+  const providerUserId = context.providerUserId;
+  if (!providerUserId) throw new Error("COMPLETION_RESOLUTION_PROVIDER_MISSING");
+  return db.transaction(async (tx) => {
+    const [proofRows, disputeRows, paymentRows] = await Promise.all([
+      tx.select().from(jobCompletionProofs).where(eq(jobCompletionProofs.requestId, data.requestId)).limit(1),
+      tx.select().from(completionDisputes).where(eq(completionDisputes.requestId, data.requestId)).limit(1),
+      tx.select().from(payments).where(eq(payments.requestId, data.requestId)).limit(1),
+    ]);
+    const proof = proofRows[0];
+    const dispute = disputeRows[0];
+    const payment = paymentRows[0];
+    if (!proof || !dispute) throw new Error("COMPLETION_DISPUTE_NOT_FOUND");
+    if (proof.status !== "disputed" || !["open", "under_review"].includes(dispute.status)) {
+      throw new Error("COMPLETION_DISPUTE_INVALID_STATUS");
+    }
+    if (!payment || payment.status !== "held") throw new Error("ESCROW_NOT_HELD");
+    const now = new Date();
+    if (data.resolution === "provider") {
+      await releaseHeldEscrowInTransaction(tx, {
+        requestId: data.requestId,
+        completionProofId: proof.id,
+        paymentId: payment.id,
+        providerUserId,
+        providerPayout: payment.providerPayout,
+        reason: "admin_resolution",
+        actorUserId: data.adminUserId,
+      });
+      await tx
+        .update(jobCompletionProofs)
+        .set({ status: "resolved", releasedAt: now, releaseReason: "admin_resolution" })
+        .where(eq(jobCompletionProofs.id, proof.id));
+    } else {
+      const refundResult = await tx
+        .update(payments)
+        .set({ status: "refunded" })
+        .where(and(eq(payments.id, payment.id), eq(payments.status, "held")));
+      if ((refundResult[0]?.affectedRows ?? 0) !== 1) throw new Error("ESCROW_REFUND_CONFLICT");
+      await tx
+        .update(jobCompletionProofs)
+        .set({ status: "resolved" })
+        .where(eq(jobCompletionProofs.id, proof.id));
+    }
+    await tx
+      .update(completionDisputes)
+      .set({
+        status: data.resolution === "provider" ? "resolved_provider" : "resolved_customer",
+        reviewedByUserId: data.adminUserId,
+        resolutionNote: data.resolutionNote.trim(),
+        resolvedAt: now,
+      })
+      .where(eq(completionDisputes.id, dispute.id));
+    return { requestId: data.requestId, resolution: data.resolution, resolvedAt: now };
+  });
+}
+
+export async function autoReleaseDueCompletionProofs(now = new Date(), limit = 100) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const candidates = await db
+    .select({ requestId: jobCompletionProofs.requestId })
+    .from(jobCompletionProofs)
+    .where(and(eq(jobCompletionProofs.status, "submitted"), lte(jobCompletionProofs.responseDueAt, now)))
+    .limit(boundedLimit);
+  const results: Array<{ requestId: number; released: boolean; duplicated: boolean; skipped?: string }> = [];
+
+  for (const candidate of candidates) {
+    try {
+      const result = await db.transaction(async (tx) => {
+        const [proofRows, disputeRows, paymentRows] = await Promise.all([
+          tx.select().from(jobCompletionProofs).where(eq(jobCompletionProofs.requestId, candidate.requestId)).limit(1),
+          tx.select().from(completionDisputes).where(eq(completionDisputes.requestId, candidate.requestId)).limit(1),
+          tx.select().from(payments).where(eq(payments.requestId, candidate.requestId)).limit(1),
+        ]);
+        const proof = proofRows[0];
+        const payment = paymentRows[0];
+        if (!proof || proof.status !== "submitted" || proof.responseDueAt > now) {
+          return { released: false, duplicated: true, skipped: "NO_LONGER_DUE" };
+        }
+        if (disputeRows[0]) return { released: false, duplicated: false, skipped: "DISPUTE_OPEN" };
+        if (!payment || payment.status !== "held") return { released: false, duplicated: false, skipped: "ESCROW_NOT_HELD" };
+        const contextRows = await tx
+          .select({ providerUserId: providers.userId })
+          .from(serviceRequests)
+          .innerJoin(providers, eq(serviceRequests.assignedProviderId, providers.id))
+          .where(eq(serviceRequests.id, candidate.requestId))
+          .limit(1);
+        const providerUserId = contextRows[0]?.providerUserId;
+        if (!providerUserId) return { released: false, duplicated: false, skipped: "PROVIDER_MISSING" };
+        const release = await releaseHeldEscrowInTransaction(tx, {
+          requestId: candidate.requestId,
+          completionProofId: proof.id,
+          paymentId: payment.id,
+          providerUserId,
+          providerPayout: payment.providerPayout,
+          reason: "auto_release",
+        });
+        await tx
+          .update(jobCompletionProofs)
+          .set({ status: "auto_approved", releasedAt: now, releaseReason: "auto_release" })
+          .where(and(eq(jobCompletionProofs.id, proof.id), eq(jobCompletionProofs.status, "submitted")));
+        return { released: release.released, duplicated: release.duplicated };
+      });
+      results.push({ requestId: candidate.requestId, ...result });
+    } catch (error) {
+      results.push({
+        requestId: candidate.requestId,
+        released: false,
+        duplicated: false,
+        skipped: error instanceof Error ? error.message : "UNKNOWN_ERROR",
+      });
+    }
+  }
+  return results;
 }
 
 // ── Job Lifecycle Functions ──

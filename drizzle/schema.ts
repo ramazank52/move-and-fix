@@ -301,6 +301,109 @@ export const jobTracking = mysqlTable(
   ],
 );
 
+// Provider-submitted completion proof. Customer approval or the 48-hour
+// deadline is required before any associated escrow can be released.
+export const jobCompletionProofs = mysqlTable(
+  "job_completion_proofs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    providerId: int("providerId").notNull(),
+    submittedByUserId: int("submittedByUserId").notNull(),
+    summary: text("summary").notNull(),
+    status: mysqlEnum("status", ["submitted", "approved", "auto_approved", "disputed", "resolved"])
+      .default("submitted")
+      .notNull(),
+    responseDueAt: timestamp("responseDueAt").notNull(),
+    customerApprovedAt: timestamp("customerApprovedAt"),
+    releasedAt: timestamp("releasedAt"),
+    releaseReason: mysqlEnum("releaseReason", ["customer_approval", "auto_release", "admin_resolution"]),
+    aiAnalysisStatus: mysqlEnum("aiAnalysisStatus", ["pending", "completed", "unavailable", "failed"])
+      .default("pending")
+      .notNull(),
+    aiAnalysisSummary: text("aiAnalysisSummary"),
+    aiAnalysisConfidence: int("aiAnalysisConfidence"),
+    aiAnalysisFlags: text("aiAnalysisFlags"),
+    aiAnalyzedAt: timestamp("aiAnalyzedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("job_completion_proofs_request_unique").on(table.requestId),
+    index("job_completion_proofs_due_status_idx").on(table.status, table.responseDueAt),
+    index("job_completion_proofs_provider_idx").on(table.providerId, table.createdAt),
+  ],
+);
+
+// Explicit proof-to-media linkage prevents a completion from being approved
+// without provider-owned evidence and keeps later dispute review traceable.
+export const jobCompletionProofMedia = mysqlTable(
+  "job_completion_proof_media",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    completionProofId: int("completionProofId").notNull(),
+    mediaId: int("mediaId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("job_completion_proof_media_media_unique").on(table.mediaId),
+    uniqueIndex("job_completion_proof_media_proof_media_unique").on(
+      table.completionProofId,
+      table.mediaId,
+    ),
+    index("job_completion_proof_media_proof_idx").on(table.completionProofId),
+  ],
+);
+
+// A request can have one active dispute for its single completion proof.
+// Evidence files remain in service_request_media with purpose="dispute".
+export const completionDisputes = mysqlTable(
+  "completion_disputes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    completionProofId: int("completionProofId").notNull(),
+    openedByUserId: int("openedByUserId").notNull(),
+    reasonCode: mysqlEnum("reasonCode", ["incomplete_work", "quality_issue", "damage", "wrong_service", "other"])
+      .notNull(),
+    description: text("description").notNull(),
+    status: mysqlEnum("status", ["open", "under_review", "resolved_customer", "resolved_provider"])
+      .default("open")
+      .notNull(),
+    reviewedByUserId: int("reviewedByUserId"),
+    resolutionNote: text("resolutionNote"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("completion_disputes_request_unique").on(table.requestId),
+    index("completion_disputes_status_created_idx").on(table.status, table.createdAt),
+    index("completion_disputes_proof_idx").on(table.completionProofId),
+  ],
+);
+
+// Immutable payment-side idempotency record. The unique payment key prevents
+// duplicate customer/system release calls from double-crediting a provider.
+export const escrowReleaseEvents = mysqlTable(
+  "escrow_release_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    paymentId: int("paymentId").notNull(),
+    completionProofId: int("completionProofId").notNull(),
+    reason: mysqlEnum("reason", ["customer_approval", "auto_release", "admin_resolution"]).notNull(),
+    actorUserId: int("actorUserId"),
+    idempotencyKey: varchar("idempotencyKey", { length: 160 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("escrow_release_events_payment_unique").on(table.paymentId),
+    uniqueIndex("escrow_release_events_idempotency_unique").on(table.idempotencyKey),
+    index("escrow_release_events_request_idx").on(table.requestId),
+  ],
+);
+
 // Messages
 export const messages = mysqlTable("messages", {
   id: int("id").autoincrement().primaryKey(),

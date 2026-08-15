@@ -11,6 +11,7 @@ import {
 import { ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { ENV } from "./_core/env";
+import { createHeartbeatJob, listHeartbeatJobs, updateHeartbeatJob } from "./_core/heartbeat";
 import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { ownerRouter } from "./_core/ownerRouter";
@@ -27,6 +28,7 @@ import {
 import { aiService } from "./services/AIService";
 import { eventService } from "./services/EventService";
 import { storagePut } from "./storage";
+import { analyzeCompletionEvidence } from "./services/CompletionEvidenceAnalysisService";
 import {
   gatewayCheckoutService,
   GatewayCheckoutError,
@@ -257,6 +259,34 @@ async function runTrackingOperation<T>(operation: () => Promise<T>): Promise<T> 
       code: "INTERNAL_SERVER_ERROR",
       message: "Canlı takip işlemi tamamlanamadı",
     });
+  }
+}
+
+async function runCompletionOperation<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "COMPLETION_OPERATION_FAILED";
+    if (message.includes("NOT_FOUND") || message.includes("not found")) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "İş tamamlama kaydı bulunamadı" });
+    }
+    if (message.includes("FORBIDDEN") || message.includes("Not authorized")) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Bu iş tamamlama işlemine yetkiniz yok" });
+    }
+    if (
+      message.includes("INVALID_STATUS") ||
+      message.includes("JOB_NOT_COMPLETED") ||
+      message.includes("RESPONSE_EXPIRED") ||
+      message.includes("DISPUTE_OPEN") ||
+      message.includes("ESCROW_") ||
+      message.includes("CONFLICT")
+    ) {
+      throw new TRPCError({ code: "CONFLICT", message: "İşin mevcut durumu bu işlem için uygun değil" });
+    }
+    if (message.includes("MEDIA_REQUIRED") || message.includes("PAYOUT_INVALID")) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Kanıt veya ödeme bilgisi geçerli değil" });
+    }
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "İş tamamlama işlemi gerçekleştirilemedi" });
   }
 }
 
@@ -724,6 +754,120 @@ export const appRouter = router({
       )
       .mutation(({ ctx, input }) =>
         runTrackingOperation(() => db.updateJobLifecycle({ ...input, userId: ctx.user.id })),
+      ),
+  }),
+
+  // Completion proof — only the assigned provider can submit proof. The customer
+  // may approve or dispute before the 48-hour response deadline.
+  completion: router({
+    workflow: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        runCompletionOperation(() => db.getCompletionWorkflow(input.requestId, ctx.user.id)),
+      ),
+    submitProof: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number().int().positive(),
+          summary: z.string().trim().min(10).max(2_000),
+          media: z
+            .array(
+              z.object({
+                originalName: z
+                  .string()
+                  .trim()
+                  .min(1)
+                  .max(255)
+                  .regex(/^[^\\/\u0000-\u001f]+$/, "Geçersiz dosya adı"),
+                mimeType: z.enum([
+                  "image/jpeg",
+                  "image/png",
+                  "image/webp",
+                  "image/heic",
+                  "image/heif",
+                  "video/mp4",
+                  "video/quicktime",
+                ]),
+                base64: z.string().min(4).max(36_000_000),
+              }),
+            )
+            .min(1)
+            .max(4),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const workflow = await runCompletionOperation(() =>
+          db.getCompletionWorkflow(input.requestId, ctx.user.id),
+        );
+        if (!workflow.canProviderSubmitProof) {
+          throw new TRPCError({ code: "CONFLICT", message: "Bu iş için kanıt gönderemezsiniz" });
+        }
+        let totalSize = 0;
+        const prepared = input.media.map((item) => {
+          const policy = allowedRequestMedia[item.mimeType];
+          const buffer = decodeStrictBase64(item.base64);
+          if (buffer.length > policy.maxBytes) {
+            throw new TRPCError({
+              code: "PAYLOAD_TOO_LARGE",
+              message: policy.kind === "image" ? "Görsel en fazla 8 MB olabilir" : "Video en fazla 25 MB olabilir",
+            });
+          }
+          if (!hasExpectedMediaSignature(buffer, item.mimeType)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Dosya içeriği medya türüyle uyuşmuyor" });
+          }
+          totalSize += buffer.length;
+          return { item, policy, buffer, sha256: createHash("sha256").update(buffer).digest("hex") };
+        });
+        if (totalSize > 32 * 1024 * 1024) {
+          throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Toplam kanıt dosyası boyutu en fazla 32 MB olabilir" });
+        }
+        const aiAnalysis = await analyzeCompletionEvidence({
+          summary: input.summary,
+          media: prepared.map(({ policy, buffer, item }) => ({
+            buffer,
+            kind: policy.kind,
+            mimeType: item.mimeType,
+          })),
+        });
+        const uploaded = await Promise.all(
+          prepared.map(async ({ item, policy, buffer, sha256 }) => {
+            const key = `completion-proofs/${input.requestId}/${ctx.user.id}/${randomUUID()}.${policy.extension}`;
+            const stored = await storagePut(key, buffer, item.mimeType);
+            return {
+              storageKey: stored.key,
+              originalName: item.originalName,
+              mimeType: item.mimeType,
+              sizeBytes: buffer.length,
+              sha256,
+              kind: policy.kind,
+            };
+          }),
+        );
+        return runCompletionOperation(() =>
+          db.submitCompletionProof({
+            requestId: input.requestId,
+            userId: ctx.user.id,
+            summary: input.summary,
+            aiAnalysis,
+            media: uploaded,
+          }),
+        );
+      }),
+    approve: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) =>
+        runCompletionOperation(() => db.approveCompletionProof({ requestId: input.requestId, userId: ctx.user.id })),
+      ),
+    dispute: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number().int().positive(),
+          reasonCode: z.enum(["incomplete_work", "quality_issue", "damage", "wrong_service", "other"]),
+          description: z.string().trim().min(10).max(2_000),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        runCompletionOperation(() => db.openCompletionDispute({ ...input, userId: ctx.user.id })),
       ),
   }),
 
@@ -1211,6 +1355,34 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
   }),
 
   admin: router({
+    configureCompletionAutoRelease: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yönetici yetkisi gerektirir" });
+      }
+      if (!ENV.completionAutoReleaseSecret) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Otomatik emanet serbest bırakma sırrı yapılandırılmadı",
+        });
+      }
+
+      const name = "movefix-completion-auto-release";
+      const job = {
+        cron: "0 15 * * * *",
+        path: "/api/scheduled/completion-auto-release",
+        method: "POST" as const,
+        payload: { token: ENV.completionAutoReleaseSecret, limit: 25 },
+        description: "Move&Fix 48 saatlik iş kanıtı yanıt süresi dolan emanetleri idempotent olarak çözer.",
+      };
+      const existing = await listHeartbeatJobs("", { page: 1, pageSize: 100 });
+      const prior = existing.jobs.find((item) => item.name === name);
+      if (prior) {
+        const updated = await updateHeartbeatJob(prior.taskUid, { ...job, enable: true }, "");
+        return { taskUid: prior.taskUid, updated: true, nextExecutionAt: updated.nextExecutionAt ?? null };
+      }
+      const created = await createHeartbeatJob({ name, ...job }, "");
+      return { taskUid: created.taskUid, updated: false, nextExecutionAt: created.nextExecutionAt ?? null };
+    }),
     reviewProviderDocument: protectedProcedure
       .input(z.object({
         documentId: z.number().int().positive(),
@@ -1241,6 +1413,25 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
         });
         const verificationStatus = await db.refreshProviderVerificationStatus(document.providerId);
         return { id: document.id, status: input.status, verificationStatus };
+      }),
+    resolveCompletionDispute: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number().int().positive(),
+          resolution: z.enum(["customer", "provider"]),
+          resolutionNote: z.string().trim().min(10).max(2_000),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yönetici yetkisi gerektirir" });
+        }
+        return runCompletionOperation(() =>
+          db.resolveCompletionDispute({
+            ...input,
+            adminUserId: ctx.user.id,
+          }),
+        );
       }),
   }),
   // MoveWallet — user-scoped balance, history and withdrawal workflow
