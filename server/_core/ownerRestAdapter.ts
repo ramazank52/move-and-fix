@@ -43,7 +43,9 @@ type OwnerProcedure =
   | "retireSettlementPolicy"
   | "cancellationCases"
   | "changeOrders"
-  | "reviewCancellationCase";
+  | "reviewCancellationCase"
+  | "riskFlags"
+  | "reviewRiskFlag";
 
 async function requireMoveOsAdmin(req: Request, res: Response): Promise<User | null> {
   try {
@@ -362,6 +364,35 @@ export function registerOwnerRestRoutes(app: Express) {
       );
     } catch (error) {
       sendOwnerError(res, error, "İptal kaydı çözümlenemedi");
+    }
+  });
+
+  app.get("/api/owner/risk-flags", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "riskFlags", {
+          limit: req.query.limit ? Number(req.query.limit) : 50,
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Risk kayıtları alınamadı");
+    }
+  });
+
+  app.post("/api/owner/risk-flags/:riskFlagId/review", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "reviewRiskFlag", {
+          ...req.body,
+          riskFlagId: Number(req.params.riskFlagId),
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Risk kaydı incelenemedi");
     }
   });
 

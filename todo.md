@@ -320,9 +320,12 @@
 - [x] Faz 4 masraf sahipliği, medya yetkisi, masraf/claim ayrımı ve müşteri görünürlüğü regresyonlarını doğrula
 - [x] Faz 4 aktif işten erişilen gerçek masraf listesi, kanıt yükleme ve geri ödeme talebi mobil akışını ekle
 - [x] Faz 4 müşteri için masraf iade talebi onay/red kararı ve denetlenebilir durum görünümünü ekle
-- [ ] Faz 5 MoveAI taslak–özet–açık onay–request oluşturma akışını, sahte fiyat/ETA/usta üretmeme kuralıyla güçlendir
-- [ ] Faz 5 AI yetki sınırı, prompt injection veri ayrımı, trust/risk sinyalleri, itibar bütünlüğü ve iş güvenliği capability kontrollerini ekle
-- [ ] Faz 5 AI/risk etkilerinde human-review, açıklanabilir audit ve kritik finansal/hukuki işlem engellerini test et
+- [x] Faz 5 MoveAI taslak–özet–açık onay–request oluşturma akışını, sahte fiyat/ETA/usta üretmeme kuralıyla güçlendir
+- [x] Faz 5 AI yetki sınırı, prompt injection veri ayrımı, trust/risk sinyalleri, itibar bütünlüğü ve iş güvenliği capability kontrollerini ekle
+- [x] Faz 5 AI/risk etkilerinde human-review, açıklanabilir audit ve kritik finansal/hukuki işlem engellerini test et
+- [x] Faz 5 MoveAI komutunu talep oluşturmadan önce değişmez taslak oluşturacak ve açık kullanıcı onayı gerektirecek şekilde dönüştür
+- [x] Faz 5 kullanıcı-profesyonel güven sinyallerini, risk flag yaşam döngüsünü ve fail-closed uygunsuz eşleşme engelini ekle
+- [x] Faz 5 MoveOS’ta MFA korumalı insan incelemeli risk flag denetim yüzeyini ekle
 - [ ] Faz 6 13 dilli locale altyapısı, RTL, cihaz dili algılama, para/tarih/sayı biçimleme ve message translation original korunumu ekle
 - [ ] Faz 6 MoveOS kritik işlem onayı, re-auth/MFA, canary/shadow mode, guarded kill switch ve denetlenebilir release kontrolünü uygula
 - [ ] Faz 6 gözlemlenebilirlik, SBOM/SCA/secret scan, restore runbook, store compliance ve erişilebilirlik kalite kontrollerini ekle

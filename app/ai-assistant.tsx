@@ -26,6 +26,8 @@ interface Message {
   suggestions?: string[];
   category?: string;
   requestId?: number;
+  draftId?: number;
+  draftStatus?: "draft" | "blocked";
 }
 
 export default function AIAssistantScreen() {
@@ -67,22 +69,11 @@ export default function AIAssistantScreen() {
         suggestions: data.suggestions || undefined,
         category: data.category || undefined,
         requestId: data.requestId || undefined,
+        draftId: data.draftId || undefined,
+        draftStatus: data.draftStatus || undefined,
       };
       setMessages((prev) => [...prev, response]);
 
-      if (data.requestId) {
-        Alert.alert(
-          t("ai.requestCreatedTitle"),
-          t("ai.requestCreatedBody"),
-          [
-            { text: t("ai.later"), style: "cancel" },
-            {
-              text: t("ai.viewProviders"),
-              onPress: () => router.push(`/category/${data.category || 1}` as any),
-            },
-          ]
-        );
-      }
     },
     onError: (_error, variables) => {
       setLoading(false);
@@ -99,6 +90,20 @@ export default function AIAssistantScreen() {
         },
       ]);
     },
+  });
+
+  const confirmDraftMutation = trpc.ai.confirmDraft.useMutation({
+    onSuccess: (data) => {
+      Alert.alert(
+        t("ai.requestCreatedTitle"),
+        t("ai.requestCreatedBody"),
+        [{ text: t("ai.viewProviders"), onPress: () => router.push(`/job/${data.requestId}` as any) }],
+      );
+      setMessages((current) => current.map((message) => message.draftId === data.draftId
+        ? { ...message, draftStatus: undefined, requestId: data.requestId }
+        : message));
+    },
+    onError: (error) => Alert.alert("Taslak onaylanamadı", error.message || "Lütfen taslağı yeniden oluşturun."),
   });
 
   const getLocalResponse = (text: string): { text: string; suggestions?: string[]; category?: string } => {
@@ -333,6 +338,38 @@ export default function AIAssistantScreen() {
                     </Pressable>
                   ))}
                 </View>
+              )}
+
+              {msg.draftId && msg.draftStatus === "draft" && (
+                <View style={{ marginTop: 8, marginLeft: 36 }}>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>
+                    Taslak hazır. Hizmet talebi yalnızca onayınızla oluşturulur.
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="MoveAI hizmet taslağını onayla"
+                    disabled={confirmDraftMutation.isPending}
+                    onPress={() => confirmDraftMutation.mutate({ draftId: msg.draftId! })}
+                    style={({ pressed }) => ({
+                      alignSelf: "flex-start",
+                      backgroundColor: colors.accentPurple,
+                      paddingHorizontal: 14,
+                      paddingVertical: 9,
+                      borderRadius: 12,
+                      opacity: pressed || confirmDraftMutation.isPending ? 0.75 : 1,
+                    })}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>
+                      {confirmDraftMutation.isPending ? "Onaylanıyor…" : "Taslağı onayla"}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {msg.draftStatus === "blocked" && (
+                <Text style={{ marginTop: 8, marginLeft: 36, fontSize: 12, color: colors.error }}>
+                  Bu taslak güvenlik incelemesi nedeniyle onaylanamaz.
+                </Text>
               )}
 
               <Text

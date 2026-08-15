@@ -148,10 +148,38 @@ function renderChangeOrders(result) {
   }).join("") || "<tr><td colspan=\"6\">Change order kaydı bulunamadı.</td></tr>";
 }
 
+function renderRiskFlags(result) {
+  const flags = Array.isArray(result) ? result : result.items || result.riskFlags || [];
+  $("#risk-flags-list").innerHTML = flags.map((flag) => {
+    const reviewable = flag.status === "open" || flag.status === "under_review";
+    return `<tr><td>#${escapeHtml(flag.subjectUserId)}</td><td>${flag.relatedRequestId ? `#${escapeHtml(flag.relatedRequestId)}` : "—"}</td><td>${escapeHtml(flag.source)} / ${escapeHtml(flag.reasonCode)}</td><td>${escapeHtml(flag.severity)}</td><td>${escapeHtml(flag.status)}</td><td>${escapeHtml(formatDate(flag.createdAt))}</td><td>${reviewable ? `<button class="row-action" type="button" data-review-risk="${flag.id}">İncele</button>` : "—"}</td></tr>`;
+  }).join("") || "<tr><td colspan=\"7\">İncelenecek risk sinyali bulunamadı.</td></tr>";
+  document.querySelectorAll("[data-review-risk]").forEach((button) => button.addEventListener("click", async () => {
+    const decision = window.prompt("Karar: under_review, resolved veya dismissed", "under_review");
+    if (!decision) return;
+    const normalizedDecision = decision.trim();
+    if (!["under_review", "resolved", "dismissed"].includes(normalizedDecision)) {
+      notice("Geçersiz risk kararı.", true);
+      return;
+    }
+    const reviewNote = window.prompt("İnsan incelemesi gerekçesi (en az 10 karakter)");
+    if (!reviewNote) return;
+    if (!window.confirm("Risk kaydı silinmeden insan inceleme kararıyla güncellenecek. Devam edilsin mi?")) return;
+    try {
+      await api(`/api/owner/risk-flags/${button.dataset.reviewRisk}/review`, {
+        method: "POST",
+        body: JSON.stringify({ decision: normalizedDecision, reviewNote }),
+      });
+      await loadData();
+      notice("Risk inceleme kararı kaydedildi.");
+    } catch (error) { notice(error.message, true); }
+  }));
+}
+
 async function loadData() {
   notice("Veriler yenileniyor…");
-  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, changeOrders] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/change-orders?limit=20")]);
-  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderChangeOrders(changeOrders);
+  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, changeOrders, riskFlags] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/change-orders?limit=20"), api("/api/owner/risk-flags?limit=50")]);
+  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderChangeOrders(changeOrders); renderRiskFlags(riskFlags);
   setMfaVisible(false);
   $("#dashboard").hidden = false;
   notice("Gerçek ortak API verileri güncellendi.");

@@ -21,6 +21,7 @@ import {
   commissionRateForProvider,
   type EscrowPaymentStatus,
 } from "./payments/policy";
+import { trustRestrictionForReviewedRisk } from "./trust/policy";
 import {
   buildEscrowReleasedLedgerEntry,
   buildPaymentHeldLedgerEntry,
@@ -719,6 +720,9 @@ import {
   providerCapabilityAppeals,
   providerCapabilityReviews,
   providerCapabilityStatuses,
+  moveAiDrafts,
+  trustProfiles,
+  riskFlags,
 } from "../drizzle/schema";
 
 // Service Categories
@@ -4818,4 +4822,207 @@ export async function resolveExpenseRefundRequest(input: {
     );
   if (Number(result[0].affectedRows) !== 1) throw new Error("EXPENSE_REFUND_NOT_ACTIONABLE");
   return { id: input.refundRequestId, status: input.decision };
+}
+
+type MoveAiDraftPayload = {
+  categoryId: number;
+  title: string;
+  description: string;
+  suggestions: string[];
+};
+
+function parseMoveAiDraftPayload(value: string): MoveAiDraftPayload {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+    if (
+      record &&
+      typeof record.categoryId === "number" &&
+      Number.isInteger(record.categoryId) &&
+      record.categoryId > 0 &&
+      typeof record.title === "string" &&
+      typeof record.description === "string" &&
+      Array.isArray(record.suggestions)
+    ) {
+      return {
+        categoryId: record.categoryId,
+        title: record.title,
+        description: record.description,
+        suggestions: record.suggestions.filter(
+          (item): item is string => typeof item === "string",
+        ),
+      };
+    }
+  } catch {
+    // A malformed persisted AI payload must never become an executable request.
+  }
+  throw new Error("MOVE_AI_DRAFT_INVALID");
+}
+
+async function getOrCreateTrustProfile(database: NonNullable<Awaited<ReturnType<typeof getDb>>>, userId: number) {
+  const existing = await database.select().from(trustProfiles).where(eq(trustProfiles.userId, userId)).limit(1);
+  if (existing[0]) return existing[0];
+  await database.insert(trustProfiles).values({ userId, score: 100, status: "active" });
+  const created = await database.select().from(trustProfiles).where(eq(trustProfiles.userId, userId)).limit(1);
+  if (!created[0]) throw new Error("TRUST_PROFILE_CREATE_FAILED");
+  return created[0];
+}
+
+/** AI output is data only. This stores a user-owned proposal and never creates a service request. */
+export async function createMoveAiDraft(input: {
+  userId: number;
+  sourceMessage: string;
+  assistantSummary: string;
+  categoryId: number;
+  suggestions: string[];
+  riskLevel: "low" | "medium" | "high";
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const trust = await getOrCreateTrustProfile(database, input.userId);
+  const blocked = trust.status !== "active" || input.riskLevel === "high";
+  const status = blocked ? "blocked" : "draft";
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+  const payload: MoveAiDraftPayload = {
+    categoryId: input.categoryId,
+    title: input.sourceMessage.slice(0, 100),
+    description: input.sourceMessage,
+    suggestions: input.suggestions.slice(0, 6),
+  };
+  return database.transaction(async (tx) => {
+    const result = await tx.insert(moveAiDrafts).values({
+      userId: input.userId,
+      sourceMessage: input.sourceMessage,
+      assistantSummary: input.assistantSummary,
+      categoryId: input.categoryId,
+      draftJson: JSON.stringify(payload),
+      riskLevel: input.riskLevel,
+      status,
+      expiresAt,
+    });
+    const id = Number(result[0].insertId);
+    if (input.riskLevel === "high") {
+      await tx.insert(riskFlags).values({
+        subjectUserId: input.userId,
+        source: "move_ai",
+        reasonCode: "MOVE_AI_HIGH_RISK_DRAFT",
+        severity: "high",
+        detailsJson: JSON.stringify({ draftId: id }),
+      });
+    }
+    return { id, status, expiresAt, riskLevel: input.riskLevel, payload };
+  });
+}
+
+export async function getMoveAiDraftForUser(draftId: number, userId: number) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select()
+    .from(moveAiDrafts)
+    .where(and(eq(moveAiDrafts.id, draftId), eq(moveAiDrafts.userId, userId)))
+    .limit(1);
+  const draft = rows[0];
+  if (!draft) throw new Error("MOVE_AI_DRAFT_NOT_FOUND");
+  if (draft.status === "draft" && draft.expiresAt.getTime() <= Date.now()) {
+    await database.update(moveAiDrafts).set({ status: "expired" }).where(eq(moveAiDrafts.id, draft.id));
+    return { ...draft, status: "expired" as const, payload: parseMoveAiDraftPayload(draft.draftJson) };
+  }
+  return { ...draft, payload: parseMoveAiDraftPayload(draft.draftJson) };
+}
+
+/** Confirmation conditionally claims a draft and inserts the service request in the same transaction. */
+export async function confirmMoveAiDraft(input: { draftId: number; userId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(moveAiDrafts)
+      .where(and(eq(moveAiDrafts.id, input.draftId), eq(moveAiDrafts.userId, input.userId)))
+      .limit(1);
+    const draft = rows[0];
+    if (!draft) throw new Error("MOVE_AI_DRAFT_NOT_FOUND");
+    if (draft.status !== "draft" || draft.expiresAt.getTime() <= Date.now()) throw new Error("MOVE_AI_DRAFT_NOT_CONFIRMABLE");
+    if (draft.riskLevel === "high") throw new Error("MOVE_AI_DRAFT_RISK_BLOCKED");
+    const trust = await getOrCreateTrustProfile(database, input.userId);
+    if (trust.status !== "active") throw new Error("MOVE_AI_TRUST_RESTRICTED");
+    const payload = parseMoveAiDraftPayload(draft.draftJson);
+    const claimed = await tx
+      .update(moveAiDrafts)
+      .set({ status: "confirmed", confirmedAt: new Date() })
+      .where(and(eq(moveAiDrafts.id, draft.id), eq(moveAiDrafts.status, "draft")));
+    if (Number(claimed[0].affectedRows) !== 1) throw new Error("MOVE_AI_DRAFT_NOT_CONFIRMABLE");
+    const requestResult = await tx.insert(serviceRequests).values({
+      userId: input.userId,
+      categoryId: payload.categoryId,
+      title: payload.title,
+      description: payload.description,
+    });
+    const requestId = Number(requestResult[0].insertId);
+    await tx.update(moveAiDrafts).set({ confirmedRequestId: requestId }).where(eq(moveAiDrafts.id, draft.id));
+    return { requestId, draftId: draft.id };
+  });
+}
+
+export async function listRiskFlagsForAdmin(limit = 100) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database.select().from(riskFlags).orderBy(riskFlags.createdAt, riskFlags.id).limit(Math.min(Math.max(limit, 1), 100));
+}
+
+export async function reviewRiskFlag(input: {
+  riskFlagId: number;
+  adminUserId: number;
+  decision: "resolved" | "dismissed";
+  reviewNote: string;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database.transaction(async (tx) => {
+    const rows = await tx.select().from(riskFlags).where(eq(riskFlags.id, input.riskFlagId)).limit(1);
+    const flag = rows[0];
+    if (!flag || !["open", "under_review"].includes(flag.status)) {
+      throw new Error("RISK_FLAG_NOT_ACTIONABLE");
+    }
+
+    const result = await tx.update(riskFlags).set({
+      status: input.decision,
+      reviewedByUserId: input.adminUserId,
+      reviewNote: input.reviewNote.trim(),
+      resolvedAt: new Date(),
+    }).where(and(eq(riskFlags.id, input.riskFlagId), inArray(riskFlags.status, ["open", "under_review"])));
+    if (Number(result[0].affectedRows) !== 1) throw new Error("RISK_FLAG_NOT_ACTIONABLE");
+
+    // Only a human-confirmed material signal can restrict a profile. A dismissed
+    // flag deliberately leaves the pre-existing score/status untouched.
+    if (input.decision === "resolved" && ["high", "critical"].includes(flag.severity)) {
+      const profiles = await tx.select().from(trustProfiles).where(eq(trustProfiles.userId, flag.subjectUserId)).limit(1);
+      const existing = profiles[0];
+      if (existing) {
+        const next = trustRestrictionForReviewedRisk({
+          decision: input.decision,
+          severity: flag.severity,
+          currentScore: existing.score,
+          currentStatus: existing.status,
+        });
+        await tx.update(trustProfiles).set({
+          score: next.score,
+          status: next.status,
+          lastEvaluatedAt: new Date(),
+        }).where(eq(trustProfiles.id, existing.id));
+      } else {
+        await tx.insert(trustProfiles).values({
+          userId: flag.subjectUserId,
+          score: 40,
+          status: "restricted",
+          lastEvaluatedAt: new Date(),
+        });
+      }
+    }
+
+    return { id: input.riskFlagId, status: input.decision };
+  });
 }

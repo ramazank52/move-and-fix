@@ -769,6 +769,81 @@ export const serviceAgreements = mysqlTable(
   ],
 );
 
+// AI output is never an executable request. A user-owned draft must be
+// explicitly confirmed before the normal service-request path may run.
+export const moveAiDrafts = mysqlTable(
+  "move_ai_drafts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    sourceMessage: text("sourceMessage").notNull(),
+    assistantSummary: text("assistantSummary").notNull(),
+    categoryId: int("categoryId"),
+    draftJson: text("draftJson").notNull(),
+    riskLevel: mysqlEnum("riskLevel", ["low", "medium", "high"])
+      .default("low")
+      .notNull(),
+    status: mysqlEnum("status", ["draft", "confirmed", "cancelled", "expired", "blocked"])
+      .default("draft")
+      .notNull(),
+    confirmedRequestId: int("confirmedRequestId"),
+    expiresAt: timestamp("expiresAt").notNull(),
+    confirmedAt: timestamp("confirmedAt"),
+    cancelledAt: timestamp("cancelledAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("move_ai_drafts_user_status_idx").on(table.userId, table.status, table.createdAt),
+    index("move_ai_drafts_expiry_idx").on(table.status, table.expiresAt),
+  ],
+);
+
+// Trust profiles are conservative aggregate state. Unknown users stay active
+// with a neutral score, while any explicit restriction blocks privileged flows.
+export const trustProfiles = mysqlTable(
+  "trust_profiles",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().unique(),
+    score: int("score").default(100).notNull(),
+    status: mysqlEnum("status", ["active", "restricted", "blocked"])
+      .default("active")
+      .notNull(),
+    lastEvaluatedAt: timestamp("lastEvaluatedAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [index("trust_profiles_status_score_idx").on(table.status, table.score)],
+);
+
+// Risk facts are append-only operational signals. Their resolution is a
+// separate human-review action and never deletes the original signal.
+export const riskFlags = mysqlTable(
+  "risk_flags",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    subjectUserId: int("subjectUserId").notNull(),
+    relatedRequestId: int("relatedRequestId"),
+    source: mysqlEnum("source", ["move_ai", "system", "admin", "report"]).notNull(),
+    reasonCode: varchar("reasonCode", { length: 96 }).notNull(),
+    severity: mysqlEnum("severity", ["low", "medium", "high", "critical"]).notNull(),
+    status: mysqlEnum("status", ["open", "under_review", "resolved", "dismissed"])
+      .default("open")
+      .notNull(),
+    detailsJson: text("detailsJson").notNull(),
+    reviewedByUserId: int("reviewedByUserId"),
+    reviewNote: text("reviewNote"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("risk_flags_subject_status_idx").on(table.subjectUserId, table.status, table.createdAt),
+    index("risk_flags_status_severity_idx").on(table.status, table.severity, table.createdAt),
+  ],
+);
+
 // Settlement policies are prospective configuration. An accepted agreement
 // serializes the resolved policy into its immutable snapshot, so changing a
 // policy can never rewrite a historical commercial commitment.

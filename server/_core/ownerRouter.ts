@@ -23,7 +23,9 @@ import {
   listSettlementPoliciesForAdmin,
   listJobChangeOrdersForAdmin,
   listJobCancellationCasesForAdmin,
+  listRiskFlagsForAdmin,
   reviewJobCancellationForAdmin,
+  reviewRiskFlag,
   listProviderCapabilityStatuses,
   listMoveOsCategories,
   listMoveOsServices,
@@ -334,6 +336,29 @@ export const ownerRouter = router({
       } catch (error) {
         if (error instanceof Error && error.message.startsWith("CANCELLATION_")) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "İptal kaydı mevcut ödeme ve durum koşullarıyla çözümlenemiyor" });
+        }
+        throw error;
+      }
+    }),
+
+  riskFlags: adminMfaProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(50) }))
+    .query(async ({ input }) => listRiskFlagsForAdmin(input.limit)),
+
+  reviewRiskFlag: adminMfaProcedure
+    .input(
+      z.object({
+        riskFlagId: z.number().int().positive(),
+        decision: z.enum(["resolved", "dismissed"]),
+        reviewNote: z.string().trim().min(10).max(2_000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await reviewRiskFlag({ ...input, adminUserId: ctx.user!.id });
+      } catch (error) {
+        if (error instanceof Error && error.message === "RISK_FLAG_NOT_ACTIONABLE") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Risk kaydı bulunamadı veya artık incelemeye uygun değil" });
         }
         throw error;
       }

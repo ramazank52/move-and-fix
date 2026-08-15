@@ -1305,8 +1305,10 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
             parsed = { response: contentStr || "Size yardımcı olmaya çalışıyorum.", category, shouldCreateRequest: true };
           }
 
-          // If AI says to create a request, create one
-          let requestId: number | undefined;
+          // AI output is a proposal only. It never creates a service request
+          // until its owner uses the separate explicit confirmation endpoint.
+          let draftId: number | undefined;
+          let draftStatus: "draft" | "blocked" | undefined;
           if (parsed.shouldCreateRequest && parsed.category) {
             const categoryMap: Record<string, number> = {
               plumbing: 1, electrical: 2, cleaning: 3, hvac: 4,
@@ -1314,25 +1316,31 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
               painting: 6, gardening: 7, moving: 8, appliance: 9,
             };
             const categoryId = categoryMap[parsed.category] ?? 1;
-            try {
-              const req = await db.createServiceRequest({
-                categoryId,
-                title: input.message.slice(0, 100),
-                description: input.message,
-                userId: ctx.user.id,
-              });
-              // createServiceRequest returns insertId (number) from Drizzle
-              requestId = typeof req === "number" ? req : (req as unknown as { id: number }).id;
-            } catch {
-              // DB not available — still return AI response
-            }
+            const lowerMessage = input.message.toLocaleLowerCase("tr-TR");
+            const riskLevel = /(silah|uyuşturucu|dolandır|kimlik sahte|şiddet)/.test(lowerMessage)
+              ? "high" as const
+              : /(gaz kokusu|yangın|elektrik çarp)/.test(lowerMessage)
+                ? "medium" as const
+                : "low" as const;
+            const draft = await db.createMoveAiDraft({
+              userId: ctx.user.id,
+              sourceMessage: input.message,
+              assistantSummary: parsed.response ?? "Hizmet taslağı hazırlandı.",
+              categoryId,
+              suggestions: parsed.suggestions ?? [],
+              riskLevel,
+            });
+            draftId = draft.id;
+            draftStatus = draft.status === "draft" ? "draft" : "blocked";
           }
 
           return {
             response: parsed.response ?? "Size yardımcı olmaya çalışıyorum. Hangi hizmete ihtiyacınız var?",
             category: parsed.category,
             suggestions: parsed.suggestions ?? ["Su tesisatçısı", "Elektrikçi", "Çekici", "Temizlik"],
-            requestId,
+            requestId: undefined,
+            draftId,
+            draftStatus,
           };
         } catch (error: unknown) {
           // Fallback: keyword-based intent detection
@@ -1358,7 +1366,23 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
             response = "Kurye hizmeti için paket bilgilerinizi paylaşır mısınız? ₺50 başlangıç + ₺12/km.";
           }
 
-          return { response, category, suggestions, requestId: undefined };
+          return { response, category, suggestions, requestId: undefined, draftId: undefined, draftStatus: undefined };
+        }
+      }),
+    getDraft: protectedProcedure
+      .input(z.object({ draftId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.getMoveAiDraftForUser(input.draftId, ctx.user.id)),
+    confirmDraft: protectedProcedure
+      .input(z.object({ draftId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.confirmMoveAiDraft({ draftId: input.draftId, userId: ctx.user.id });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "MOVE_AI_DRAFT_CONFIRM_FAILED";
+          if (message === "MOVE_AI_DRAFT_NOT_FOUND") throw new TRPCError({ code: "NOT_FOUND", message: "MoveAI taslağı bulunamadı" });
+          if (message.includes("NOT_CONFIRMABLE")) throw new TRPCError({ code: "CONFLICT", message: "Bu taslak süresi dolmuş veya daha önce işlenmiş" });
+          if (message.includes("RISK_BLOCKED") || message.includes("TRUST_RESTRICTED")) throw new TRPCError({ code: "FORBIDDEN", message: "Bu taslak güvenlik incelemesi nedeniyle onaylanamaz" });
+          throw error;
         }
       }),
   }),
