@@ -18,6 +18,7 @@ import { registerPaymentWebhookRoutes } from "../payments/registerPaymentWebhook
 import { ENV } from "./env";
 import { createCompletionAutoReleaseResponse } from "./completion-auto-release-response";
 import * as db from "../db";
+import { runFinancialReconciliation } from "../payments/FinancialReconciliationService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -138,6 +139,51 @@ async function startServer() {
         error,
       });
       res.status(500).json({ error: "Completion auto-release processing failed" });
+    }
+  });
+
+  // The scheduled reconcilier is deliberately fail-closed: a missing secret or
+  // gateway credential cannot be reported as a clean financial result.
+  app.post("/api/scheduled/financial-reconciliation", async (req, res) => {
+    const configuredSecret = ENV.financialReconciliationSecret;
+    const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
+    const actualAuthorization = String(req.headers.authorization ?? "");
+    const callbackToken = String(req.body?.token ?? "");
+    const hasBearerMatch =
+      expectedAuthorization.length > 0 &&
+      actualAuthorization.length === expectedAuthorization.length &&
+      timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
+    const hasPayloadMatch =
+      configuredSecret.length > 0 &&
+      callbackToken.length === configuredSecret.length &&
+      timingSafeEqual(Buffer.from(callbackToken), Buffer.from(configuredSecret));
+    if (!hasBearerMatch && !hasPayloadMatch) {
+      res.status(configuredSecret ? 401 : 503).json({
+        error: configuredSecret ? "Unauthorized scheduled callback" : "Financial reconciliation is not configured",
+      });
+      return;
+    }
+
+    const provider = req.body?.provider;
+    if (provider !== "stripe" && provider !== "iyzico") {
+      res.status(400).json({ error: "provider must be stripe or iyzico" });
+      return;
+    }
+
+    try {
+      const result = await runFinancialReconciliation(provider);
+      console.info("[financial-reconciliation] completed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        ...result,
+      });
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("[financial-reconciliation] failed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        provider,
+        error,
+      });
+      res.status(500).json({ error: "Financial reconciliation failed" });
     }
   });
 

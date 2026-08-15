@@ -136,7 +136,7 @@ const passwordSchema = z
     "Parola büyük harf, küçük harf ve rakam içermelidir",
   );
 const verificationCodeSchema = z.string().regex(/^\d{6}$/, "6 haneli güvenlik kodunu girin");
-const verificationPurposeSchema = z.enum(["verify_email", "verify_phone"]);
+const verificationPurposeSchema = z.enum(["verify_email", "verify_phone", "sensitive_transaction"]);
 const providerDocumentTypeSchema = z.enum([
   "identity",
   "driver_license",
@@ -215,6 +215,17 @@ async function setLocalSession(
   includeNativeToken = false,
 ) {
   const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "Move&Fix kullanıcısı", expiresInMs: ONE_YEAR_MS });
+  const sessionId = randomUUID();
+  const forwardedFor = ctx.req.headers["x-forwarded-for"];
+  const ipAddress = Array.isArray(forwardedFor) ? forwardedFor[0] : typeof forwardedFor === "string" ? forwardedFor.split(",")[0]?.trim() : ctx.req.ip;
+  await db.createLocalAuthSession({
+    id: sessionId,
+    userId: user.id,
+    tokenHash: createHash("sha256").update(token).digest("hex"),
+    userAgent: ctx.req.headers["user-agent"]?.slice(0, 512) ?? null,
+    ipHash: ipAddress ? createHash("sha256").update(ipAddress).digest("hex") : null,
+    expiresAt: new Date(Date.now() + ONE_YEAR_MS),
+  });
   ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
   const provider = await db.getProviderProfile(user.id);
   return {
@@ -408,6 +419,27 @@ export const appRouter = router({
         const verification = await issueVerificationCode({ userId: ctx.user.id, purpose: input.purpose, destination });
         return { verificationDelivery: verification };
       }),
+    sessions: protectedProcedure.query(({ ctx }) =>
+      db.listLocalAuthSessions(ctx.user.id).then((sessions) => ({ sessions, currentSessionId: ctx.localSessionId })),
+    ),
+    revokeSession: protectedProcedure
+      .input(z.object({ sessionId: z.string().uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const revoked = await db.revokeLocalAuthSession({ userId: ctx.user.id, sessionId: input.sessionId, reason: "user_revoked" });
+        if (!revoked) throw new TRPCError({ code: "NOT_FOUND", message: "Aktif oturum bulunamadı" });
+        if (ctx.localSessionId === input.sessionId) {
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+        }
+        return { revoked: true as const };
+      }),
+    revokeOtherSessions: protectedProcedure.mutation(({ ctx }) =>
+      db.revokeOtherLocalAuthSessions({
+        userId: ctx.user.id,
+        currentSessionId: ctx.localSessionId ?? null,
+        reason: "user_revoked_others",
+      }).then((revokedCount) => ({ revokedCount })),
+    ),
     verifyCode: protectedProcedure
       .input(z.object({ purpose: verificationPurposeSchema, code: verificationCodeSchema }))
       .mutation(async ({ ctx, input }) => {
@@ -454,7 +486,10 @@ export const appRouter = router({
         await db.markAuthChallengeUsed(validChallenge.id);
         return { success: true as const };
       }),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user && ctx.localSessionId) {
+        await db.revokeLocalAuthSession({ userId: ctx.user.id, sessionId: ctx.localSessionId, reason: "logout" });
+      }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return {
@@ -1454,14 +1489,35 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
         amount: z.number().int().min(100).max(1_000_000),
         bankAccountId: z.string().trim().regex(/^TR\d{24}$/, "TR ile başlayan 26 karakterli geçerli bir IBAN girin"),
         idempotencyKey: z.string().trim().min(16).max(96),
+        reauthPassword: z.string().min(1).max(128),
+        reauthCode: verificationCodeSchema,
       }))
       .mutation(async ({ ctx, input }) => {
         const provider = await db.getProviderProfile(ctx.user.id);
         if (!provider) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Para çekme yalnızca profesyonel hesaplara açıktır" });
         }
+        // A withdrawal is a high-risk action. OAuth-only users must first add a
+        // local credential instead of receiving a weaker, silently bypassable flow.
+        const local = ctx.user.email ? await db.getUserByEmailNormalized(ctx.user.email) : null;
+        if (!local || local.user.id !== ctx.user.id || !verifyPassword(input.reauthPassword, local.credential.passwordHash)) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Para çekme için parolanızı yeniden doğrulayın" });
+        }
+        const codeHash = hashVerificationCode(ctx.user.id, "sensitive_transaction", input.reauthCode);
+        const validChallenge = await db.getActiveAuthChallenge({
+          userId: ctx.user.id,
+          purpose: "sensitive_transaction",
+          codeHash,
+        });
+        if (!validChallenge) {
+          const activeChallenge = await db.getLatestActiveAuthChallenge({ userId: ctx.user.id, purpose: "sensitive_transaction" });
+          if (activeChallenge) await db.incrementAuthChallengeAttempts(activeChallenge.id);
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Para çekme güvenlik kodu geçersiz veya süresi dolmuş" });
+        }
+        await db.markAuthChallengeUsed(validChallenge.id);
         try {
-          return await db.requestWalletWithdrawal({ ...input, userId: ctx.user.id });
+          const { reauthPassword: _reauthPassword, reauthCode: _reauthCode, ...request } = input;
+          return await db.requestWalletWithdrawal({ ...request, userId: ctx.user.id });
         } catch (error) {
           if (error instanceof db.WalletWithdrawalError) {
             const code = error.reason === "INVALID_IBAN" ? "BAD_REQUEST" : "FORBIDDEN";

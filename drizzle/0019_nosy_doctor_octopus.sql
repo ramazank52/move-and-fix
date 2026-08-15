@@ -1,0 +1,1 @@
+ALTER TABLE `auth_challenges` MODIFY COLUMN `purpose` enum('verify_email','verify_phone','password_reset','sensitive_transaction') NOT NULL;

@@ -130,7 +130,7 @@ export const authChallenges = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     userId: int("userId").notNull(),
-    purpose: mysqlEnum("purpose", ["verify_email", "verify_phone", "password_reset"]).notNull(),
+    purpose: mysqlEnum("purpose", ["verify_email", "verify_phone", "password_reset", "sensitive_transaction"]).notNull(),
     channel: mysqlEnum("channel", ["email", "sms"]).notNull(),
     destination: varchar("destination", { length: 320 }).notNull(),
     codeHash: varchar("codeHash", { length: 128 }).notNull(),
@@ -143,6 +143,28 @@ export const authChallenges = mysqlTable(
   (table) => [
     index("auth_challenges_user_purpose_idx").on(table.userId, table.purpose),
     index("auth_challenges_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+// Server-side session registry for locally authenticated accounts. OAuth sessions
+// remain managed by the identity provider; locally minted sessions are revocable.
+export const localAuthSessions = mysqlTable(
+  "local_auth_sessions",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    userId: int("userId").notNull(),
+    tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+    userAgent: varchar("userAgent", { length: 512 }),
+    ipHash: varchar("ipHash", { length: 64 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    revokedAt: timestamp("revokedAt"),
+    revokeReason: varchar("revokeReason", { length: 80 }),
+  },
+  (table) => [
+    uniqueIndex("local_auth_sessions_token_hash_unique").on(table.tokenHash),
+    index("local_auth_sessions_user_active_idx").on(table.userId, table.revokedAt, table.expiresAt),
   ],
 );
 
@@ -463,6 +485,115 @@ export const paymentWebhookEvents = mysqlTable(
   ],
 );
 
+// Immutable double-entry financial ledger. Balances are derived from posted
+// lines; wallet snapshots remain an application-read model only.
+export const financialAccounts = mysqlTable(
+  "financial_accounts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    code: varchar("code", { length: 160 }).notNull(),
+    accountType: mysqlEnum("accountType", ["asset", "liability", "revenue", "expense", "equity"])
+      .notNull(),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    ownerUserId: int("ownerUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("financial_accounts_code_currency_unique").on(table.code, table.currency),
+    index("financial_accounts_owner_idx").on(table.ownerUserId),
+  ],
+);
+
+export const financialLedgerEntries = mysqlTable(
+  "financial_ledger_entries",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    eventType: mysqlEnum("eventType", [
+      "payment_pending",
+      "payment_succeeded",
+      "hold",
+      "commission",
+      "provider_payable",
+      "settlement",
+      "refund",
+      "partial_refund",
+      "dispute_hold",
+      "payout",
+      "failed_payout",
+      "reversal",
+      "chargeback",
+      "reimbursement",
+      "adjustment",
+    ]).notNull(),
+    paymentId: int("paymentId"),
+    requestId: int("requestId"),
+    referenceType: varchar("referenceType", { length: 64 }).notNull(),
+    referenceId: varchar("referenceId", { length: 191 }).notNull(),
+    externalReference: varchar("externalReference", { length: 191 }),
+    idempotencyKey: varchar("idempotencyKey", { length: 191 }).notNull(),
+    metadata: text("metadata"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("financial_ledger_entries_idempotency_unique").on(table.idempotencyKey),
+    index("financial_ledger_entries_payment_idx").on(table.paymentId, table.createdAt),
+    index("financial_ledger_entries_request_idx").on(table.requestId, table.createdAt),
+  ],
+);
+
+export const financialLedgerLines = mysqlTable(
+  "financial_ledger_lines",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    entryId: int("entryId").notNull(),
+    accountId: int("accountId").notNull(),
+    direction: mysqlEnum("direction", ["debit", "credit"]).notNull(),
+    amount: int("amount").notNull(),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("financial_ledger_lines_entry_idx").on(table.entryId),
+    index("financial_ledger_lines_account_idx").on(table.accountId, table.currency),
+  ],
+);
+
+export const financialReconciliationRuns = mysqlTable(
+  "financial_reconciliation_runs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    provider: mysqlEnum("provider", ["iyzico", "stripe"]).notNull(),
+    startedAt: timestamp("startedAt").defaultNow().notNull(),
+    completedAt: timestamp("completedAt"),
+    status: mysqlEnum("status", ["running", "completed", "failed"])
+      .default("running")
+      .notNull(),
+    checkedCount: int("checkedCount").default(0).notNull(),
+    mismatchCount: int("mismatchCount").default(0).notNull(),
+    error: text("error"),
+  },
+  (table) => [index("financial_reconciliation_runs_provider_status_idx").on(table.provider, table.status)],
+);
+
+export const financialReconciliationAlerts = mysqlTable(
+  "financial_reconciliation_alerts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    runId: int("runId").notNull(),
+    severity: mysqlEnum("severity", ["warning", "critical"]).default("critical").notNull(),
+    code: varchar("code", { length: 64 }).default("FINANCIAL_RECONCILIATION_ALERT").notNull(),
+    paymentId: int("paymentId"),
+    externalReference: varchar("externalReference", { length: 191 }),
+    details: text("details").notNull(),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("financial_reconciliation_alerts_run_idx").on(table.runId),
+    index("financial_reconciliation_alerts_open_idx").on(table.resolvedAt, table.createdAt),
+  ],
+);
+
 // Verified reviews — exactly one review is allowed for each completed request.
 export const reviews = mysqlTable("reviews", {
   id: int("id").autoincrement().primaryKey(),
@@ -524,6 +655,9 @@ export const walletWithdrawals = mysqlTable("wallet_withdrawals", {
 export type ServiceCategory = typeof serviceCategories.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
 export type UserCredential = typeof userCredentials.$inferSelect;
+export type FinancialAccount = typeof financialAccounts.$inferSelect;
+export type FinancialLedgerEntry = typeof financialLedgerEntries.$inferSelect;
+export type FinancialLedgerLine = typeof financialLedgerLines.$inferSelect;
 export type AuthChallenge = typeof authChallenges.$inferSelect;
 export type ProviderDocument = typeof providerDocuments.$inferSelect;
 export type ProviderFavorite = typeof providerFavorites.$inferSelect;

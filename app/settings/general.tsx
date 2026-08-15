@@ -69,6 +69,7 @@ export default function GeneralSettingsScreen() {
         </View>
 
         <View style={styles.card}>
+          <LinkRow label="Aktif Cihazlar" onPress={() => router.push("/settings/security" as never)} styles={styles} colors={colors} />
           <LinkRow label="Hakkında" onPress={() => router.push("/settings/help" as never)} styles={styles} colors={colors} />
           <LinkRow label="Gizlilik Politikası" onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} />
           <LinkRow label="Kullanım Koşulları" onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} isLast />

@@ -7,6 +7,9 @@ vi.mock("../server/db", async () => {
     ...actual,
     createLocalUser: vi.fn(),
     getUserByEmailNormalized: vi.fn(),
+    listLocalAuthSessions: vi.fn(),
+    revokeLocalAuthSession: vi.fn(),
+    revokeOtherLocalAuthSessions: vi.fn(),
   };
 });
 
@@ -76,5 +79,47 @@ describe("local authentication security", () => {
     const signedInWithoutPhone = appRouter.createCaller(createContext({ phone: null }));
     await expect(signedInWithoutPhone.auth.requestVerification({ purpose: "verify_phone" }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("lists only the caller-owned server-side local sessions and exposes the current session marker", async () => {
+    const context = { ...createContext(), localSessionId: "8d2ec052-919e-443f-9eeb-a35a2f9b8d11" };
+    vi.mocked(authDb.listLocalAuthSessions).mockResolvedValue([
+      {
+        id: context.localSessionId,
+        userAgent: "Move&Fix/1.0",
+        createdAt: new Date(),
+        lastSeenAt: new Date(),
+        expiresAt: new Date(Date.now() + 60_000),
+        revokedAt: null,
+        revokeReason: null,
+      },
+    ]);
+
+    await expect(appRouter.createCaller(context).auth.sessions()).resolves.toMatchObject({
+      currentSessionId: context.localSessionId,
+      sessions: [{ id: context.localSessionId }],
+    });
+    expect(authDb.listLocalAuthSessions).toHaveBeenCalledWith(71);
+  });
+
+  it("revokes only a caller-owned session and clears the cookie when the current session is revoked", async () => {
+    const context = { ...createContext(), localSessionId: "0a5170df-e5c8-43b8-a89c-914bd99850f8" };
+    vi.mocked(authDb.revokeLocalAuthSession).mockResolvedValue(true);
+
+    await expect(appRouter.createCaller(context).auth.revokeSession({ sessionId: context.localSessionId })).resolves.toEqual({ revoked: true });
+    expect(authDb.revokeLocalAuthSession).toHaveBeenCalledWith({
+      userId: 71,
+      sessionId: context.localSessionId,
+      reason: "user_revoked",
+    });
+    expect(context.res.clearCookie).toHaveBeenCalled();
+  });
+
+  it("refuses a session identifier that is not active and owned by the caller", async () => {
+    vi.mocked(authDb.revokeLocalAuthSession).mockResolvedValue(false);
+
+    await expect(appRouter.createCaller(createContext()).auth.revokeSession({
+      sessionId: "5f7d5d9e-35dd-4140-a5cc-938c98ce7c30",
+    })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

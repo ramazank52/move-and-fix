@@ -93,6 +93,19 @@ Gerçek Stripe/iyzico, FCM/APNs, SMS, e-posta, telekom proxy/voice, production d
 | Yerelleştirme | Kalıcı dil/para tercihi, tr/en/de/fr/ar/ru dil meta verisi, RTL yön bilgisi ve güvenli tarih/numara/TRY biçimleme `i18n-core` ile ayrıştırıldı; uygulama sağlayıcısı, genel ayarlar, dil ekranı ve ana sekme başlıklarına bağlandı. |
 | Gerileme doğrulaması | Yetkisiz MoveOS çağrısı HTTP `401`, `/moveos/` statik girişi HTTP `200`; `moveos-router-contract` ve `localization-contract` testleri dahil 37 dosyada 282 test geçti. `pnpm check`, lint, server build, iOS/Android Expo export ve istemci sır taraması geçti. |
 
+## Phase 9 Finansal Defter ve Hesap Güvenliği — 15 Ağustos 2026
+
+| Kontrol | Uygulama ve doğrulama kanıtı |
+|---|---|
+| Immutable çift taraflı defter | `financial_accounts`, `financial_ledger_entries` ve `financial_ledger_lines` additive şeması uygulanmıştır. Servis yalnız dengeli borç/alacak satırlarıyla post eder; benzersiz `referenceType + referenceId + eventType` anahtarı tekrar oynatma ve yinelenen postları engeller. |
+| Ödeme ve escrow bütünlüğü | Tahsilat onayı, escrow çözümü, %10 komisyon ve profesyonel cüzdan yazımları kanonik transaction içinde defter postuna bağlanmıştır. İade ve komisyon hesapları major-unit TRY sözleşmesinden türetilir. |
+| Uzlaştırma | `financial_reconciliation_runs` ve `financial_reconciliation_alerts` şeması, sağlayıcı ödeme kaydı–iç defter karşılaştırma servisi ve imzalı `/internal/scheduled/financial-reconciliation` callback’i eklendi. Sır yoksa endpoint çalışmaz; sağlayıcı hatası çalışma kaydını başarısız kapatır. |
+| Hassas para çekme | Doğrulanmış profesyonel, normalize TR IBAN, yeterli bakiye, parola yeniden doğrulama ve tek kullanımlık hassas işlem kodu zorunludur. Kod doğrulamasından sonra kullanıldı olarak işaretlenir; yanlış kod ve parola veri katmanı mutasyonundan önce reddedilir. |
+| Oturum ve sır güvenliği | Yerel oturumlar cihaz bilgisiyle listelenir, sahiplik denetimiyle iptal edilir ve iptal edilmiş token korumalı istekte reddedilir. İstemcideki Stripe test anahtarı placeholder’ı kaldırıldı; yapılandırma yoksa ödeme fail-closed kalır. |
+| Doğrulama | Finansal defter, uzlaştırma, para çekme ikinci faktörü ve oturum regresyonları dahil 39 dosyada 295 test geçti. TypeScript, lint, server build, iOS/Android export ve export paket sır taraması geçti. |
+
+> **Açık production bağımlılığı:** Gerçek Stripe/iyzico uzlaştırması, ödeme tokenizasyonu ve ikinci faktör teslimatı yalnız kullanıcı tarafından sağlanacak doğrulanmış sağlayıcı anahtarları, callback URL’leri ve zamanlayıcı sırrı ile canlı ortamda çalıştırılabilir. Yönetici girişine zorunlu MFA henüz uygulanmamıştır; bu nedenle gerçek para hareketleri için nihai GO kararı verilmemelidir.
+
 ## Uygulama Sırası
 
 1. Additive şema/migration: alt kategori, request detail/media, provider document, verification challenge, job evidence, completion approval/dispute, audit/settings/country/currency.

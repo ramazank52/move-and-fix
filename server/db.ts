@@ -5,6 +5,7 @@ import {
   users,
   userCredentials,
   authChallenges,
+  localAuthSessions,
   providerDocuments,
   walletAccounts,
   walletTransactions,
@@ -17,6 +18,12 @@ import {
   commissionRateForProvider,
   type EscrowPaymentStatus,
 } from "./payments/policy";
+import {
+  buildEscrowReleasedLedgerEntry,
+  buildPaymentHeldLedgerEntry,
+  buildRefundLedgerEntry,
+  postFinancialLedgerEntry,
+} from "./payments/FinancialLedgerService";
 import { rankServiceOpportunitiesByLocation } from "./matching/location";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -108,7 +115,7 @@ export async function getUserByOpenId(openId: string) {
 // Local credentials and verification challenges
 // Passwords and one-time codes must arrive here as hashes; plaintext values
 // are never persisted in the database.
-export type AuthChallengePurpose = "verify_email" | "verify_phone" | "password_reset";
+export type AuthChallengePurpose = "verify_email" | "verify_phone" | "password_reset" | "sensitive_transaction";
 export type AuthChallengeChannel = "email" | "sms";
 
 export async function getUserByEmailNormalized(emailNormalized: string) {
@@ -238,6 +245,80 @@ export async function resetLocalLoginFailures(userId: number) {
     .update(userCredentials)
     .set({ failedLoginCount: 0, lockedUntil: null })
     .where(eq(userCredentials.userId, userId));
+}
+
+export async function createLocalAuthSession(data: {
+  id: string;
+  userId: number;
+  tokenHash: string;
+  userAgent?: string | null;
+  ipHash?: string | null;
+  expiresAt: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(localAuthSessions).values(data);
+  return data.id;
+}
+
+export async function getLocalAuthSessionByTokenHash(tokenHash: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(localAuthSessions)
+    .where(eq(localAuthSessions.tokenHash, tokenHash))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function touchLocalAuthSession(id: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(localAuthSessions)
+    .set({ lastSeenAt: new Date() })
+    .where(and(eq(localAuthSessions.id, id), isNull(localAuthSessions.revokedAt)));
+}
+
+export async function listLocalAuthSessions(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: localAuthSessions.id,
+      userAgent: localAuthSessions.userAgent,
+      createdAt: localAuthSessions.createdAt,
+      lastSeenAt: localAuthSessions.lastSeenAt,
+      expiresAt: localAuthSessions.expiresAt,
+      revokedAt: localAuthSessions.revokedAt,
+      revokeReason: localAuthSessions.revokeReason,
+    })
+    .from(localAuthSessions)
+    .where(eq(localAuthSessions.userId, userId))
+    .orderBy(desc(localAuthSessions.lastSeenAt));
+}
+
+export async function revokeLocalAuthSession(data: { userId: number; sessionId: string; reason: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(localAuthSessions)
+    .set({ revokedAt: new Date(), revokeReason: data.reason })
+    .where(and(eq(localAuthSessions.id, data.sessionId), eq(localAuthSessions.userId, data.userId), isNull(localAuthSessions.revokedAt)));
+  return (result[0]?.affectedRows ?? 0) === 1;
+}
+
+export async function revokeOtherLocalAuthSessions(data: { userId: number; currentSessionId: string | null; reason: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const conditions = [eq(localAuthSessions.userId, data.userId), isNull(localAuthSessions.revokedAt)];
+  if (data.currentSessionId) conditions.push(sql`${localAuthSessions.id} <> ${data.currentSessionId}`);
+  const result = await db
+    .update(localAuthSessions)
+    .set({ revokedAt: new Date(), revokeReason: data.reason })
+    .where(and(...conditions));
+  return result[0]?.affectedRows ?? 0;
 }
 
 export async function createAuthChallenge(data: {
@@ -469,9 +550,132 @@ import {
   jobCompletionProofMedia,
   completionDisputes,
   escrowReleaseEvents,
+  financialLedgerEntries,
+  financialReconciliationAlerts,
+  financialReconciliationRuns,
 } from "../drizzle/schema";
 
 // Service Categories
+
+export type FinancialReconciliationProvider = "iyzico" | "stripe";
+export type ReconciliationPaymentCandidate = {
+  id: number;
+  requestId: number;
+  amount: number;
+  status: "pending" | "held" | "released" | "refunded";
+  gatewayProvider: FinancialReconciliationProvider;
+  gatewayPaymentId: string;
+  ledgerIdempotencyKeys: string[];
+};
+
+/**
+ * Resolves the mandatory journal event(s) for an internally settled payment.
+ * This is deliberately pure so reconciliation and regression tests share one
+ * source of truth without treating the wallet snapshot as accounting truth.
+ */
+export function expectedLedgerIdempotencyKeysForPayment(input: {
+  id: number;
+  status: "pending" | "held" | "released" | "refunded";
+}) {
+  if (input.status === "held") return [`ledger:payment:${input.id}:held`];
+  if (input.status === "released") {
+    return [`ledger:payment:${input.id}:held`, `ledger:payment:${input.id}:released`];
+  }
+  if (input.status === "refunded") {
+    return [`ledger:payment:${input.id}:held`, `ledger:payment:${input.id}:refunded`];
+  }
+  return [];
+}
+
+export async function startFinancialReconciliationRun(provider: FinancialReconciliationProvider) {
+  const db = await getDb();
+  if (!db) throw new Error("FINANCIAL_RECONCILIATION_DATABASE_UNAVAILABLE");
+  const result = await db.insert(financialReconciliationRuns).values({ provider, status: "running" });
+  const id = Number(result[0].insertId);
+  if (!id) throw new Error("FINANCIAL_RECONCILIATION_RUN_CREATE_FAILED");
+  return id;
+}
+
+export async function getFinancialReconciliationCandidates(
+  provider: FinancialReconciliationProvider,
+): Promise<ReconciliationPaymentCandidate[]> {
+  const db = await getDb();
+  if (!db) throw new Error("FINANCIAL_RECONCILIATION_DATABASE_UNAVAILABLE");
+
+  const paymentRows = await db
+    .select()
+    .from(payments)
+    .where(
+      and(
+        eq(payments.gatewayProvider, provider),
+        isNotNull(payments.gatewayPaymentId),
+        inArray(payments.status, ["held", "released", "refunded"]),
+      ),
+    );
+  if (paymentRows.length === 0) return [];
+
+  const ledgerRows = await db
+    .select({ paymentId: financialLedgerEntries.paymentId, idempotencyKey: financialLedgerEntries.idempotencyKey })
+    .from(financialLedgerEntries)
+    .where(inArray(financialLedgerEntries.paymentId, paymentRows.map((payment) => payment.id)));
+  const keysByPayment = new Map<number, string[]>();
+  for (const row of ledgerRows) {
+    if (row.paymentId === null) continue;
+    keysByPayment.set(row.paymentId, [...(keysByPayment.get(row.paymentId) ?? []), row.idempotencyKey]);
+  }
+
+  return paymentRows.flatMap((payment) => {
+    if (!payment.gatewayPaymentId || !payment.gatewayProvider) return [];
+    return [{
+      id: payment.id,
+      requestId: payment.requestId,
+      amount: payment.amount,
+      status: payment.status,
+      gatewayProvider: payment.gatewayProvider,
+      gatewayPaymentId: payment.gatewayPaymentId,
+      ledgerIdempotencyKeys: keysByPayment.get(payment.id) ?? [],
+    }];
+  });
+}
+
+export async function createFinancialReconciliationAlert(input: {
+  runId: number;
+  paymentId?: number;
+  externalReference?: string;
+  details: Record<string, unknown>;
+  severity?: "warning" | "critical";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("FINANCIAL_RECONCILIATION_DATABASE_UNAVAILABLE");
+  await db.insert(financialReconciliationAlerts).values({
+    runId: input.runId,
+    paymentId: input.paymentId ?? null,
+    externalReference: input.externalReference ?? null,
+    severity: input.severity ?? "critical",
+    code: "FINANCIAL_RECONCILIATION_ALERT",
+    details: JSON.stringify(input.details),
+  });
+}
+
+export async function completeFinancialReconciliationRun(input: {
+  runId: number;
+  checkedCount: number;
+  mismatchCount: number;
+  error?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("FINANCIAL_RECONCILIATION_DATABASE_UNAVAILABLE");
+  await db
+    .update(financialReconciliationRuns)
+    .set({
+      completedAt: new Date(),
+      status: input.error ? "failed" : "completed",
+      checkedCount: input.checkedCount,
+      mismatchCount: input.mismatchCount,
+      error: input.error?.slice(0, 4_000) ?? null,
+    })
+    .where(eq(financialReconciliationRuns.id, input.runId));
+}
 export async function getActiveServiceCategories() {
   const db = await getDb();
   if (!db) return [];
@@ -1890,6 +2094,8 @@ async function releaseHeldEscrowInTransaction(
     throw new Error("ESCROW_RELEASE_CONFLICT");
   }
 
+  await postFinancialLedgerEntry(tx, buildEscrowReleasedLedgerEntry(payment));
+
   await tx
     .insert(walletAccounts)
     .values({ userId: data.providerUserId, currency: "TRY" })
@@ -3030,6 +3236,13 @@ export async function transitionPaymentFromVerifiedWebhook(data: {
       .where(eq(payments.id, payment.id))
       .limit(1);
     if (!updatedRows[0]) throw new Error("PAYMENT_UPDATE_FAILED");
+
+    if (data.nextStatus === "held") {
+      await postFinancialLedgerEntry(tx, buildPaymentHeldLedgerEntry(updatedRows[0]));
+    } else if (data.nextStatus === "refunded" && payment.status === "held") {
+      await postFinancialLedgerEntry(tx, buildRefundLedgerEntry(updatedRows[0]));
+    }
+
     return { payment: updatedRows[0], duplicated: false };
   });
 }

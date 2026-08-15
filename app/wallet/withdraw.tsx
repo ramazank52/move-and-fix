@@ -17,6 +17,8 @@ export default function WalletWithdrawScreen() {
   const router = useRouter();
   const [amount, setAmount] = useState("");
   const [iban, setIban] = useState("");
+  const [reauthPassword, setReauthPassword] = useState("");
+  const [reauthCode, setReauthCode] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(createIdempotencyKey);
   const summaryQuery = trpc.wallet.summary.useQuery();
   const utils = trpc.useUtils();
@@ -34,6 +36,10 @@ export default function WalletWithdrawScreen() {
     },
     onError: (error) => Alert.alert("Para Çekme Başarısız", error.message || "Lütfen tekrar deneyin."),
   });
+  const requestSecurityCode = trpc.auth.requestVerification.useMutation({
+    onSuccess: () => Alert.alert("Güvenlik Kodu Gönderildi", "Kayıtlı e-posta adresinize gönderilen 6 haneli kodu girin."),
+    onError: (error) => Alert.alert("Kod Gönderilemedi", error.message || "Güvenlik kodu gönderilemedi."),
+  });
 
   const submit = () => {
     const value = Number(amount.replace(",", "."));
@@ -49,7 +55,15 @@ export default function WalletWithdrawScreen() {
       Alert.alert("Geçersiz IBAN", "TR ile başlayan 26 karakterli geçerli bir IBAN girin.");
       return;
     }
-    withdraw.mutate({ amount: value, bankAccountId: normalizedIban, idempotencyKey });
+    if (!reauthPassword) {
+      Alert.alert("Parola Doğrulaması Gerekli", "Güvenliğiniz için para çekme talebinden önce parolanızı girin.");
+      return;
+    }
+    if (!/^\d{6}$/.test(reauthCode)) {
+      Alert.alert("Güvenlik Kodu Gerekli", "E-posta adresinize gönderilen 6 haneli güvenlik kodunu girin.");
+      return;
+    }
+    withdraw.mutate({ amount: value, bankAccountId: normalizedIban, idempotencyKey, reauthPassword, reauthCode });
   };
 
   return (
@@ -101,6 +115,38 @@ export default function WalletWithdrawScreen() {
             placeholderTextColor={colors.muted}
             style={{ height: 52, borderRadius: 13, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, color: colors.foreground, paddingHorizontal: 15 }}
           />
+          <Text className="mb-2 mt-5 text-sm font-semibold text-foreground">Parolanızla doğrulayın</Text>
+          <TextInput
+            value={reauthPassword}
+            onChangeText={setReauthPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="password"
+            placeholder="Hesap parolanız"
+            placeholderTextColor={colors.muted}
+            style={{ height: 52, borderRadius: 13, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, color: colors.foreground, paddingHorizontal: 15 }}
+          />
+          <View style={{ marginTop: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <Text className="text-sm font-semibold text-foreground">E-posta güvenlik kodu</Text>
+            <Pressable
+              disabled={requestSecurityCode.isPending}
+              onPress={() => requestSecurityCode.mutate({ purpose: "sensitive_transaction" })}
+              style={({ pressed }) => ({ minHeight: 34, justifyContent: "center", paddingHorizontal: 10, borderRadius: 9, backgroundColor: colors.primary + "18", opacity: pressed || requestSecurityCode.isPending ? 0.6 : 1 })}
+            >
+              <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>{requestSecurityCode.isPending ? "Gönderiliyor" : "Kod gönder"}</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            value={reauthCode}
+            onChangeText={(value) => setReauthCode(value.replace(/\D/g, "").slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+            placeholder="6 haneli kod"
+            placeholderTextColor={colors.muted}
+            style={{ marginTop: 8, height: 52, borderRadius: 13, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, color: colors.foreground, paddingHorizontal: 15, fontSize: 17, fontWeight: "700", letterSpacing: 5 }}
+          />
+          <Text className="mt-2 text-xs leading-5 text-muted">Güvenlik kodu 10 dakika geçerlidir ve yalnız bir para çekme talebinde kullanılabilir.</Text>
           <Pressable
             disabled={withdraw.isPending}
             onPress={submit}

@@ -287,3 +287,10 @@
 - [x] Phase 8 MoveOS: mock owner token/girişini kaldır; yönetici kimliğini yalnız ortak oturumdan türet; kategori, kullanıcı ve hizmet yönetiminde gerçek veri katmanını kullan
 - [x] Phase 8 MoveOS: inşa edilmiş yönetici context’i, mock dashboard/cüzdan/analitik verileri ve sahte başarılı yazma uçlarını fail-closed gerçek uygulamalarla değiştir
 - [x] Phase 8 yerelleştirme: kalıcı dil ve para birimi seçimi, RTL yön desteği, güvenli para/numara/tarih biçimleyicileri ve ayarlar ekranı bağını uygula
+- [x] Phase 9 finansal discovery: ödeme, escrow, wallet, webhook, anahtar yönetimi ve oturum güvenliğinin gerçek üretim yollarını denetle
+- [x] Phase 9 finansal defter: immutable çift taraflı kayıt, hesap bakiyesi türetimi, benzersiz referanslar ve idempotent finansal olay sözleşmesini tasarla ve migration ile uygula
+- [x] Phase 9 uzlaştırma: sağlayıcı ödemeleri ile iç defteri karşılaştıran, uyuşmazlıkta FINANCIAL_RECONCILIATION_ALERT üreten yetkili ve zamanlanabilir akışı uygula
+- [x] Phase 9 ödeme sertleştirme: replay/race/double-spend, tutar-para birimi, durum makinesi, re-auth ve tokenizasyon sınırlarını gerçek akışta doğrula veya fail-closed tamamla
+- [ ] Phase 9 hesap ve sır güvenliği: MFA, cihaz/oturum listesi, oturum iptali, şüpheli giriş ve hassas işlem re-auth kapsamını denetle; gerçekçi biçimde eksikleri tamamla
+- [x] Phase 9 yerel oturum cihaz listesi, sahiplik denetimli oturum iptali, token rotasyonu, hassas para çekme parola + tek kullanımlık kod re-auth ve istemci sır sızıntısı korumalarını uygula
+- [x] Phase 9 güvenlik-finans unit, integration, authorization, hata ve edge-case regresyonlarını ekle; kalite kapılarını tekrar çalıştır
