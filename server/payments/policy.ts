@@ -30,6 +30,53 @@ export function calculatePaymentBreakdown(amount: number, commissionRateBps: num
   };
 }
 
+export type CancellationSettlementOutcome = "refund" | "partial_refund" | "provider_payable";
+
+/**
+ * İnsan incelemesinin immutable held ödeme üzerinden ürettiği settlement planı.
+ * Gateway iadesi ve immutable defter hareketi bu planı ancak doğrulanmış
+ * sağlayıcı callback'i sonrasında uygular.
+ */
+export function calculateCancellationSettlementPlan(input: {
+  paymentAmount: number;
+  commissionRateBps: number;
+  settlementOutcome: CancellationSettlementOutcome;
+  refundAmount?: number;
+}) {
+  if (!Number.isSafeInteger(input.paymentAmount) || input.paymentAmount <= 0) {
+    throw new Error("CANCELLATION_PAYMENT_AMOUNT_INVALID");
+  }
+
+  const refundAmount =
+    input.settlementOutcome === "refund"
+      ? input.paymentAmount
+      : input.settlementOutcome === "provider_payable"
+        ? 0
+        : input.refundAmount;
+  if (
+    refundAmount === undefined ||
+    !Number.isSafeInteger(refundAmount) ||
+    refundAmount < 0 ||
+    refundAmount > input.paymentAmount ||
+    (input.settlementOutcome === "partial_refund" && (refundAmount <= 0 || refundAmount >= input.paymentAmount)) ||
+    (input.settlementOutcome !== "partial_refund" && input.refundAmount !== undefined && input.refundAmount !== refundAmount)
+  ) {
+    throw new Error("CANCELLATION_REFUND_AMOUNT_INVALID");
+  }
+
+  const providerGrossAmount = input.paymentAmount - refundAmount;
+  const breakdown =
+    providerGrossAmount === 0
+      ? { commissionAmount: 0, providerPayout: 0 }
+      : calculatePaymentBreakdown(providerGrossAmount, input.commissionRateBps);
+  return {
+    refundAmount,
+    providerGrossAmount,
+    commissionAmount: breakdown.commissionAmount,
+    providerPayoutAmount: breakdown.providerPayout,
+  };
+}
+
 export function commissionRateForProvider(isPremium: boolean) {
   return isPremium ? PREMIUM_COMMISSION_RATE_BPS : STANDARD_COMMISSION_RATE_BPS;
 }

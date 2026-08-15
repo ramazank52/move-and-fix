@@ -1,0 +1,1 @@
+ALTER TABLE `settlement_policies` ADD `commissionRateBps` int DEFAULT 1000 NOT NULL;

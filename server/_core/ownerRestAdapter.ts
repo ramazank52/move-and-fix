@@ -37,7 +37,13 @@ type OwnerProcedure =
   | "transitionCountryCompliancePackage"
   | "registerCountryOfficialSource"
   | "saveCountryLaunchGate"
-  | "enableCountryProfessionalMarketplace";
+  | "enableCountryProfessionalMarketplace"
+  | "settlementPolicies"
+  | "createSettlementPolicy"
+  | "retireSettlementPolicy"
+  | "cancellationCases"
+  | "changeOrders"
+  | "reviewCancellationCase";
 
 async function requireMoveOsAdmin(req: Request, res: Response): Promise<User | null> {
   try {
@@ -273,6 +279,89 @@ export function registerOwnerRestRoutes(app: Express) {
       res.json(await callOwnerProcedure(req, res, user, "withdrawFunds", req.body));
     } catch (error) {
       sendOwnerError(res, error, "Platform para çekme işlemi başlatılamadı");
+    }
+  });
+
+  app.get("/api/owner/settlement-policies", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "settlementPolicies", {
+          limit: req.query.limit ? Number(req.query.limit) : 20,
+          offset: req.query.offset ? Number(req.query.offset) : 0,
+          status: typeof req.query.status === "string" ? req.query.status : undefined,
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Settlement policy kayıtları alınamadı");
+    }
+  });
+
+  app.post("/api/owner/settlement-policies", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "createSettlementPolicy", req.body));
+    } catch (error) {
+      sendOwnerError(res, error, "Settlement policy oluşturulamadı");
+    }
+  });
+
+  app.post("/api/owner/settlement-policies/:policyId/retire", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "retireSettlementPolicy", { policyId: Number(req.params.policyId) }));
+    } catch (error) {
+      sendOwnerError(res, error, "Settlement policy emekliye ayrılamadı");
+    }
+  });
+
+  app.get("/api/owner/cancellation-cases", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "cancellationCases", {
+          limit: req.query.limit ? Number(req.query.limit) : 20,
+          offset: req.query.offset ? Number(req.query.offset) : 0,
+          status: typeof req.query.status === "string" ? req.query.status : undefined,
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "İptal inceleme kayıtları alınamadı");
+    }
+  });
+
+  app.get("/api/owner/change-orders", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "changeOrders", {
+          limit: req.query.limit ? Number(req.query.limit) : 20,
+          offset: req.query.offset ? Number(req.query.offset) : 0,
+          status: typeof req.query.status === "string" ? req.query.status : undefined,
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Change order denetim kayıtları alınamadı");
+    }
+  });
+
+  app.post("/api/owner/cancellation-cases/:requestId/review", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "reviewCancellationCase", {
+          ...req.body,
+          requestId: Number(req.params.requestId),
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "İptal kaydı çözümlenemedi");
     }
   });
 

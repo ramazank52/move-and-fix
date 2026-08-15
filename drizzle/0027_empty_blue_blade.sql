@@ -1,0 +1,1 @@
+ALTER TABLE `job_cancellation_cases` ADD `evidenceJson` text;

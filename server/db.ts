@@ -16,6 +16,7 @@ import {
 import { ENV } from "./_core/env";
 import {
   assertPaymentStatusTransition,
+  calculateCancellationSettlementPlan,
   calculatePaymentBreakdown,
   commissionRateForProvider,
   type EscrowPaymentStatus,
@@ -698,6 +699,10 @@ import {
   messages,
   payments,
   paymentWebhookEvents,
+  serviceAgreements,
+  settlementPolicies,
+  jobChangeOrders,
+  jobCancellationCases,
   providerFavorites,
   reviews,
   jobTracking,
@@ -716,6 +721,230 @@ import {
 // Service Categories
 
 export type FinancialReconciliationProvider = "iyzico" | "stripe";
+const DEFAULT_SETTLEMENT_COUNTRY_CODE = "TR";
+const DEFAULT_SETTLEMENT_CONTRACT_TYPE = "standard";
+
+function isValidCompletionReviewHours(value: number) {
+  return Number.isInteger(value) && value >= 1 && value <= 168;
+}
+
+type SettlementPolicyRow = typeof settlementPolicies.$inferSelect;
+
+export type ResolvedSettlementPolicy = Pick<
+  SettlementPolicyRow,
+  | "id"
+  | "scopeKey"
+  | "countryCode"
+  | "categoryId"
+  | "gatewayProvider"
+  | "contractType"
+  | "precedence"
+  | "version"
+  | "commissionRateBps"
+  | "completionReviewHours"
+  | "cancellationPolicyJson"
+>;
+
+function parseCancellationPolicySnapshot(value: string) {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("not an object");
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    throw new Error("SETTLEMENT_POLICY_CANCELLATION_POLICY_INVALID");
+  }
+}
+
+/**
+ * Selects a prospective policy with deterministic specificity ordering.
+ * Only active, time-effective policies can be selected. The caller stores the
+ * returned values in an agreement snapshot, preventing later policy edits from
+ * changing an accepted job.
+ */
+export function resolveSettlementPolicy(
+  policies: SettlementPolicyRow[],
+  input: {
+    countryCode: string;
+    categoryId: number;
+    gatewayProvider?: "iyzico" | "stripe";
+    contractType?: string;
+    now?: Date;
+  },
+): ResolvedSettlementPolicy {
+  const now = input.now ?? new Date();
+  const contractType = input.contractType ?? DEFAULT_SETTLEMENT_CONTRACT_TYPE;
+  const gatewayProvider = input.gatewayProvider ?? "any";
+  const candidates = policies
+    .filter(
+      (policy) =>
+        policy.status === "active" &&
+        policy.countryCode === input.countryCode &&
+        policy.contractType === contractType &&
+        (policy.categoryId === null || policy.categoryId === input.categoryId) &&
+        (policy.gatewayProvider === "any" || policy.gatewayProvider === gatewayProvider) &&
+        policy.effectiveFrom <= now &&
+        (policy.effectiveTo === null || policy.effectiveTo > now),
+    )
+    .sort((left, right) => {
+      const score = (policy: SettlementPolicyRow) =>
+        (policy.categoryId === input.categoryId ? 4 : 0) +
+        (policy.gatewayProvider === gatewayProvider && gatewayProvider !== "any" ? 2 : 0) +
+        (policy.contractType === contractType ? 1 : 0);
+      return score(right) - score(left) || right.precedence - left.precedence || right.id - left.id;
+    });
+  const policy = candidates[0];
+  if (!policy) throw new Error("SETTLEMENT_POLICY_NOT_FOUND");
+  if (!isValidCompletionReviewHours(policy.completionReviewHours)) {
+    throw new Error("AGREEMENT_COMPLETION_REVIEW_WINDOW_INVALID");
+  }
+  if (!Number.isInteger(policy.commissionRateBps) || policy.commissionRateBps < 0 || policy.commissionRateBps > 10_000) {
+    throw new Error("SETTLEMENT_POLICY_COMMISSION_RATE_INVALID");
+  }
+  parseCancellationPolicySnapshot(policy.cancellationPolicyJson);
+  return policy;
+}
+
+async function resolveSettlementPolicyInTransaction(
+  tx: DatabaseTransaction,
+  input: { categoryId: number; gatewayProvider?: "iyzico" | "stripe" },
+) {
+  const policyRows = await tx
+    .select()
+    .from(settlementPolicies)
+    .where(
+      and(
+        eq(settlementPolicies.countryCode, DEFAULT_SETTLEMENT_COUNTRY_CODE),
+        eq(settlementPolicies.status, "active"),
+      ),
+    );
+  return resolveSettlementPolicy(policyRows, {
+    countryCode: DEFAULT_SETTLEMENT_COUNTRY_CODE,
+    categoryId: input.categoryId,
+    gatewayProvider: input.gatewayProvider,
+  });
+}
+
+function settlementPolicyScopeKey(input: {
+  countryCode: string;
+  categoryId?: number | null;
+  gatewayProvider: "any" | "iyzico" | "stripe";
+  contractType: string;
+  version: string;
+}) {
+  return [
+    input.countryCode.toUpperCase(),
+    input.categoryId ?? "all",
+    input.gatewayProvider,
+    input.contractType.trim().toLowerCase(),
+    input.version.trim(),
+  ].join(":");
+}
+
+export async function listSettlementPoliciesForAdmin(input: {
+  limit: number;
+  offset: number;
+  status?: "draft" | "active" | "retired" | "suspended";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db
+    .select()
+    .from(settlementPolicies)
+    .where(input.status ? eq(settlementPolicies.status, input.status) : undefined)
+    .orderBy(desc(settlementPolicies.effectiveFrom), desc(settlementPolicies.id))
+    .limit(input.limit)
+    .offset(input.offset);
+}
+
+export async function createSettlementPolicyForAdmin(data: {
+  createdByUserId: number;
+  countryCode: string;
+  categoryId?: number | null;
+  gatewayProvider: "any" | "iyzico" | "stripe";
+  contractType: string;
+  precedence: number;
+  version: string;
+  commissionRateBps: number;
+  completionReviewHours: number;
+  cancellationPolicy: Record<string, unknown>;
+  status: "draft" | "active" | "suspended";
+  effectiveFrom: Date;
+  effectiveTo?: Date | null;
+}) {
+  if (!isValidCompletionReviewHours(data.completionReviewHours)) {
+    throw new Error("SETTLEMENT_POLICY_COMPLETION_REVIEW_WINDOW_INVALID");
+  }
+  if (!Number.isInteger(data.commissionRateBps) || data.commissionRateBps < 0 || data.commissionRateBps > 10_000) {
+    throw new Error("SETTLEMENT_POLICY_COMMISSION_RATE_INVALID");
+  }
+  const countryCode = data.countryCode.trim().toUpperCase();
+  const contractType = data.contractType.trim().toLowerCase();
+  const version = data.version.trim();
+  if (!/^[A-Z]{2}$/.test(countryCode) || !/^[a-z0-9_-]{1,48}$/.test(contractType) || version.length < 1 || version.length > 64) {
+    throw new Error("SETTLEMENT_POLICY_INPUT_INVALID");
+  }
+  if (!Number.isInteger(data.precedence) || data.precedence < -10_000 || data.precedence > 10_000) {
+    throw new Error("SETTLEMENT_POLICY_PRECEDENCE_INVALID");
+  }
+  if (!Number.isInteger(data.categoryId ?? 0) || (data.categoryId ?? 0) < 0) {
+    throw new Error("SETTLEMENT_POLICY_CATEGORY_INVALID");
+  }
+  if (!(data.effectiveFrom instanceof Date) || Number.isNaN(data.effectiveFrom.getTime())) {
+    throw new Error("SETTLEMENT_POLICY_EFFECTIVE_FROM_INVALID");
+  }
+  if (data.effectiveTo && data.effectiveTo <= data.effectiveFrom) {
+    throw new Error("SETTLEMENT_POLICY_EFFECTIVE_TO_INVALID");
+  }
+  const cancellationPolicyJson = JSON.stringify(data.cancellationPolicy);
+  parseCancellationPolicySnapshot(cancellationPolicyJson);
+  const scopeKey = settlementPolicyScopeKey({
+    countryCode,
+    categoryId: data.categoryId ?? null,
+    gatewayProvider: data.gatewayProvider,
+    contractType,
+    version,
+  });
+  if (scopeKey.length > 191) throw new Error("SETTLEMENT_POLICY_SCOPE_KEY_INVALID");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const inserted = await db.insert(settlementPolicies).values({
+    scopeKey,
+    countryCode,
+    categoryId: data.categoryId ?? null,
+    gatewayProvider: data.gatewayProvider,
+    contractType,
+    precedence: data.precedence,
+    version,
+    commissionRateBps: data.commissionRateBps,
+    completionReviewHours: data.completionReviewHours,
+    cancellationPolicyJson,
+    status: data.status,
+    effectiveFrom: data.effectiveFrom,
+    effectiveTo: data.effectiveTo ?? null,
+    createdByUserId: data.createdByUserId,
+  });
+  const id = Number(inserted[0].insertId);
+  if (!id) throw new Error("SETTLEMENT_POLICY_CREATE_FAILED");
+  const rows = await db.select().from(settlementPolicies).where(eq(settlementPolicies.id, id)).limit(1);
+  if (!rows[0]) throw new Error("SETTLEMENT_POLICY_CREATE_FAILED");
+  return rows[0];
+}
+
+/** Policies are never edited in-place after publication; retire and create a successor instead. */
+export async function retireSettlementPolicyForAdmin(data: { policyId: number; retiredByUserId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = new Date();
+  const updated = await db
+    .update(settlementPolicies)
+    .set({ status: "retired", effectiveTo: now })
+    .where(and(eq(settlementPolicies.id, data.policyId), inArray(settlementPolicies.status, ["draft", "active", "suspended"])));
+  if ((updated[0]?.affectedRows ?? 0) !== 1) throw new Error("SETTLEMENT_POLICY_NOT_RETIRABLE");
+  return { success: true, policyId: data.policyId, retiredByUserId: data.retiredByUserId };
+}
+
 export type ReconciliationPaymentCandidate = {
   id: number;
   requestId: number;
@@ -2197,6 +2426,40 @@ type DatabaseClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type DatabaseTransaction = Parameters<Parameters<DatabaseClient["transaction"]>[0]>[0];
 type CompletionReleaseReason = "customer_approval" | "auto_release" | "admin_resolution";
 
+async function getAgreementForPaymentInTransaction(
+  tx: DatabaseTransaction,
+  payment: {
+    id: number;
+    requestId: number;
+    userId: number;
+    providerId: number;
+    offerId: number | null;
+    amount: number;
+    commissionRateBps: number | null;
+    commissionAmount: number | null;
+    providerPayout: number | null;
+  },
+) {
+  const rows = await tx
+    .select()
+    .from(serviceAgreements)
+    .where(eq(serviceAgreements.requestId, payment.requestId))
+    .limit(1);
+  const agreement = rows[0];
+  if (!agreement) throw new Error("PAYMENT_AGREEMENT_NOT_FOUND");
+  const matches =
+    agreement.paymentId === payment.id &&
+    agreement.customerUserId === payment.userId &&
+    agreement.providerId === payment.providerId &&
+    agreement.offerId === payment.offerId &&
+    agreement.agreedAmount === payment.amount &&
+    agreement.commissionRateBps === payment.commissionRateBps &&
+    agreement.commissionAmount === payment.commissionAmount &&
+    agreement.providerPayout === payment.providerPayout;
+  if (!matches) throw new Error("PAYMENT_AGREEMENT_MISMATCH");
+  return agreement;
+}
+
 async function releaseHeldEscrowInTransaction(
   tx: DatabaseTransaction,
   data: {
@@ -2232,6 +2495,10 @@ async function releaseHeldEscrowInTransaction(
   if (payment.requestId !== data.requestId) throw new Error("ESCROW_REQUEST_MISMATCH");
   if (payment.status !== "held") {
     throw new Error(payment.status === "released" ? "ESCROW_RELEASE_EVENT_MISSING" : "ESCROW_NOT_HELD");
+  }
+  const agreement = await getAgreementForPaymentInTransaction(tx, payment);
+  if (agreement.providerPayout !== data.providerPayout) {
+    throw new Error("ESCROW_AGREEMENT_PAYOUT_MISMATCH");
   }
 
   const idempotencyKey = `escrow-release:${data.paymentId}`;
@@ -2362,7 +2629,6 @@ export async function submitCompletionProof(data: {
   if (data.media.length < 1) throw new Error("COMPLETION_PROOF_MEDIA_REQUIRED");
 
   const now = new Date();
-  const responseDueAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
   return db.transaction(async (tx) => {
     const existing = await tx
       .select()
@@ -2370,6 +2636,21 @@ export async function submitCompletionProof(data: {
       .where(eq(jobCompletionProofs.requestId, data.requestId))
       .limit(1);
     if (existing[0]) return { proof: existing[0], duplicated: true };
+
+    const agreementRows = await tx
+      .select()
+      .from(serviceAgreements)
+      .where(eq(serviceAgreements.requestId, data.requestId))
+      .limit(1);
+    const agreement = agreementRows[0];
+    if (!agreement) throw new Error("COMPLETION_PROOF_AGREEMENT_NOT_FOUND");
+    if (agreement.providerId !== providerId) throw new Error("COMPLETION_PROOF_AGREEMENT_MISMATCH");
+    if (!isValidCompletionReviewHours(agreement.completionReviewHours)) {
+      throw new Error("COMPLETION_PROOF_REVIEW_WINDOW_INVALID");
+    }
+    const responseDueAt = new Date(
+      now.getTime() + agreement.completionReviewHours * 60 * 60 * 1000,
+    );
 
     const proofResult = await tx.insert(jobCompletionProofs).values({
       requestId: data.requestId,
@@ -2654,38 +2935,663 @@ export async function autoReleaseDueCompletionProofs(now = new Date(), limit = 1
 
 // ── Job Lifecycle Functions ──
 
-// Accept an offer and assign provider to the service request
+// Accept an offer, capture commercial terms, and assign the provider in one transaction.
 export async function acceptOffer(offerId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Get the offer first
-  const offerRows = await db.select().from(offers).where(eq(offers.id, offerId)).limit(1);
-  if (offerRows.length === 0) throw new Error("Offer not found");
-  const offer = offerRows[0];
+  return db.transaction(async (tx) => {
+    const offerRows = await tx.select().from(offers).where(eq(offers.id, offerId)).limit(1);
+    const offer = offerRows[0];
+    if (!offer) throw new Error("OFFER_NOT_FOUND");
 
-  // Verify the service request belongs to this user
-  const requestRows = await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.requestId)).limit(1);
-  if (requestRows.length === 0) throw new Error("Service request not found");
-  if (requestRows[0].userId !== userId) throw new Error("Not authorized to accept this offer");
-  if (requestRows[0].status !== "pending") throw new Error("Service request is not accepting offers");
-  if (offer.status !== "pending") throw new Error("Offer is not pending");
+    const requestRows = await tx
+      .select()
+      .from(serviceRequests)
+      .where(eq(serviceRequests.id, offer.requestId))
+      .limit(1);
+    const request = requestRows[0];
+    if (!request) throw new Error("SERVICE_REQUEST_NOT_FOUND");
+    if (request.userId !== userId) throw new Error("OFFER_ACCEPT_FORBIDDEN");
+    if (request.status !== "pending") throw new Error("OFFER_ACCEPT_REQUEST_NOT_PENDING");
+    if (offer.status !== "pending") throw new Error("OFFER_ACCEPT_NOT_PENDING");
 
-  // Close competing pending offers before accepting the selected offer.
-  await db
-    .update(offers)
-    .set({ status: "rejected" })
-    .where(and(eq(offers.requestId, offer.requestId), eq(offers.status, "pending")));
+    const providerRows = await tx
+      .select()
+      .from(providers)
+      .where(eq(providers.id, offer.providerId))
+      .limit(1);
+    const provider = providerRows[0];
+    if (!provider) throw new Error("OFFER_ACCEPT_PROVIDER_NOT_FOUND");
 
-  // Update selected offer status to accepted
-  await db.update(offers).set({ status: "accepted" }).where(eq(offers.id, offerId));
+    const detailRows = await tx
+      .select()
+      .from(serviceRequestDetails)
+      .where(eq(serviceRequestDetails.requestId, request.id))
+      .limit(1);
+    const details = detailRows[0] ?? null;
+    const [requestMediaRows, providerDocumentRows, providerCredentialRows] = await Promise.all([
+      tx
+        .select({
+          id: serviceRequestMedia.id,
+          purpose: serviceRequestMedia.purpose,
+          kind: serviceRequestMedia.kind,
+          originalName: serviceRequestMedia.originalName,
+          mimeType: serviceRequestMedia.mimeType,
+          sizeBytes: serviceRequestMedia.sizeBytes,
+          sha256: serviceRequestMedia.sha256,
+          createdAt: serviceRequestMedia.createdAt,
+        })
+        .from(serviceRequestMedia)
+        .where(eq(serviceRequestMedia.requestId, request.id))
+        .orderBy(serviceRequestMedia.createdAt, serviceRequestMedia.id),
+      tx
+        .select({
+          id: providerDocuments.id,
+          type: providerDocuments.type,
+          status: providerDocuments.status,
+          sha256: providerDocuments.sha256,
+          mimeType: providerDocuments.mimeType,
+          sizeBytes: providerDocuments.sizeBytes,
+          reviewedAt: providerDocuments.reviewedAt,
+          retentionDueAt: providerDocuments.retentionDueAt,
+        })
+        .from(providerDocuments)
+        .where(and(eq(providerDocuments.providerId, provider.id), eq(providerDocuments.status, "approved")))
+        .orderBy(providerDocuments.type, providerDocuments.id),
+      tx
+        .select({
+          id: providerCredentials.id,
+          documentId: providerCredentials.documentId,
+          credentialType: providerCredentials.credentialType,
+          status: providerCredentials.status,
+          assuranceLevel: providerCredentials.assuranceLevel,
+          verifiedAt: providerCredentials.verifiedAt,
+          validFrom: providerCredentials.validFrom,
+          expiresAt: providerCredentials.expiresAt,
+          sourceVersion: providerCredentials.sourceVersion,
+          ruleVersion: providerCredentials.ruleVersion,
+        })
+        .from(providerCredentials)
+        .where(and(eq(providerCredentials.providerId, provider.id), eq(providerCredentials.status, "verified")))
+        .orderBy(providerCredentials.credentialType, providerCredentials.id),
+    ]);
+    const settlementPolicy = await resolveSettlementPolicyInTransaction(tx, {
+      categoryId: request.categoryId,
+    });
+    const breakdown = calculatePaymentBreakdown(offer.price, settlementPolicy.commissionRateBps);
+    const completionReviewHours = settlementPolicy.completionReviewHours;
+    const cancellationPolicy = parseCancellationPolicySnapshot(
+      settlementPolicy.cancellationPolicyJson,
+    );
 
-  // Update service request: assign provider and set status to active
-  await db.update(serviceRequests)
-    .set({ assignedProviderId: offer.providerId, status: "active" })
-    .where(eq(serviceRequests.id, offer.requestId));
+    // The conditional request update is the concurrency guard: only one offer
+    // may move a pending request to active, even if two accepts race.
+    const requestUpdate = await tx
+      .update(serviceRequests)
+      .set({ assignedProviderId: offer.providerId, status: "active" })
+      .where(
+        and(
+          eq(serviceRequests.id, request.id),
+          eq(serviceRequests.userId, userId),
+          eq(serviceRequests.status, "pending"),
+        ),
+      );
+    if ((requestUpdate[0]?.affectedRows ?? 0) !== 1) {
+      throw new Error("OFFER_ACCEPT_CONFLICT");
+    }
 
-  return { success: true, offerId, requestId: offer.requestId };
+    const acceptedOfferUpdate = await tx
+      .update(offers)
+      .set({ status: "accepted" })
+      .where(and(eq(offers.id, offer.id), eq(offers.status, "pending")));
+    if ((acceptedOfferUpdate[0]?.affectedRows ?? 0) !== 1) {
+      throw new Error("OFFER_ACCEPT_CONFLICT");
+    }
+
+    await tx
+      .update(offers)
+      .set({ status: "rejected" })
+      .where(and(eq(offers.requestId, request.id), eq(offers.status, "pending")));
+
+    const snapshot = JSON.stringify({
+      version: 1,
+      acceptedAt: new Date().toISOString(),
+      parties: {
+        customerUserId: userId,
+        providerId: provider.id,
+        providerUserId: provider.userId,
+      },
+      request: {
+        id: request.id,
+        categoryId: request.categoryId,
+        title: request.title,
+        description: request.description,
+        address: request.address,
+        latitude: request.latitude,
+        longitude: request.longitude,
+        budgetMin: request.budgetMin,
+        budgetMax: request.budgetMax,
+        estimatedPrice: request.estimatedPrice,
+      },
+      serviceScope: details
+        ? {
+            serviceType: details.serviceType,
+            subcategoryId: details.subcategoryId,
+            pickupAddress: details.pickupAddress,
+            destinationAddress: details.destinationAddress,
+            distanceKm: details.distanceKm,
+            pickupFloor: details.pickupFloor,
+            destinationFloor: details.destinationFloor,
+            pickupHasElevator: details.pickupHasElevator,
+            destinationHasElevator: details.destinationHasElevator,
+            attributesJson: details.attributesJson,
+          }
+        : null,
+      evidenceSnapshot: {
+        requestMedia: requestMediaRows,
+        providerVerification: {
+          status: provider.verificationStatus,
+          approvedDocuments: providerDocumentRows,
+          verifiedCredentials: providerCredentialRows,
+        },
+      },
+      offer: {
+        id: offer.id,
+        price: offer.price,
+        message: offer.message,
+        estimatedTime: offer.estimatedTime,
+        createdAt: offer.createdAt,
+      },
+      paymentTerms: {
+        currency: "TRY",
+        holdRequiredBeforeWork: true,
+        agreedAmount: breakdown.amount,
+        commissionRateBps: breakdown.commissionRateBps,
+        commissionAmount: breakdown.commissionAmount,
+        providerPayout: breakdown.providerPayout,
+        completionReviewHours,
+        settlementCondition: "customer_approval_or_review_window_without_dispute",
+        settlementPolicy: {
+          id: settlementPolicy.id,
+          scopeKey: settlementPolicy.scopeKey,
+          version: settlementPolicy.version,
+          countryCode: settlementPolicy.countryCode,
+          categoryId: settlementPolicy.categoryId,
+          contractType: settlementPolicy.contractType,
+          gatewayProvider: settlementPolicy.gatewayProvider,
+          commissionRateBps: settlementPolicy.commissionRateBps,
+          cancellation: cancellationPolicy,
+        },
+      },
+    });
+    const agreementResult = await tx.insert(serviceAgreements).values({
+      requestId: request.id,
+      offerId: offer.id,
+      customerUserId: userId,
+      providerId: provider.id,
+      currency: "TRY",
+      agreedAmount: breakdown.amount,
+      commissionRateBps: breakdown.commissionRateBps,
+      commissionAmount: breakdown.commissionAmount,
+      providerPayout: breakdown.providerPayout,
+      completionReviewHours,
+      snapshotJson: snapshot,
+    });
+    const agreementId = Number(agreementResult[0].insertId);
+    if (!agreementId) throw new Error("AGREEMENT_CREATE_FAILED");
+
+    return { success: true, offerId: offer.id, requestId: request.id, agreementId };
+  });
+}
+
+type JobChangeOrderKind = "scope" | "schedule" | "amount";
+type JobCancellationReason = "schedule" | "provider_unavailable" | "customer_changed_mind" | "safety" | "other";
+type JobCancellationSettlementOutcome = "refund" | "partial_refund" | "provider_payable" | "no_payment";
+
+async function getAgreementPartyContextInTransaction(
+  tx: DatabaseTransaction,
+  requestId: number,
+  userId: number,
+  allowUnacceptedCustomerRequest = false,
+) {
+  const requestRows = await tx
+    .select()
+    .from(serviceRequests)
+    .where(eq(serviceRequests.id, requestId))
+    .limit(1);
+  const request = requestRows[0];
+  if (!request) throw new Error("JOB_AGREEMENT_REQUEST_NOT_FOUND");
+
+  const agreementRows = await tx
+    .select()
+    .from(serviceAgreements)
+    .where(eq(serviceAgreements.requestId, requestId))
+    .limit(1);
+  const agreement = agreementRows[0] ?? null;
+  if (!agreement) {
+    if (allowUnacceptedCustomerRequest && request.status === "pending" && request.userId === userId) {
+      return { request, agreement: null, actor: "customer" as const };
+    }
+    throw new Error("JOB_AGREEMENT_NOT_FOUND");
+  }
+  if (agreement.customerUserId === userId && request.userId === userId) {
+    return { request, agreement, actor: "customer" as const };
+  }
+  const providerRows = await tx
+    .select({ userId: providers.userId })
+    .from(providers)
+    .where(eq(providers.id, agreement.providerId))
+    .limit(1);
+  if (providerRows[0]?.userId === userId) {
+    return { request, agreement, actor: "provider" as const };
+  }
+  throw new Error("JOB_AGREEMENT_FORBIDDEN");
+}
+
+async function assertOwnedJobEvidenceInTransaction(
+  tx: DatabaseTransaction,
+  requestId: number,
+  userId: number,
+  mediaIds: number[],
+) {
+  const uniqueMediaIds = [...new Set(mediaIds)];
+  if (uniqueMediaIds.length !== mediaIds.length || uniqueMediaIds.length > 8) {
+    throw new Error("JOB_EVIDENCE_INVALID");
+  }
+  if (uniqueMediaIds.length === 0) return [];
+  const mediaRows = await tx
+    .select({ id: serviceRequestMedia.id })
+    .from(serviceRequestMedia)
+    .where(
+      and(
+        eq(serviceRequestMedia.requestId, requestId),
+        eq(serviceRequestMedia.ownerUserId, userId),
+        inArray(serviceRequestMedia.id, uniqueMediaIds),
+      ),
+    );
+  if (mediaRows.length !== uniqueMediaIds.length) throw new Error("JOB_EVIDENCE_FORBIDDEN");
+  return uniqueMediaIds;
+}
+
+export async function createJobChangeOrder(data: {
+  requestId: number;
+  userId: number;
+  kind: JobChangeOrderKind;
+  description: string;
+  amountDelta: number;
+  evidenceMediaIds?: number[];
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const description = data.description.trim();
+  if (description.length < 10 || description.length > 2_000) throw new Error("CHANGE_ORDER_DESCRIPTION_INVALID");
+  if (!Number.isInteger(data.amountDelta) || data.amountDelta < 0 || data.amountDelta > 1_000_000) {
+    throw new Error("CHANGE_ORDER_AMOUNT_INVALID");
+  }
+  if ((data.kind === "amount") !== (data.amountDelta > 0)) {
+    throw new Error("CHANGE_ORDER_AMOUNT_KIND_MISMATCH");
+  }
+
+  return db.transaction(async (tx) => {
+    const context = await getAgreementPartyContextInTransaction(tx, data.requestId, data.userId);
+    if (!context.agreement) throw new Error("JOB_AGREEMENT_NOT_FOUND");
+    if (context.request.status !== "active") throw new Error("CHANGE_ORDER_REQUEST_INVALID_STATUS");
+    const evidenceMediaIds = await assertOwnedJobEvidenceInTransaction(
+      tx,
+      data.requestId,
+      data.userId,
+      data.evidenceMediaIds ?? [],
+    );
+    const result = await tx.insert(jobChangeOrders).values({
+      requestId: data.requestId,
+      agreementId: context.agreement.id,
+      requestedByUserId: data.userId,
+      kind: data.kind,
+      description,
+      amountDelta: data.amountDelta,
+      evidenceJson: evidenceMediaIds.length ? JSON.stringify(evidenceMediaIds) : null,
+      status: "requested",
+    });
+    const rows = await tx
+      .select()
+      .from(jobChangeOrders)
+      .where(eq(jobChangeOrders.id, Number(result[0].insertId)))
+      .limit(1);
+    if (!rows[0]) throw new Error("CHANGE_ORDER_CREATE_FAILED");
+    return rows[0];
+  });
+}
+
+export async function respondToJobChangeOrder(data: {
+  changeOrderId: number;
+  userId: number;
+  decision: "accepted" | "rejected";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    const rows = await tx.select().from(jobChangeOrders).where(eq(jobChangeOrders.id, data.changeOrderId)).limit(1);
+    const changeOrder = rows[0];
+    if (!changeOrder) throw new Error("CHANGE_ORDER_NOT_FOUND");
+    const context = await getAgreementPartyContextInTransaction(tx, changeOrder.requestId, data.userId);
+    if (!context.agreement) throw new Error("JOB_AGREEMENT_NOT_FOUND");
+    if (context.agreement.id !== changeOrder.agreementId) throw new Error("CHANGE_ORDER_AGREEMENT_MISMATCH");
+    if (changeOrder.requestedByUserId === data.userId) throw new Error("CHANGE_ORDER_SELF_RESPONSE_FORBIDDEN");
+    if (changeOrder.status !== "requested") throw new Error("CHANGE_ORDER_NOT_PENDING");
+    const updateResult = await tx
+      .update(jobChangeOrders)
+      .set({ status: data.decision, respondedByUserId: data.userId, respondedAt: new Date() })
+      .where(and(eq(jobChangeOrders.id, changeOrder.id), eq(jobChangeOrders.status, "requested")));
+    if ((updateResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CHANGE_ORDER_RESPONSE_CONFLICT");
+    const updatedRows = await tx.select().from(jobChangeOrders).where(eq(jobChangeOrders.id, changeOrder.id)).limit(1);
+    if (!updatedRows[0]) throw new Error("CHANGE_ORDER_NOT_FOUND");
+    return updatedRows[0];
+  });
+}
+
+export async function withdrawJobChangeOrder(changeOrderId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    const rows = await tx.select().from(jobChangeOrders).where(eq(jobChangeOrders.id, changeOrderId)).limit(1);
+    const changeOrder = rows[0];
+    if (!changeOrder) throw new Error("CHANGE_ORDER_NOT_FOUND");
+    await getAgreementPartyContextInTransaction(tx, changeOrder.requestId, userId);
+    if (changeOrder.requestedByUserId !== userId) throw new Error("CHANGE_ORDER_WITHDRAW_FORBIDDEN");
+    if (changeOrder.status !== "requested") throw new Error("CHANGE_ORDER_NOT_PENDING");
+    const updateResult = await tx
+      .update(jobChangeOrders)
+      .set({ status: "withdrawn" })
+      .where(and(eq(jobChangeOrders.id, changeOrder.id), eq(jobChangeOrders.status, "requested")));
+    if ((updateResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CHANGE_ORDER_RESPONSE_CONFLICT");
+    return { success: true, changeOrderId };
+  });
+}
+
+export async function listJobChangeOrders(requestId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    const context = await getAgreementPartyContextInTransaction(tx, requestId, userId);
+    if (!context.agreement) throw new Error("JOB_AGREEMENT_NOT_FOUND");
+    return tx
+      .select()
+      .from(jobChangeOrders)
+      .where(and(eq(jobChangeOrders.requestId, requestId), eq(jobChangeOrders.agreementId, context.agreement.id)))
+      .orderBy(desc(jobChangeOrders.createdAt));
+  });
+}
+
+/** MoveOS denetimi için salt-okunur, MFA korumalı listeleme; taraf kararlarını değiştirmez. */
+export async function listJobChangeOrdersForAdmin(input: {
+  limit: number;
+  offset: number;
+  status?: "requested" | "accepted" | "rejected" | "withdrawn" | "expired";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db
+    .select()
+    .from(jobChangeOrders)
+    .where(input.status ? eq(jobChangeOrders.status, input.status) : undefined)
+    .orderBy(desc(jobChangeOrders.createdAt))
+    .limit(input.limit)
+    .offset(input.offset);
+}
+
+export async function openJobCancellation(data: {
+  requestId: number;
+  userId: number;
+  reasonCode: JobCancellationReason;
+  description: string;
+  evidenceMediaIds?: number[];
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const description = data.description.trim();
+  if (description.length < 10 || description.length > 2_000) throw new Error("CANCELLATION_DESCRIPTION_INVALID");
+  return db.transaction(async (tx) => {
+    const context = await getAgreementPartyContextInTransaction(tx, data.requestId, data.userId, true);
+    if (context.request.status === "completed" || context.request.status === "cancelled") {
+      throw new Error("CANCELLATION_REQUEST_INVALID_STATUS");
+    }
+    const existingRows = await tx
+      .select()
+      .from(jobCancellationCases)
+      .where(eq(jobCancellationCases.requestId, data.requestId))
+      .limit(1);
+    if (existingRows[0]) throw new Error("CANCELLATION_ALREADY_OPEN");
+    const evidenceMediaIds = await assertOwnedJobEvidenceInTransaction(
+      tx,
+      data.requestId,
+      data.userId,
+      data.evidenceMediaIds ?? [],
+    );
+    const result = await tx.insert(jobCancellationCases).values({
+      requestId: data.requestId,
+      agreementId: context.agreement?.id ?? null,
+      openedByUserId: data.userId,
+      reasonCode: data.reasonCode,
+      description,
+      evidenceJson: evidenceMediaIds.length ? JSON.stringify(evidenceMediaIds) : null,
+      status: "requested",
+      settlementOutcome: "pending",
+    });
+    const rows = await tx
+      .select()
+      .from(jobCancellationCases)
+      .where(eq(jobCancellationCases.id, Number(result[0].insertId)))
+      .limit(1);
+    if (!rows[0]) throw new Error("CANCELLATION_CREATE_FAILED");
+    return rows[0];
+  });
+}
+
+export async function getJobCancellation(requestId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    await getAgreementPartyContextInTransaction(tx, requestId, userId, true);
+    const rows = await tx
+      .select()
+      .from(jobCancellationCases)
+      .where(eq(jobCancellationCases.requestId, requestId))
+      .limit(1);
+    return rows[0] ?? null;
+  });
+}
+
+export async function withdrawJobCancellation(requestId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    const context = await getAgreementPartyContextInTransaction(tx, requestId, userId, true);
+    const rows = await tx
+      .select()
+      .from(jobCancellationCases)
+      .where(eq(jobCancellationCases.requestId, requestId))
+      .limit(1);
+    const cancellation = rows[0];
+    if (!cancellation) throw new Error("CANCELLATION_NOT_FOUND");
+    if (cancellation.openedByUserId !== userId) throw new Error("CANCELLATION_WITHDRAW_FORBIDDEN");
+    if (cancellation.status !== "requested") throw new Error("CANCELLATION_NOT_PENDING");
+    if (context.agreement && cancellation.agreementId !== context.agreement.id) {
+      throw new Error("CANCELLATION_AGREEMENT_MISMATCH");
+    }
+    const updateResult = await tx
+      .update(jobCancellationCases)
+      .set({ status: "withdrawn" })
+      .where(and(eq(jobCancellationCases.id, cancellation.id), eq(jobCancellationCases.status, "requested")));
+    if ((updateResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_WITHDRAW_CONFLICT");
+    return { success: true, cancellationId: cancellation.id };
+  });
+}
+
+export async function listJobCancellationCasesForAdmin(input: {
+  limit: number;
+  offset: number;
+  status?: "requested" | "under_review" | "resolved" | "withdrawn";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db
+    .select()
+    .from(jobCancellationCases)
+    .where(input.status ? eq(jobCancellationCases.status, input.status) : undefined)
+    .orderBy(desc(jobCancellationCases.createdAt))
+    .limit(input.limit)
+    .offset(input.offset);
+}
+
+/** A review records a proposed outcome only; no funds move until a verified gateway event. */
+export async function reviewJobCancellationForAdmin(data: {
+  requestId: number;
+  reviewerUserId: number;
+  settlementOutcome: JobCancellationSettlementOutcome;
+  resolutionNote: string;
+  refundAmount?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const resolutionNote = data.resolutionNote.trim();
+  if (resolutionNote.length < 10 || resolutionNote.length > 2_000) {
+    throw new Error("CANCELLATION_RESOLUTION_NOTE_INVALID");
+  }
+
+  return db.transaction(async (tx) => {
+    const cancellationRows = await tx
+      .select()
+      .from(jobCancellationCases)
+      .where(eq(jobCancellationCases.requestId, data.requestId))
+      .limit(1);
+    const cancellation = cancellationRows[0];
+    if (!cancellation) throw new Error("CANCELLATION_NOT_FOUND");
+    if (cancellation.status !== "requested" && cancellation.status !== "under_review") {
+      throw new Error("CANCELLATION_NOT_REVIEWABLE");
+    }
+
+    const paymentRows = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.requestId, data.requestId))
+      .limit(1);
+    const payment = paymentRows[0] ?? null;
+    const now = new Date();
+    const hasRequestedRefund = data.refundAmount !== undefined;
+    if (hasRequestedRefund && (!Number.isSafeInteger(data.refundAmount) || data.refundAmount! < 0)) {
+      throw new Error("CANCELLATION_REFUND_AMOUNT_INVALID");
+    }
+
+    if (data.settlementOutcome === "no_payment") {
+      if (payment && payment.status !== "pending") {
+        throw new Error("CANCELLATION_NO_PAYMENT_OUTCOME_INVALID");
+      }
+      if (hasRequestedRefund) throw new Error("CANCELLATION_NO_PAYMENT_REFUND_AMOUNT_INVALID");
+      const resolved = await tx
+        .update(jobCancellationCases)
+        .set({
+          status: "resolved",
+          settlementOutcome: "no_payment",
+          resolutionNote,
+          reviewedByUserId: data.reviewerUserId,
+          reviewedAt: now,
+          resolvedByUserId: data.reviewerUserId,
+          resolvedAt: now,
+          refundAmount: null,
+          providerGrossAmount: null,
+          commissionAmount: null,
+          providerPayoutAmount: null,
+        })
+        .where(
+          and(
+            eq(jobCancellationCases.id, cancellation.id),
+            inArray(jobCancellationCases.status, ["requested", "under_review"]),
+          ),
+        );
+      if ((resolved[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REVIEW_CONFLICT");
+      const requestResult = await tx
+        .update(serviceRequests)
+        .set({ status: "cancelled" })
+        .where(
+          and(
+            eq(serviceRequests.id, data.requestId),
+            inArray(serviceRequests.status, ["pending", "active"]),
+          ),
+        );
+      if ((requestResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REQUEST_UPDATE_CONFLICT");
+    } else {
+      if (!payment || payment.status !== "held") {
+        throw new Error("CANCELLATION_SETTLEMENT_REQUIRES_HELD_PAYMENT");
+      }
+      const settlementPlan = calculateCancellationSettlementPlan({
+        paymentAmount: payment.amount,
+        commissionRateBps: payment.commissionRateBps ?? 0,
+        settlementOutcome: data.settlementOutcome,
+        ...(hasRequestedRefund ? { refundAmount: data.refundAmount } : {}),
+      });
+      const reviewed = await tx
+        .update(jobCancellationCases)
+        .set({
+          status: "under_review",
+          settlementOutcome: data.settlementOutcome,
+          resolutionNote,
+          reviewedByUserId: data.reviewerUserId,
+          reviewedAt: now,
+          refundAmount: settlementPlan.refundAmount,
+          providerGrossAmount: settlementPlan.providerGrossAmount,
+          commissionAmount: settlementPlan.commissionAmount,
+          providerPayoutAmount: settlementPlan.providerPayoutAmount,
+        })
+        .where(
+          and(
+            eq(jobCancellationCases.id, cancellation.id),
+            inArray(jobCancellationCases.status, ["requested", "under_review"]),
+          ),
+        );
+      if ((reviewed[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REVIEW_CONFLICT");
+    }
+
+    const rows = await tx
+      .select()
+      .from(jobCancellationCases)
+      .where(eq(jobCancellationCases.id, cancellation.id))
+      .limit(1);
+    if (!rows[0]) throw new Error("CANCELLATION_NOT_FOUND");
+    return rows[0];
+  });
+}
+
+async function resolveRefundCancellationInTransaction(
+  tx: DatabaseTransaction,
+  payment: typeof payments.$inferSelect,
+) {
+  const cancellationRows = await tx
+    .select()
+    .from(jobCancellationCases)
+    .where(eq(jobCancellationCases.requestId, payment.requestId))
+    .limit(1);
+  const cancellation = cancellationRows[0];
+  if (
+    !cancellation ||
+    cancellation.status !== "under_review" ||
+    cancellation.settlementOutcome !== "refund" ||
+    !cancellation.reviewedByUserId
+  ) {
+    return false;
+  }
+  const now = new Date();
+  const resolved = await tx
+    .update(jobCancellationCases)
+    .set({ status: "resolved", resolvedByUserId: cancellation.reviewedByUserId, resolvedAt: now })
+    .where(and(eq(jobCancellationCases.id, cancellation.id), eq(jobCancellationCases.status, "under_review")));
+  if ((resolved[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REFUND_RESOLUTION_CONFLICT");
+  const requestResult = await tx
+    .update(serviceRequests)
+    .set({ status: "cancelled" })
+    .where(and(eq(serviceRequests.id, payment.requestId), eq(serviceRequests.status, "active")));
+  if ((requestResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REQUEST_UPDATE_CONFLICT");
+  return true;
 }
 
 export async function rejectOffer(offerId: number, userId: number) {
@@ -2936,41 +3842,44 @@ export async function getPaymentQuote(requestId: number, userId: number) {
     throw new Error("PAYMENT_REQUEST_NOT_READY");
   }
 
-  const offerRows = await db
+  const agreementRows = await db
     .select()
-    .from(offers)
+    .from(serviceAgreements)
     .where(
       and(
-        eq(offers.requestId, request.id),
-        eq(offers.providerId, request.assignedProviderId),
-        eq(offers.status, "accepted"),
+        eq(serviceAgreements.requestId, request.id),
+        eq(serviceAgreements.customerUserId, userId),
       ),
     )
     .limit(1);
-  const offer = offerRows[0];
-  if (!offer) throw new Error("PAYMENT_ACCEPTED_OFFER_NOT_FOUND");
+  const agreement = agreementRows[0];
+  if (!agreement) throw new Error("PAYMENT_AGREEMENT_NOT_FOUND");
+  if (agreement.providerId !== request.assignedProviderId) {
+    throw new Error("PAYMENT_AGREEMENT_MISMATCH");
+  }
+  if (agreement.currency !== "TRY") throw new Error("PAYMENT_CURRENCY_UNSUPPORTED");
 
   const providerRows = await db
     .select()
     .from(providers)
-    .where(eq(providers.id, request.assignedProviderId))
+    .where(eq(providers.id, agreement.providerId))
     .limit(1);
   const provider = providerRows[0];
   if (!provider) throw new Error("PAYMENT_PROVIDER_NOT_FOUND");
-
-  const breakdown = calculatePaymentBreakdown(
-    offer.price,
-    commissionRateForProvider(provider.isPremium === 1),
-  );
 
   return {
     requestId: request.id,
     requestTitle: request.title,
     providerId: provider.id,
     providerName: provider.displayName,
-    offerId: offer.id,
+    offerId: agreement.offerId,
+    agreementId: agreement.id,
+    completionReviewHours: agreement.completionReviewHours,
     currency: "TRY" as const,
-    ...breakdown,
+    amount: agreement.agreedAmount,
+    commissionRateBps: agreement.commissionRateBps,
+    commissionAmount: agreement.commissionAmount,
+    providerPayout: agreement.providerPayout,
   };
 }
 
@@ -3008,15 +3917,40 @@ export async function createPayment(data: {
       return { payment: existingForRequest[0], duplicated: true };
     }
 
+    const agreementRows = await tx
+      .select()
+      .from(serviceAgreements)
+      .where(
+        and(
+          eq(serviceAgreements.id, quote.agreementId),
+          eq(serviceAgreements.requestId, data.requestId),
+          eq(serviceAgreements.customerUserId, data.userId),
+        ),
+      )
+      .limit(1);
+    const agreement = agreementRows[0];
+    if (!agreement) throw new Error("PAYMENT_AGREEMENT_NOT_FOUND");
+    if (agreement.paymentId != null) throw new Error("PAYMENT_AGREEMENT_PAYMENT_CONFLICT");
+    if (
+      agreement.providerId !== quote.providerId ||
+      agreement.offerId !== quote.offerId ||
+      agreement.agreedAmount !== quote.amount ||
+      agreement.commissionRateBps !== quote.commissionRateBps ||
+      agreement.commissionAmount !== quote.commissionAmount ||
+      agreement.providerPayout !== quote.providerPayout
+    ) {
+      throw new Error("PAYMENT_AGREEMENT_MISMATCH");
+    }
+
     const result = await tx.insert(payments).values({
-      requestId: quote.requestId,
+      requestId: agreement.requestId,
       userId: data.userId,
-      providerId: quote.providerId,
-      offerId: quote.offerId,
-      amount: quote.amount,
-      commissionRateBps: quote.commissionRateBps,
-      commissionAmount: quote.commissionAmount,
-      providerPayout: quote.providerPayout,
+      providerId: agreement.providerId,
+      offerId: agreement.offerId,
+      amount: agreement.agreedAmount,
+      commissionRateBps: agreement.commissionRateBps,
+      commissionAmount: agreement.commissionAmount,
+      providerPayout: agreement.providerPayout,
       idempotencyKey: scopedKey,
       status: "pending",
     });
@@ -3026,6 +3960,13 @@ export async function createPayment(data: {
       .where(eq(payments.id, result[0].insertId))
       .limit(1);
     if (!rows[0]) throw new Error("PAYMENT_CREATE_FAILED");
+    const agreementUpdate = await tx
+      .update(serviceAgreements)
+      .set({ paymentId: rows[0].id })
+      .where(and(eq(serviceAgreements.id, agreement.id), isNull(serviceAgreements.paymentId)));
+    if ((agreementUpdate[0]?.affectedRows ?? 0) !== 1) {
+      throw new Error("PAYMENT_AGREEMENT_PAYMENT_CONFLICT");
+    }
     return { payment: rows[0], duplicated: false };
   });
 
@@ -3415,7 +4356,17 @@ export async function transitionPaymentFromVerifiedWebhook(data: {
     if (!payment) throw new Error("PAYMENT_NOT_FOUND");
     if (payment.status === data.nextStatus) return { payment, duplicated: true };
 
+    if (data.nextStatus === "held") {
+      const requestRows = await tx
+        .select({ status: serviceRequests.status })
+        .from(serviceRequests)
+        .where(eq(serviceRequests.id, payment.requestId))
+        .limit(1);
+      if (requestRows[0]?.status !== "active") throw new Error("PAYMENT_REQUEST_NOT_ACTIVE");
+    }
+
     assertPaymentStatusTransition(payment.status, data.nextStatus);
+    await getAgreementForPaymentInTransaction(tx, payment);
     const updateResult = await tx
       .update(payments)
       .set({ status: data.nextStatus })
@@ -3433,6 +4384,7 @@ export async function transitionPaymentFromVerifiedWebhook(data: {
       await postFinancialLedgerEntry(tx, buildPaymentHeldLedgerEntry(updatedRows[0]));
     } else if (data.nextStatus === "refunded" && payment.status === "held") {
       await postFinancialLedgerEntry(tx, buildRefundLedgerEntry(updatedRows[0]));
+      await resolveRefundCancellationInTransaction(tx, updatedRows[0]);
     }
 
     return { payment: updatedRows[0], duplicated: false };

@@ -741,6 +741,139 @@ export const payments = mysqlTable("payments", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+// Immutable commercial snapshot captured when an offer is accepted. Financial
+// policy changes apply prospectively; historical agreements keep their terms.
+export const serviceAgreements = mysqlTable(
+  "service_agreements",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    offerId: int("offerId").notNull(),
+    customerUserId: int("customerUserId").notNull(),
+    providerId: int("providerId").notNull(),
+    paymentId: int("paymentId"),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    agreedAmount: int("agreedAmount").notNull(),
+    commissionRateBps: int("commissionRateBps").notNull(),
+    commissionAmount: int("commissionAmount").notNull(),
+    providerPayout: int("providerPayout").notNull(),
+    completionReviewHours: int("completionReviewHours").notNull(),
+    snapshotJson: text("snapshotJson").notNull(),
+    acceptedAt: timestamp("acceptedAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("service_agreements_request_unique").on(table.requestId),
+    uniqueIndex("service_agreements_offer_unique").on(table.offerId),
+    index("service_agreements_provider_idx").on(table.providerId, table.createdAt),
+  ],
+);
+
+// Settlement policies are prospective configuration. An accepted agreement
+// serializes the resolved policy into its immutable snapshot, so changing a
+// policy can never rewrite a historical commercial commitment.
+export const settlementPolicies = mysqlTable(
+  "settlement_policies",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    scopeKey: varchar("scopeKey", { length: 191 }).notNull().unique(),
+    countryCode: varchar("countryCode", { length: 2 }).notNull(),
+    categoryId: int("categoryId"),
+    gatewayProvider: mysqlEnum("gatewayProvider", ["any", "iyzico", "stripe"])
+      .default("any")
+      .notNull(),
+    contractType: varchar("contractType", { length: 48 }).default("standard").notNull(),
+    precedence: int("precedence").default(0).notNull(),
+    version: varchar("version", { length: 64 }).notNull(),
+    commissionRateBps: int("commissionRateBps").default(1000).notNull(),
+    completionReviewHours: int("completionReviewHours").notNull(),
+    cancellationPolicyJson: text("cancellationPolicyJson").notNull(),
+    status: mysqlEnum("status", ["draft", "active", "retired", "suspended"])
+      .default("draft")
+      .notNull(),
+    effectiveFrom: timestamp("effectiveFrom").defaultNow().notNull(),
+    effectiveTo: timestamp("effectiveTo"),
+    createdByUserId: int("createdByUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("settlement_policies_lookup_idx").on(
+      table.countryCode,
+      table.categoryId,
+      table.gatewayProvider,
+      table.contractType,
+      table.status,
+      table.effectiveFrom,
+    ),
+  ],
+);
+
+// A change only becomes effective after the counterparty accepts it; it never
+// mutates the accepted agreement snapshot or releases held funds.
+export const jobChangeOrders = mysqlTable(
+  "job_change_orders",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    agreementId: int("agreementId").notNull(),
+    requestedByUserId: int("requestedByUserId").notNull(),
+    kind: mysqlEnum("kind", ["scope", "schedule", "amount"]).notNull(),
+    description: text("description").notNull(),
+    amountDelta: int("amountDelta").default(0).notNull(),
+    evidenceJson: text("evidenceJson"),
+    status: mysqlEnum("status", ["requested", "accepted", "rejected", "withdrawn", "expired"])
+      .default("requested")
+      .notNull(),
+    respondedByUserId: int("respondedByUserId"),
+    respondedAt: timestamp("respondedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("job_change_orders_request_status_idx").on(table.requestId, table.status),
+    index("job_change_orders_agreement_idx").on(table.agreementId, table.createdAt),
+  ],
+);
+
+// Cancellation is modeled separately from completion disputes. Settlement is
+// decided by an authorized workflow; cancellation alone can never release funds.
+export const jobCancellationCases = mysqlTable(
+  "job_cancellation_cases",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    agreementId: int("agreementId"),
+    openedByUserId: int("openedByUserId").notNull(),
+    reasonCode: mysqlEnum("reasonCode", ["schedule", "provider_unavailable", "customer_changed_mind", "safety", "other"])
+      .notNull(),
+    description: text("description").notNull(),
+    evidenceJson: text("evidenceJson"),
+    status: mysqlEnum("status", ["requested", "under_review", "resolved", "withdrawn"])
+      .default("requested")
+      .notNull(),
+    reviewedByUserId: int("reviewedByUserId"),
+    reviewedAt: timestamp("reviewedAt"),
+    resolvedByUserId: int("resolvedByUserId"),
+    settlementOutcome: mysqlEnum("settlementOutcome", ["pending", "refund", "partial_refund", "provider_payable", "no_payment"])
+      .default("pending")
+      .notNull(),
+    refundAmount: int("refundAmount"),
+    providerGrossAmount: int("providerGrossAmount"),
+    commissionAmount: int("commissionAmount"),
+    providerPayoutAmount: int("providerPayoutAmount"),
+    settlementGatewayReference: varchar("settlementGatewayReference", { length: 191 }),
+    resolutionNote: text("resolutionNote"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("job_cancellation_cases_request_unique").on(table.requestId),
+    index("job_cancellation_cases_status_idx").on(table.status, table.createdAt),
+  ],
+);
+
 // Payment webhook delivery ledger — provider event IDs are globally idempotent per provider.
 export const paymentWebhookEvents = mysqlTable(
   "payment_webhook_events",

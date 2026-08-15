@@ -1,0 +1,1 @@
+ALTER TABLE `job_change_orders` ADD `evidenceJson` text;

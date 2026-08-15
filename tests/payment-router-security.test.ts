@@ -40,6 +40,8 @@ const quote = {
   providerId: 9,
   providerName: "Doğrulanmış Usta",
   offerId: 31,
+  agreementId: 61,
+  completionReviewHours: 48,
   currency: "TRY" as const,
   amount: 850,
   commissionRateBps: 1_000,

@@ -18,6 +18,12 @@ import {
   getMoveOsDashboardMetrics,
   getMoveOsService,
   getMoveOsUser,
+  createSettlementPolicyForAdmin,
+  retireSettlementPolicyForAdmin,
+  listSettlementPoliciesForAdmin,
+  listJobChangeOrdersForAdmin,
+  listJobCancellationCasesForAdmin,
+  reviewJobCancellationForAdmin,
   listProviderCapabilityStatuses,
   listMoveOsCategories,
   listMoveOsServices,
@@ -104,6 +110,38 @@ const countryLaunchChecklistInput = z.object({
   security_sign_off: z.boolean(),
   production_tests: z.boolean(),
 }).strict();
+
+const cancellationPolicyInput = z
+  .object({
+    version: z.string().trim().min(1).max(64),
+    customerCancellation: z.enum(["review_required", "no_payment_only"]),
+    providerCancellation: z.enum(["review_required", "no_payment_only"]),
+    forceMajeure: z.enum(["review_required", "escalate"]),
+    documentedExpenses: z.enum(["review_required", "not_automatic"]),
+    partialSettlement: z.enum(["review_required", "not_automatic"]),
+  })
+  .strict();
+
+const settlementPolicyInput = z
+  .object({
+    countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/),
+    categoryId: z.number().int().positive().nullable().optional(),
+    gatewayProvider: z.enum(["any", "iyzico", "stripe"]),
+    contractType: z.string().trim().regex(/^[a-zA-Z0-9_-]{1,48}$/),
+    precedence: z.number().int().min(-10_000).max(10_000).default(0),
+    version: z.string().trim().min(1).max(64),
+    commissionRateBps: z.number().int().min(0).max(10_000),
+    completionReviewHours: z.number().int().min(1).max(168),
+    cancellationPolicy: cancellationPolicyInput,
+    status: z.enum(["draft", "active", "suspended"]).default("draft"),
+    effectiveFrom: z.coerce.date(),
+    effectiveTo: z.coerce.date().nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.effectiveTo && value.effectiveTo <= value.effectiveFrom) {
+      ctx.addIssue({ code: "custom", path: ["effectiveTo"], message: "Bitiş tarihi başlangıç tarihinden sonra olmalıdır" });
+    }
+  });
 
 function hashAdminMfaCode(userId: number, code: string): string {
   if (!ENV.cookieSecret) {
@@ -238,6 +276,64 @@ export const ownerRouter = router({
       } catch (error) {
         if (error instanceof Error && error.message === "COUNTRY_PROFESSIONAL_MARKETPLACE_BLOCKED") {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ülke açma kapısı tamamlanmadan profesyonel pazaryeri etkinleştirilemez" });
+        }
+        throw error;
+      }
+    }),
+
+  settlementPolicies: adminMfaProcedure
+    .input(listInput.extend({ status: z.enum(["draft", "active", "retired", "suspended"]).optional() }))
+    .query(async ({ input }) => listSettlementPoliciesForAdmin(input)),
+
+  createSettlementPolicy: adminMfaProcedure
+    .input(settlementPolicyInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await createSettlementPolicyForAdmin({ ...input, createdByUserId: ctx.user!.id });
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith("SETTLEMENT_POLICY_")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Settlement policy alanları geçersiz" });
+        }
+        throw error;
+      }
+    }),
+
+  retireSettlementPolicy: adminMfaProcedure
+    .input(z.object({ policyId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await retireSettlementPolicyForAdmin({ policyId: input.policyId, retiredByUserId: ctx.user!.id });
+      } catch (error) {
+        if (error instanceof Error && error.message === "SETTLEMENT_POLICY_NOT_RETIRABLE") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Policy bulunamadı veya zaten emekliye ayrıldı" });
+        }
+        throw error;
+      }
+    }),
+
+  cancellationCases: adminMfaProcedure
+    .input(listInput.extend({ status: z.enum(["requested", "under_review", "resolved", "withdrawn"]).optional() }))
+    .query(async ({ input }) => listJobCancellationCasesForAdmin(input)),
+
+  changeOrders: adminMfaProcedure
+    .input(listInput.extend({ status: z.enum(["requested", "accepted", "rejected", "withdrawn", "expired"]).optional() }))
+    .query(async ({ input }) => listJobChangeOrdersForAdmin(input)),
+
+  reviewCancellationCase: adminMfaProcedure
+    .input(
+      z.object({
+        requestId: z.number().int().positive(),
+        settlementOutcome: z.enum(["refund", "partial_refund", "provider_payable", "no_payment"]),
+        resolutionNote: z.string().trim().min(10).max(2_000),
+        refundAmount: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await reviewJobCancellationForAdmin({ ...input, reviewerUserId: ctx.user!.id });
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith("CANCELLATION_")) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "İptal kaydı mevcut ödeme ve durum koşullarıyla çözümlenemiyor" });
         }
         throw error;
       }

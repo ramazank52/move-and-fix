@@ -312,7 +312,7 @@
 - [ ] Faz 2 sürekli yeniden kontrol zamanlaması, 90/30/15/7 günlük sona erme uyarıları ve veri minimizasyon/retention politikasını ekle
 - [ ] Faz 2 Türkiye pilotu için yalnız kullanıcı sağladığı resmi kaynaklar ve hukuk onayı temelinde versioned compliance seedlerini uygula; ülke hukuku içeriği uydurma
 - [ ] Faz 2 migrasyon, yetki, politika motoru, itiraz, ülke açma kapısı ve regresyon testlerini çalıştır; build/export kalite kapılarını doğrula
-- [ ] Faz 3 versioned/prospective komisyon, immutable anlaşma snapshot, hold/settlement koşulları ve configurable completion review penceresini ekle
+- [x] Faz 3 versioned/prospective komisyon, immutable anlaşma snapshot, hold/settlement koşulları ve configurable completion review penceresini ekle
 - [ ] Faz 3 dispute, partial settlement, iptal, change request ve güvenli iş dosyası yaşam döngüsünü gerçek API/DB akışına bağla
 - [ ] Faz 3 ödeme webhook, idempotency, replay, race-condition ve server-side tutar/para birimi kontrollerini regresyon testleriyle doğrula
 - [ ] Faz 4 job-scoped expense record, ayrı reimbursement claim, müşteri borcu olmama kuralı ve hassas bilgi redaksiyonunu uygula
@@ -325,3 +325,12 @@
 - [ ] Faz 6 MoveOS kritik işlem onayı, re-auth/MFA, canary/shadow mode, guarded kill switch ve denetlenebilir release kontrolünü uygula
 - [ ] Faz 6 gözlemlenebilirlik, SBOM/SCA/secret scan, restore runbook, store compliance ve erişilebilirlik kalite kontrollerini ekle
 - [ ] Faz 3–6 her modülde TypeScript, lint, test, yetki, hata/edge-case, iOS/Android export ve secret scan kalite kapılarını doğrula; yayın başlatma
+- [x] Faz 3 teklif kabulünde anlaşma snapshot’ını atomik oluştur ve geçmiş fiyat/komisyon/inceleme koşullarını değişmez kaydet
+- [x] Faz 3 ödeme teklifi ve ödeme intent’ini anlaşma snapshot’ına bağla; mevcut canlı politika hesaplarına bağımlılığı kaldır
+- [x] Faz 3 change order ve iptal akışlarını rol/nesne yetkileri ile gerçek tRPC API’ye bağla
+- [ ] Faz 3 anlaşma, ödeme, change order ve iptal regresyonlarını hata ve eşzamanlılık senaryolarıyla doğrula
+- [x] Faz 3 completion-review ve iptal politikalarını ülke/hizmet/ödeme önceliğiyle versioned/prospective settlement policy kayıtlarından çöz
+- [x] Faz 3 MoveOS’ta MFA korumalı iptal inceleme ve settlement policy yönetim prosedürlerini ekle
+- [x] Faz 3 MoveOS’ta müşteri-profesyonel change order kayıtlarının salt-okunur denetim görünümünü ekle
+- [x] Faz 3 kabul anındaki request medya ve profesyonel belge doğrulama metadatasını değişmez agreement snapshot’ına ekle
+- [ ] Faz 3 kısmi settlement planını tutar bileşenleriyle kaydet; yalnız doğrulanmış gateway işlemi sonrası idempotent muhasebeleştir

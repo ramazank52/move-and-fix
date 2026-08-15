@@ -71,10 +71,87 @@ function renderCountryCompliance(overviews) {
 
 function escapeHtml(value) { const element = document.createElement("div"); element.textContent = String(value ?? ""); return element.innerHTML; }
 
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("tr-TR");
+}
+
+function renderSettlementPolicies(result) {
+  const policies = Array.isArray(result) ? result : result.items || result.policies || [];
+  $("#settlement-policies-list").innerHTML = policies.map((policy) => {
+    const scope = [policy.countryCode, policy.categoryId ? `kategori #${policy.categoryId}` : "tüm kategoriler", policy.gatewayProvider || "any"].join(" · ");
+    const rate = Number(policy.commissionRateBps || 0) / 100;
+    const canRetire = policy.status !== "retired";
+    return `<tr><td>${escapeHtml(scope)}</td><td>${escapeHtml(policy.version)}</td><td>%${escapeHtml(rate.toLocaleString("tr-TR", { maximumFractionDigits: 2 }))}</td><td>${escapeHtml(policy.completionReviewHours)} saat</td><td>${escapeHtml(policy.status)}</td><td>${escapeHtml(formatDate(policy.effectiveFrom))}</td><td>${canRetire ? `<button class="row-action" type="button" data-retire-policy="${policy.id}">Emekliye ayır</button>` : "—"}</td></tr>`;
+  }).join("") || "<tr><td colspan=\"7\">Settlement policy bulunamadı.</td></tr>";
+  document.querySelectorAll("[data-retire-policy]").forEach((button) => button.addEventListener("click", async () => {
+    if (!window.confirm("Bu policy yalnız gelecekteki anlaşmalar için emekliye ayrılır. Mevcut snapshot’lar değişmez. Devam edilsin mi?")) return;
+    try {
+      await api(`/api/owner/settlement-policies/${button.dataset.retirePolicy}/retire`, { method: "POST" });
+      await loadData();
+      notice("Settlement policy emekliye ayrıldı; mevcut anlaşma snapshot’ları korunuyor.");
+    } catch (error) { notice(error.message, true); }
+  }));
+}
+
+function renderCancellationCases(result) {
+  const cases = Array.isArray(result) ? result : result.items || result.cases || [];
+  $("#cancellation-cases-list").innerHTML = cases.map((item) => {
+    const reviewable = item.status === "requested" || item.status === "under_review";
+    const plan = item.refundAmount === null || item.refundAmount === undefined
+      ? "Gateway planı yok"
+      : `İade ${money.format(item.refundAmount)} · Net ${money.format(item.providerPayoutAmount || 0)} · Komisyon ${money.format(item.commissionAmount || 0)}`;
+    return `<tr><td>#${escapeHtml(item.requestId)}</td><td>#${escapeHtml(item.openedByUserId)}</td><td>${escapeHtml(item.reasonCode)}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(item.settlementOutcome || "pending")}</td><td>${escapeHtml(plan)}</td><td>${reviewable ? `<button class="row-action" type="button" data-review-cancellation="${item.requestId}">İncele</button>` : "—"}</td></tr>`;
+  }).join("") || "<tr><td colspan=\"7\">İncelenecek iptal kaydı bulunamadı.</td></tr>";
+  document.querySelectorAll("[data-review-cancellation]").forEach((button) => button.addEventListener("click", async () => {
+    const settlementOutcome = window.prompt("Önerilen sonuç: refund, partial_refund, provider_payable veya no_payment", "refund");
+    if (!settlementOutcome) return;
+    const normalizedOutcome = settlementOutcome.trim();
+    if (!["refund", "partial_refund", "provider_payable", "no_payment"].includes(normalizedOutcome)) {
+      notice("Geçersiz settlement sonucu.", true);
+      return;
+    }
+    let refundAmount;
+    if (normalizedOutcome === "partial_refund") {
+      const refundInput = window.prompt("Müşteriye iade edilecek tam TL tutarı (0’dan büyük, toplam ödemeden küçük)");
+      if (refundInput === null) return;
+      refundAmount = Number(refundInput.trim());
+      if (!Number.isSafeInteger(refundAmount) || refundAmount <= 0) {
+        notice("Kısmi iade tutarı geçerli bir tam TL tutarı olmalıdır.", true);
+        return;
+      }
+    }
+    const resolutionNote = window.prompt("İnsan incelemesi gerekçesi (en az 10 karakter)");
+    if (!resolutionNote) return;
+    if (!window.confirm("Bu inceleme kayda alınır. Para yalnız doğrulanmış gateway olayıyla hareket eder. Devam edilsin mi?")) return;
+    try {
+      await api(`/api/owner/cancellation-cases/${button.dataset.reviewCancellation}/review`, {
+        method: "POST",
+        body: JSON.stringify({
+          settlementOutcome: normalizedOutcome,
+          resolutionNote,
+          ...(refundAmount === undefined ? {} : { refundAmount }),
+        }),
+      });
+      await loadData();
+      notice("İptal inceleme sonucu kaydedildi; gateway doğrulaması bekleniyor.");
+    } catch (error) { notice(error.message, true); }
+  }));
+}
+
+function renderChangeOrders(result) {
+  const orders = Array.isArray(result) ? result : result.items || result.changeOrders || [];
+  $("#change-orders-list").innerHTML = orders.map((order) => {
+    const amount = Number(order.amountDelta || 0).toLocaleString("tr-TR");
+    return `<tr><td>#${escapeHtml(order.requestId)}</td><td>#${escapeHtml(order.requestedByUserId)}</td><td>${escapeHtml(order.kind)}</td><td>${escapeHtml(amount)} ₺</td><td>${escapeHtml(order.status)}</td><td>${escapeHtml(formatDate(order.createdAt))}</td></tr>`;
+  }).join("") || "<tr><td colspan=\"6\">Change order kaydı bulunamadı.</td></tr>";
+}
+
 async function loadData() {
   notice("Veriler yenileniyor…");
-  const [metrics, categories, users, countryCompliance] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries")]);
-  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance);
+  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, changeOrders] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/change-orders?limit=20")]);
+  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderChangeOrders(changeOrders);
   setMfaVisible(false);
   $("#dashboard").hidden = false;
   notice("Gerçek ortak API verileri güncellendi.");

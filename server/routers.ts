@@ -65,6 +65,11 @@ const requestAttributeValueSchema = z.union([
   z.null(),
 ]);
 
+const agreementEvidenceMediaIdsSchema = z
+  .array(z.number().int().positive())
+  .max(8)
+  .refine((ids) => new Set(ids).size === ids.length, "Kanıt dosyası tekrar edemez");
+
 const serviceRequestDetailsSchema = z.object({
   subcategoryId: z.number().int().positive().optional(),
   serviceType: serviceRequestTypeSchema,
@@ -299,6 +304,32 @@ async function runCompletionOperation<T>(operation: () => Promise<T>): Promise<T
       throw new TRPCError({ code: "BAD_REQUEST", message: "Kanıt veya ödeme bilgisi geçerli değil" });
     }
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "İş tamamlama işlemi gerçekleştirilemedi" });
+  }
+}
+
+async function runAgreementOperation<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "JOB_AGREEMENT_OPERATION_FAILED";
+    if (message.includes("NOT_FOUND")) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "İş veya anlaşma kaydı bulunamadı" });
+    }
+    if (message.includes("FORBIDDEN")) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Bu iş anlaşması işlemine yetkiniz yok" });
+    }
+    if (message.includes("INVALID") || message.includes("MISMATCH") || message.includes("DESCRIPTION")) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Gönderilen iş anlaşması verisi geçerli değil" });
+    }
+    if (
+      message.includes("CONFLICT") ||
+      message.includes("NOT_PENDING") ||
+      message.includes("ALREADY_OPEN") ||
+      message.includes("REQUEST_INVALID_STATUS")
+    ) {
+      throw new TRPCError({ code: "CONFLICT", message: "İşin mevcut durumu bu işlem için uygun değil" });
+    }
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "İş anlaşması işlemi tamamlanamadı" });
   }
 }
 
@@ -744,6 +775,64 @@ export const appRouter = router({
           });
         }
       }),
+  }),
+
+  agreements: router({
+    changeOrders: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        runAgreementOperation(() => db.listJobChangeOrders(input.requestId, ctx.user.id)),
+      ),
+    createChangeOrder: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number().int().positive(),
+          kind: z.enum(["scope", "schedule", "amount"]),
+          description: z.string().trim().min(10).max(2_000),
+          amountDelta: z.number().int().min(0).max(1_000_000).default(0),
+          evidenceMediaIds: agreementEvidenceMediaIdsSchema.default([]),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        runAgreementOperation(() => db.createJobChangeOrder({ ...input, userId: ctx.user.id })),
+      ),
+    respondToChangeOrder: protectedProcedure
+      .input(
+        z.object({
+          changeOrderId: z.number().int().positive(),
+          decision: z.enum(["accepted", "rejected"]),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        runAgreementOperation(() => db.respondToJobChangeOrder({ ...input, userId: ctx.user.id })),
+      ),
+    withdrawChangeOrder: protectedProcedure
+      .input(z.object({ changeOrderId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) =>
+        runAgreementOperation(() => db.withdrawJobChangeOrder(input.changeOrderId, ctx.user.id)),
+      ),
+    cancellation: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        runAgreementOperation(() => db.getJobCancellation(input.requestId, ctx.user.id)),
+      ),
+    openCancellation: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number().int().positive(),
+          reasonCode: z.enum(["schedule", "provider_unavailable", "customer_changed_mind", "safety", "other"]),
+          description: z.string().trim().min(10).max(2_000),
+          evidenceMediaIds: agreementEvidenceMediaIdsSchema.default([]),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        runAgreementOperation(() => db.openJobCancellation({ ...input, userId: ctx.user.id })),
+      ),
+    withdrawCancellation: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) =>
+        runAgreementOperation(() => db.withdrawJobCancellation(input.requestId, ctx.user.id)),
+      ),
   }),
 
   // Active job tracking — customer reads; only the assigned provider writes.
