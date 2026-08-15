@@ -301,3 +301,27 @@
 - [ ] Phase 10 MFA/i18n/sandbox hata, yetki, edge-case ve regresyon testlerini ekle; kalite kapılarını yeniden çalıştır
 - [x] Phase 10 geçersiz/eskimiş oturumda kök route yükleme ekranının takılı kalmadığını doğrula ve yönlendirme regresyonunu düzelt
 - [x] Phase 10 admin MFA kod isteğine kullanıcı ve amaç bağlı kısa aralıklı tekrar sınırı ekle; hata ve başarı sözleşmesini test et
+- [x] Phase 10 gerçek oturum bootstrap: geçersiz OAuth/JWT çerezi, web oturumu temizleme ve kök yönlendirme durum makinesini yönetim önizlemesinde kök neden düzeyinde doğrula
+- [ ] Phase 10 ödeme/OTP sandbox: iyzico, Stripe ve OTP sağlayıcılarının credential yokluğundaki fail-closed davranışlarını, callback ve uzlaştırma önkoşullarını doğrula
+- [ ] Phase 10 cihaz E2E: Expo Go QR, güvenli cihaz test kontrol listesi ve kullanıcı tarafından tamamlanacak fiziksel bağımlılıkları hazırla
+- [x] Faz 2 provider + capability + jurisdiction doğrulama veri modeli, kanıt güvence seviyeleri ve capability-sonuç durumlarını additive migration ile kur
+- [x] Faz 2 deterministik capability politika motoru, unknown=blocked kuralı, capability-scoped enable/block ve belge sona erme davranışını uygula
+- [x] Faz 2 insan incelemesi, yeni belge sunma ve itiraz akışlarını rol/nesne yetkileriyle uygula
+- [x] Faz 2 ülke uyum paketi, resmî kaynak kataloğu, versioned hukuk kuralı ve admin onay yaşam döngüsünü kur
+- [x] Faz 2 ülke açma kapısı, tamamlanma kontrol listesi ve MoveOS country compliance yönetim ekranlarını mevcut ortak API üzerinden ekle
+- [ ] Faz 2 sürekli yeniden kontrol zamanlaması, 90/30/15/7 günlük sona erme uyarıları ve veri minimizasyon/retention politikasını ekle
+- [ ] Faz 2 Türkiye pilotu için yalnız kullanıcı sağladığı resmi kaynaklar ve hukuk onayı temelinde versioned compliance seedlerini uygula; ülke hukuku içeriği uydurma
+- [ ] Faz 2 migrasyon, yetki, politika motoru, itiraz, ülke açma kapısı ve regresyon testlerini çalıştır; build/export kalite kapılarını doğrula
+- [ ] Faz 3 versioned/prospective komisyon, immutable anlaşma snapshot, hold/settlement koşulları ve configurable completion review penceresini ekle
+- [ ] Faz 3 dispute, partial settlement, iptal, change request ve güvenli iş dosyası yaşam döngüsünü gerçek API/DB akışına bağla
+- [ ] Faz 3 ödeme webhook, idempotency, replay, race-condition ve server-side tutar/para birimi kontrollerini regresyon testleriyle doğrula
+- [ ] Faz 4 job-scoped expense record, ayrı reimbursement claim, müşteri borcu olmama kuralı ve hassas bilgi redaksiyonunu uygula
+- [ ] Faz 4 mesaj ve aktif iş bağlamına job expense file erişimi ile güvenli medya ilişkilendirmesini ekle
+- [ ] Faz 4 masraf sahipliği, medya yetkisi, masraf/claim ayrımı ve müşteri görünürlüğü regresyonlarını doğrula
+- [ ] Faz 5 MoveAI taslak–özet–açık onay–request oluşturma akışını, sahte fiyat/ETA/usta üretmeme kuralıyla güçlendir
+- [ ] Faz 5 AI yetki sınırı, prompt injection veri ayrımı, trust/risk sinyalleri, itibar bütünlüğü ve iş güvenliği capability kontrollerini ekle
+- [ ] Faz 5 AI/risk etkilerinde human-review, açıklanabilir audit ve kritik finansal/hukuki işlem engellerini test et
+- [ ] Faz 6 13 dilli locale altyapısı, RTL, cihaz dili algılama, para/tarih/sayı biçimleme ve message translation original korunumu ekle
+- [ ] Faz 6 MoveOS kritik işlem onayı, re-auth/MFA, canary/shadow mode, guarded kill switch ve denetlenebilir release kontrolünü uygula
+- [ ] Faz 6 gözlemlenebilirlik, SBOM/SCA/secret scan, restore runbook, store compliance ve erişilebilirlik kalite kontrollerini ekle
+- [ ] Faz 3–6 her modülde TypeScript, lint, test, yetki, hata/edge-case, iOS/Android export ve secret scan kalite kapılarını doğrula; yayın başlatma

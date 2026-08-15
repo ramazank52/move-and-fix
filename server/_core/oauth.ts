@@ -1,7 +1,7 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import type { Express, Request, Response } from "express";
 import { getProviderProfile, getUserByOpenId, upsertUser } from "../db";
-import { getSessionCookieOptions } from "./cookies";
+import { clearSessionCookie, getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
 function getQueryParam(req: Request, key: string): string | undefined {
@@ -136,8 +136,7 @@ export function registerOAuthRoutes(app: Express) {
   });
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {
-    const cookieOptions = getSessionCookieOptions(req);
-    res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+    clearSessionCookie(req, res);
     res.json({ success: true });
   });
 
@@ -148,6 +147,7 @@ export function registerOAuthRoutes(app: Express) {
       res.json({ user: await buildUserResponse(user) });
     } catch (error) {
       console.error("[Auth] /api/auth/me failed:", error);
+      clearSessionCookie(req, res);
       res.status(401).json({ error: "Not authenticated", user: null });
     }
   });
@@ -175,6 +175,7 @@ export function registerOAuthRoutes(app: Express) {
       res.json({ success: true, user: await buildUserResponse(user) });
     } catch (error) {
       console.error("[Auth] /api/auth/session failed:", error);
+      clearSessionCookie(req, res);
       res.status(401).json({ error: "Invalid token" });
     }
   });

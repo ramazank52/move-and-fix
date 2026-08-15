@@ -15,6 +15,7 @@ import { createHeartbeatJob, listHeartbeatJobs, updateHeartbeatJob } from "./_co
 import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { ownerRouter } from "./_core/ownerRouter";
+import { complianceRouter } from "./compliance/router";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -327,6 +328,7 @@ async function runMessageOperation<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 export const appRouter = router({
+  compliance: complianceRouter,
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   owner: ownerRouter,

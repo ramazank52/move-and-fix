@@ -7,6 +7,8 @@ vi.mock("../server/db", async () => {
     ...actual,
     getProviderProfile: vi.fn(),
     getProviderDocuments: vi.fn(),
+    listProviderCapabilityStatuses: vi.fn(),
+    createProviderCapabilityAppeal: vi.fn(),
     assertMessageParticipant: vi.fn(),
   };
 });
@@ -47,6 +49,7 @@ describe("provider document and voice media security", () => {
   it("rejects anonymous document reads, document uploads and voice uploads", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
     await expect(caller.providers.getDocuments()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.compliance.myCapabilities()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.providers.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.messages.sendVoice({ requestId: 9, receiverId: 10, mimeType: "audio/webm", durationMs: 500, base64: "AAAA" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(storagePut).not.toHaveBeenCalled();
@@ -80,6 +83,30 @@ describe("provider document and voice media security", () => {
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(providerDb.assertMessageParticipant).not.toHaveBeenCalled();
     expect(storagePut).not.toHaveBeenCalled();
+  });
+
+  it("derives capability appeals from the provider session and rejects non-providers", async () => {
+    vi.mocked(providerDb.getProviderProfile).mockResolvedValue(null);
+    const nonProvider = appRouter.createCaller(createContext(89));
+    await expect(nonProvider.compliance.appeal({
+      providerCapabilityStatusId: 77,
+      type: "appeal",
+      statement: "İnceleme sonucuna ilişkin ek kanıtımı değerlendirmeye sunuyorum.",
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(providerDb.createProviderCapabilityAppeal).not.toHaveBeenCalled();
+
+    vi.mocked(providerDb.getProviderProfile).mockResolvedValue({ id: 903 } as Awaited<ReturnType<typeof providerDb.getProviderProfile>>);
+    vi.mocked(providerDb.createProviderCapabilityAppeal).mockResolvedValue({ id: 55 } as Awaited<ReturnType<typeof providerDb.createProviderCapabilityAppeal>>);
+    const provider = appRouter.createCaller(createContext(90));
+    await expect(provider.compliance.appeal({
+      providerCapabilityStatusId: 78,
+      type: "resubmission",
+      statement: "Güncel belge ve kapsam açıklamam yeniden değerlendirme için hazırdır.",
+    })).resolves.toMatchObject({ id: 55 });
+    expect(providerDb.createProviderCapabilityAppeal).toHaveBeenCalledWith(expect.objectContaining({
+      providerId: 903,
+      providerCapabilityStatusId: 78,
+    }));
   });
 
   it("enforces the admin-only provider-document review boundary", async () => {

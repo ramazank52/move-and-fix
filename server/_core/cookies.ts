@@ -1,4 +1,5 @@
-import type { CookieOptions, Request } from "express";
+import type { CookieOptions, Request, Response } from "express";
+import { COOKIE_NAME } from "../../shared/const";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -57,4 +58,13 @@ export function getSessionCookieOptions(
     sameSite: "none",
     secure: isSecureRequest(req),
   };
+}
+
+/**
+ * Expire the session cookie using exactly the same scope attributes as issuance.
+ * Cookie deletion fails silently in browsers when domain, path, SameSite, or
+ * secure differs from the original value, so all auth failure paths share this.
+ */
+export function clearSessionCookie(req: Request, res: Response) {
+  res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(req), maxAge: -1 });
 }

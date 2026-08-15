@@ -30,7 +30,14 @@ type OwnerProcedure =
   | "withdrawFunds"
   | "analytics"
   | "services"
-  | "getService";
+  | "getService"
+  | "countryCompliance"
+  | "createCountryJurisdiction"
+  | "createCountryCompliancePackage"
+  | "transitionCountryCompliancePackage"
+  | "registerCountryOfficialSource"
+  | "saveCountryLaunchGate"
+  | "enableCountryProfessionalMarketplace";
 
 async function requireMoveOsAdmin(req: Request, res: Response): Promise<User | null> {
   try {
@@ -305,6 +312,76 @@ export function registerOwnerRestRoutes(app: Express) {
       res.json(await callOwnerProcedure(req, res, user, "getService", { serviceId: Number(req.params.serviceId) }));
     } catch (error) {
       sendOwnerError(res, error, "Hizmet talebi alınamadı");
+    }
+  });
+
+  app.get("/api/owner/compliance/countries", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "countryCompliance"));
+    } catch (error) {
+      sendOwnerError(res, error, "Ülke uyum paketleri alınamadı");
+    }
+  });
+
+  app.post("/api/owner/compliance/countries", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "createCountryJurisdiction", req.body));
+    } catch (error) {
+      sendOwnerError(res, error, "Ülke yargı alanı oluşturulamadı");
+    }
+  });
+
+  app.post("/api/owner/compliance/countries/:jurisdictionId/packages", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "createCountryCompliancePackage", { ...req.body, jurisdictionId: Number(req.params.jurisdictionId) }));
+    } catch (error) {
+      sendOwnerError(res, error, "Uyum paketi oluşturulamadı");
+    }
+  });
+
+  app.post("/api/owner/compliance/packages/:packageId/status", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "transitionCountryCompliancePackage", { ...req.body, packageId: Number(req.params.packageId) }));
+    } catch (error) {
+      sendOwnerError(res, error, "Uyum paketi durumu güncellenemedi");
+    }
+  });
+
+  app.post("/api/owner/compliance/countries/:jurisdictionId/sources", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "registerCountryOfficialSource", { ...req.body, jurisdictionId: Number(req.params.jurisdictionId) }));
+    } catch (error) {
+      sendOwnerError(res, error, "Resmî kaynak kaydedilemedi");
+    }
+  });
+
+  app.put("/api/owner/compliance/countries/:jurisdictionId/gate", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "saveCountryLaunchGate", { ...req.body, jurisdictionId: Number(req.params.jurisdictionId) }));
+    } catch (error) {
+      sendOwnerError(res, error, "Ülke açma kapısı kaydedilemedi");
+    }
+  });
+
+  app.post("/api/owner/compliance/countries/:jurisdictionId/enable", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "enableCountryProfessionalMarketplace", { jurisdictionId: Number(req.params.jurisdictionId) }));
+    } catch (error) {
+      sendOwnerError(res, error, "Profesyonel pazaryeri etkinleştirilemedi");
     }
   });
 

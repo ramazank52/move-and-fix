@@ -27,10 +27,21 @@ const notifications = vi.hoisted(() => ({
   sendVerificationCode: vi.fn(),
 }));
 
+const countryCompliance = vi.hoisted(() => ({
+  listCountryComplianceOverviews: vi.fn(),
+  createCountryJurisdiction: vi.fn(),
+  createCountryCompliancePackage: vi.fn(),
+  transitionCountryCompliancePackage: vi.fn(),
+  registerOfficialComplianceSource: vi.fn(),
+  saveCountryLaunchChecklist: vi.fn(),
+  enableCountryProfessionalMarketplace: vi.fn(),
+}));
+
 vi.mock("../server/services/NotificationServiceV2", () => ({
   NotificationChannel: { EMAIL: "email" },
   notificationServiceV2: notifications,
 }));
+vi.mock("../server/compliance/CountryComplianceRepository", () => countryCompliance);
 
 import { ownerRouter } from "../server/_core/ownerRouter";
 
@@ -57,6 +68,7 @@ describe("MoveOS ortak API sözleşmesi", () => {
     db.hasValidAdminMfaGrant.mockResolvedValue(true);
     db.createAuthChallenge.mockResolvedValue(71);
     notifications.sendVerificationCode.mockResolvedValue({ deliveryStatus: "delivered" });
+    countryCompliance.listCountryComplianceOverviews.mockResolvedValue([]);
   });
 
   it("MFA grant’i olmayan yönetici oturumunun MoveOS verisine erişimini reddeder", async () => {
@@ -68,6 +80,22 @@ describe("MoveOS ortak API sözleşmesi", () => {
   it("dashboard’u sabit değerler yerine veri katmanındaki gerçek özetten üretir", async () => {
     await expect(adminCaller().dashboard()).resolves.toEqual(metrics);
     expect(db.getMoveOsDashboardMetrics).toHaveBeenCalledOnce();
+  });
+
+  it("ülke uyum görünümünü MFA grant’i olmayan yönetici için fail-closed kapatır", async () => {
+    db.hasValidAdminMfaGrant.mockResolvedValue(false);
+    await expect(adminCaller().countryCompliance()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(countryCompliance.listCountryComplianceOverviews).not.toHaveBeenCalled();
+  });
+
+  it("paket durum geçişini yönetici kimliğiyle insan incelemesine bağlar", async () => {
+    await expect(adminCaller().transitionCountryCompliancePackage({ packageId: 14, status: "approved" })).resolves.toBeUndefined();
+    expect(countryCompliance.transitionCountryCompliancePackage).toHaveBeenCalledWith({ packageId: 14, status: "approved", reviewerUserId: 7 });
+  });
+
+  it("eksik ülke açma kapısını profesyonel pazaryerini açmadan reddeder", async () => {
+    countryCompliance.enableCountryProfessionalMarketplace.mockRejectedValue(new Error("COUNTRY_PROFESSIONAL_MARKETPLACE_BLOCKED"));
+    await expect(adminCaller().enableCountryProfessionalMarketplace({ jurisdictionId: 4 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 
   it("yönetici olmayan ortak oturumun yönetim verisine erişimini reddeder", async () => {

@@ -53,12 +53,28 @@ function renderUsers(result) {
   $("#users-list").innerHTML = users.map((user) => `<tr><td>${escapeHtml(user.name || user.email || "Bilinmiyor")}</td><td>${escapeHtml(user.role || "user")}</td><td>${status(!user.banned)}</td></tr>`).join("") || "<tr><td colspan=\"3\">Kullanıcı bulunamadı.</td></tr>";
 }
 
+function countryGateStatus(overview) {
+  if (overview.gate?.status === "enabled") return "Etkin";
+  if (overview.evaluation?.ready) return "Açılmaya hazır";
+  return `Bloklu (${overview.evaluation?.missing?.length || 0} eksik)`;
+}
+
+function renderCountryCompliance(overviews) {
+  const rows = Array.isArray(overviews) ? overviews : [];
+  $("#country-compliance-list").innerHTML = rows.map((overview) => {
+    const country = overview.jurisdiction || {};
+    const source = `${overview.verifiedSourceCount || 0}/${overview.sourceCount || 0} doğrulanmış`;
+    const marketplace = overview.gate?.status === "enabled" ? "Etkin" : "Kapalı";
+    return `<tr><td>${escapeHtml(country.displayName || country.countryCode || "Bilinmiyor")}${country.regionCode ? ` · ${escapeHtml(country.regionCode)}` : ""}</td><td>${escapeHtml(overview.currentPackage?.status || "Paket yok")}</td><td>${escapeHtml(source)}</td><td>${escapeHtml(countryGateStatus(overview))}</td><td>${escapeHtml(marketplace)}</td></tr>`;
+  }).join("") || "<tr><td colspan=\"5\">Henüz ülke uyum paketi yok.</td></tr>";
+}
+
 function escapeHtml(value) { const element = document.createElement("div"); element.textContent = String(value ?? ""); return element.innerHTML; }
 
 async function loadData() {
   notice("Veriler yenileniyor…");
-  const [metrics, categories, users] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10")]);
-  renderDashboard(metrics); renderCategories(categories); renderUsers(users);
+  const [metrics, categories, users, countryCompliance] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries")]);
+  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance);
   setMfaVisible(false);
   $("#dashboard").hidden = false;
   notice("Gerçek ortak API verileri güncellendi.");
@@ -117,6 +133,16 @@ $("#category-form").addEventListener("submit", async (event) => {
   const form = new FormData(event.currentTarget);
   try { await api("/api/owner/categories", { method: "POST", body: JSON.stringify({ name: form.get("name"), pricingType: form.get("pricingType") }) }); event.currentTarget.reset(); await loadData(); notice("Kategori oluşturuldu."); }
   catch (error) { notice(error.message, true); }
+});
+$("#country-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  try {
+    await api("/api/owner/compliance/countries", { method: "POST", body: JSON.stringify({ countryCode: String(form.get("countryCode") || "").toUpperCase(), displayName: form.get("displayName"), regionCode: form.get("regionCode") || undefined }) });
+    event.currentTarget.reset();
+    await loadData();
+    notice("Yargı alanı taslak olarak oluşturuldu. Resmî kaynak, hukuk paketi ve açma kapısı onayı olmadan pazaryeri açılmaz.");
+  } catch (error) { notice(error.message, true); }
 });
 $("#command-form").addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -76,7 +76,7 @@ export default function ProviderDashboardScreen() {
       setAvailabilityOverride(null);
       Alert.alert(t("provider.dashboardUnavailable"), t("provider.dashboardUnavailableBody"));
     }
-  }, [availabilityMutation, isAvailable, opportunitiesQuery, profileQuery]);
+  }, [availabilityMutation, isAvailable, opportunitiesQuery, profileQuery, t]);
 
   const hasError = profileQuery.isError || jobsQuery.isError || earningsQuery.isError || opportunitiesQuery.isError;
   const isLoading = profileQuery.isLoading || jobsQuery.isLoading || earningsQuery.isLoading || opportunitiesQuery.isLoading;

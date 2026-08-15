@@ -8,6 +8,7 @@ import {
   localAuthSessions,
   adminMfaGrants,
   providerDocuments,
+  providerCredentials,
   walletAccounts,
   walletTransactions,
   walletWithdrawals,
@@ -516,11 +517,17 @@ export async function createProviderDocument(data: {
 export async function getProviderDocuments(providerId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db
+  const documents = await db
     .select()
     .from(providerDocuments)
     .where(eq(providerDocuments.providerId, providerId))
     .orderBy(desc(providerDocuments.createdAt), desc(providerDocuments.id));
+  const now = new Date();
+  return documents.map((document) =>
+    document.contentPurgedAt || (document.retentionDueAt && document.retentionDueAt.getTime() <= now.getTime())
+      ? { ...document, storageKey: "" }
+      : document,
+  );
 }
 
 export async function updateProviderDocumentStatus(data: {
@@ -552,6 +559,104 @@ export async function getProviderDocumentById(id: number) {
     .where(eq(providerDocuments.id, id))
     .limit(1);
   return rows[0] ?? null;
+}
+
+export async function listProviderCapabilityStatuses(providerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(providerCapabilityStatuses)
+    .where(eq(providerCapabilityStatuses.providerId, providerId))
+    .orderBy(desc(providerCapabilityStatuses.updatedAt), desc(providerCapabilityStatuses.id));
+}
+
+export async function createProviderCapabilityAppeal(data: {
+  providerId: number;
+  providerCapabilityStatusId: number;
+  type: "appeal" | "resubmission";
+  statement: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const statuses = await db
+    .select({ id: providerCapabilityStatuses.id, status: providerCapabilityStatuses.status })
+    .from(providerCapabilityStatuses)
+    .where(
+      and(
+        eq(providerCapabilityStatuses.id, data.providerCapabilityStatusId),
+        eq(providerCapabilityStatuses.providerId, data.providerId),
+      ),
+    )
+    .limit(1);
+  const capabilityStatus = statuses[0];
+  if (!capabilityStatus) throw new Error("PROVIDER_CAPABILITY_STATUS_NOT_FOUND");
+  if (
+    capabilityStatus.status !== "REJECTED" &&
+    capabilityStatus.status !== "EXPIRED_OR_SUSPENDED" &&
+    capabilityStatus.status !== "MANUAL_REVIEW"
+  ) {
+    throw new Error("PROVIDER_CAPABILITY_APPEAL_NOT_ALLOWED");
+  }
+  const created = await db.insert(providerCapabilityAppeals).values({
+    providerId: data.providerId,
+    providerCapabilityStatusId: data.providerCapabilityStatusId,
+    type: data.type,
+    statement: data.statement.trim(),
+    status: "submitted",
+  });
+  const rows = await db
+    .select()
+    .from(providerCapabilityAppeals)
+    .where(eq(providerCapabilityAppeals.id, Number(created[0].insertId)))
+    .limit(1);
+  if (!rows[0]) throw new Error("PROVIDER_CAPABILITY_APPEAL_CREATE_FAILED");
+  return rows[0];
+}
+
+export async function reviewProviderCapabilityStatus(data: {
+  providerCapabilityStatusId: number;
+  credentialId?: number;
+  reviewerUserId: number;
+  decision: "verified" | "limited_scope" | "manual_review" | "rejected" | "suspended";
+  rationale: string;
+  scopeNote?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const nextStatus = {
+    verified: "VERIFIED",
+    limited_scope: "VERIFIED_LIMITED_SCOPE",
+    manual_review: "MANUAL_REVIEW",
+    rejected: "REJECTED",
+    suspended: "EXPIRED_OR_SUSPENDED",
+  } as const;
+  return db.transaction(async (tx) => {
+    const updated = await tx
+      .update(providerCapabilityStatuses)
+      .set({
+        status: nextStatus[data.decision],
+        ...(data.scopeNote !== undefined ? { scopeNote: data.scopeNote.trim().slice(0, 500) || null } : {}),
+        ...(data.credentialId !== undefined ? { lastCredentialId: data.credentialId } : {}),
+        evaluatedAt: new Date(),
+      })
+      .where(eq(providerCapabilityStatuses.id, data.providerCapabilityStatusId));
+    if ((updated[0]?.affectedRows ?? 0) !== 1) throw new Error("PROVIDER_CAPABILITY_STATUS_NOT_FOUND");
+    await tx.insert(providerCapabilityReviews).values({
+      providerCapabilityStatusId: data.providerCapabilityStatusId,
+      credentialId: data.credentialId ?? null,
+      reviewerUserId: data.reviewerUserId,
+      decision: data.decision,
+      rationale: data.rationale.trim(),
+    });
+    const rows = await tx
+      .select()
+      .from(providerCapabilityStatuses)
+      .where(eq(providerCapabilityStatuses.id, data.providerCapabilityStatusId))
+      .limit(1);
+    if (!rows[0]) throw new Error("PROVIDER_CAPABILITY_STATUS_NOT_FOUND");
+    return rows[0];
+  });
 }
 
 export async function refreshProviderVerificationStatus(providerId: number) {
@@ -603,6 +708,9 @@ import {
   financialLedgerEntries,
   financialReconciliationAlerts,
   financialReconciliationRuns,
+  providerCapabilityAppeals,
+  providerCapabilityReviews,
+  providerCapabilityStatuses,
 } from "../drizzle/schema";
 
 // Service Categories
@@ -3128,6 +3236,40 @@ export async function getPaymentByIyzicoCheckoutToken(checkoutToken: string) {
   const payment = rows[0];
   if (!payment) throw new Error("PAYMENT_NOT_FOUND");
   return payment;
+}
+
+export async function listDueProviderCredentials(now = new Date()) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db
+    .select()
+    .from(providerCredentials)
+    .where(and(eq(providerCredentials.status, "verified"), isNotNull(providerCredentials.nextCheckAt), lte(providerCredentials.nextCheckAt, now)));
+}
+
+export async function blockCapabilitiesPendingCredentialReverification(input: {
+  providerId: number;
+  jurisdictionId: number;
+  credentialId: number;
+  now?: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = input.now ?? new Date();
+  return db
+    .update(providerCapabilityStatuses)
+    .set({
+      status: "MANUAL_REVIEW",
+      evaluatedAt: now,
+      scopeNote: "Credential reverification is due; capability is blocked pending human review.",
+    })
+    .where(
+      and(
+        eq(providerCapabilityStatuses.providerId, input.providerId),
+        eq(providerCapabilityStatuses.jurisdictionId, input.jurisdictionId),
+        eq(providerCapabilityStatuses.lastCredentialId, input.credentialId),
+      ),
+    );
 }
 
 export async function transitionPaymentStatus(data: {

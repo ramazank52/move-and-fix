@@ -187,6 +187,60 @@ async function startServer() {
     }
   });
 
+  // A due credential is never treated as implicitly verified. This callback
+  // removes only the credential-linked capability scopes until a reviewer
+  // records a new decision; it never auto-enables capability access.
+  app.post("/api/scheduled/compliance-reverification", async (req, res) => {
+    const configuredSecret = ENV.complianceReverificationSecret;
+    const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
+    const actualAuthorization = String(req.headers.authorization ?? "");
+    const callbackToken = String(req.body?.token ?? "");
+    const hasBearerMatch =
+      expectedAuthorization.length > 0 &&
+      actualAuthorization.length === expectedAuthorization.length &&
+      timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
+    const hasPayloadMatch =
+      configuredSecret.length > 0 &&
+      callbackToken.length === configuredSecret.length &&
+      timingSafeEqual(Buffer.from(callbackToken), Buffer.from(configuredSecret));
+    if (!hasBearerMatch && !hasPayloadMatch) {
+      res.status(configuredSecret ? 401 : 503).json({
+        error: configuredSecret ? "Unauthorized scheduled callback" : "Compliance reverification is not configured",
+      });
+      return;
+    }
+
+    const requestedLimit = Number(req.body?.limit ?? 100);
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 500) {
+      res.status(400).json({ error: "limit must be an integer between 1 and 500" });
+      return;
+    }
+
+    try {
+      const dueCredentials = await db.listDueProviderCredentials(new Date());
+      const selected = dueCredentials.slice(0, requestedLimit);
+      for (const credential of selected) {
+        await db.blockCapabilitiesPendingCredentialReverification({
+          providerId: credential.providerId,
+          jurisdictionId: credential.jurisdictionId,
+          credentialId: credential.id,
+        });
+      }
+      console.info("[compliance-reverification] processed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        dueCredentials: dueCredentials.length,
+        blockedCapabilityScopes: selected.length,
+      });
+      res.status(200).json({ dueCredentials: dueCredentials.length, blockedCapabilityScopes: selected.length });
+    } catch (error) {
+      console.error("[compliance-reverification] failed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        error,
+      });
+      res.status(500).json({ error: "Compliance reverification processing failed" });
+    }
+  });
+
   // CSRF protection — token endpoint (for cookie-based web clients like MoveOS)
   const csrf = new CSRFProtection();
   app.get("/api/csrf-token", (req, res) => {

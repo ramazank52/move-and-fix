@@ -29,4 +29,5 @@ export const ENV = {
   completionAutoReleaseSecret:
     process.env.ESCROW_RELEASE_CRON_SECRET ?? process.env.COMPLETION_AUTO_RELEASE_SECRET ?? "",
   financialReconciliationSecret: process.env.FINANCIAL_RECONCILIATION_CRON_SECRET ?? "",
+  complianceReverificationSecret: process.env.COMPLIANCE_REVERIFICATION_CRON_SECRET ?? "",
 };

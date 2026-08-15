@@ -18,14 +18,25 @@ import {
   getMoveOsDashboardMetrics,
   getMoveOsService,
   getMoveOsUser,
+  listProviderCapabilityStatuses,
   listMoveOsCategories,
   listMoveOsServices,
   listMoveOsUsers,
   incrementAuthChallengeAttempts,
   markAuthChallengeUsed,
+  reviewProviderCapabilityStatus,
   updateMoveOsCategory,
   updateMoveOsUser,
 } from "../db";
+import {
+  createCountryCompliancePackage,
+  createCountryJurisdiction,
+  enableCountryProfessionalMarketplace,
+  listCountryComplianceOverviews,
+  registerOfficialComplianceSource,
+  saveCountryLaunchChecklist,
+  transitionCountryCompliancePackage,
+} from "../compliance/CountryComplianceRepository";
 import { ENV } from "./env";
 import { STANDARD_COMMISSION_RATE_BPS } from "../payments/policy";
 import { adminMfaProcedure, adminProcedure, publicProcedure, router } from "./trpc";
@@ -71,6 +82,28 @@ function adminAuthRequired() {
 
 const mfaCodeSchema = z.string().regex(/^\d{6}$/, "6 haneli güvenlik kodunu girin");
 const ADMIN_MFA_REQUEST_COOLDOWN_MS = 60_000;
+const countryLaunchChecklistInput = z.object({
+  service_compliance: z.boolean(),
+  credential_rules: z.boolean(),
+  official_sources: z.boolean(),
+  platform_law: z.boolean(),
+  payments: z.boolean(),
+  payment_provider_license: z.boolean(),
+  tax: z.boolean(),
+  privacy: z.boolean(),
+  worker_classification: z.boolean(),
+  insurance: z.boolean(),
+  consumer_rules: z.boolean(),
+  ai_rules: z.boolean(),
+  safety: z.boolean(),
+  support: z.boolean(),
+  store_compliance: z.boolean(),
+  legal_sign_off: z.boolean(),
+  privacy_sign_off: z.boolean(),
+  payment_sign_off: z.boolean(),
+  security_sign_off: z.boolean(),
+  production_tests: z.boolean(),
+}).strict();
 
 function hashAdminMfaCode(userId: number, code: string): string {
   if (!ENV.cookieSecret) {
@@ -158,6 +191,57 @@ export const ownerRouter = router({
   logout: adminProcedure.mutation(async () => ({ success: true })),
 
   dashboard: adminMfaProcedure.query(async () => getMoveOsDashboardMetrics()),
+
+  listProviderCapabilities: adminMfaProcedure
+    .input(z.object({ providerId: z.number().int().positive() }))
+    .query(async ({ input }) => listProviderCapabilityStatuses(input.providerId)),
+
+  reviewProviderCapability: adminMfaProcedure
+    .input(
+      z.object({
+        providerCapabilityStatusId: z.number().int().positive(),
+        credentialId: z.number().int().positive().optional(),
+        decision: z.enum(["verified", "limited_scope", "manual_review", "rejected", "suspended"]),
+        rationale: z.string().trim().min(10).max(2_000),
+        scopeNote: z.string().trim().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => reviewProviderCapabilityStatus({ ...input, reviewerUserId: ctx.user!.id })),
+
+  countryCompliance: adminMfaProcedure.query(async () => listCountryComplianceOverviews()),
+
+  createCountryJurisdiction: adminMfaProcedure
+    .input(z.object({ countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/), regionCode: z.string().trim().max(16).optional(), displayName: z.string().trim().min(2).max(120) }))
+    .mutation(async ({ ctx, input }) => createCountryJurisdiction({ ...input, createdByUserId: ctx.user!.id })),
+
+  createCountryCompliancePackage: adminMfaProcedure
+    .input(z.object({ jurisdictionId: z.number().int().positive(), version: z.string().trim().min(1).max(64), summary: z.string().trim().max(4_000).optional() }))
+    .mutation(async ({ ctx, input }) => createCountryCompliancePackage({ ...input, createdByUserId: ctx.user!.id })),
+
+  transitionCountryCompliancePackage: adminMfaProcedure
+    .input(z.object({ packageId: z.number().int().positive(), status: z.enum(["draft", "legal_review", "approved", "enabled", "blocked", "retired"]) }))
+    .mutation(async ({ ctx, input }) => transitionCountryCompliancePackage({ ...input, reviewerUserId: ctx.user!.id })),
+
+  registerCountryOfficialSource: adminMfaProcedure
+    .input(z.object({ jurisdictionId: z.number().int().positive(), authorityName: z.string().trim().min(2).max(200), sourceUrl: z.string().url().max(2_000), sourceVersion: z.string().trim().min(1).max(120), status: z.enum(["draft", "verified", "superseded", "revoked"]) }))
+    .mutation(async ({ ctx, input }) => registerOfficialComplianceSource({ ...input, reviewedByUserId: ctx.user!.id })),
+
+  saveCountryLaunchGate: adminMfaProcedure
+    .input(z.object({ jurisdictionId: z.number().int().positive(), packageId: z.number().int().positive().optional(), checklist: countryLaunchChecklistInput }))
+    .mutation(async ({ ctx, input }) => saveCountryLaunchChecklist({ ...input, evaluatedByUserId: ctx.user!.id })),
+
+  enableCountryProfessionalMarketplace: adminMfaProcedure
+    .input(z.object({ jurisdictionId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await enableCountryProfessionalMarketplace({ ...input, enabledByUserId: ctx.user!.id });
+      } catch (error) {
+        if (error instanceof Error && error.message === "COUNTRY_PROFESSIONAL_MARKETPLACE_BLOCKED") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ülke açma kapısı tamamlanmadan profesyonel pazaryeri etkinleştirilemez" });
+        }
+        throw error;
+      }
+    }),
 
   users: adminMfaProcedure
     .input(
