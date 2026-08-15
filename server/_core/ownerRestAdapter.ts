@@ -45,7 +45,9 @@ type OwnerProcedure =
   | "changeOrders"
   | "reviewCancellationCase"
   | "riskFlags"
-  | "reviewRiskFlag";
+  | "reviewRiskFlag"
+  | "featureFlags"
+  | "setFeatureFlag";
 
 async function requireMoveOsAdmin(req: Request, res: Response): Promise<User | null> {
   try {
@@ -393,6 +395,30 @@ export function registerOwnerRestRoutes(app: Express) {
       );
     } catch (error) {
       sendOwnerError(res, error, "Risk kaydı incelenemedi");
+    }
+  });
+
+  app.get("/api/owner/feature-flags", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "featureFlags", {
+          limit: req.query.limit ? Number(req.query.limit) : 100,
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Feature flag kayıtları alınamadı");
+    }
+  });
+
+  app.post("/api/owner/feature-flags", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "setFeatureFlag", req.body));
+    } catch (error) {
+      sendOwnerError(res, error, "Feature flag güncellenemedi");
     }
   });
 

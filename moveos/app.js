@@ -176,10 +176,57 @@ function renderRiskFlags(result) {
   }));
 }
 
+function renderFeatureFlags(result) {
+  const flags = Array.isArray(result) ? result : result.items || result.featureFlags || [];
+  $("#feature-flags-list").innerHTML = flags.map((flag) => {
+    const enabled = Number(flag.enabled) === 1;
+    const killed = Number(flag.killSwitch) === 1;
+    const rollout = Number(flag.rolloutPercent || 0);
+    const action = enabled && !killed ? "Kapat" : "Etkinleştir";
+    return `<tr><td><strong>${escapeHtml(flag.flagKey)}</strong><br><small>${escapeHtml(flag.reason || "—")}</small></td><td>${status(enabled && !killed)}</td><td>%${escapeHtml(rollout)}</td><td>${killed ? "Açık" : "Kapalı"}</td><td>v${escapeHtml(flag.version)}</td><td>${escapeHtml(formatDate(flag.createdAt))}</td><td><button class="row-action" type="button" data-toggle-flag="${escapeHtml(flag.flagKey)}" data-flag-enabled="${enabled && !killed ? "1" : "0"}" data-rollout="${escapeHtml(rollout)}">${action}</button></td></tr>`;
+  }).join("") || "<tr><td colspan=\"7\">Henüz operasyonel feature flag kaydı yok.</td></tr>";
+  document.querySelectorAll("[data-toggle-flag]").forEach((button) => button.addEventListener("click", async () => {
+    const currentlyEnabled = button.dataset.flagEnabled === "1";
+    const key = button.dataset.toggleFlag;
+    const enabled = !currentlyEnabled;
+    const initialRollout = enabled ? Math.max(1, Number(button.dataset.rollout || 100)) : 0;
+    const rolloutText = window.prompt("Canary yüzdesi (0–100). Anonim kullanıcılar kapsam dışıdır.", String(initialRollout));
+    if (rolloutText === null) return;
+    const rolloutPct = Number(rolloutText.trim());
+    if (!Number.isInteger(rolloutPct) || rolloutPct < 0 || rolloutPct > 100) {
+      notice("Canary yüzdesi 0 ile 100 arasında tam sayı olmalıdır.", true);
+      return;
+    }
+    const reason = window.prompt("Değişiklik gerekçesi (en az 3 karakter)");
+    if (!reason || reason.trim().length < 3) {
+      notice("Denetim için değişiklik gerekçesi zorunludur.", true);
+      return;
+    }
+    const description = enabled
+      ? `“${key}” flag’i %${rolloutPct} canary ile etkinleştirilecek.`
+      : `“${key}” flag’i kill-switch ile anında kapatılacak.`;
+    if (!window.confirm(`${description}\n\nBu işlem yeni bir sürüm oluşturur. Devam edilsin mi?`)) return;
+    try {
+      await api("/api/owner/feature-flags", {
+        method: "POST",
+        body: JSON.stringify({
+          key,
+          enabled,
+          rolloutPct,
+          killSwitch: !enabled,
+          reason: reason.trim(),
+        }),
+      });
+      await loadData();
+      notice(enabled ? "Feature flag yeni canary sürümüyle etkinleştirildi." : "Feature flag kill-switch ile fail-closed kapatıldı.");
+    } catch (error) { notice(error.message, true); }
+  }));
+}
+
 async function loadData() {
   notice("Veriler yenileniyor…");
-  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, changeOrders, riskFlags] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/change-orders?limit=20"), api("/api/owner/risk-flags?limit=50")]);
-  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderChangeOrders(changeOrders); renderRiskFlags(riskFlags);
+  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, changeOrders, riskFlags, featureFlags] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/change-orders?limit=20"), api("/api/owner/risk-flags?limit=50"), api("/api/owner/feature-flags?limit=100")]);
+  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderChangeOrders(changeOrders); renderRiskFlags(riskFlags); renderFeatureFlags(featureFlags);
   setMfaVisible(false);
   $("#dashboard").hidden = false;
   notice("Gerçek ortak API verileri güncellendi.");

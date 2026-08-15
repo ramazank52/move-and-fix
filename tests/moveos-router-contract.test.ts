@@ -24,6 +24,8 @@ const db = vi.hoisted(() => ({
   listJobChangeOrdersForAdmin: vi.fn(),
   listJobCancellationCasesForAdmin: vi.fn(),
   reviewJobCancellationForAdmin: vi.fn(),
+  listFeatureFlags: vi.fn(),
+  setFeatureFlag: vi.fn(),
 }));
 
 vi.mock("../server/db", () => db);
@@ -81,6 +83,39 @@ describe("MoveOS ortak API sözleşmesi", () => {
     db.hasValidAdminMfaGrant.mockResolvedValue(false);
     await expect(adminCaller().dashboard()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(db.getMoveOsDashboardMetrics).not.toHaveBeenCalled();
+  });
+
+  it("MFA grant’i olmayan yönetici için feature flag değiştirmeyi fail-closed reddeder", async () => {
+    db.hasValidAdminMfaGrant.mockResolvedValue(false);
+
+    await expect(
+      adminCaller().setFeatureFlag({
+        key: "moveai.experimental-routing",
+        enabled: true,
+        rolloutPct: 20,
+        reason: "Kademeli MoveAI yönlendirme doğrulaması",
+      }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(db.setFeatureFlag).not.toHaveBeenCalled();
+  });
+
+  it("MFA doğrulanmış yönetici güncellemesini oturumdaki yönetici kimliğiyle veri katmanına bağlar", async () => {
+    db.setFeatureFlag.mockResolvedValue({ id: 3, flagKey: "moveai.experimental-routing", version: 1 });
+
+    await expect(
+      adminCaller().setFeatureFlag({
+        key: "moveai.experimental-routing",
+        enabled: true,
+        rolloutPct: 20,
+        reason: "Kademeli MoveAI yönlendirme doğrulaması",
+      }),
+    ).resolves.toMatchObject({ id: 3, flagKey: "moveai.experimental-routing" });
+    expect(db.setFeatureFlag).toHaveBeenCalledWith(expect.objectContaining({
+      adminUserId: 7,
+      key: "moveai.experimental-routing",
+      enabled: true,
+      rolloutPct: 20,
+    }));
   });
 
   it("dashboard’u sabit değerler yerine veri katmanındaki gerçek özetten üretir", async () => {

@@ -97,6 +97,9 @@ export default function HomeScreen() {
         {/* 3. MoveAI Mor Gradient Banner */}
         <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("home.moveAITitle")}
+            accessibilityHint={t("home.moveAISubtitle")}
             onPress={() => router.push("/ai-assistant" as any)}
             style={({ pressed }) => [
               {
@@ -145,6 +148,8 @@ export default function HomeScreen() {
             {quickAccess.map((cat, idx) => (
               <Pressable
                 key={idx}
+                accessibilityRole="button"
+                accessibilityLabel={cat.name}
                 onPress={() => router.push("/explore" as any)}
                 style={({ pressed }) => [
                   {
@@ -184,6 +189,8 @@ export default function HomeScreen() {
         {activeJob && (
           <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("home.activeJob")}
               onPress={() => router.push(`/job/${activeJob.id}` as any)}
               style={({ pressed }) => [
                 {
@@ -245,7 +252,11 @@ export default function HomeScreen() {
             <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
               {t("home.nearbyProviders")}
             </Text>
-            <Pressable onPress={() => router.push("/explore" as any)}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t("home.nearbyProviders")} ${t("common.seeAll")}`}
+              onPress={() => router.push("/explore" as any)}
+            >
               <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>{t("common.seeAll")}</Text>
             </Pressable>
           </View>
@@ -259,6 +270,8 @@ export default function HomeScreen() {
               {nearbyProviders.slice(0, 3).map((provider) => (
                 <Pressable
                   key={provider.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={provider.displayName}
                   onPress={() => router.push(`/provider/${provider.id}` as any)}
                   style={({ pressed }) => [
                     {
@@ -325,7 +338,11 @@ export default function HomeScreen() {
             <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
               {t("home.popularServices")}
             </Text>
-            <Pressable onPress={() => router.push("/explore" as any)}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t("home.popularServices")} ${t("common.seeAll")}`}
+              onPress={() => router.push("/explore" as any)}
+            >
               <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>{t("common.seeAll")}</Text>
             </Pressable>
           </View>
@@ -334,6 +351,8 @@ export default function HomeScreen() {
             {popularServices.map((service, idx) => (
               <Pressable
                 key={idx}
+                accessibilityRole="button"
+                accessibilityLabel={service.name}
                 onPress={() => router.push("/explore" as any)}
                 style={({ pressed }) => [
                   {

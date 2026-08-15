@@ -114,6 +114,12 @@
             <p class="subtle">Risk sinyalleri silinmez. Yönetici gerekçeli karar ile incelemeye alır, çözer veya reddeder. Kritik ya da bloke güven durumları yalnız burada kaldırılabilir.</p>
             <div class="table-wrap"><table><thead><tr><th>Kullanıcı</th><th>Hizmet</th><th>Kaynak / neden</th><th>Şiddet</th><th>Durum</th><th>Oluşturulma</th><th>İşlem</th></tr></thead><tbody id="risk-flags-list"></tbody></table></div>
           </section>
+
+          <section class="panel" aria-labelledby="feature-flags-title">
+            <div class="panel-heading"><div><p class="eyebrow">FAZ 6 / OPERATIONAL CONTROL</p><h2 id="feature-flags-title">Canary rollout ve kill-switch</h2></div><span class="tag">MFA + gerekçeli değişiklik</span></div>
+            <p class="subtle">Her değişiklik yeni ve denetlenebilir bir sürüm oluşturur. Kapatma işlemi anında fail-closed kill-switch uygular; anonim kullanıcılar canary kapsamına alınmaz.</p>
+            <div class="table-wrap"><table><thead><tr><th>Flag</th><th>Durum</th><th>Canary</th><th>Kill-switch</th><th>Sürüm</th><th>Güncelleme</th><th>İşlem</th></tr></thead><tbody id="feature-flags-list"></tbody></table></div>
+          </section>
         </div>
       </section>
     </main>

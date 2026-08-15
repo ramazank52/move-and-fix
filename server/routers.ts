@@ -1564,6 +1564,23 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       }),
   }),
 
+  featureFlags: router({
+    resolve: protectedProcedure
+      .input(
+        z.object({
+          key: z.string().trim().min(1).max(96),
+          countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/).optional(),
+        }),
+      )
+      .query(async ({ ctx, input }) => ({
+        key: input.key,
+        enabled: await db.resolveFeatureFlag(input.key, {
+          userId: ctx.user.id,
+          countryCode: input.countryCode?.toUpperCase(),
+        }),
+      })),
+  }),
+
   admin: router({
     configureCompletionAutoRelease: protectedProcedure.mutation(async ({ ctx }) => {
       if (ctx.user.role !== "admin") {

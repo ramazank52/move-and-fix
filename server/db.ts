@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNotNull, isNull, like, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -12,6 +12,8 @@ import {
   walletAccounts,
   walletTransactions,
   walletWithdrawals,
+  operationalFeatureFlags,
+  operationalEvents,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import {
@@ -2706,7 +2708,7 @@ export async function approveCompletionProof(data: { requestId: number; userId: 
   const providerUserId = context.providerUserId;
   if (!providerUserId) throw new Error("COMPLETION_APPROVAL_PROVIDER_MISSING");
 
-  return db.transaction(async (tx) => {
+  const outcome = await db.transaction(async (tx) => {
     const proofRows = await tx
       .select()
       .from(jobCompletionProofs)
@@ -2766,6 +2768,15 @@ export async function approveCompletionProof(data: { requestId: number; userId: 
     if (!updated[0]) throw new Error("COMPLETION_PROOF_NOT_FOUND");
     return { proof: updated[0], released: release.released, duplicated: release.duplicated };
   });
+  if (outcome.released && !outcome.duplicated) {
+    await logOperationEvent({
+      eventType: "escrow.released",
+      subjectId: data.requestId,
+      actorId: data.userId,
+      payload: { completionProofId: outcome.proof.id, reason: "customer_approval" },
+    });
+  }
+  return outcome;
 }
 
 export async function openCompletionDispute(data: {
@@ -2826,7 +2837,7 @@ export async function resolveCompletionDispute(data: {
   const { db, context } = await getTrackingAccessContext(data.requestId);
   const providerUserId = context.providerUserId;
   if (!providerUserId) throw new Error("COMPLETION_RESOLUTION_PROVIDER_MISSING");
-  return db.transaction(async (tx) => {
+  const outcome = await db.transaction(async (tx) => {
     const [proofRows, disputeRows, paymentRows] = await Promise.all([
       tx.select().from(jobCompletionProofs).where(eq(jobCompletionProofs.requestId, data.requestId)).limit(1),
       tx.select().from(completionDisputes).where(eq(completionDisputes.requestId, data.requestId)).limit(1),
@@ -2877,6 +2888,22 @@ export async function resolveCompletionDispute(data: {
       .where(eq(completionDisputes.id, dispute.id));
     return { requestId: data.requestId, resolution: data.resolution, resolvedAt: now };
   });
+  await logOperationEvent({
+    eventType: "completion_dispute.resolved",
+    subjectId: data.requestId,
+    actorId: data.adminUserId,
+    severity: data.resolution === "customer" ? "warning" : "info",
+    payload: { resolution: data.resolution },
+  });
+  if (data.resolution === "provider") {
+    await logOperationEvent({
+      eventType: "escrow.released",
+      subjectId: data.requestId,
+      actorId: data.adminUserId,
+      payload: { reason: "admin_resolution" },
+    });
+  }
+  return outcome;
 }
 
 export async function autoReleaseDueCompletionProofs(now = new Date(), limit = 100) {
@@ -2928,6 +2955,13 @@ export async function autoReleaseDueCompletionProofs(now = new Date(), limit = 1
         return { released: release.released, duplicated: release.duplicated };
       });
       results.push({ requestId: candidate.requestId, ...result });
+      if (result.released && !result.duplicated) {
+        await logOperationEvent({
+          eventType: "escrow.released",
+          subjectId: candidate.requestId,
+          payload: { reason: "auto_release" },
+        });
+      }
     } catch (error) {
       results.push({
         requestId: candidate.requestId,
@@ -3466,7 +3500,7 @@ export async function reviewJobCancellationForAdmin(data: {
     throw new Error("CANCELLATION_RESOLUTION_NOTE_INVALID");
   }
 
-  return db.transaction(async (tx) => {
+  const outcome = await db.transaction(async (tx) => {
     const cancellationRows = await tx
       .select()
       .from(jobCancellationCases)
@@ -3567,6 +3601,20 @@ export async function reviewJobCancellationForAdmin(data: {
     if (!rows[0]) throw new Error("CANCELLATION_NOT_FOUND");
     return rows[0];
   });
+  await logOperationEvent({
+    eventType: "cancellation.reviewed",
+    subjectId: data.requestId,
+    actorId: data.reviewerUserId,
+    severity: data.settlementOutcome === "no_payment" ? "info" : "warning",
+    payload: {
+      cancellationId: outcome.id,
+      settlementOutcome: data.settlementOutcome,
+      status: outcome.status,
+      refundAmount: outcome.refundAmount,
+      providerPayoutAmount: outcome.providerPayoutAmount,
+    },
+  });
+  return outcome;
 }
 
 async function resolveRefundCancellationInTransaction(
@@ -4981,7 +5029,7 @@ export async function reviewRiskFlag(input: {
 }) {
   const database = await getDb();
   if (!database) throw new Error("Database not available");
-  return database.transaction(async (tx) => {
+  const reviewed = await database.transaction(async (tx) => {
     const rows = await tx.select().from(riskFlags).where(eq(riskFlags.id, input.riskFlagId)).limit(1);
     const flag = rows[0];
     if (!flag || !["open", "under_review"].includes(flag.status)) {
@@ -5025,4 +5073,218 @@ export async function reviewRiskFlag(input: {
 
     return { id: input.riskFlagId, status: input.decision };
   });
+  await logOperationEvent({
+    eventType: "risk_flag.reviewed",
+    subjectId: input.riskFlagId,
+    actorId: input.adminUserId,
+    payload: { decision: input.decision },
+  });
+  return reviewed;
+}
+
+// Faz 6: Operational feature flags are append-only configuration records. A
+// missing/expired/broken flag must never activate a protected capability.
+export type FeatureFlagContext = {
+  userId?: number;
+  countryCode?: string;
+};
+
+function normalizeOperationalFlagKey(flagKey: string): string {
+  const normalized = flagKey.trim();
+  if (!/^[a-z][a-z0-9_.-]{0,95}$/.test(normalized)) {
+    throw new Error("FEATURE_FLAG_KEY_INVALID");
+  }
+  return normalized;
+}
+
+/** Deterministic and dependency-free bucket suitable for non-security canary allocation. */
+export function featureFlagBucket(seed: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % 100;
+}
+
+export type FeatureFlagEvaluationRecord = {
+  flagKey: string;
+  enabled: number;
+  killSwitch: number;
+  rolloutPercent: number;
+  audienceSeed: string;
+};
+
+/**
+ * Evaluates a previously selected, currently active flag record. This remains
+ * pure so that the security-critical fail-closed and canary rules are tested
+ * without requiring a live database.
+ */
+export function evaluateFeatureFlag(
+  flag: FeatureFlagEvaluationRecord | null | undefined,
+  context: FeatureFlagContext = {},
+): boolean {
+  if (!flag || flag.enabled !== 1 || flag.killSwitch === 1) return false;
+  if (!Number.isInteger(flag.rolloutPercent) || flag.rolloutPercent <= 0) return false;
+  if (flag.rolloutPercent >= 100) return true;
+
+  // A canary must be stable for one identity. Anonymous callers receive no
+  // experimental capability rather than a random and unverifiable result.
+  if (!Number.isSafeInteger(context.userId) || (context.userId ?? 0) <= 0) return false;
+  const allocationKey = `${flag.audienceSeed}:${flag.flagKey}:${context.userId}:${context.countryCode ?? ""}`;
+  return featureFlagBucket(allocationKey) < flag.rolloutPercent;
+}
+
+export async function resolveFeatureFlag(
+  key: string,
+  context: FeatureFlagContext = {},
+): Promise<boolean> {
+  let flagKey: string;
+  try {
+    flagKey = normalizeOperationalFlagKey(key);
+  } catch {
+    return false;
+  }
+
+  const database = await getDb();
+  if (!database) return false;
+
+  try {
+    const now = new Date();
+    const candidates = await database
+      .select()
+      .from(operationalFeatureFlags)
+      .where(
+        and(
+          eq(operationalFeatureFlags.flagKey, flagKey),
+          lte(operationalFeatureFlags.startsAt, now),
+          or(isNull(operationalFeatureFlags.endsAt), gt(operationalFeatureFlags.endsAt, now)),
+        ),
+      )
+      .orderBy(desc(operationalFeatureFlags.version))
+      .limit(1);
+    const flag = candidates[0];
+    return evaluateFeatureFlag(flag, context);
+  } catch (error) {
+    console.error("[FeatureFlags] Failed to resolve operational flag", { key: flagKey, error });
+    return false;
+  }
+}
+
+export async function setFeatureFlag(input: {
+  key: string;
+  enabled: boolean;
+  rolloutPct?: number;
+  killSwitch?: boolean;
+  audienceSeed?: string;
+  reason?: string;
+  adminUserId: number;
+}) {
+  const flagKey = normalizeOperationalFlagKey(input.key);
+  if (!Number.isSafeInteger(input.adminUserId) || input.adminUserId <= 0) {
+    throw new Error("FEATURE_FLAG_ADMIN_INVALID");
+  }
+  const rolloutPercent = input.rolloutPct ?? (input.enabled ? 100 : 0);
+  if (!Number.isInteger(rolloutPercent) || rolloutPercent < 0 || rolloutPercent > 100) {
+    throw new Error("FEATURE_FLAG_ROLLOUT_INVALID");
+  }
+  const audienceSeed = (input.audienceSeed ?? flagKey).trim();
+  if (!audienceSeed || audienceSeed.length > 96) throw new Error("FEATURE_FLAG_AUDIENCE_SEED_INVALID");
+  const reason = (input.reason ?? "Operational feature flag update").trim();
+  if (!reason || reason.length > 280) throw new Error("FEATURE_FLAG_REASON_INVALID");
+
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+
+  const flag = await database.transaction(async (tx) => {
+    const latest = await tx
+      .select()
+      .from(operationalFeatureFlags)
+      .where(eq(operationalFeatureFlags.flagKey, flagKey))
+      .orderBy(desc(operationalFeatureFlags.version))
+      .limit(1);
+    const version = (latest[0]?.version ?? 0) + 1;
+    const killSwitch = input.killSwitch ?? !input.enabled;
+    await tx.insert(operationalFeatureFlags).values({
+      flagKey,
+      version,
+      enabled: input.enabled ? 1 : 0,
+      rolloutPercent,
+      killSwitch: killSwitch ? 1 : 0,
+      audienceSeed,
+      createdByUserId: input.adminUserId,
+      reason,
+    });
+    const inserted = await tx
+      .select()
+      .from(operationalFeatureFlags)
+      .where(and(eq(operationalFeatureFlags.flagKey, flagKey), eq(operationalFeatureFlags.version, version)))
+      .limit(1);
+    if (!inserted[0]) throw new Error("FEATURE_FLAG_WRITE_FAILED");
+    return inserted[0];
+  });
+
+  await logOperationEvent({
+    eventType: "feature_flag.updated",
+    subjectId: flag.id,
+    actorId: input.adminUserId,
+    payload: {
+      key: flag.flagKey,
+      version: flag.version,
+      enabled: flag.enabled === 1,
+      rolloutPercent: flag.rolloutPercent,
+      killSwitch: flag.killSwitch === 1,
+      reason: flag.reason,
+    },
+  });
+  return flag;
+}
+
+/** Returns the latest immutable version for each flag, newest flags first. */
+export async function listFeatureFlags(limit = 100) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select()
+    .from(operationalFeatureFlags)
+    .orderBy(desc(operationalFeatureFlags.createdAt), desc(operationalFeatureFlags.version))
+    .limit(Math.min(Math.max(limit, 1), 200));
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    if (seen.has(row.flagKey)) return false;
+    seen.add(row.flagKey);
+    return true;
+  });
+}
+
+export async function logOperationEvent(input: {
+  eventType: string;
+  subjectId?: number;
+  actorId?: number;
+  payload?: Record<string, unknown>;
+  severity?: "info" | "warning" | "error";
+}): Promise<void> {
+  const eventType = input.eventType.trim();
+  if (!eventType || eventType.length > 96) {
+    console.error("[Operations] Ignored invalid event type");
+    return;
+  }
+  const database = await getDb();
+  if (!database) return;
+  try {
+    await database.insert(operationalEvents).values({
+      eventType,
+      severity: input.severity ?? "info",
+      requestId: input.subjectId == null ? undefined : String(input.subjectId),
+      actorUserId: input.actorId,
+      metadataJson: {
+        subjectId: input.subjectId,
+        ...(input.payload ?? {}),
+      },
+    });
+  } catch (error) {
+    // Observability must not change the outcome of a protected financial or
+    // safety transition. The structured console error remains observable.
+    console.error("[Operations] Failed to persist event", { eventType, error });
+  }
 }

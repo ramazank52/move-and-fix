@@ -26,6 +26,8 @@ import {
   listRiskFlagsForAdmin,
   reviewJobCancellationForAdmin,
   reviewRiskFlag,
+  listFeatureFlags,
+  setFeatureFlag,
   listProviderCapabilityStatuses,
   listMoveOsCategories,
   listMoveOsServices,
@@ -359,6 +361,32 @@ export const ownerRouter = router({
       } catch (error) {
         if (error instanceof Error && error.message === "RISK_FLAG_NOT_ACTIONABLE") {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Risk kaydı bulunamadı veya artık incelemeye uygun değil" });
+        }
+        throw error;
+      }
+    }),
+
+  featureFlags: adminMfaProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }))
+    .query(async ({ input }) => listFeatureFlags(input.limit)),
+
+  setFeatureFlag: adminMfaProcedure
+    .input(
+      z.object({
+        key: z.string().trim().regex(/^[a-z][a-z0-9_.-]{0,95}$/),
+        enabled: z.boolean(),
+        rolloutPct: z.number().int().min(0).max(100).optional(),
+        killSwitch: z.boolean().optional(),
+        audienceSeed: z.string().trim().min(1).max(96).optional(),
+        reason: z.string().trim().min(3).max(280),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await setFeatureFlag({ ...input, adminUserId: ctx.user!.id });
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith("FEATURE_FLAG_")) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Feature flag ayarları geçersiz" });
         }
         throw error;
       }

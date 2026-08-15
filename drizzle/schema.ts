@@ -1,4 +1,4 @@
-import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { index, int, json, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -701,6 +701,44 @@ export const escrowReleaseEvents = mysqlTable(
     uniqueIndex("escrow_release_events_idempotency_unique").on(table.idempotencyKey),
     index("escrow_release_events_request_idx").on(table.requestId),
   ],
+);
+
+// Operational controls are evaluated server-side. They are deliberately
+// append-only by version so that a rollback/kill-switch decision is auditable.
+export const operationalFeatureFlags = mysqlTable(
+  "operational_feature_flags",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    flagKey: varchar("flagKey", { length: 96 }).notNull(),
+    version: int("version").notNull(),
+    enabled: int("enabled").default(0).notNull(),
+    rolloutPercent: int("rolloutPercent").default(0).notNull(),
+    killSwitch: int("killSwitch").default(0).notNull(),
+    audienceSeed: varchar("audienceSeed", { length: 96 }).notNull(),
+    startsAt: timestamp("startsAt").defaultNow().notNull(),
+    endsAt: timestamp("endsAt"),
+    createdByUserId: int("createdByUserId").notNull(),
+    reason: varchar("reason", { length: 280 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("operational_flags_version_unique").on(table.flagKey, table.version),
+    index("operational_flags_lookup_idx").on(table.flagKey, table.startsAt),
+  ],
+);
+
+export const operationalEvents = mysqlTable(
+  "operational_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    eventType: varchar("eventType", { length: 96 }).notNull(),
+    severity: mysqlEnum("severity", ["info", "warning", "error"]).default("info").notNull(),
+    requestId: varchar("requestId", { length: 96 }),
+    actorUserId: int("actorUserId"),
+    metadataJson: json("metadataJson").notNull(),
+    occurredAt: timestamp("occurredAt").defaultNow().notNull(),
+  },
+  (table) => [index("operational_events_type_time_idx").on(table.eventType, table.occurredAt)],
 );
 
 // Messages

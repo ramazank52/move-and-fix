@@ -204,7 +204,12 @@ export default function AIAssistantScreen() {
             borderBottomColor: colors.border,
           }}
         >
-          <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("back")}
+            onPress={() => router.back()}
+            style={{ marginRight: 12 }}
+          >
             <IconSymbol name="chevron.left" size={24} color={colors.foreground} />
           </Pressable>
 
@@ -317,6 +322,9 @@ export default function AIAssistantScreen() {
                   {msg.suggestions.map((sug, i) => (
                     <Pressable
                       key={i}
+                      accessibilityRole="button"
+                      accessibilityLabel={sug}
+                      accessibilityHint={t("aiAssistant")}
                       onPress={() => handleSuggestion(sug)}
                       style={({ pressed }) => [
                         {
@@ -348,6 +356,7 @@ export default function AIAssistantScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="MoveAI hizmet taslağını onayla"
+                    accessibilityHint="Taslağı onayladıktan sonra gerçek hizmet talebi oluşturulur."
                     disabled={confirmDraftMutation.isPending}
                     onPress={() => confirmDraftMutation.mutate({ draftId: msg.draftId! })}
                     style={({ pressed }) => ({
@@ -437,6 +446,8 @@ export default function AIAssistantScreen() {
         >
           <TextInput
             value={input}
+            accessibilityLabel={t("ai.inputPlaceholder")}
+            accessibilityHint={t("aiAssistant")}
             onChangeText={setInput}
             placeholder={t("ai.inputPlaceholder")}
             placeholderTextColor={colors.muted}
@@ -456,6 +467,9 @@ export default function AIAssistantScreen() {
             onSubmitEditing={() => sendMessage()}
           />
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="MoveAI mesajını gönder"
+            accessibilityHint={t("ai.inputPlaceholder")}
             onPress={() => sendMessage()}
             disabled={!input.trim() || loading}
             style={({ pressed }) => [

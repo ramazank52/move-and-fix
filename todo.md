@@ -329,6 +329,9 @@
 - [ ] Faz 6 13 dilli locale altyapısı, RTL, cihaz dili algılama, para/tarih/sayı biçimleme ve message translation original korunumu ekle
 - [ ] Faz 6 MoveOS kritik işlem onayı, re-auth/MFA, canary/shadow mode, guarded kill switch ve denetlenebilir release kontrolünü uygula
 - [ ] Faz 6 gözlemlenebilirlik, SBOM/SCA/secret scan, restore runbook, store compliance ve erişilebilirlik kalite kontrollerini ekle
+- [ ] Faz 6 MFA korumalı MoveOS feature flag, canary rollout ve guarded kill-switch yönetimini ekle
+- [ ] Faz 6 istek bağlamlı structured event log, sağlık ve rollout gözlemlenebilirlik yüzeyini ekle
+- [ ] Faz 6 mobil erişilebilirlik, mağaza gizlilik/izin beyanı ve eksik biçimlendirme denetimlerini uygula
 - [ ] Faz 3–6 her modülde TypeScript, lint, test, yetki, hata/edge-case, iOS/Android export ve secret scan kalite kapılarını doğrula; yayın başlatma
 - [x] Faz 3 teklif kabulünde anlaşma snapshot’ını atomik oluştur ve geçmiş fiyat/komisyon/inceleme koşullarını değişmez kaydet
 - [x] Faz 3 ödeme teklifi ve ödeme intent’ini anlaşma snapshot’ına bağla; mevcut canlı politika hesaplarına bağımlılığı kaldır
@@ -339,3 +342,9 @@
 - [x] Faz 3 MoveOS’ta müşteri-profesyonel change order kayıtlarının salt-okunur denetim görünümünü ekle
 - [x] Faz 3 kabul anındaki request medya ve profesyonel belge doğrulama metadatasını değişmez agreement snapshot’ına ekle
 - [ ] Faz 3 kısmi settlement planını tutar bileşenleriyle kaydet; yalnız doğrulanmış gateway işlemi sonrası idempotent muhasebeleştir
+- [x] Faz 6 feature flag çözümleme, sürümlü canary rollout ve kill-switch veri yordamlarını testlerle tamamla
+- [x] Faz 6 MoveOS MFA korumalı feature flag API ve yönetim panelini gerçek ortak backend’e bağla
+- [x] Faz 6 ödeme, iptal, risk ve release değişimleri için istek bağlamlı yapılandırılmış olay günlüğünü ekle
+- [x] Faz 6 kritik mobil yüzeylerde erişilebilirlik etiketleri, rolleri ve eylem ipuçlarını denetle
+- [x] Faz 6 mağaza gizlilik URL’si ve konum/bildirim izin açıklamalarını üretim öncesi yapılandırmaya ekle
+- [x] Faz 6 yetki, canary, kill-switch, hata ve edge-case regresyonları ile kalite kapılarını tamamla

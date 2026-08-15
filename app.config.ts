@@ -53,8 +53,10 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
     "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "ITSAppUsesNonExemptEncryption": false,
+      "NSLocationWhenInUseUsageDescription": "Move&Fix, aktif hizmet sırasında konumunuzu canlı takip, varış bilgisi ve yakındaki profesyoneller için kullanır.",
+      "NSMicrophoneUsageDescription": "Move&Fix, yalnızca seçtiğiniz sohbet mesajını sesli kaydetmeniz için mikrofona erişir."
+    }
   },
   android: {
     adaptiveIcon: {
@@ -66,7 +68,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS"],
+    permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "POST_NOTIFICATIONS", "RECORD_AUDIO"],
     intentFilters: [
       {
         action: "VIEW",
@@ -90,6 +92,9 @@ const config: ExpoConfig = {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
+  extra: {
+    privacyPolicyUrl: "https://moveandfix.app/legal/privacy",
+  },
   plugins: [
     "expo-router",
     [
@@ -109,7 +114,7 @@ const config: ExpoConfig = {
     [
       "expo-audio",
       {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
+        microphonePermission: "Move&Fix, yalnızca seçtiğiniz sohbet mesajını sesli kaydetmeniz için mikrofona erişir.",
       },
     ],
     [
