@@ -278,9 +278,12 @@
 - [x] Phase 7 TypeScript, lint, build ve ödeme/cüzdan hedef testlerini doğrula
 - [x] Phase 7 para çekme: veri katmanında doğrulanmış profesyonel, TR IBAN ve yetersiz bakiye kontrollerini fail-closed uygula; router rol sınırını ve yetkilendirme regresyonlarını doğrula
 - [ ] MoveOS içinde içerik, kategori, ücret, komisyon, kullanıcı, hizmet ve sistem ayarlarının gerçek ortak API üzerinden yönetimini tamamla
-- [ ] Türkçe, İngilizce, Almanca, Fransızca, Arapça ve Rusça; RTL; ülke, para birimi, tarih/saat ve ölçü yerelleştirme altyapısını tamamla
+- [ ] Türkçe, İngilizce, Almanca, Fransızca, Arapça ve Rusça; RTL; ülke, para birimi, tarih/saat ve ölçü yerelleştirme altyapısını tüm ekranlara tamamla
 - [ ] Yetkilendirme, fraud/abuse, rate-limit, audit log, hata yönetimi, performans ve deployment hazırlığını denetleyip eksikleri gider
 - [ ] Her yeni/değişen kapsam için unit, integration, E2E, authorization, hata ve edge-case testleri ekle
 - [ ] Önceden PASS olan tüm testleri, 14/14 gerçek render’ı, TypeScript, lint, build ve iOS/Android export’u yeniden doğrula
 - [ ] Yeni dış bağımlılıkları sahte PASS üretmeden BLOCKER olarak kaydet
 - [ ] Tüm tamamlamaları geri yüklenebilir checkpoint’e al ve gereksinim bazlı production raporunu teslim et
+- [x] Phase 8 MoveOS: mock owner token/girişini kaldır; yönetici kimliğini yalnız ortak oturumdan türet; kategori, kullanıcı ve hizmet yönetiminde gerçek veri katmanını kullan
+- [x] Phase 8 MoveOS: inşa edilmiş yönetici context’i, mock dashboard/cüzdan/analitik verileri ve sahte başarılı yazma uçlarını fail-closed gerçek uygulamalarla değiştir
+- [x] Phase 8 yerelleştirme: kalıcı dil ve para birimi seçimi, RTL yön desteği, güvenli para/numara/tarih biçimleyicileri ve ayarlar ekranı bağını uygula

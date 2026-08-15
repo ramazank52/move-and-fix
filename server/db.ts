@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, like, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -547,6 +547,312 @@ export async function getActiveServiceSubcategories(categoryId?: number) {
     .from(serviceSubcategories)
     .where(condition)
     .orderBy(serviceSubcategories.categoryId, serviceSubcategories.sortOrder, serviceSubcategories.id);
+}
+
+export async function getMoveOsDashboardMetrics() {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+
+  const [paymentTotals, dailyPaymentTotals, userTotals, requestTotals] = await Promise.all([
+    db
+      .select({
+        totalRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${payments.status} IN ('held', 'released') THEN ${payments.amount} ELSE 0 END), 0)`,
+        commissionRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${payments.status} = 'released' THEN ${payments.commissionAmount} ELSE 0 END), 0)`,
+        pendingPayments: sql<number>`COALESCE(SUM(CASE WHEN ${payments.status} = 'held' THEN ${payments.amount} ELSE 0 END), 0)`,
+      })
+      .from(payments),
+    db
+      .select({
+        dailyRevenue: sql<number>`COALESCE(SUM(CASE WHEN ${payments.status} IN ('held', 'released') THEN ${payments.amount} ELSE 0 END), 0)`,
+      })
+      .from(payments)
+      .where(gte(payments.createdAt, dayStart)),
+    db
+      .select({
+        activeUsers: sql<number>`COUNT(DISTINCT ${users.id})`,
+        activeProviders: sql<number>`COUNT(DISTINCT CASE WHEN ${providers.isAvailable} = 1 THEN ${providers.id} END)`,
+      })
+      .from(users)
+      .leftJoin(providers, eq(providers.userId, users.id)),
+    db
+      .select({
+        dailyOrders: sql<number>`COALESCE(SUM(CASE WHEN ${serviceRequests.createdAt} >= ${dayStart} THEN 1 ELSE 0 END), 0)`,
+      })
+      .from(serviceRequests),
+  ]);
+
+  const totals = paymentTotals[0];
+  const daily = dailyPaymentTotals[0];
+  const usersSummary = userTotals[0];
+  const requests = requestTotals[0];
+  const pendingPayments = Number(totals?.pendingPayments ?? 0);
+
+  return {
+    dailyRevenue: Number(daily?.dailyRevenue ?? 0),
+    totalRevenue: Number(totals?.totalRevenue ?? 0),
+    commissionRevenue: Number(totals?.commissionRevenue ?? 0),
+    pendingPayments,
+    activeUsers: Number(usersSummary?.activeUsers ?? 0),
+    activeProviders: Number(usersSummary?.activeProviders ?? 0),
+    dailyOrders: Number(requests?.dailyOrders ?? 0),
+    systemStatus: "healthy" as const,
+    risks:
+      pendingPayments > 0
+        ? [`${pendingPayments} TRY tutarında serbest bırakılmayı bekleyen escrow mevcut.`]
+        : [],
+    recommendations: [],
+  };
+}
+
+export type MoveOsUserRole = "admin" | "customer" | "provider";
+
+export async function listMoveOsUsers(input: {
+  role?: MoveOsUserRole;
+  search?: string;
+  limit: number;
+  offset: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+
+  const conditions = [];
+  if (input.role === "admin") {
+    conditions.push(eq(users.role, "admin"));
+  } else if (input.role === "provider") {
+    conditions.push(isNotNull(providers.id));
+  } else if (input.role === "customer") {
+    conditions.push(and(eq(users.role, "user"), isNull(providers.id)));
+  }
+  const normalizedSearch = input.search?.trim();
+  if (normalizedSearch) {
+    const pattern = `%${normalizedSearch.replace(/[\\%_]/g, "\\$&")}%`;
+    conditions.push(or(like(users.name, pattern), like(users.email, pattern), like(users.phone, pattern)));
+  }
+  const condition = conditions.length > 0 ? and(...conditions) : undefined;
+  const query = db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      phone: users.phone,
+      systemRole: users.role,
+      createdAt: users.createdAt,
+      lastSignedIn: users.lastSignedIn,
+      providerId: providers.id,
+      rating: providers.rating,
+      completedJobs: providers.completedJobs,
+      verificationStatus: providers.verificationStatus,
+    })
+    .from(users)
+    .leftJoin(providers, eq(providers.userId, users.id));
+  const countQuery = db
+    .select({ total: sql<number>`COUNT(*)` })
+    .from(users)
+    .leftJoin(providers, eq(providers.userId, users.id));
+  const [rows, counts] = await Promise.all([
+    condition
+      ? query.where(condition).limit(input.limit).offset(input.offset)
+      : query.limit(input.limit).offset(input.offset),
+    condition ? countQuery.where(condition) : countQuery,
+  ]);
+
+  return {
+    total: Number(counts[0]?.total ?? 0),
+    users: rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      phone: row.phone,
+      name: row.name,
+      role: row.systemRole === "admin" ? "admin" : row.providerId ? "provider" : "customer",
+      createdAt: row.createdAt,
+      lastSignedIn: row.lastSignedIn,
+      rating: row.rating,
+      completedJobs: row.completedJobs,
+      verificationStatus: row.verificationStatus,
+    })),
+  };
+}
+
+export async function getMoveOsUser(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      phone: users.phone,
+      systemRole: users.role,
+      createdAt: users.createdAt,
+      lastSignedIn: users.lastSignedIn,
+      providerId: providers.id,
+      displayName: providers.displayName,
+      rating: providers.rating,
+      completedJobs: providers.completedJobs,
+      verificationStatus: providers.verificationStatus,
+    })
+    .from(users)
+    .leftJoin(providers, eq(providers.userId, users.id))
+    .where(eq(users.id, userId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    ...row,
+    role: row.systemRole === "admin" ? "admin" : row.providerId ? "provider" : "customer",
+  };
+}
+
+export async function updateMoveOsUser(input: {
+  userId: number;
+  name?: string;
+  role?: "user" | "admin";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+  const existing = await getMoveOsUser(input.userId);
+  if (!existing) return null;
+  const changes: Partial<typeof users.$inferInsert> = {};
+  if (input.name !== undefined) changes.name = input.name;
+  if (input.role !== undefined) changes.role = input.role;
+  if (Object.keys(changes).length === 0) return existing;
+  await db.update(users).set(changes).where(eq(users.id, input.userId));
+  return getMoveOsUser(input.userId);
+}
+
+export async function listMoveOsCategories() {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+  return db
+    .select({
+      id: serviceCategories.id,
+      name: serviceCategories.name,
+      slug: serviceCategories.slug,
+      icon: serviceCategories.icon,
+      color: serviceCategories.color,
+      pricingType: serviceCategories.pricingType,
+      kmRate: serviceCategories.kmRate,
+      basePrice: serviceCategories.basePrice,
+      isActive: serviceCategories.isActive,
+      sortOrder: serviceCategories.sortOrder,
+      createdAt: serviceCategories.createdAt,
+      professionalCount: sql<number>`COUNT(${providers.id})`,
+    })
+    .from(serviceCategories)
+    .leftJoin(providers, eq(providers.categoryId, serviceCategories.id))
+    .groupBy(serviceCategories.id)
+    .orderBy(serviceCategories.sortOrder, serviceCategories.id);
+}
+
+export async function createMoveOsCategory(input: {
+  name: string;
+  slug: string;
+  icon?: string | null;
+  color?: string | null;
+  pricingType: "fixed" | "km_based" | "hourly";
+  kmRate?: number | null;
+  basePrice?: number | null;
+  sortOrder?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+  const result = await db.insert(serviceCategories).values({
+    ...input,
+    isActive: 1,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const rows = await db
+    .select()
+    .from(serviceCategories)
+    .where(eq(serviceCategories.id, Number(result[0].insertId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateMoveOsCategory(input: {
+  categoryId: number;
+  name?: string;
+  slug?: string;
+  icon?: string | null;
+  color?: string | null;
+  pricingType?: "fixed" | "km_based" | "hourly";
+  kmRate?: number | null;
+  basePrice?: number | null;
+  isActive?: number;
+  sortOrder?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+  const { categoryId, ...changes } = input;
+  if (Object.keys(changes).length > 0) {
+    await db.update(serviceCategories).set(changes).where(eq(serviceCategories.id, categoryId));
+  }
+  const rows = await db
+    .select()
+    .from(serviceCategories)
+    .where(eq(serviceCategories.id, categoryId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function archiveMoveOsCategory(categoryId: number) {
+  return updateMoveOsCategory({ categoryId, isActive: 0 });
+}
+
+export async function listMoveOsServices(input: { limit: number; offset: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select({
+        id: serviceRequests.id,
+        title: serviceRequests.title,
+        status: serviceRequests.status,
+        categoryName: serviceCategories.name,
+        customerName: users.name,
+        assignedProviderId: serviceRequests.assignedProviderId,
+        estimatedPrice: serviceRequests.estimatedPrice,
+        createdAt: serviceRequests.createdAt,
+      })
+      .from(serviceRequests)
+      .leftJoin(serviceCategories, eq(serviceCategories.id, serviceRequests.categoryId))
+      .leftJoin(users, eq(users.id, serviceRequests.userId))
+      .orderBy(desc(serviceRequests.createdAt))
+      .limit(input.limit)
+      .offset(input.offset),
+    db.select({ total: sql<number>`COUNT(*)` }).from(serviceRequests),
+  ]);
+  return { total: Number(totalRows[0]?.total ?? 0), services: rows };
+}
+
+export async function getMoveOsService(serviceId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("MOVEOS_DATABASE_UNAVAILABLE");
+  const rows = await db
+    .select({
+      id: serviceRequests.id,
+      title: serviceRequests.title,
+      description: serviceRequests.description,
+      status: serviceRequests.status,
+      categoryName: serviceCategories.name,
+      customerId: serviceRequests.userId,
+      customerName: users.name,
+      assignedProviderId: serviceRequests.assignedProviderId,
+      estimatedPrice: serviceRequests.estimatedPrice,
+      budgetMin: serviceRequests.budgetMin,
+      budgetMax: serviceRequests.budgetMax,
+      createdAt: serviceRequests.createdAt,
+      updatedAt: serviceRequests.updatedAt,
+    })
+    .from(serviceRequests)
+    .leftJoin(serviceCategories, eq(serviceCategories.id, serviceRequests.categoryId))
+    .leftJoin(users, eq(users.id, serviceRequests.userId))
+    .where(eq(serviceRequests.id, serviceId))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 // Service Requests

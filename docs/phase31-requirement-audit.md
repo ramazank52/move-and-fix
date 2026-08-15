@@ -46,12 +46,12 @@ Aşağıdaki production alanları için henüz ayrı ve kalıcı model bulunmuyo
 | 29–30 | **IMPLEMENTED** | Provider lifecycle ile iş başlangıç/bitiş ve `completeJob` mevcut; kanıt zorunluluğu yok |
 | 31–35 | **MISSING** | İş fotoğraf/kanıtı, multimodal AI analizi, müşteri onayı, dispute ve güvenilir 48 saat otomatik serbest bırakma yok |
 | 36 | **IMPLEMENTED** | Ödeme gateway ve escrow tabloları/akışları mevcut; canlı başarı credential olmadan fail-closed |
-| 37 | **PARTIAL** | Standart komisyon şu an %15, premium %10; kullanıcının istediği genel %10 ve admin-dinamik politika uygulanmamış |
+| 37 | **PARTIAL** | Standart platform komisyonu merkezi ödeme politikasında %10’a hizalandı; yönetici tarafından değiştirilebilen, sürümlü komisyon politikası henüz uygulanmadı |
 | 38–39 | **IMPLEMENTED** | DB-backed provider wallet, bakiye/işlem geçmişi ve para çekme mevcut |
 | 40–41 | **IMPLEMENTED** | Server-side ücret, imza doğrulama, webhook event ledger, idempotency ve double-payment korumaları mevcut |
-| 42–43 | **PARTIAL** | Aynı server içinde owner API adapter/router var; ayrı `moveos/` frontend klasörü yok, `app/admin.tsx` var; owner tarafında mock token/TODO CRUD ve mock AI komut yolları mevcut |
-| 44–45 | **PARTIAL** | `lib/i18n.ts` tr/en/de/fr/ar için sınırlı anahtar seti içeriyor; Rusça yok, ekranların çoğu hardcoded Türkçe, RTL uygulanmamış |
-| 46–47 | **MISSING/PARTIAL** | TRY/Turkey hardcoded; ülke, çoklu para birimi, locale tarih-saat/ölçü ve ödeme currency policy genel değil |
+| 42–43 | **PARTIAL** | Ayrı `moveos/` web arayüzü, ortak platform oturumu ve gerçek `/api/owner/*` API’leriyle çalışır; sabit owner token/giriş ve inşa edilmiş yönetici context’i kaldırıldı. Kategori, kullanıcı ve hizmet yüzeyi gerçek DB yolundadır; tam içerik/sistem ayarı yönetimi henüz kapsam dışıdır |
+| 44–45 | **PARTIAL** | `i18n-core` ve kalıcı sağlayıcı tr/en/de/fr/ar/ru dil sözleşmesi, RTL yön bilgisi, ayarlar bağlantısı ve sekme başlıklarında uygulanmıştır. Ekranlardaki tüm sabit Türkçe metinlerin çeviri anahtarlarına göçü tamamlanmamıştır |
+| 46–47 | **PARTIAL** | TRY major-unit ödeme politikası korunur; güvenli locale para/numara/tarih biçimleyicileri ve seçilebilir arayüz para birimi tercihi eklendi. Dinamik çoklu-para ödeme tahsilatı ve ülke bazlı ödeme politikası henüz yoktur |
 | 48 | **PARTIAL** | Temel güvenlik var; rate limit ve audit log in-memory, fraud/abuse kuralları sınırlı |
 | 49 | **IMPLEMENTED/PARTIAL** | 254 test mevcut ve temel akışlar güçlü; yeni alanlar için testler henüz yok |
 | 50 | **PARTIAL** | Merkezi hata sınıfları ve logger var; kalıcı/harici gözlemleme backend’i yok |
@@ -61,8 +61,8 @@ Aşağıdaki production alanları için henüz ayrı ve kalıcı model bulunmuyo
 
 | Dosya | Bulgular |
 |---|---|
-| `server/_core/ownerRestAdapter.ts` | Development mock owner token; kullanıcı/kategori/hizmet CRUD içinde TODO yolları |
-| `server/_core/ownerRouter.ts` | Mock login/2FA/users/AI response |
+| `server/_core/ownerRestAdapter.ts` | Sabit owner login/2FA endpointleri `410 Gone`; yönetim REST çağrıları yalnız ortak oturum ve `admin` rolüyle owner router’a yönlendirilir |
+| `server/_core/ownerRouter.ts` | Dashboard, kategori, kullanıcı ve hizmet sorguları ortak veri katmanından gelir; AI komut etkileri onaylı yürütücü yoksa fail-closed kalır |
 | `server/services/AIService.ts` | Bazı provider/approval yollarında mock implementasyon |
 | `server/services/NotificationService.ts` ve `NotificationServiceV2.ts` | Gerçek push/SMS/e-posta teslimat sağlayıcıları tamamlanmamış |
 | `server/services/PaymentGatewayService.ts` | Bazı raporlama/bakiye yardımcıları mock; gerçek checkout yolu ayrı `server/payments/*` modüllerinde |
@@ -82,6 +82,16 @@ Gerçek Stripe/iyzico, FCM/APNs, SMS, e-posta, telekom proxy/voice, production d
 | Bakiye güvenliği | Koşullu bakiye düşümü yalnız yeterli kullanılabilir bakiye varsa başarılı olur; yetersiz bakiye fail-closed `FORBIDDEN` sonucu verir. |
 | Gerileme testleri | Yeni `payment-withdrawal-security.test.ts`: normalizasyon, onaylı profesyonel koşulu, müşteri reddi, geçersiz IBAN, yetersiz bakiye ve auth-bound payload senaryolarını kapsar. |
 | Kalite kapıları | `pnpm check`, `pnpm lint`, `pnpm build`, tam `pnpm test` paketi: 35 dosya / 292 test geçti. iOS ve Android Expo export ile hedefli istemci sır taraması geçti. |
+
+## Phase 8 MoveOS ve Yerelleştirme Sertleştirmesi — 15 Ağustos 2026
+
+| Kontrol | Uygulama ve doğrulama kanıtı |
+|---|---|
+| Ayrı MoveOS web arayüzü | `moveos/` altında API-first web arayüzü eklendi ve backend’de `/moveos` statik rotasıyla sunuldu. Arayüz yalnız `/api/auth/me` ve yönetici-korumalı `/api/owner/*` üzerinden veri alır; ayrı backend oluşturulmadı. |
+| Yönetici kimliği | Sabit owner token/parola ve inşa edilmiş context kaldırıldı. Geçersiz veya oturumsuz yönetim isteği HTTP `401`, yönetici olmayan oturum `403` ile fail-closed döner. |
+| Gerçek veri yolu | Dashboard, kategoriler, kullanıcılar, hizmetler, platform finans özeti ve analizler ortak DB yardımcılarına bağlandı. Kategori ekleme/güncelleme/arşivleme gerçek API üzerinden gerçekleşir; AI etkili komutları onaylı yürütücü yoksa değişiklik yapmaz. |
+| Yerelleştirme | Kalıcı dil/para tercihi, tr/en/de/fr/ar/ru dil meta verisi, RTL yön bilgisi ve güvenli tarih/numara/TRY biçimleme `i18n-core` ile ayrıştırıldı; uygulama sağlayıcısı, genel ayarlar, dil ekranı ve ana sekme başlıklarına bağlandı. |
+| Gerileme doğrulaması | Yetkisiz MoveOS çağrısı HTTP `401`, `/moveos/` statik girişi HTTP `200`; `moveos-router-contract` ve `localization-contract` testleri dahil 37 dosyada 282 test geçti. `pnpm check`, lint, server build, iOS/Android Expo export ve istemci sır taraması geçti. |
 
 ## Uygulama Sırası
 

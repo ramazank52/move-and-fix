@@ -6,6 +6,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
+import { useLocalization } from "@/lib/i18n";
 import { useThemeContext } from "@/lib/theme-provider";
 
 export default function GeneralSettingsScreen() {
@@ -14,6 +15,7 @@ export default function GeneralSettingsScreen() {
   const router = useRouter();
   const { logout } = useAuth();
   const { colorScheme, setColorScheme } = useThemeContext();
+  const { language } = useLocalization();
   const [notifications, setNotifications] = useState(true);
 
   const handleLogout = () => {
@@ -42,7 +44,7 @@ export default function GeneralSettingsScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
-          <SettingValueRow label="Dil" value="Türkçe" styles={styles} />
+          <LinkRow label="Dil" value={language === "tr" ? "Türkçe" : language.toUpperCase()} onPress={() => router.push("/settings/language" as never)} styles={styles} colors={colors} />
           <View style={[styles.row, styles.divider]}>
             <Text style={styles.rowLabel}>Karanlık Mod</Text>
             <Switch
@@ -108,12 +110,14 @@ function SettingValueRow({
 
 function LinkRow({
   label,
+  value,
   onPress,
   styles,
   colors,
   isLast = false,
 }: {
   label: string;
+  value?: string;
   onPress: () => void;
   styles: ReturnType<typeof createStyles>;
   colors: ReturnType<typeof useColors>;
@@ -126,7 +130,10 @@ function LinkRow({
       style={({ pressed }) => [styles.row, !isLast && styles.divider, pressed && styles.pressed]}
     >
       <Text style={styles.rowLabel}>{label}</Text>
-      <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+        <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+      </View>
     </Pressable>
   );
 }

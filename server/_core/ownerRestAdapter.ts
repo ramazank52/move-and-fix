@@ -1,340 +1,284 @@
 /**
- * Owner REST Adapter
+ * MoveOS REST compatibility adapter.
  *
- * MoveOS admin panel (Next.js) REST endpoint'lerini backend tRPC owner prosedürlerine köprüler.
- * MoveOS lib/api.ts şu endpoint'leri çağırır:
- *   POST   /api/owner/login
- *   POST   /api/owner/verify-2fa
- *   POST   /api/owner/logout
- *   GET    /api/owner/dashboard
- *   GET    /api/owner/users
- *   GET    /api/owner/users/:userId
- *   PUT    /api/owner/users/:userId
- *   DELETE /api/owner/users/:userId
- *   GET    /api/owner/categories
- *   POST   /api/owner/categories
- *   PUT    /api/owner/categories/:categoryId
- *   DELETE /api/owner/categories/:categoryId
- *   POST   /api/owner/ai-command
- *   GET    /api/owner/wallet
- *   POST   /api/owner/wallet/withdraw
- *   GET    /api/owner/analytics
- *
- * Bu adapter, tRPC owner router'ını çağırıp sonucu REST formatında döndürür.
- * Owner token doğrulaması Bearer token ile yapılır.
+ * REST istemcileri, mobil uygulamayla aynı platform oturumunu kullanarak
+ * gerçek `owner` tRPC prosedürlerine erişir. Bu katman asla owner token,
+ * owner parolası veya örnek yönetim bağlamı üretmez.
  */
 
 import type { Express, Request, Response } from "express";
+import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import { ownerRouter } from "./ownerRouter";
-import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import { securityAuditLog } from "./security";
-import { AuthError, ValidationError } from "./errors";
 
-type OwnerRouter = typeof ownerRouter;
-type OwnerOutput = inferRouterOutputs<OwnerRouter>;
-type OwnerInput = inferRouterInputs<OwnerRouter>;
+type OwnerProcedure =
+  | "logout"
+  | "dashboard"
+  | "users"
+  | "getUser"
+  | "updateUser"
+  | "categories"
+  | "createCategory"
+  | "updateCategory"
+  | "archiveCategory"
+  | "aiCommand"
+  | "wallet"
+  | "withdrawFunds"
+  | "analytics"
+  | "services"
+  | "getService";
 
-/**
- * Owner token'ını doğrula ve kullanıcı bilgisini döndür.
- * MoveOS login'inden alınan mock token'ı kabul eder veya gerçek Manus session token'ı.
- */
-async function authenticateOwner(req: Request): Promise<boolean> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return false;
-  }
-
-  const token = authHeader.slice("Bearer ".length).trim();
-
-  // Mock owner token'ı kabul et (MoveOS development için)
-  if (token.startsWith("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lciI")) {
-    return true;
-  }
-
-  // Gerçek Manus session token'ı dene
-  try {
-    await sdk.authenticateRequest(req);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Owner yetkilendirme middleware'i
- * Mock owner token veya gerçek admin session token kabul eder.
- */
-async function requireOwnerAuth(req: Request, res: Response): Promise<boolean> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Yetkilendirme gerekli", code: "UNAUTHORIZED" });
-    return false;
-  }
-
-  const token = authHeader.slice("Bearer ".length).trim();
-
-  // Mock owner token'ı kabul et (MoveOS development için)
-  if (token.startsWith("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lciI")) {
-    return true;
-  }
-
-  // Gerçek session token doğrula ve admin rolü kontrol et
+async function requireMoveOsAdmin(req: Request, res: Response): Promise<User | null> {
   try {
     const user = await sdk.authenticateRequest(req);
     if (user.role !== "admin") {
-      res.status(403).json({ error: "Admin yetkisi gerekli", code: "FORBIDDEN" });
-      return false;
+      res.status(403).json({ error: "MoveOS için yönetici yetkisi gerekli", code: "FORBIDDEN" });
+      return null;
     }
-    return true;
+    return user;
   } catch {
-    res.status(401).json({ error: "Geçersiz token", code: "INVALID_TOKEN" });
-    return false;
+    res.status(401).json({ error: "Ortak platform oturumu gerekli", code: "UNAUTHORIZED" });
+    return null;
   }
 }
 
-/**
- * tRPC prosedürünü çağır ve sonucu döndür.
- * Basit bir in-memory caller — gerçek tRPC context olmadan çalışır.
- */
 async function callOwnerProcedure<T>(
   req: Request,
   res: Response,
-  procedure: "login" | "verify2FA" | "logout" | "dashboard" | "users" | "getUser" | "categories" | "createCategory" | "updateCategory" | "aiCommand" | "wallet" | "withdrawFunds" | "analytics",
+  user: User,
+  procedure: OwnerProcedure,
   input?: unknown,
 ): Promise<T> {
-  // tRPC router'ı doğrudan çağır — context gerektirmeyen prosedürler için
-  // Bu basit yaklaşım, mock veri döndüren prosedürler için yeterlidir.
-  const ctx = { req, res, user: { id: 1, openId: "owner", role: "admin", name: null, email: null, loginMethod: null, lastSignedIn: null } as any };
-  const caller = ownerRouter.createCaller(ctx);
-
-  // @ts-expect-error — dynamic procedure call
-  const result = input !== undefined ? await caller[procedure](input) : await caller[procedure]();
+  const caller = ownerRouter.createCaller({ req, res, user });
+  // tRPC'nin dinamik REST köprüsünde yöntem adı runtime'da seçilir.
+  const result = input === undefined
+    ? await (caller[procedure] as () => Promise<unknown>)()
+    : await (caller[procedure] as (value: unknown) => Promise<unknown>)(input);
   return result as T;
 }
 
+function statusForOwnerError(error: unknown) {
+  const code = typeof error === "object" && error && "code" in error
+    ? String((error as { code: unknown }).code)
+    : "";
+  if (code === "UNAUTHORIZED") return 401;
+  if (code === "FORBIDDEN") return 403;
+  if (code === "NOT_FOUND") return 404;
+  if (code === "PRECONDITION_FAILED") return 412;
+  if (code === "BAD_REQUEST" || code === "PARSE_ERROR") return 400;
+  if (code === "CONFLICT") return 409;
+  return 500;
+}
+
+function sendOwnerError(res: Response, error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : fallback;
+  res.status(statusForOwnerError(error)).json({ error: message });
+}
+
 export function registerOwnerRestRoutes(app: Express) {
-  // ── Auth ──
+  // Eski, sabit owner parolası/OTP endpointleri üretimde kapalıdır.
+  app.post("/api/owner/login", (_req, res) => {
+    res.status(410).json({
+      error: "MoveOS yalnız ortak platform oturumuyla açılır; ayrı owner giriş endpointi kaldırıldı.",
+      code: "GONE",
+    });
+  });
+  app.post("/api/owner/verify-2fa", (_req, res) => {
+    res.status(410).json({
+      error: "MoveOS doğrulaması ortak platform hesabı üzerinden yürütülür.",
+      code: "GONE",
+    });
+  });
 
-  app.post("/api/owner/login", async (req: Request, res: Response) => {
+  app.post("/api/owner/logout", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        res.status(400).json({ error: "Email ve şifre gerekli" });
-        return;
-      }
-      const result = await callOwnerProcedure(req, res, "login", { email, password });
-      securityAuditLog.log("owner.login", req.ip || "unknown", "success", "owner");
-      res.json(result);
+      res.json(await callOwnerProcedure(req, res, user, "logout"));
     } catch (error) {
-      securityAuditLog.log("owner.login", req.ip || "unknown", "failure", undefined, error instanceof Error ? error.message : "Unknown");
-      if (error instanceof AuthError) {
-        res.status(401).json({ error: error.message });
-      } else if (error instanceof ValidationError) {
-        res.status(400).json({ error: error.message });
-      } else if (error instanceof Error && error.message.includes("Geçersiz")) {
-        res.status(401).json({ error: error.message });
-      } else {
-        // tRPC Zod validation errors come as TRPCError
-        const msg = error instanceof Error ? error.message : "Giriş başarısız";
-        if (msg.includes("invalid") || msg.includes("expected") || msg.includes("required") || msg.includes("min") || msg.includes("Too small")) {
-          res.status(400).json({ error: msg });
-        } else {
-          res.status(500).json({ error: msg });
-        }
-      }
+      sendOwnerError(res, error, "Çıkış işlemi tamamlanamadı");
     }
   });
 
-  app.post("/api/owner/verify-2fa", async (req: Request, res: Response) => {
+  app.get("/api/owner/dashboard", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const { email, otpCode } = req.body;
-      if (!email || !otpCode) {
-        res.status(400).json({ error: "Email ve OTP kodu gerekli" });
-        return;
-      }
-      const result = await callOwnerProcedure(req, res, "verify2FA", { email, otpCode });
-      res.json(result);
+      res.json(await callOwnerProcedure(req, res, user, "dashboard"));
     } catch (error) {
-      const status = error instanceof Error && error.message.includes("Geçersiz") ? 401 : 500;
-      res.status(status).json({ error: error instanceof Error ? error.message : "Doğrulama başarısız" });
+      sendOwnerError(res, error, "Dashboard verileri alınamadı");
     }
   });
 
-  app.post("/api/owner/logout", async (req: Request, res: Response) => {
-    res.json({ success: true });
-  });
-
-  // ── Dashboard ──
-
-  app.get("/api/owner/dashboard", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.get("/api/owner/users", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const result = await callOwnerProcedure(req, res, "dashboard");
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: "Dashboard verileri alınamadı" });
-    }
-  });
-
-  // ── Users ──
-
-  app.get("/api/owner/users", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
-    try {
-      const filters = {
+      const input = {
         role: typeof req.query.role === "string" ? req.query.role : undefined,
         search: typeof req.query.search === "string" ? req.query.search : undefined,
         limit: req.query.limit ? Number(req.query.limit) : 20,
         offset: req.query.offset ? Number(req.query.offset) : 0,
       };
-      const result = await callOwnerProcedure(req, res, "users", filters);
-      res.json(result);
+      res.json(await callOwnerProcedure(req, res, user, "users", input));
     } catch (error) {
-      res.status(500).json({ error: "Kullanıcılar alınamadı" });
+      sendOwnerError(res, error, "Kullanıcılar alınamadı");
     }
   });
 
-  app.get("/api/owner/users/:userId", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.get("/api/owner/users/:userId", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const result = await callOwnerProcedure(req, res, "getUser", { userId: req.params.userId });
-      res.json(result);
+      res.json(await callOwnerProcedure(req, res, user, "getUser", { userId: Number(req.params.userId) }));
     } catch (error) {
-      res.status(500).json({ error: "Kullanıcı alınamadı" });
+      sendOwnerError(res, error, "Kullanıcı alınamadı");
     }
   });
 
-  app.put("/api/owner/users/:userId", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
-    // TODO: gerçek DB güncelleme
-    res.json({ success: true, userId: req.params.userId, ...req.body });
-  });
-
-  app.delete("/api/owner/users/:userId", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
-    // TODO: gerçek DB silme
-    res.json({ success: true, userId: req.params.userId });
-  });
-
-  // ── Categories ──
-
-  app.get("/api/owner/categories", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.put("/api/owner/users/:userId", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const result = await callOwnerProcedure(req, res, "categories");
-      res.json(result);
+      const input = {
+        userId: Number(req.params.userId),
+        name: req.body?.name,
+        role: req.body?.role,
+      };
+      res.json(await callOwnerProcedure(req, res, user, "updateUser", input));
     } catch (error) {
-      res.status(500).json({ error: "Kategoriler alınamadı" });
+      sendOwnerError(res, error, "Kullanıcı güncellenemedi");
     }
   });
 
-  app.post("/api/owner/categories", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.delete("/api/owner/users/:userId", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    securityAuditLog.log("owner.user_delete_blocked", req.ip || "unknown", "failure", String(user.id));
+    res.status(412).json({
+      error: "Kullanıcı silme için geri alınabilir arşivleme ve KVKK saklama politikası modellenmeden işlem başlatılamaz.",
+      code: "PRECONDITION_FAILED",
+    });
+  });
+
+  app.get("/api/owner/categories", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const { name, description, commission } = req.body;
-      if (!name || !description || commission === undefined) {
-        res.status(400).json({ error: "name, description ve commission gerekli" });
-        return;
-      }
-      const result = await callOwnerProcedure(req, res, "createCategory", { name, description, commission });
-      res.json(result);
+      res.json(await callOwnerProcedure(req, res, user, "categories"));
     } catch (error) {
-      res.status(500).json({ error: "Kategori oluşturulamadı" });
+      sendOwnerError(res, error, "Kategoriler alınamadı");
     }
   });
 
-  app.put("/api/owner/categories/:categoryId", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.post("/api/owner/categories", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const categoryId = Number(req.params.categoryId);
-      const result = await callOwnerProcedure(req, res, "updateCategory", {
-        categoryId,
-        ...req.body,
-      });
-      res.json(result);
+      res.json(await callOwnerProcedure(req, res, user, "createCategory", req.body));
     } catch (error) {
-      res.status(500).json({ error: "Kategori güncellenemedi" });
+      sendOwnerError(res, error, "Kategori oluşturulamadı");
     }
   });
 
-  app.delete("/api/owner/categories/:categoryId", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
-    // TODO: gerçek DB silme
-    res.json({ success: true, categoryId: req.params.categoryId });
-  });
-
-  // ── AI Command ──
-
-  app.post("/api/owner/ai-command", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.put("/api/owner/categories/:categoryId", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const { command } = req.body;
-      if (!command) {
-        res.status(400).json({ error: "Komut gerekli" });
-        return;
-      }
-      const result = await callOwnerProcedure(req, res, "aiCommand", { command });
-      res.json(result);
+      res.json(
+        await callOwnerProcedure(req, res, user, "updateCategory", {
+          ...req.body,
+          categoryId: Number(req.params.categoryId),
+        }),
+      );
     } catch (error) {
-      res.status(500).json({ error: "AI komut işlenemedi" });
+      sendOwnerError(res, error, "Kategori güncellenemedi");
     }
   });
 
-  // ── Wallet ──
-
-  app.get("/api/owner/wallet", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.delete("/api/owner/categories/:categoryId", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const result = await callOwnerProcedure(req, res, "wallet");
-      res.json(result);
+      res.json(
+        await callOwnerProcedure(req, res, user, "archiveCategory", {
+          categoryId: Number(req.params.categoryId),
+        }),
+      );
     } catch (error) {
-      res.status(500).json({ error: "Cüzdan bilgileri alınamadı" });
+      sendOwnerError(res, error, "Kategori arşivlenemedi");
     }
   });
 
-  app.post("/api/owner/wallet/withdraw", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.post("/api/owner/ai-command", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const { amount, bankAccountId } = req.body;
-      if (!amount || !bankAccountId) {
-        res.status(400).json({ error: "amount ve bankAccountId gerekli" });
-        return;
-      }
-      const result = await callOwnerProcedure(req, res, "withdrawFunds", { amount, bankAccountId });
-      res.json(result);
+      res.json(await callOwnerProcedure(req, res, user, "aiCommand", { command: req.body?.command }));
     } catch (error) {
-      res.status(500).json({ error: "Para çekme işlemi başarısız" });
+      sendOwnerError(res, error, "AI komut işlenemedi");
     }
   });
 
-  // ── Analytics ──
-
-  app.get("/api/owner/analytics", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
+  app.get("/api/owner/wallet", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
     try {
-      const from = typeof req.query.from === "string" ? req.query.from : undefined;
-      const to = typeof req.query.to === "string" ? req.query.to : undefined;
-      const result = await callOwnerProcedure(req, res, "analytics", { from, to });
-      res.json(result);
+      res.json(await callOwnerProcedure(req, res, user, "wallet"));
     } catch (error) {
-      res.status(500).json({ error: "Analitik verileri alınamadı" });
+      sendOwnerError(res, error, "Platform finans özeti alınamadı");
     }
   });
 
-  // ── Services (MoveOS lib/api.ts) ──
-
-  app.get("/api/owner/services", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
-    // TODO: gerçek servis listesi
-    res.json({ services: [], total: 0 });
+  app.post("/api/owner/wallet/withdraw", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "withdrawFunds", req.body));
+    } catch (error) {
+      sendOwnerError(res, error, "Platform para çekme işlemi başlatılamadı");
+    }
   });
 
-  app.get("/api/owner/services/:serviceId", async (req: Request, res: Response) => {
-    if (!(await requireOwnerAuth(req, res))) return;
-    // TODO: gerçek servis detayı
-    res.json({ id: req.params.serviceId, name: "Servis", status: "active" });
+  app.get("/api/owner/analytics", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      const input = {
+        from: typeof req.query.from === "string" ? req.query.from : undefined,
+        to: typeof req.query.to === "string" ? req.query.to : undefined,
+      };
+      res.json(await callOwnerProcedure(req, res, user, "analytics", input));
+    } catch (error) {
+      sendOwnerError(res, error, "Analitik verileri alınamadı");
+    }
   });
 
-  console.log("[Owner REST Adapter] Registered /api/owner/* routes");
+  app.get("/api/owner/services", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "services", {
+          limit: req.query.limit ? Number(req.query.limit) : 20,
+          offset: req.query.offset ? Number(req.query.offset) : 0,
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Hizmetler alınamadı");
+    }
+  });
+
+  app.get("/api/owner/services/:serviceId", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "getService", { serviceId: Number(req.params.serviceId) }));
+    } catch (error) {
+      sendOwnerError(res, error, "Hizmet talebi alınamadı");
+    }
+  });
+
+  console.log("[MoveOS REST] Registered shared-session /api/owner/* routes");
 }

@@ -5,9 +5,11 @@ import { Platform, Dimensions } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useLocalization } from "@/lib/i18n";
 
 export default function TabLayout() {
   const colors = useColors();
+  const { translate } = useLocalization();
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 60 + bottomPadding;
@@ -52,42 +54,42 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Ana Sayfa",
+          title: translate("home"),
           tabBarIcon: ({ color }) => <IconSymbol size={22} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: "Keşfet",
+          title: translate("explore"),
           tabBarIcon: ({ color }) => <IconSymbol size={22} name="magnifyingglass" color={color} />,
         }}
       />
       <Tabs.Screen
         name="my-jobs"
         options={{
-          title: "İşlerim",
+          title: translate("myJobs"),
           tabBarIcon: ({ color }) => <IconSymbol size={22} name="briefcase.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
-          title: "Mesajlar",
+          title: translate("messages"),
           tabBarIcon: ({ color }) => <IconSymbol size={22} name="message.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="wallet"
         options={{
-          title: "MoveWallet",
+          title: translate("wallet"),
           tabBarIcon: ({ color }) => <IconSymbol size={22} name="wallet.pass.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profil",
+          title: translate("profile"),
           tabBarIcon: ({ color }) => <IconSymbol size={22} name="person.fill" color={color} />,
         }}
       />

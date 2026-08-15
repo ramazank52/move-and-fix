@@ -1,300 +1,215 @@
 /**
- * Owner Router - MoveOS için API endpoints
- * 
- * Kurucu (Owner) için tüm yönetim işlemleri
+ * MoveOS yönetim API'si.
+ *
+ * Bu router mobil uygulamayla aynı oturum, API ve veri tabanını kullanır.
+ * Ayrı owner parolası, token üretimi veya örnek yönetim verisi bulunmaz.
  */
 
-import { router, publicProcedure, protectedProcedure } from './trpc';
-import { z } from 'zod';
-import { AuthError } from './errors';
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+
+import {
+  archiveMoveOsCategory,
+  createMoveOsCategory,
+  getMoveOsDashboardMetrics,
+  getMoveOsService,
+  getMoveOsUser,
+  listMoveOsCategories,
+  listMoveOsServices,
+  listMoveOsUsers,
+  updateMoveOsCategory,
+  updateMoveOsUser,
+} from "../db";
+import { STANDARD_COMMISSION_RATE_BPS } from "../payments/policy";
+import { adminProcedure, publicProcedure, router } from "./trpc";
+
+const listInput = z.object({
+  limit: z.number().int().min(1).max(100).default(20),
+  offset: z.number().int().min(0).default(0),
+});
+
+const categoryInput = z.object({
+  name: z.string().trim().min(2).max(100),
+  slug: z.string().trim().min(2).max(100).regex(/^[a-z0-9-]+$/).optional(),
+  icon: z.string().trim().max(10).nullable().optional(),
+  color: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional(),
+  pricingType: z.enum(["fixed", "km_based", "hourly"]).default("fixed"),
+  kmRate: z.number().int().min(0).max(1_000_000).nullable().optional(),
+  basePrice: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  sortOrder: z.number().int().min(0).max(10_000).optional(),
+});
+
+function createSlug(name: string) {
+  const transliterated = name
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/ş/g, "s")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return transliterated.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function adminAuthRequired() {
+  throw new TRPCError({
+    code: "UNAUTHORIZED",
+    message: "MoveOS yalnız ortak platform oturumuyla açılır. Ayrı owner parolası ve OTP akışı devre dışıdır.",
+  });
+}
 
 export const ownerRouter = router({
-  /**
-   * Authentication
-   */
+  /** Legacy password endpoints are intentionally fail-closed. */
   login: publicProcedure
-    .input(z.object({
-      email: z.string().email(),
-      password: z.string().min(6),
-    }))
-    .mutation(async ({ input }) => {
-      // Mock owner login
-      if (input.email === 'owner@movefix.com' && input.password === 'password123') {
-        return {
-          token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lciIsImVtYWlsIjoib3duZXJAbW92ZWZpeC5jb20iLCJyb2xlIjoib3duZXIifQ.mock',
-          user: {
-            id: 'owner',
-            email: 'owner@movefix.com',
-            name: 'Move&Fix Kurucu',
-            role: 'owner',
-          },
-          requires2FA: false,
-        };
-      }
-      throw new AuthError('Geçersiz kimlik bilgileri');
-    }),
+    .input(z.object({ email: z.string().email(), password: z.string().min(6) }))
+    .mutation(adminAuthRequired),
 
   verify2FA: publicProcedure
-    .input(z.object({
-      email: z.string().email(),
-      otpCode: z.string().length(6),
-    }))
-    .mutation(async ({ input }) => {
-      // Mock 2FA verification
-      if (input.otpCode === '123456') {
-        return {
-          token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvd25lciIsImVtYWlsIjoib3duZXJAbW92ZWZpeC5jb20iLCJyb2xlIjoib3duZXIifQ.mock',
-          user: {
-            id: 'owner',
-            email: input.email,
-            name: 'Move&Fix Kurucu',
-            role: 'owner',
-          },
-        };
-      }
-      throw new AuthError('Geçersiz OTP kodu');
-    }),
+    .input(z.object({ email: z.string().email(), otpCode: z.string().length(6) }))
+    .mutation(adminAuthRequired),
 
-  logout: protectedProcedure
-    .mutation(async ({ ctx }) => {
-      return { success: true };
-    }),
+  logout: adminProcedure.mutation(async () => ({ success: true })),
 
-  /**
-   * Dashboard
-   */
-  dashboard: protectedProcedure
-    .query(async ({ ctx }) => {
-      return {
-        dailyRevenue: 45000,
-        totalRevenue: 1250000,
-        commissionRevenue: 125000,
-        pendingPayments: 15000,
-        activeUsers: 2350,
-        activeProviders: 480,
-        dailyOrders: 156,
-        systemStatus: 'healthy',
-        risks: [
-          'Yüksek iptal oranı (%8.5) - İncelenmelidir',
-          'Banka hesabında düşük bakiye - Para yatırılmalıdır',
-        ],
-        recommendations: [
-          'Elektrik kategorisinde kampanya başlatılmalı',
-          'Yeni ustaları onaylamaya devam et',
-          'Müşteri destek ekibini genişlet',
-        ],
-      };
-    }),
+  dashboard: adminProcedure.query(async () => getMoveOsDashboardMetrics()),
 
-  /**
-   * Users Management
-   */
-  users: protectedProcedure
-    .input(z.object({
-      role: z.string().optional(),
-      search: z.string().optional(),
-      limit: z.number().default(20),
-      offset: z.number().default(0),
-    }))
+  users: adminProcedure
+    .input(
+      listInput.extend({
+        role: z.enum(["admin", "customer", "provider"]).optional(),
+        search: z.string().trim().max(100).optional(),
+      }),
+    )
+    .query(async ({ input }) => listMoveOsUsers(input)),
+
+  getUser: adminProcedure
+    .input(z.object({ userId: z.number().int().positive() }))
     .query(async ({ input }) => {
-      // Mock users list
-      return {
-        total: 2350,
-        users: [
-          {
-            id: '1',
-            email: 'customer1@example.com',
-            name: 'Ahmet Yılmaz',
-            role: 'customer',
-            createdAt: new Date('2024-01-15'),
-            status: 'active',
-          },
-          {
-            id: '2',
-            email: 'provider1@example.com',
-            name: 'Elektrikçi Mehmet',
-            role: 'provider',
-            createdAt: new Date('2024-01-10'),
-            status: 'active',
-            rating: 4.8,
-            completedJobs: 156,
-          },
-        ],
-      };
+      const user = await getMoveOsUser(input.userId);
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "Kullanıcı bulunamadı" });
+      return user;
     }),
 
-  getUser: protectedProcedure
-    .input(z.object({ userId: z.string() }))
+  updateUser: adminProcedure
+    .input(
+      z.object({
+        userId: z.number().int().positive(),
+        name: z.string().trim().min(2).max(200).optional(),
+        role: z.enum(["user", "admin"]).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.id === input.userId && input.role === "user") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Yönetici kendi yönetici yetkisini kaldıramaz" });
+      }
+      const updated = await updateMoveOsUser(input);
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Kullanıcı bulunamadı" });
+      return updated;
+    }),
+
+  categories: adminProcedure.query(async () => {
+    const categories = await listMoveOsCategories();
+    return categories.map((category) => ({
+      ...category,
+      commissionRateBps: STANDARD_COMMISSION_RATE_BPS,
+    }));
+  }),
+
+  createCategory: adminProcedure.input(categoryInput).mutation(async ({ input }) => {
+    const slug = input.slug ?? createSlug(input.name);
+    if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "Geçerli kategori adı gerekli" });
+    const category = await createMoveOsCategory({ ...input, slug });
+    if (!category) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Kategori oluşturulamadı" });
+    return { ...category, commissionRateBps: STANDARD_COMMISSION_RATE_BPS };
+  }),
+
+  updateCategory: adminProcedure
+    .input(categoryInput.partial().extend({ categoryId: z.number().int().positive(), isActive: z.boolean().optional() }))
+    .mutation(async ({ input }) => {
+      const { categoryId, isActive, ...changes } = input;
+      if (Object.keys(changes).length === 0 && isActive === undefined) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Güncellenecek kategori alanı gerekli" });
+      }
+      const slug = changes.slug ?? (changes.name ? createSlug(changes.name) : undefined);
+      const category = await updateMoveOsCategory({
+        categoryId,
+        ...changes,
+        ...(slug ? { slug } : {}),
+        ...(isActive === undefined ? {} : { isActive: isActive ? 1 : 0 }),
+      });
+      if (!category) throw new TRPCError({ code: "NOT_FOUND", message: "Kategori bulunamadı" });
+      return { ...category, commissionRateBps: STANDARD_COMMISSION_RATE_BPS };
+    }),
+
+  archiveCategory: adminProcedure
+    .input(z.object({ categoryId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const category = await archiveMoveOsCategory(input.categoryId);
+      if (!category) throw new TRPCError({ code: "NOT_FOUND", message: "Kategori bulunamadı" });
+      return { ...category, commissionRateBps: STANDARD_COMMISSION_RATE_BPS };
+    }),
+
+  aiCommand: adminProcedure
+    .input(z.object({ command: z.string().trim().min(3).max(2_000) }))
+    .mutation(async ({ input }) => ({
+      command: input.command,
+      action: "confirmation_required" as const,
+      executed: false,
+      response:
+        "Yönetim komutu alındı. Etkili işlemler için MoveOS onaylı komut yürütücüsü henüz yapılandırılmadığından hiçbir veri değiştirilmedi.",
+    })),
+
+  wallet: adminProcedure.query(async () => {
+    const metrics = await getMoveOsDashboardMetrics();
+    return {
+      balance: metrics.commissionRevenue,
+      totalEarnings: metrics.commissionRevenue,
+      totalWithdrawals: 0,
+      pendingWithdrawals: 0,
+      lastWithdrawal: null,
+      bankAccounts: [],
+      currency: "TRY" as const,
+      note: "Platform banka hesabı ve şirket para çekme modeli henüz veri tabanında tanımlı değildir; yalnız gerçekleşmiş komisyon toplamı gösterilir.",
+    };
+  }),
+
+  withdrawFunds: adminProcedure
+    .input(z.object({ amount: z.number().int().positive(), bankAccountId: z.string().trim().min(1).max(96) }))
+    .mutation(async () => {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Şirket banka hesabı ve onaylı ödeme süreci modellenmeden platform para çekme işlemi başlatılamaz.",
+      });
+    }),
+
+  analytics: adminProcedure
+    .input(z.object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() }).optional())
     .query(async ({ input }) => {
-      return {
-        id: input.userId,
-        email: 'user@example.com',
-        name: 'Kullanıcı Adı',
-        role: 'customer',
-        createdAt: new Date(),
-        profileData: {},
-      };
-    }),
-
-  /**
-   * Categories Management
-   */
-  categories: protectedProcedure
-    .query(async () => {
-      return [
-        {
-          id: 1,
-          name: 'Temizlik',
-          description: 'Ev ve ofis temizliği',
-          commission: 15,
-          active: true,
-        },
-        {
-          id: 2,
-          name: 'Su Tesisatı',
-          description: 'Su tesisatı ve onarım',
-          commission: 18,
-          active: true,
-        },
-        {
-          id: 3,
-          name: 'Elektrik',
-          description: 'Elektrik tesisatı ve onarım',
-          commission: 20,
-          active: true,
-        },
-      ];
-    }),
-
-  createCategory: protectedProcedure
-    .input(z.object({
-      name: z.string(),
-      description: z.string(),
-      commission: z.number(),
-    }))
-    .mutation(async ({ input }) => {
-      return {
-        id: Math.random(),
-        ...input,
-        active: true,
-        createdAt: new Date(),
-      };
-    }),
-
-  updateCategory: protectedProcedure
-    .input(z.object({
-      categoryId: z.number(),
-      name: z.string().optional(),
-      description: z.string().optional(),
-      commission: z.number().optional(),
-    }))
-    .mutation(async ({ input }) => {
-      return {
-        id: input.categoryId,
-        name: input.name || 'Kategori Adı',
-        description: input.description || 'Açıklama',
-        commission: input.commission || 15,
-        active: true,
-        updatedAt: new Date(),
-      };
-    }),
-
-  /**
-   * AI Command
-   */
-  aiCommand: protectedProcedure
-    .input(z.object({ command: z.string() }))
-    .mutation(async ({ input }) => {
-      // Mock AI response
-      const command = input.command.toLowerCase();
-
-      if (command.includes('kategori') && command.includes('ekle')) {
-        return {
-          response: '✅ Yeni kategori oluşturmaya hazırım. Kategori adı, açıklama ve komisyon oranını belirt.',
-          action: 'create_category',
-          preview: {
-            name: 'Yeni Kategori',
-            commission: 15,
-          },
-        };
+      if (input?.from && input.to && input.from > input.to) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Başlangıç tarihi bitiş tarihinden sonra olamaz" });
       }
-
-      if (command.includes('komisyon')) {
-        return {
-          response: '✅ Komisyon oranını güncellemeye hazırım. Hangi kategorinin komisyonunu değiştirmek istiyorsun?',
-          action: 'update_commission',
-        };
-      }
-
+      const metrics = await getMoveOsDashboardMetrics();
       return {
-        response: '✅ Komutunuzu anladım. Lütfen daha spesifik bir talimat verin.',
-        action: 'help',
+        period: input?.from && input.to ? { from: input.from, to: input.to } : null,
+        totalOrders: metrics.dailyOrders,
+        totalRevenue: metrics.totalRevenue,
+        averageOrderValue: 0,
+        customerSatisfaction: null,
+        topCategories: [],
+        topProviders: [],
+        note: "Ayrıntılı dönemsel analitik, sorgu parametreleri için indeksli raporlama modeli eklendiğinde sunulacaktır; bu yanıt gerçek özet veriyi içerir.",
       };
     }),
 
-  /**
-   * Wallet
-   */
-  wallet: protectedProcedure
-    .query(async () => {
-      return {
-        balance: 125000,
-        totalEarnings: 1250000,
-        totalWithdrawals: 1125000,
-        pendingWithdrawals: 0,
-        lastWithdrawal: new Date('2024-08-01'),
-        bankAccounts: [
-          {
-            id: '1',
-            bankName: 'Ziraat Bankası',
-            accountNumber: '****5678',
-            iban: 'TR****',
-            isDefault: true,
-          },
-        ],
-      };
-    }),
+  services: adminProcedure.input(listInput).query(async ({ input }) => listMoveOsServices(input)),
 
-  withdrawFunds: protectedProcedure
-    .input(z.object({
-      amount: z.number().positive(),
-      bankAccountId: z.string(),
-    }))
-    .mutation(async ({ input }) => {
-      return {
-        success: true,
-        transactionId: `TXN-${Date.now()}`,
-        amount: input.amount,
-        status: 'pending',
-        estimatedTime: '1-2 iş günü',
-      };
-    }),
-
-  /**
-   * Analytics
-   */
-  analytics: protectedProcedure
-    .input(z.object({
-      from: z.string().optional(),
-      to: z.string().optional(),
-    }))
-    .query(async () => {
-      return {
-        period: 'Bu Ay',
-        totalOrders: 3450,
-        totalRevenue: 125000,
-        averageOrderValue: 36.2,
-        customerSatisfaction: 4.6,
-        topCategories: [
-          { name: 'Temizlik', orders: 890, revenue: 35000 },
-          { name: 'Elektrik', orders: 650, revenue: 32500 },
-          { name: 'Su Tesisatı', orders: 540, revenue: 27000 },
-        ],
-        topProviders: [
-          { name: 'Elektrikçi Mehmet', orders: 156, rating: 4.9 },
-          { name: 'Tesisatçı Ali', orders: 142, rating: 4.8 },
-          { name: 'Temizlik Şirketi XYZ', orders: 128, rating: 4.7 },
-        ],
-      };
+  getService: adminProcedure
+    .input(z.object({ serviceId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const service = await getMoveOsService(input.serviceId);
+      if (!service) throw new TRPCError({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
+      return service;
     }),
 });

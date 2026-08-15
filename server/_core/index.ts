@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { timingSafeEqual } from "crypto";
 import compression from "compression";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -173,6 +174,10 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerOwnerRestRoutes(app);
+  // MoveOS, mobil uygulamayla aynı backend, oturum ve API sözleşmesini kullanan
+  // ayrı bir web arayüzüdür. Statik dosyalar yalnız arayüzü sunar; tüm veri
+  // çağrıları ortak, yönetici-korumalı /api/owner/* yollarından yapılır.
+  app.use("/moveos", express.static(path.resolve(process.cwd(), "moveos"), { index: "index.html" }));
 
   // Health check endpoints
   app.get("/api/health", (_req, res) => {

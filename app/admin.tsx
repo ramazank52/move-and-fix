@@ -1,27 +1,45 @@
-import { Text, View, ScrollView, Pressable } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useRouter } from "expo-router";
+import { trpc } from "@/lib/trpc";
+
+function formatTry(amount: number) {
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Yönetim verileri alınamadı.";
+}
 
 export default function AdminDashboardScreen() {
   const colors = useColors();
   const router = useRouter();
+  const dashboardQuery = trpc.owner.dashboard.useQuery(undefined, { staleTime: 30_000 });
+  const categoriesQuery = trpc.owner.categories.useQuery(undefined, { staleTime: 60_000 });
+  const dashboard = dashboardQuery.data;
+  const categories = categoriesQuery.data ?? [];
+  const isRefreshing = dashboardQuery.isRefetching || categoriesQuery.isRefetching;
+  const error = dashboardQuery.error ?? categoriesQuery.error;
 
-  const stats = [
-    { label: "Toplam Kullanıcı", value: "12.450", change: "+8%", color: "#3B82F6" },
-    { label: "Aktif Usta", value: "2.340", change: "+12%", color: "#10B981" },
-    { label: "Aylık Gelir", value: "₺245K", change: "+15%", color: "#F59E0B" },
-    { label: "Tamamlanan İş", value: "8.920", change: "+22%", color: "#A855F7" },
-  ];
+  const refresh = () => {
+    void Promise.all([dashboardQuery.refetch(), categoriesQuery.refetch()]);
+  };
 
-  const recentActivities = [
-    { type: "user", text: "Yeni kullanıcı kaydı: Ayşe K.", time: "5 dk önce" },
-    { type: "payment", text: "Ödeme onaylandı: ₺1.200", time: "12 dk önce" },
-    { type: "report", text: "Yeni şikayet raporu #1234", time: "30 dk önce" },
-    { type: "provider", text: "Yeni usta başvurusu: Mehmet D.", time: "1 saat önce" },
-    { type: "system", text: "Sistem güncellemesi tamamlandı", time: "2 saat önce" },
-  ];
+  const stats = dashboard
+    ? [
+        { label: "Toplam Kullanıcı", value: String(dashboard.activeUsers), color: "#3B82F6" },
+        { label: "Müsait Usta", value: String(dashboard.activeProviders), color: "#10B981" },
+        { label: "Toplam Tahsilat", value: formatTry(dashboard.totalRevenue), color: "#F59E0B" },
+        { label: "Bugünkü Talep", value: String(dashboard.dailyOrders), color: "#A855F7" },
+      ]
+    : [];
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
@@ -35,129 +53,117 @@ export default function AdminDashboardScreen() {
           borderBottomColor: colors.border,
         }}
       >
-        <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
+        <Pressable onPress={() => router.back()} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Geri dön">
           <IconSymbol name="chevron.left.forwardslash.chevron.right" size={20} color={colors.foreground} />
         </Pressable>
         <Text style={{ flex: 1, textAlign: "center", fontSize: 17, fontWeight: "600", color: colors.foreground }}>
-          Admin Paneli
+          MoveOS
         </Text>
-        <View style={{ width: 28 }} />
+        <Pressable onPress={refresh} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel="Yönetim verilerini yenile">
+          <IconSymbol name="arrow.clockwise" size={20} color={colors.primary} />
+        </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        {/* Stats Grid */}
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
-          {stats.map((stat) => (
-            <View
-              key={stat.label}
-              style={{
-                width: "48%",
-                backgroundColor: colors.surface,
-                borderRadius: 12,
-                padding: 14,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={{ fontSize: 12, color: colors.muted }}>{stat.label}</Text>
-              <Text style={{ fontSize: 22, fontWeight: "bold", color: stat.color, marginTop: 4 }}>
-                {stat.value}
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.success, marginTop: 4 }}>{stat.change} bu ay</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Quick Actions */}
-        <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginBottom: 12 }}>
-          Hızlı İşlemler
-        </Text>
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
-          {[
-            { icon: "person.fill" as const, label: "Kullanıcılar", color: "#3B82F6" },
-            { icon: "wrench.fill" as const, label: "Kategoriler", color: "#10B981" },
-            { icon: "chart.bar.fill" as const, label: "Raporlar", color: "#F59E0B" },
-            { icon: "gearshape.fill" as const, label: "Ayarlar", color: "#6366F1" },
-          ].map((action) => (
-            <Pressable
-              key={action.label}
-              style={({ pressed }) => [
-                {
-                  flex: 1,
-                  alignItems: "center",
-                  padding: 12,
-                  borderRadius: 12,
-                  backgroundColor: action.color + "12",
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-            >
-              <IconSymbol name={action.icon} size={22} color={action.color} />
-              <Text style={{ fontSize: 11, color: action.color, fontWeight: "500", marginTop: 6 }}>
-                {action.label}
-              </Text>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={colors.primary} />}
+      >
+        {dashboardQuery.isLoading || categoriesQuery.isLoading ? (
+          <View style={{ minHeight: 260, alignItems: "center", justifyContent: "center", gap: 12 }}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={{ color: colors.muted }}>MoveOS verileri yükleniyor…</Text>
+          </View>
+        ) : error ? (
+          <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.error }}>
+            <Text style={{ color: colors.error, fontWeight: "600", marginBottom: 6 }}>Yönetim verileri kullanılamıyor</Text>
+            <Text style={{ color: colors.muted, lineHeight: 20 }}>{errorMessage(error)}</Text>
+            <Pressable onPress={refresh} style={{ marginTop: 14, alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 12 }}>
+              <Text style={{ color: colors.primary, fontWeight: "600" }}>Tekrar dene</Text>
             </Pressable>
-          ))}
-        </View>
+          </View>
+        ) : dashboard ? (
+          <>
+            <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 12 }}>
+              Ortak platform verileri · TRY · son yenileme anlık
+            </Text>
 
-        {/* Commission Settings */}
-        <View
-          style={{
-            backgroundColor: colors.surface,
-            borderRadius: 12,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: colors.border,
-            marginBottom: 20,
-          }}
-        >
-          <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 10 }}>
-            Komisyon Ayarları
-          </Text>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-            <Text style={{ fontSize: 14, color: colors.muted }}>Standart Komisyon</Text>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>%15</Text>
-          </View>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-            <Text style={{ fontSize: 14, color: colors.muted }}>Premium Usta Komisyonu</Text>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: "#A855F7" }}>%10</Text>
-          </View>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text style={{ fontSize: 14, color: colors.muted }}>Yeni Usta Komisyonu</Text>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.success }}>%5 (ilk ay)</Text>
-          </View>
-        </View>
-
-        {/* Recent Activity */}
-        <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginBottom: 12 }}>
-          Son Aktiviteler
-        </Text>
-        {recentActivities.map((activity, i) => (
-          <View
-            key={i}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingVertical: 12,
-              borderBottomWidth: i < recentActivities.length - 1 ? 0.5 : 0,
-              borderBottomColor: colors.border,
-            }}
-          >
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: colors.primary,
-                marginRight: 12,
-              }}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, color: colors.foreground }}>{activity.text}</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+              {stats.map((stat) => (
+                <View
+                  key={stat.label}
+                  style={{
+                    width: "48%",
+                    backgroundColor: colors.surface,
+                    borderRadius: 12,
+                    padding: 14,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: colors.muted }}>{stat.label}</Text>
+                  <Text style={{ fontSize: 21, fontWeight: "bold", color: stat.color, marginTop: 5, fontVariant: ["tabular-nums"] }}>
+                    {stat.value}
+                  </Text>
+                </View>
+              ))}
             </View>
-            <Text style={{ fontSize: 11, color: colors.muted }}>{activity.time}</Text>
-          </View>
-        ))}
+
+            <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 20 }}>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 12 }}>Platform Finans Özeti</Text>
+              {[
+                ["Bugünkü tahsilat", formatTry(dashboard.dailyRevenue)],
+                ["Serbest bırakılmayı bekleyen escrow", formatTry(dashboard.pendingPayments)],
+                ["Gerçekleşen platform komisyonu", formatTry(dashboard.commissionRevenue)],
+                ["Standart komisyon", "%10"],
+              ].map(([label, value], index) => (
+                <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", marginTop: index === 0 ? 0 : 10 }}>
+                  <Text style={{ color: colors.muted }}>{label}</Text>
+                  <Text style={{ color: colors.foreground, fontWeight: "600" }}>{value}</Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginBottom: 12 }}>Hizmet Kategorileri</Text>
+            <View style={{ backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
+              {categories.length === 0 ? (
+                <Text style={{ color: colors.muted, padding: 16 }}>Kayıtlı kategori bulunmuyor.</Text>
+              ) : (
+                categories.map((category, index) => (
+                  <View
+                    key={category.id}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      padding: 14,
+                      borderBottomWidth: index < categories.length - 1 ? 0.5 : 0,
+                      borderBottomColor: colors.border,
+                    }}
+                  >
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: category.color ?? colors.primary, marginRight: 10 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.foreground, fontWeight: "600" }}>{category.name}</Text>
+                      <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>
+                        {category.pricingType === "km_based" ? "KM bazlı" : category.pricingType === "hourly" ? "Saatlik" : "Sabit fiyat"} · {category.professionalCount} profesyonel
+                      </Text>
+                    </View>
+                    <Text style={{ color: category.isActive ? colors.success : colors.muted, fontSize: 12, fontWeight: "600" }}>
+                      {category.isActive ? "AKTİF" : "ARŞİV"}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+
+            <View style={{ marginTop: 20, backgroundColor: colors.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 8 }}>Sistem Sinyalleri</Text>
+              {dashboard.risks.length > 0 ? (
+                dashboard.risks.map((risk) => <Text key={risk} style={{ color: colors.warning, lineHeight: 20 }}>• {risk}</Text>)
+              ) : (
+                <Text style={{ color: colors.muted }}>Bu özet için kaydedilmiş açık risk sinyali yok.</Text>
+              )}
+            </View>
+          </>
+        ) : null}
       </ScrollView>
     </ScreenContainer>
   );

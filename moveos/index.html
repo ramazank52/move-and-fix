@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>MoveOS | Yönetim Merkezi</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">MOVE&FIX / MOVEOS</p>
+          <h1>Yönetim Merkezi</h1>
+        </div>
+        <div class="session">
+          <span id="session-name">Oturum kontrol ediliyor…</span>
+          <button id="refresh" type="button">Yenile</button>
+        </div>
+      </header>
+
+      <section id="notice" class="notice" role="status" aria-live="polite"></section>
+
+      <section id="dashboard" class="dashboard" hidden>
+        <div class="metrics" aria-label="Platform özeti">
+          <article class="metric"><span>Aktif kullanıcı</span><strong id="active-users">—</strong></article>
+          <article class="metric"><span>Aktif profesyonel</span><strong id="active-providers">—</strong></article>
+          <article class="metric"><span>Günlük iş</span><strong id="daily-orders">—</strong></article>
+          <article class="metric"><span>Toplam gelir</span><strong id="total-revenue">—</strong></article>
+          <article class="metric"><span>Komisyon geliri</span><strong id="commission-revenue">—</strong></article>
+          <article class="metric"><span>Bekleyen ödeme</span><strong id="pending-payments">—</strong></article>
+        </div>
+
+        <div class="grid">
+          <section class="panel" aria-labelledby="categories-title">
+            <div class="panel-heading"><div><p class="eyebrow">KATALOG</p><h2 id="categories-title">Hizmet kategorileri</h2></div><span class="tag">%10 merkezi komisyon</span></div>
+            <form id="category-form" class="form-row">
+              <label>Yeni kategori<input id="category-name" name="name" required minlength="2" maxlength="100" placeholder="Örn. Bahçe tasarımı" /></label>
+              <label>Fiyat tipi<select id="pricing-type" name="pricingType"><option value="fixed">Sabit</option><option value="km_based">KM bazlı</option><option value="hourly">Saatlik</option></select></label>
+              <button type="submit">Kategori ekle</button>
+            </form>
+            <div class="table-wrap"><table><thead><tr><th>Ad</th><th>Fiyat tipi</th><th>Durum</th><th>İşlem</th></tr></thead><tbody id="categories-list"></tbody></table></div>
+          </section>
+
+          <section class="panel" aria-labelledby="command-title">
+            <div class="panel-heading"><div><p class="eyebrow">MOVEAI</p><h2 id="command-title">Onaylı komut alanı</h2></div></div>
+            <p class="subtle">Etkili komutlar, onaylı yürütücü yapılandırılana kadar hiçbir veriyi değiştirmez.</p>
+            <form id="command-form" class="command-form">
+              <label for="command">Yönetim komutu</label>
+              <textarea id="command" required minlength="3" maxlength="2000" placeholder="Örn. Yeni kategori ekle: Bahçe tasarımı"></textarea>
+              <button type="submit">Komutu değerlendir</button>
+            </form>
+            <pre id="command-result" class="result" hidden></pre>
+          </section>
+
+          <section class="panel" aria-labelledby="users-title">
+            <div class="panel-heading"><div><p class="eyebrow">GÜVENLİK</p><h2 id="users-title">Son kullanıcılar</h2></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Ad</th><th>Rol</th><th>Durum</th></tr></thead><tbody id="users-list"></tbody></table></div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
