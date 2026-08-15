@@ -703,6 +703,9 @@ import {
   settlementPolicies,
   jobChangeOrders,
   jobCancellationCases,
+  jobExpenses,
+  jobExpenseMedia,
+  expenseRefundRequests,
   providerFavorites,
   reviews,
   jobTracking,
@@ -4709,4 +4712,54 @@ export async function creditWalletBalance(data: {
     if (!rows[0]) throw new Error("Wallet credit could not be recorded");
     return { transaction: rows[0], duplicated: false };
   });
+}
+
+type JobExpenseCategory = "fuel" | "toll" | "parking" | "material" | "part" | "paint" | "equipment" | "transport" | "packaging" | "other";
+
+async function getExpenseJobContext(requestId: number, userId: number) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database.select({ request: serviceRequests, agreement: serviceAgreements }).from(serviceRequests)
+    .innerJoin(serviceAgreements, eq(serviceAgreements.requestId, serviceRequests.id)).where(eq(serviceRequests.id, requestId)).limit(1);
+  const context = rows[0];
+  if (!context) throw new Error("EXPENSE_AGREEMENT_NOT_FOUND");
+  const isCustomer = context.request.userId === userId;
+  const isProvider = context.agreement.providerId === userId;
+  if (!isCustomer && !isProvider) throw new Error("EXPENSE_ACCESS_DENIED");
+  return { database, ...context, isCustomer, isProvider };
+}
+
+export async function createJobExpense(input: { requestId: number; providerUserId: number; category: JobExpenseCategory; amount: number; description: string; purchasedAt: Date; vendorName?: string; brand?: string; model?: string; quantity?: number; locationUrl?: string; mediaIds: number[] }) {
+  if (!Number.isInteger(input.amount) || input.amount <= 0) throw new Error("EXPENSE_AMOUNT_INVALID");
+  const context = await getExpenseJobContext(input.requestId, input.providerUserId);
+  if (!context.isProvider) throw new Error("EXPENSE_PROVIDER_ONLY");
+  const mediaIds = [...new Set(input.mediaIds)];
+  return context.database.transaction(async (tx) => {
+    if (mediaIds.length) {
+      const media = await tx.select({ id: serviceRequestMedia.id }).from(serviceRequestMedia).where(and(eq(serviceRequestMedia.requestId, input.requestId), eq(serviceRequestMedia.ownerUserId, input.providerUserId), eq(serviceRequestMedia.purpose, "expense"), inArray(serviceRequestMedia.id, mediaIds)));
+      if (media.length !== mediaIds.length) throw new Error("EXPENSE_MEDIA_NOT_OWNED");
+    }
+    const result = await tx.insert(jobExpenses).values({ requestId: input.requestId, agreementId: context.agreement.id, providerId: context.agreement.providerId, category: input.category, amount: input.amount, description: input.description, purchasedAt: input.purchasedAt, vendorName: input.vendorName, brand: input.brand, model: input.model, quantity: input.quantity, locationUrl: input.locationUrl });
+    const expenseId = Number(result[0].insertId);
+    if (mediaIds.length) await tx.insert(jobExpenseMedia).values(mediaIds.map((mediaId) => ({ expenseId, mediaId })));
+    return expenseId;
+  });
+}
+
+export async function listJobExpensesForParticipant(requestId: number, userId: number) {
+  const context = await getExpenseJobContext(requestId, userId);
+  const expenses = await context.database.select().from(jobExpenses).where(eq(jobExpenses.requestId, requestId)).orderBy(jobExpenses.createdAt, jobExpenses.id);
+  return Promise.all(expenses.map(async (expense) => ({ ...expense, media: await context.database.select({ id: serviceRequestMedia.id, kind: serviceRequestMedia.kind, originalName: serviceRequestMedia.originalName, mimeType: serviceRequestMedia.mimeType, sizeBytes: serviceRequestMedia.sizeBytes }).from(jobExpenseMedia).innerJoin(serviceRequestMedia, eq(jobExpenseMedia.mediaId, serviceRequestMedia.id)).where(eq(jobExpenseMedia.expenseId, expense.id)) })));
+}
+
+export async function submitExpenseRefundRequest(input: { expenseId: number; providerUserId: number; requestedAmount: number; materialAssessmentJson: string }) {
+  if (!Number.isInteger(input.requestedAmount) || input.requestedAmount <= 0) throw new Error("EXPENSE_REFUND_AMOUNT_INVALID");
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database.select().from(jobExpenses).where(eq(jobExpenses.id, input.expenseId)).limit(1);
+  const expense = rows[0];
+  if (!expense || expense.providerId !== input.providerUserId) throw new Error("EXPENSE_REFUND_ACCESS_DENIED");
+  if (input.requestedAmount > expense.amount) throw new Error("EXPENSE_REFUND_EXCEEDS_EXPENSE");
+  const result = await database.insert(expenseRefundRequests).values({ requestId: expense.requestId, expenseId: expense.id, providerId: expense.providerId, requestedAmount: input.requestedAmount, materialAssessmentJson: input.materialAssessmentJson, status: "submitted" });
+  return Number(result[0].insertId);
 }

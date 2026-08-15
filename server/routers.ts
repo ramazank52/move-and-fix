@@ -811,6 +811,39 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         runAgreementOperation(() => db.withdrawJobChangeOrder(input.changeOrderId, ctx.user.id)),
       ),
+    expenses: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        runAgreementOperation(() => db.listJobExpensesForParticipant(input.requestId, ctx.user.id)),
+      ),
+    createExpense: protectedProcedure
+      .input(z.object({
+        requestId: z.number().int().positive(),
+        category: z.enum(["fuel", "toll", "parking", "material", "part", "paint", "equipment", "transport", "packaging", "other"]),
+        amount: z.number().int().positive().max(1_000_000),
+        description: z.string().trim().min(3).max(2_000),
+        purchasedAt: z.coerce.date(),
+        vendorName: z.string().trim().max(191).optional(),
+        brand: z.string().trim().max(120).optional(),
+        model: z.string().trim().max(120).optional(),
+        quantity: z.number().int().positive().max(100_000).optional(),
+        locationUrl: z.string().url().max(500).optional(),
+        mediaIds: z.array(z.number().int().positive()).max(8).superRefine((items, ctx) => {
+          if (new Set(items).size !== items.length) ctx.addIssue({ code: "custom", message: "Tekrarlayan medya kaydı gönderilemez" });
+        }).default([]),
+      }))
+      .mutation(({ ctx, input }) =>
+        runAgreementOperation(() => db.createJobExpense({ ...input, providerUserId: ctx.user.id })),
+      ),
+    submitExpenseRefund: protectedProcedure
+      .input(z.object({
+        expenseId: z.number().int().positive(),
+        requestedAmount: z.number().int().positive().max(1_000_000),
+        materialAssessmentJson: z.string().trim().min(2).max(8_000),
+      }))
+      .mutation(({ ctx, input }) =>
+        runAgreementOperation(() => db.submitExpenseRefundRequest({ ...input, providerUserId: ctx.user.id })),
+      ),
     cancellation: protectedProcedure
       .input(z.object({ requestId: z.number().int().positive() }))
       .query(({ ctx, input }) =>

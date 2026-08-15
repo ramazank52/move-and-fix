@@ -540,7 +540,7 @@ export const serviceRequestMedia = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     requestId: int("requestId").notNull(),
     ownerUserId: int("ownerUserId").notNull(),
-    purpose: mysqlEnum("purpose", ["request", "before", "after", "completion", "dispute"])
+    purpose: mysqlEnum("purpose", ["request", "before", "after", "completion", "expense", "dispute"])
       .default("request")
       .notNull(),
     kind: mysqlEnum("kind", ["image", "video", "document"]).notNull(),
@@ -871,6 +871,80 @@ export const jobCancellationCases = mysqlTable(
   (table) => [
     uniqueIndex("job_cancellation_cases_request_unique").on(table.requestId),
     index("job_cancellation_cases_status_idx").on(table.status, table.createdAt),
+  ],
+);
+
+// Provider-entered transparency records. These never create a customer debt or
+// change an accepted agreement; a reimbursement claim is a separate workflow.
+export const jobExpenses = mysqlTable(
+  "job_expenses",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    agreementId: int("agreementId").notNull(),
+    providerId: int("providerId").notNull(),
+    category: mysqlEnum("category", [
+      "fuel", "toll", "parking", "material", "part", "paint", "equipment", "transport", "packaging", "other",
+    ]).notNull(),
+    amount: int("amount").notNull(),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    description: text("description").notNull(),
+    purchasedAt: timestamp("purchasedAt").notNull(),
+    vendorName: varchar("vendorName", { length: 191 }),
+    brand: varchar("brand", { length: 120 }),
+    model: varchar("model", { length: 120 }),
+    quantity: int("quantity"),
+    locationUrl: varchar("locationUrl", { length: 500 }),
+    sharedWithCustomer: int("sharedWithCustomer").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("job_expenses_request_created_idx").on(table.requestId, table.createdAt),
+    index("job_expenses_provider_created_idx").on(table.providerId, table.createdAt),
+  ],
+);
+
+// Media stays in service_request_media; this immutable link prevents expense
+// evidence from being reused across records or exposed outside the job context.
+export const jobExpenseMedia = mysqlTable(
+  "job_expense_media",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    expenseId: int("expenseId").notNull(),
+    mediaId: int("mediaId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("job_expense_media_media_unique").on(table.mediaId),
+    uniqueIndex("job_expense_media_expense_media_unique").on(table.expenseId, table.mediaId),
+    index("job_expense_media_expense_idx").on(table.expenseId),
+  ],
+);
+
+// A reimbursement request is deliberately distinct from the transparency entry.
+export const expenseRefundRequests = mysqlTable(
+  "expense_refund_requests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    expenseId: int("expenseId").notNull(),
+    providerId: int("providerId").notNull(),
+    requestedAmount: int("requestedAmount").notNull(),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    materialAssessmentJson: text("materialAssessmentJson").notNull(),
+    status: mysqlEnum("status", ["draft", "submitted", "under_review", "approved", "rejected", "withdrawn"])
+      .default("draft")
+      .notNull(),
+    reviewedByUserId: int("reviewedByUserId"),
+    resolutionNote: text("resolutionNote"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("expense_refund_requests_expense_unique").on(table.expenseId),
+    index("expense_refund_requests_request_status_idx").on(table.requestId, table.status),
   ],
 );
 
