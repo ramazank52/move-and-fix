@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHmac } from "node:crypto";
 
 const db = vi.hoisted(() => ({
   getMoveOsDashboardMetrics: vi.fn(),
@@ -9,12 +10,27 @@ const db = vi.hoisted(() => ({
   getMoveOsService: vi.fn(),
   getMoveOsUser: vi.fn(),
   hasValidAdminMfaGrant: vi.fn(),
+  createAuthChallenge: vi.fn(),
+  getLatestActiveAuthChallenge: vi.fn(),
+  incrementAuthChallengeAttempts: vi.fn(),
+  markAuthChallengeUsed: vi.fn(),
+  createAdminMfaGrant: vi.fn(),
   listMoveOsServices: vi.fn(),
   listMoveOsUsers: vi.fn(),
   updateMoveOsUser: vi.fn(),
 }));
 
 vi.mock("../server/db", () => db);
+vi.mock("../server/_core/env", () => ({ ENV: { cookieSecret: "moveos-mfa-test-secret" } }));
+
+const notifications = vi.hoisted(() => ({
+  sendVerificationCode: vi.fn(),
+}));
+
+vi.mock("../server/services/NotificationServiceV2", () => ({
+  NotificationChannel: { EMAIL: "email" },
+  notificationServiceV2: notifications,
+}));
 
 import { ownerRouter } from "../server/_core/ownerRouter";
 
@@ -30,7 +46,7 @@ const metrics = {
 };
 
 const adminCaller = () =>
-  ownerRouter.createCaller({ user: { id: 7, role: "admin" }, sessionFingerprint: "test-admin-session" } as never);
+  ownerRouter.createCaller({ user: { id: 7, role: "admin", email: "admin@movefix.test" }, sessionFingerprint: "test-admin-session" } as never);
 const customerCaller = () =>
   ownerRouter.createCaller({ user: { id: 8, role: "user" }, sessionFingerprint: "test-user-session" } as never);
 
@@ -39,6 +55,8 @@ describe("MoveOS ortak API sözleşmesi", () => {
     vi.clearAllMocks();
     db.getMoveOsDashboardMetrics.mockResolvedValue(metrics);
     db.hasValidAdminMfaGrant.mockResolvedValue(true);
+    db.createAuthChallenge.mockResolvedValue(71);
+    notifications.sendVerificationCode.mockResolvedValue({ deliveryStatus: "delivered" });
   });
 
   it("MFA grant’i olmayan yönetici oturumunun MoveOS verisine erişimini reddeder", async () => {
@@ -92,5 +110,54 @@ describe("MoveOS ortak API sözleşmesi", () => {
     await expect(adminCaller().login({ email: "owner@movefix.com", password: "password123" })).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
+  });
+
+  it("MFA kodu teslim edilmezse yönetici grant’i üretmeden fail-closed davranır", async () => {
+    notifications.sendVerificationCode.mockResolvedValue({ deliveryStatus: "failed" });
+
+    await expect(adminCaller().requestMfa()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(db.createAdminMfaGrant).not.toHaveBeenCalled();
+  });
+
+  it("yakın zamanda gönderilmiş geçerli MFA kodunu tekrar e-posta göndermeden sınırlar", async () => {
+    db.getLatestActiveAuthChallenge.mockResolvedValue({
+      id: 70,
+      createdAt: new Date(Date.now() - 30_000),
+    });
+
+    await expect(adminCaller().requestMfa()).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    expect(db.createAuthChallenge).not.toHaveBeenCalled();
+    expect(notifications.sendVerificationCode).not.toHaveBeenCalled();
+  });
+
+  it("geçersiz MFA kodunda yalnız deneme sayısını artırır ve grant vermez", async () => {
+    db.getLatestActiveAuthChallenge.mockResolvedValue({
+      id: 71,
+      codeHash: createHmac("sha256", "moveos-mfa-test-secret").update("7:admin_mfa:123456").digest("hex"),
+      attempts: 0,
+      maxAttempts: 5,
+    });
+
+    await expect(adminCaller().verifyMfa({ code: "654321" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(db.incrementAuthChallengeAttempts).toHaveBeenCalledWith(71);
+    expect(db.markAuthChallengeUsed).not.toHaveBeenCalled();
+    expect(db.createAdminMfaGrant).not.toHaveBeenCalled();
+  });
+
+  it("doğru MFA kodunu tek kullanımlık challenge ile session-bound grant’e dönüştürür", async () => {
+    db.getLatestActiveAuthChallenge.mockResolvedValue({
+      id: 72,
+      codeHash: createHmac("sha256", "moveos-mfa-test-secret").update("7:admin_mfa:123456").digest("hex"),
+      attempts: 0,
+      maxAttempts: 5,
+    });
+
+    await expect(adminCaller().verifyMfa({ code: "123456" })).resolves.toEqual({ success: true, expiresInSeconds: 1800 });
+    expect(db.markAuthChallengeUsed).toHaveBeenCalledWith(72);
+    expect(db.createAdminMfaGrant).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 7,
+      sessionFingerprint: "test-admin-session",
+      challengeId: 72,
+    }));
   });
 });

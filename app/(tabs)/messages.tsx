@@ -12,21 +12,25 @@ import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "@/lib/i18n";
+import { localeForLanguage } from "@/lib/i18n-core";
 import { trpc } from "@/lib/trpc";
 
-function formatConversationTime(value: Date | string | null) {
+function formatConversationTime(value: Date | string | null, locale: string) {
   if (!value) return "";
   const date = new Date(value);
   const now = new Date();
   const isToday = date.toDateString() === now.toDateString();
   return isToday
-    ? date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+    ? date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
 
 export default function MessagesScreen() {
   const colors = useColors();
+  const { t, language } = useTranslation();
   const router = useRouter();
+  const locale = localeForLanguage(language);
   const [refreshing, setRefreshing] = useState(false);
   const conversationsQuery = trpc.messages.list.useQuery(undefined, {
     refetchOnMount: true,
@@ -43,17 +47,17 @@ export default function MessagesScreen() {
     <ScreenContainer className="px-5 pt-5">
       <View style={{ marginBottom: 18 }}>
         <Text style={{ fontSize: 28, lineHeight: 34, fontWeight: "800", color: colors.foreground }}>
-          Mesajlar
+          {t("messages.title")}
         </Text>
         <Text style={{ marginTop: 4, fontSize: 13, lineHeight: 18, color: colors.muted }}>
-          Profesyonellerle görüşmeleriniz
+          {t("messages.subtitle")}
         </Text>
       </View>
 
       {conversationsQuery.isLoading ? (
         <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 60 }}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ fontSize: 14, color: colors.muted, marginTop: 12 }}>Mesajlar yükleniyor...</Text>
+          <Text style={{ fontSize: 14, color: colors.muted, marginTop: 12 }}>{t("messages.loading")}</Text>
         </View>
       ) : conversationsQuery.isError ? (
         <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 60 }}>
@@ -71,10 +75,10 @@ export default function MessagesScreen() {
             <IconSymbol name="wifi.exclamationmark" size={30} color={colors.error} />
           </View>
           <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
-            Mesajlar yüklenemedi
+            {t("messages.errorTitle")}
           </Text>
           <Text style={{ marginTop: 6, marginBottom: 16, fontSize: 13, color: colors.muted, textAlign: "center" }}>
-            Bağlantınızı kontrol edip yeniden deneyin.
+            {t("messages.errorBody")}
           </Text>
           <Pressable
             onPress={() => conversationsQuery.refetch()}
@@ -86,7 +90,7 @@ export default function MessagesScreen() {
               opacity: pressed ? 0.82 : 1,
             })}
           >
-            <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 14 }}>Tekrar Dene</Text>
+            <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 14 }}>{t("messages.retry")}</Text>
           </Pressable>
         </View>
       ) : (
@@ -146,7 +150,7 @@ export default function MessagesScreen() {
                       ) : null}
                     </View>
                     <Text style={{ color: item.unreadCount > 0 ? colors.primary : colors.muted, fontSize: 11, fontWeight: "600" }}>
-                      {formatConversationTime(item.lastMessageAt)}
+                      {formatConversationTime(item.lastMessageAt, locale)}
                     </Text>
                   </View>
 
@@ -204,10 +208,10 @@ export default function MessagesScreen() {
                 <IconSymbol name="message.fill" size={30} color={colors.muted} />
               </View>
               <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}>
-                Henüz mesajınız yok
+                {t("messages.emptyTitle")}
               </Text>
               <Text style={{ marginTop: 6, fontSize: 13, lineHeight: 19, color: colors.muted, textAlign: "center" }}>
-                Bir profesyonelle iletişime geçtiğinizde görüşmeniz burada görünür.
+                {t("messages.emptyBody")}
               </Text>
             </View>
           }

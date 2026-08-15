@@ -14,6 +14,8 @@ import { router } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "@/lib/i18n";
+import { formatMoney as formatLocalizedMoney, localeForLanguage, type TranslationKey } from "@/lib/i18n-core";
 import { trpc } from "@/lib/trpc";
 
 type FilterKey = "active" | "offers" | "scheduled" | "completed";
@@ -31,31 +33,25 @@ type FilterableJob = {
   lifecycleStatus: LifecycleStatus;
 };
 
-const FILTERS: readonly { key: FilterKey; label: string }[] = [
-  { key: "active", label: "Aktif" },
-  { key: "offers", label: "Teklifler" },
-  { key: "scheduled", label: "Planlanan" },
-  { key: "completed", label: "Tamamlanan" },
+const FILTERS: readonly { key: FilterKey; labelKey: TranslationKey }[] = [
+  { key: "active", labelKey: "jobs.filter.active" },
+  { key: "offers", labelKey: "jobs.filter.offers" },
+  { key: "scheduled", labelKey: "jobs.filter.scheduled" },
+  { key: "completed", labelKey: "jobs.filter.completed" },
 ];
 
 const STATUS_META: Record<
   Exclude<LifecycleStatus, null> | "offers",
-  { label: string; color: string; background: string }
+  { labelKey: TranslationKey; color: string; background: string }
 > = {
-  offers: { label: "Teklif Bekliyor", color: "#F59E0B", background: "#F59E0B1F" },
-  scheduled: { label: "Planlandı", color: "#8A5CFF", background: "#8A5CFF1F" },
-  on_the_way: { label: "Yolda", color: "#3B82F6", background: "#3B82F61F" },
-  arrived: { label: "Geldi", color: "#06B6D4", background: "#06B6D41F" },
-  in_progress: { label: "İş Başladı", color: "#22C55E", background: "#22C55E1F" },
-  completed: { label: "Tamamlandı", color: "#22C55E", background: "#22C55E1F" },
-  cancelled: { label: "İptal", color: "#EF4444", background: "#EF44441F" },
+  offers: { labelKey: "jobs.status.offers", color: "#F59E0B", background: "#F59E0B1F" },
+  scheduled: { labelKey: "jobs.status.scheduled", color: "#8A5CFF", background: "#8A5CFF1F" },
+  on_the_way: { labelKey: "jobs.status.onTheWay", color: "#3B82F6", background: "#3B82F61F" },
+  arrived: { labelKey: "jobs.status.arrived", color: "#06B6D4", background: "#06B6D41F" },
+  in_progress: { labelKey: "jobs.status.inProgress", color: "#22C55E", background: "#22C55E1F" },
+  completed: { labelKey: "jobs.status.completed", color: "#22C55E", background: "#22C55E1F" },
+  cancelled: { labelKey: "jobs.status.cancelled", color: "#EF4444", background: "#EF44441F" },
 };
-
-function formatMoney(value: number | string | null | undefined) {
-  if (value == null) return null;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? `₺${numeric.toLocaleString("tr-TR")}` : null;
-}
 
 function getLifecycle(job: FilterableJob): Exclude<LifecycleStatus, null> | "offers" {
   if (job.status === "pending") return "offers";
@@ -74,6 +70,7 @@ function matchesFilter(job: FilterableJob, filter: FilterKey) {
 
 export default function MyJobsScreen() {
   const colors = useColors();
+  const { t, language } = useTranslation();
   const [activeFilter, setActiveFilter] = useState<FilterKey>("active");
   const [refreshing, setRefreshing] = useState(false);
   const requestsQuery = trpc.requests.list.useQuery(undefined, { refetchOnMount: true });
@@ -114,17 +111,17 @@ export default function MyJobsScreen() {
   const renderJob = ({ item: job }: { item: (typeof jobs)[number] }) => {
     const lifecycle = getLifecycle(job);
     const status = STATUS_META[lifecycle];
-    const acceptedPrice = formatMoney(job.acceptedPrice);
+    const acceptedPrice = job.acceptedPrice == null ? null : formatLocalizedMoney(job.acceptedPrice, language);
     const budget =
       job.budgetMin != null && job.budgetMax != null
-        ? `${formatMoney(job.budgetMin)} – ${formatMoney(job.budgetMax)}`
+        ? `${formatLocalizedMoney(job.budgetMin, language)} – ${formatLocalizedMoney(job.budgetMax, language)}`
         : null;
     const actionLabel =
       job.status === "pending"
-        ? "Teklifleri Gör"
+        ? t("jobs.action.viewOffers")
         : job.status === "active"
-          ? "İşi Takip Et"
-          : "Detayı Gör";
+          ? t("jobs.action.track")
+          : t("jobs.action.viewDetail");
 
     return (
       <Pressable
@@ -144,14 +141,14 @@ export default function MyJobsScreen() {
           </View>
           <View style={styles.cardHeading}>
             <Text style={[styles.category, { color: colors.primary }]}>
-              {job.categoryName ?? "Hizmet"}
+              {job.categoryName ?? t("jobs.serviceFallback")}
             </Text>
             <Text style={[styles.jobTitle, { color: colors.foreground }]} numberOfLines={2}>
               {job.title}
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: status.background }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+            <Text style={[styles.statusText, { color: status.color }]}>{t(status.labelKey)}</Text>
           </View>
         </View>
 
@@ -161,7 +158,7 @@ export default function MyJobsScreen() {
               <IconSymbol name="person.fill" size={18} color={colors.primary} />
             </View>
             <View style={styles.providerCopy}>
-              <Text style={[styles.metaLabel, { color: colors.muted }]}>Profesyonel</Text>
+              <Text style={[styles.metaLabel, { color: colors.muted }]}>{t("jobs.provider")}</Text>
               <Text style={[styles.providerName, { color: colors.foreground }]} numberOfLines={1}>
                 {job.providerName}
               </Text>
@@ -169,7 +166,7 @@ export default function MyJobsScreen() {
             {job.etaMinutes != null ? (
               <View style={styles.etaRow}>
                 <IconSymbol name="clock.fill" size={14} color={colors.muted} />
-                <Text style={[styles.etaText, { color: colors.muted }]}>{job.etaMinutes} dk</Text>
+                <Text style={[styles.etaText, { color: colors.muted }]}>{job.etaMinutes} {t("jobs.minuteShort")}</Text>
               </View>
             ) : null}
           </View>
@@ -179,7 +176,7 @@ export default function MyJobsScreen() {
           <View style={styles.metaItem}>
             <IconSymbol name="calendar" size={16} color={colors.muted} />
             <Text style={[styles.metaValue, { color: colors.muted }]}>
-              {new Date(job.createdAt).toLocaleDateString("tr-TR")}
+              {new Date(job.createdAt).toLocaleDateString(localeForLanguage(language))}
             </Text>
           </View>
           {job.address ? (
@@ -195,16 +192,16 @@ export default function MyJobsScreen() {
         <View style={[styles.cardBottom, { borderTopColor: colors.border }]}>
           <View style={styles.priceCopy}>
             <Text style={[styles.metaLabel, { color: colors.muted }]}>
-              {acceptedPrice ? "Kabul Edilen Teklif" : "Bütçe"}
+              {acceptedPrice ? t("jobs.acceptedOffer") : t("jobs.budget")}
             </Text>
             <Text style={[styles.price, { color: colors.foreground }]}>
-              {acceptedPrice ?? budget ?? "Teklif bekleniyor"}
+              {acceptedPrice ?? budget ?? t("jobs.waitingOffer")}
             </Text>
           </View>
           <View style={styles.actionRow}>
             {job.providerUserId ? (
               <Pressable
-                accessibilityLabel={`${job.providerName ?? "Profesyonel"} ile mesajlaş`}
+                accessibilityLabel={t("jobs.chatAccessibility", { name: job.providerName ?? t("jobs.provider") })}
                 onPress={(event) => {
                   event.stopPropagation();
                   router.push(
@@ -232,8 +229,8 @@ export default function MyJobsScreen() {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.foreground }]}>İşlerim</Text>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>Tüm hizmetlerini tek yerden takip et</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>{t("jobs.title")}</Text>
+        <Text style={[styles.subtitle, { color: colors.muted }]}>{t("jobs.subtitle")}</Text>
       </View>
 
       <ScrollView
@@ -260,7 +257,7 @@ export default function MyJobsScreen() {
               ]}
             >
               <Text style={[styles.filterText, { color: selected ? "#FFFFFF" : colors.muted }]}>
-                {filter.label}
+                {t(filter.labelKey)}
               </Text>
               <View
                 style={[
@@ -285,12 +282,12 @@ export default function MyJobsScreen() {
       {requestsQuery.isLoading ? (
         <View style={styles.centerState}>
           <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={[styles.stateDescription, { color: colors.muted }]}>İşlerin yükleniyor...</Text>
+          <Text style={[styles.stateDescription, { color: colors.muted }]}>{t("jobs.loading")}</Text>
         </View>
       ) : requestsQuery.error ? (
         <View style={styles.centerState}>
           <IconSymbol name="wifi.exclamationmark" size={42} color={colors.error} />
-          <Text style={[styles.stateTitle, { color: colors.foreground }]}>İşlerin alınamadı</Text>
+          <Text style={[styles.stateTitle, { color: colors.foreground }]}>{t("jobs.errorTitle")}</Text>
           <Text style={[styles.stateDescription, { color: colors.muted }]}>
             {requestsQuery.error.message}
           </Text>
@@ -301,7 +298,7 @@ export default function MyJobsScreen() {
               { backgroundColor: colors.primary, opacity: pressed ? 0.76 : 1 },
             ]}
           >
-            <Text style={styles.retryText}>Tekrar Dene</Text>
+            <Text style={styles.retryText}>{t("jobs.retry")}</Text>
           </Pressable>
         </View>
       ) : (
@@ -324,9 +321,9 @@ export default function MyJobsScreen() {
               >
                 <IconSymbol name="briefcase.fill" size={32} color={colors.muted} />
               </View>
-              <Text style={[styles.stateTitle, { color: colors.foreground }]}>Bu bölümde iş yok</Text>
+              <Text style={[styles.stateTitle, { color: colors.foreground }]}>{t("jobs.emptyTitle")}</Text>
               <Text style={[styles.stateDescription, { color: colors.muted }]}>
-                Durumu değişen hizmetlerin burada otomatik olarak görünür.
+                {t("jobs.emptyBody")}
               </Text>
               {activeFilter === "offers" ? (
                 <Pressable
@@ -336,7 +333,7 @@ export default function MyJobsScreen() {
                     { backgroundColor: colors.primary, opacity: pressed ? 0.76 : 1 },
                   ]}
                 >
-                  <Text style={styles.retryText}>Yeni Talep Oluştur</Text>
+                  <Text style={styles.retryText}>{t("jobs.newRequest")}</Text>
                 </Pressable>
               ) : null}
             </View>

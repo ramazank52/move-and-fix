@@ -4,54 +4,57 @@ import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "@/lib/i18n";
+import { localeForLanguage } from "@/lib/i18n-core";
 import { trpc } from "@/lib/trpc";
 
-function formatSessionDate(value: Date | string) {
-  return new Date(value).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" });
+function formatSessionDate(value: Date | string, language: Parameters<typeof localeForLanguage>[0]) {
+  return new Date(value).toLocaleString(localeForLanguage(language), { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default function SecuritySettingsScreen() {
   const colors = useColors();
+  const { t, language } = useTranslation();
   const router = useRouter();
   const utils = trpc.useUtils();
   const sessions = trpc.auth.sessions.useQuery();
   const revokeSession = trpc.auth.revokeSession.useMutation({
     onSuccess: () => utils.auth.sessions.invalidate(),
-    onError: (error) => Alert.alert("Oturum İptal Edilemedi", error.message),
+    onError: (error) => Alert.alert(t("security.revokeFailed"), error.message),
   });
   const revokeOthers = trpc.auth.revokeOtherSessions.useMutation({
     onSuccess: async ({ revokedCount }) => {
       await utils.auth.sessions.invalidate();
-      Alert.alert("Oturumlar Kapatıldı", `${revokedCount} diğer oturum güvenle iptal edildi.`);
+      Alert.alert(t("security.sessionsRevoked"), t("security.sessionsRevokedBody", { count: revokedCount }));
     },
-    onError: (error) => Alert.alert("Oturumlar İptal Edilemedi", error.message),
+    onError: (error) => Alert.alert(t("security.sessionsRevokeFailed"), error.message),
   });
 
   const confirmRevoke = (sessionId: string, isCurrent: boolean) => {
     Alert.alert(
-      isCurrent ? "Bu Cihazdan Çıkış Yap" : "Cihaz Oturumunu Kapat",
-      isCurrent ? "Bu cihazdaki oturumunuz kapatılacak." : "Bu cihaz artık hesabınıza erişemeyecek.",
+      isCurrent ? t("security.revokeCurrentTitle") : t("security.revokeDeviceTitle"),
+      isCurrent ? t("security.revokeCurrentBody") : t("security.revokeDeviceBody"),
       [
-        { text: "İptal", style: "cancel" },
-        { text: "Oturumu Kapat", style: "destructive", onPress: () => revokeSession.mutate({ sessionId }) },
+        { text: t("security.cancel"), style: "cancel" },
+        { text: t("security.revoke"), style: "destructive", onPress: () => revokeSession.mutate({ sessionId }) },
       ],
     );
   };
 
   const confirmRevokeOthers = () => {
-    Alert.alert("Diğer Tüm Oturumları Kapat", "Bu cihaz dışındaki tüm aktif oturumlar kapatılacak.", [
-      { text: "İptal", style: "cancel" },
-      { text: "Diğerlerini Kapat", style: "destructive", onPress: () => revokeOthers.mutate() },
+    Alert.alert(t("security.revokeOthersTitle"), t("security.revokeOthersBody"), [
+      { text: t("security.cancel"), style: "cancel" },
+      { text: t("security.revokeOthers"), style: "destructive", onPress: () => revokeOthers.mutate() },
     ]);
   };
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]} style={styles.screen}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable accessibilityLabel="Geri dön" onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+        <Pressable accessibilityLabel={t("security.back")} onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Hesap Güvenliği</Text>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{t("security.title")}</Text>
         <View style={styles.back} />
       </View>
 
@@ -59,21 +62,21 @@ export default function SecuritySettingsScreen() {
         <View style={[styles.notice, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}35` }]}>
           <IconSymbol name="lock.shield.fill" size={20} color={colors.primary} />
           <View style={styles.noticeText}>
-            <Text style={[styles.noticeTitle, { color: colors.foreground }]}>Güvenli oturumlar</Text>
-            <Text style={[styles.noticeBody, { color: colors.muted }]}>Tanımadığınız cihazları hemen kapatın. Para çekme işlemlerinde parola ile yeniden doğrulama istenir.</Text>
+            <Text style={[styles.noticeTitle, { color: colors.foreground }]}>{t("security.noticeTitle")}</Text>
+            <Text style={[styles.noticeBody, { color: colors.muted }]}>{t("security.noticeBody")}</Text>
           </View>
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Aktif cihazlar</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("security.activeDevices")}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Diğer oturumları kapat"
+            accessibilityLabel={t("security.revokeOthers")}
             disabled={revokeOthers.isPending || !sessions.data?.sessions.some((item) => item.id !== sessions.data?.currentSessionId && !item.revokedAt)}
             onPress={confirmRevokeOthers}
             style={({ pressed }) => [styles.revokeOthers, { borderColor: colors.error }, (pressed || revokeOthers.isPending) && styles.pressed]}
           >
-            <Text style={[styles.revokeOthersText, { color: colors.error }]}>Diğerlerini kapat</Text>
+            <Text style={[styles.revokeOthersText, { color: colors.error }]}>{t("security.revokeOthers")}</Text>
           </Pressable>
         </View>
 
@@ -82,9 +85,9 @@ export default function SecuritySettingsScreen() {
         ) : sessions.isError ? (
           <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <IconSymbol name="wifi.exclamationmark" size={22} color={colors.error} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Oturumlar yüklenemedi</Text>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{t("security.loadFailed")}</Text>
             <Pressable onPress={() => sessions.refetch()} style={({ pressed }) => [styles.retry, { backgroundColor: colors.primary }, pressed && styles.pressed]}>
-              <Text style={styles.retryText}>Yeniden dene</Text>
+              <Text style={styles.retryText}>{t("security.retry")}</Text>
             </Pressable>
           </View>
         ) : sessions.data?.sessions.length ? (
@@ -97,21 +100,21 @@ export default function SecuritySettingsScreen() {
                   <IconSymbol name={isCurrent ? "person.badge.shield.checkmark.fill" : "lock.fill"} size={20} color={inactive ? colors.muted : colors.primary} />
                   <View style={styles.sessionInfo}>
                     <View style={styles.sessionNameRow}>
-                      <Text style={[styles.sessionName, { color: colors.foreground }]} numberOfLines={1}>{isCurrent ? "Bu cihaz" : "Giriş yapılmış cihaz"}</Text>
-                      {isCurrent ? <Text style={[styles.currentBadge, { color: colors.primary, backgroundColor: `${colors.primary}18` }]}>Aktif</Text> : null}
+                      <Text style={[styles.sessionName, { color: colors.foreground }]} numberOfLines={1}>{isCurrent ? t("security.currentDevice") : t("security.signedInDevice")}</Text>
+                      {isCurrent ? <Text style={[styles.currentBadge, { color: colors.primary, backgroundColor: `${colors.primary}18` }]}>{t("security.active")}</Text> : null}
                     </View>
-                    <Text style={[styles.sessionMeta, { color: colors.muted }]} numberOfLines={1}>{session.userAgent || "Cihaz bilgisi mevcut değil"}</Text>
-                    <Text style={[styles.sessionMeta, { color: colors.muted }]}>{inactive ? "Oturum kapalı" : `Son etkinlik: ${formatSessionDate(session.lastSeenAt)}`}</Text>
+                    <Text style={[styles.sessionMeta, { color: colors.muted }]} numberOfLines={1}>{session.userAgent || t("security.deviceMissing")}</Text>
+                    <Text style={[styles.sessionMeta, { color: colors.muted }]}>{inactive ? t("security.closed") : t("security.lastActivity", { date: formatSessionDate(session.lastSeenAt, language) })}</Text>
                   </View>
                   {!inactive ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={isCurrent ? "Bu cihazdan çıkış yap" : "Cihaz oturumunu kapat"}
+                      accessibilityLabel={isCurrent ? t("security.revokeCurrentTitle") : t("security.revokeDeviceTitle")}
                       disabled={revokeSession.isPending}
                       onPress={() => confirmRevoke(session.id, isCurrent)}
                       style={({ pressed }) => [styles.sessionAction, (pressed || revokeSession.isPending) && styles.pressed]}
                     >
-                      <Text style={[styles.sessionActionText, { color: colors.error }]}>{isCurrent ? "Çıkış" : "Kapat"}</Text>
+                      <Text style={[styles.sessionActionText, { color: colors.error }]}>{isCurrent ? t("security.signOut") : t("security.close")}</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -121,8 +124,8 @@ export default function SecuritySettingsScreen() {
         ) : (
           <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <IconSymbol name="lock.fill" size={22} color={colors.muted} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Yerel oturum bulunamadı</Text>
-            <Text style={[styles.emptyBody, { color: colors.muted }]}>OAuth oturumları kimlik sağlayıcısı tarafından yönetilir.</Text>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{t("security.noSessions")}</Text>
+            <Text style={[styles.emptyBody, { color: colors.muted }]}>{t("security.noSessionsBody")}</Text>
           </View>
         )}
       </ScrollView>

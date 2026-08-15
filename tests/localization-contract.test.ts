@@ -26,6 +26,7 @@ describe("yerelleştirme sözleşmesi", () => {
       "explore.title",
       "ai.welcome",
       "wallet.history",
+      "messages.emptyTitle",
       "profile.personalInfo",
       "checkout.serviceSummary",
       "checkout.payWith",
@@ -61,5 +62,33 @@ describe("yerelleştirme sözleşmesi", () => {
     const value = new Date("2026-08-15T12:00:00.000Z");
     expect(formatLocalDate(value, "tr")).toContain("2026");
     expect(formatLocalDate(value, "en")).toContain("2026");
+  });
+
+  it("işlerim ve canlı takip metinlerini seçilen dille parametrik üretir", () => {
+    expect(t("jobs.title", "tr")).toBe("İşlerim");
+    expect(t("jobs.status.onTheWay", "en")).toBe("On the way");
+    expect(t("jobs.chatAccessibility", "ru", { name: "Murat" })).toBe("Написать Murat");
+    expect(t("tracking.status.etaSubtitle", "tr", { minutes: 12 })).toBe("Tahmini varış 12 dakika");
+    expect(t("tracking.status.etaSubtitle", "en", { minutes: 12 })).toBe("Estimated arrival in 12 minutes");
+    expect(t("tracking.lastUpdated", "ru", { time: "14:30" })).toBe("Обновлено 14:30");
+    expect(t("tracking.reviewService", "en")).toBe("Rate Service");
+  });
+
+  it("konuşma ekranının hata ve katılımcı metinlerini desteklenen dillerde çözer", () => {
+    expect(t("chat.providerMeta", "tr", { rating: "4.9" })).toBe("Profesyonel · 4.9 puan");
+    expect(t("chat.emptyTitle", "en")).toBe("No messages yet");
+    expect(t("chat.recordVoice", "ru")).toBe("Записать голосовое сообщение");
+  });
+
+  it("profesyonel fırsat ve teklif formu metinlerini tüm birincil dillerde çözer", () => {
+    expect(t("opportunities.title", "tr")).toBe("Yeni İş Fırsatları");
+    expect(t("opportunities.makeOffer", "en")).toBe("Make Offer");
+    expect(t("opportunities.estimatedTimePlaceholder", "ru")).toContain("30");
+  });
+
+  it("hesap güvenliği oturum eylemlerini parametrik ve yerel dille çözer", () => {
+    expect(t("security.sessionsRevokedBody", "tr", { count: 2 })).toContain("2");
+    expect(t("security.revokeOthers", "en")).toBe("Close Others");
+    expect(t("security.title", "ru")).toBe("Безопасность аккаунта");
   });
 });

@@ -16,6 +16,8 @@ import { ProviderBottomNav } from "@/components/provider-bottom-nav";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "@/lib/i18n";
+import { formatMoney } from "@/lib/i18n-core";
 import { trpc } from "@/lib/trpc";
 
 const CATEGORY_META: Record<string, { icon: string; color: string }> = {
@@ -40,6 +42,7 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
 
 export default function ProviderOpportunitiesScreen() {
   const colors = useColors();
+  const { t, language } = useTranslation();
   const { height: viewportHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ requestId?: string }>();
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(() => {
@@ -65,7 +68,7 @@ export default function ProviderOpportunitiesScreen() {
 
   const createOffer = trpc.offers.create.useMutation({
     onSuccess: async () => {
-      Alert.alert("Teklif Gönderildi", "Müşteri teklifiniz hakkında bilgilendirildi.");
+      Alert.alert(t("opportunities.offerSentTitle"), t("opportunities.offerSentBody"));
       setSelectedRequestId(null);
       setPrice("");
       setEstimatedTime("");
@@ -73,7 +76,7 @@ export default function ProviderOpportunitiesScreen() {
       await jobsQuery.refetch();
     },
     onError: (error) => {
-      Alert.alert("Teklif Gönderilemedi", error.message || "Lütfen tekrar deneyin.");
+      Alert.alert(t("opportunities.offerFailedTitle"), error.message || t("opportunities.retry"));
     },
   });
 
@@ -81,15 +84,15 @@ export default function ProviderOpportunitiesScreen() {
     const amount = Number(price.replace(",", "."));
 
     if (!selectedOpportunity || !profileQuery.data?.id) {
-      Alert.alert("Profil Gerekli", "Teklif verebilmek için profesyonel profiliniz bulunmalıdır.");
+      Alert.alert(t("opportunities.profileRequiredTitle"), t("opportunities.profileRequiredBody"));
       return;
     }
     if (!Number.isFinite(amount) || amount <= 0) {
-      Alert.alert("Geçersiz Tutar", "Lütfen sıfırdan büyük bir teklif tutarı girin.");
+      Alert.alert(t("opportunities.invalidAmountTitle"), t("opportunities.invalidAmountBody"));
       return;
     }
     if (!estimatedTime.trim()) {
-      Alert.alert("Süre Gerekli", "Tahmini varış veya tamamlama süresini girin.");
+      Alert.alert(t("opportunities.durationRequiredTitle"), t("opportunities.durationRequiredBody"));
       return;
     }
 
@@ -105,7 +108,7 @@ export default function ProviderOpportunitiesScreen() {
     return (
       <ScreenContainer edges={["top", "bottom", "left", "right"]} className="items-center justify-center">
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 12, color: colors.muted, fontSize: 14 }}>İş fırsatları yükleniyor…</Text>
+        <Text style={{ marginTop: 12, color: colors.muted, fontSize: 14 }}>{t("opportunities.loading")}</Text>
       </ScreenContainer>
     );
   }
@@ -114,9 +117,9 @@ export default function ProviderOpportunitiesScreen() {
     return (
       <ScreenContainer edges={["top", "bottom", "left", "right"]} className="items-center justify-center px-8">
         <IconSymbol name="wifi.exclamationmark" size={42} color={colors.error} />
-        <Text style={{ marginTop: 16, color: colors.foreground, fontSize: 18, fontWeight: "700", textAlign: "center" }}>Fırsatlar alınamadı</Text>
+        <Text style={{ marginTop: 16, color: colors.foreground, fontSize: 18, fontWeight: "700", textAlign: "center" }}>{t("opportunities.errorTitle")}</Text>
         <Text style={{ marginTop: 8, color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: "center" }}>
-          Bağlantınızı kontrol edip yeniden deneyin.
+          {t("opportunities.errorBody")}
         </Text>
         <Pressable
           onPress={() => {
@@ -133,7 +136,7 @@ export default function ProviderOpportunitiesScreen() {
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>Yeniden Dene</Text>
+          <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>{t("opportunities.retry")}</Text>
         </Pressable>
       </ScreenContainer>
     );
@@ -163,7 +166,7 @@ export default function ProviderOpportunitiesScreen() {
           borderBottomColor: colors.border,
         }}
       >
-        <Text style={{ color: colors.foreground, fontSize: 18, lineHeight: 24, fontWeight: "700" }}>Yeni İş Fırsatları</Text>
+        <Text style={{ color: colors.foreground, fontSize: 18, lineHeight: 24, fontWeight: "700" }}>{t("opportunities.title")}</Text>
       </View>
 
       <FlatList
@@ -174,9 +177,9 @@ export default function ProviderOpportunitiesScreen() {
         ListEmptyComponent={
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 30 }}>
             <IconSymbol name="briefcase.fill" size={44} color={colors.muted} />
-            <Text style={{ marginTop: 16, color: colors.foreground, fontSize: 18, fontWeight: "700", textAlign: "center" }}>Yeni fırsat bulunmuyor</Text>
+            <Text style={{ marginTop: 16, color: colors.foreground, fontSize: 18, fontWeight: "700", textAlign: "center" }}>{t("opportunities.emptyTitle")}</Text>
             <Text style={{ marginTop: 8, color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: "center" }}>
-              Kategorinize uygun yeni müşteri talepleri burada görünecek.
+              {t("opportunities.emptyBody")}
             </Text>
           </View>
         }
@@ -214,12 +217,12 @@ export default function ProviderOpportunitiesScreen() {
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={{ color: colors.foreground, fontSize: 14, lineHeight: 19, fontWeight: "700" }} numberOfLines={2}>{item.title}</Text>
                   <Text style={{ marginTop: 2, color: colors.muted, fontSize: 11 }} numberOfLines={1}>
-                    {category?.name || "Hizmet talebi"}
+                    {category?.name || t("opportunities.serviceFallback")}
                   </Text>
                   <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
                     <IconSymbol name="location.fill" size={13} color={colors.muted} />
                     <Text style={{ flex: 1, marginLeft: 4, color: colors.muted, fontSize: 12, lineHeight: 17 }} numberOfLines={1}>
-                      {item.address || "Konum belirtilmedi"}
+                      {item.address || t("opportunities.locationMissing")}
                     </Text>
                     {item.distanceKm ? (
                       <Text style={{ color: colors.muted, fontSize: 12, fontWeight: "600" }}>{item.distanceKm} km</Text>
@@ -234,11 +237,11 @@ export default function ProviderOpportunitiesScreen() {
 
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
                 <View>
-                  <Text style={{ color: colors.muted, fontSize: 12 }}>Müşteri bütçesi</Text>
+                  <Text style={{ color: colors.muted, fontSize: 12 }}>{t("opportunities.customerBudget")}</Text>
                   <Text style={{ marginTop: 4, color: colors.foreground, fontSize: 16, fontWeight: "800" }}>
                     {item.budgetMin || item.budgetMax
-                      ? `₺${item.budgetMin ?? 0} – ₺${item.budgetMax ?? item.budgetMin}`
-                      : "Teklife açık"}
+                      ? `${formatMoney(item.budgetMin ?? 0, language)} – ${formatMoney(item.budgetMax ?? item.budgetMin ?? 0, language)}`
+                      : t("opportunities.openForOffer")}
                   </Text>
                 </View>
                 <Pressable
@@ -252,7 +255,7 @@ export default function ProviderOpportunitiesScreen() {
                   })}
                 >
                   <Text style={{ color: isSelected ? colors.primary : "#FFFFFF", fontWeight: "700" }}>
-                    {isSelected ? "Kapat" : "Teklif Ver"}
+                    {isSelected ? t("opportunities.close") : t("opportunities.makeOffer")}
                   </Text>
                 </Pressable>
               </View>
@@ -263,7 +266,7 @@ export default function ProviderOpportunitiesScreen() {
                     value={price}
                     onChangeText={setPrice}
                     keyboardType="decimal-pad"
-                    placeholder="Teklif tutarı (₺)"
+                    placeholder={t("opportunities.pricePlaceholder")}
                     placeholderTextColor={colors.muted}
                     style={{
                       minHeight: 48,
@@ -278,7 +281,7 @@ export default function ProviderOpportunitiesScreen() {
                   <TextInput
                     value={estimatedTime}
                     onChangeText={setEstimatedTime}
-                    placeholder="Tahmini süre, örn. 30 dakika"
+                    placeholder={t("opportunities.estimatedTimePlaceholder")}
                     placeholderTextColor={colors.muted}
                     style={{
                       minHeight: 48,
@@ -294,7 +297,7 @@ export default function ProviderOpportunitiesScreen() {
                   <TextInput
                     value={message}
                     onChangeText={setMessage}
-                    placeholder="Müşteriye kısa not (isteğe bağlı)"
+                    placeholder={t("opportunities.messagePlaceholder")}
                     placeholderTextColor={colors.muted}
                     multiline
                     maxLength={500}
@@ -326,7 +329,7 @@ export default function ProviderOpportunitiesScreen() {
                     {createOffer.isPending ? (
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Teklifi Gönder</Text>
+                      <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>{t("opportunities.sendOffer")}</Text>
                     )}
                   </Pressable>
                 </View>

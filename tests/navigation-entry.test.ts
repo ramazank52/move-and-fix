@@ -18,7 +18,7 @@ function user(overrides: Partial<User> = {}): User {
 }
 
 describe("resolveEntryRoute", () => {
-  it("sends unauthenticated users to onboarding", () => {
+  it("sends unauthenticated users, including expired web sessions normalized to null, to onboarding", () => {
     expect(resolveEntryRoute(null)).toBe(ENTRY_ROUTES.unauthenticated);
   });
 

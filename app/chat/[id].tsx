@@ -23,6 +23,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { VoiceAudioBubble } from "@/components/voice-audio-bubble";
 import { useColors } from "@/hooks/use-colors";
 import { readUriAsBase64 } from "@/lib/file-to-base64";
+import { useTranslation } from "@/lib/i18n";
+import { localeForLanguage } from "@/lib/i18n-core";
 import { trpc } from "@/lib/trpc";
 
 export default function ChatRoomScreen() {
@@ -32,6 +34,7 @@ export default function ChatRoomScreen() {
     otherUserId?: string;
   }>();
   const colors = useColors();
+  const { t, language } = useTranslation();
   const router = useRouter();
   const utils = trpc.useUtils();
   const [input, setInput] = useState("");
@@ -129,8 +132,8 @@ export default function ChatRoomScreen() {
     }
   }, [audioRecorder, hasValidConversationContext, otherUid, recorderState.isRecording, requestId, sendVoiceMutation]);
 
-  const participantName = participantQuery.data?.displayName ?? "Profesyonel";
-  const participantInitial = participantName.charAt(0).toLocaleUpperCase("tr-TR");
+  const participantName = participantQuery.data?.displayName ?? t("chat.providerFallback");
+  const participantInitial = participantName.charAt(0).toLocaleUpperCase(localeForLanguage(language));
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
@@ -174,9 +177,9 @@ export default function ChatRoomScreen() {
           <Text style={{ marginTop: 2, fontSize: 12, color: colors.muted }}>
             {participantQuery.data?.isProvider
               ? participantQuery.data.rating
-                ? `Profesyonel · ${Number(participantQuery.data.rating).toFixed(1)} puan`
-                : "Profesyonel"
-              : "Move&Fix kullanıcısı"}
+                ? t("chat.providerMeta", { rating: Number(participantQuery.data.rating).toFixed(1) })
+                : t("chat.providerFallback")
+              : t("chat.userMeta")}
           </Text>
         </View>
       </View>
@@ -194,18 +197,18 @@ export default function ChatRoomScreen() {
               <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
                 <IconSymbol name="exclamationmark.shield.fill" size={30} color={colors.error} />
                 <Text style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>
-                  Bu sohbet için geçerli bir hizmet kaydı gerekli.
+                  {t("chat.invalidContext")}
                 </Text>
               </View>
             ) : messagesQuery.isLoading ? (
               <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ fontSize: 14, color: colors.muted, marginTop: 12 }}>Mesajlar yükleniyor...</Text>
+                <Text style={{ fontSize: 14, color: colors.muted, marginTop: 12 }}>{t("chat.loading")}</Text>
               </View>
             ) : messagesQuery.isError ? (
               <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
                 <IconSymbol name="wifi.exclamationmark" size={30} color={colors.error} />
-                <Text style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>Mesajlar yüklenemedi</Text>
+                <Text style={{ fontSize: 14, color: colors.muted, marginTop: 8 }}>{t("chat.loadError")}</Text>
               </View>
             ) : (
               <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 40 }}>
@@ -222,8 +225,8 @@ export default function ChatRoomScreen() {
                 >
                   <IconSymbol name="message.fill" size={26} color={colors.muted} />
                 </View>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>Henüz mesaj yok</Text>
-                <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>İlk mesajı gönderin</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}>{t("chat.emptyTitle")}</Text>
+                <Text style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>{t("chat.emptyBody")}</Text>
               </View>
             )
           }
@@ -268,7 +271,7 @@ export default function ChatRoomScreen() {
                 <View style={{ marginTop: 4, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                   <Text style={{ fontSize: 10, color: item.isOwn ? "#FFFFFFB3" : colors.muted }}>
                     {item.createdAt
-                      ? new Date(item.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+                      ? new Date(item.createdAt).toLocaleTimeString(localeForLanguage(language), { hour: "2-digit", minute: "2-digit" })
                       : ""}
                   </Text>
                   {item.isOwn ? (
@@ -284,7 +287,7 @@ export default function ChatRoomScreen() {
 
         {sendMessageMutation.isError || sendVoiceMutation.isError ? (
           <Text style={{ paddingHorizontal: 16, paddingBottom: 6, color: colors.error, fontSize: 12 }}>
-            {sendVoiceMutation.isError ? "Sesli mesaj gönderilemedi. Lütfen tekrar deneyin." : "Mesaj gönderilemedi. Lütfen tekrar deneyin."}
+            {sendVoiceMutation.isError ? t("chat.voiceSendError") : t("chat.sendError")}
           </Text>
         ) : null}
         <View
@@ -303,7 +306,7 @@ export default function ChatRoomScreen() {
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Mesaj yazın..."
+            placeholder={t("chat.placeholder")}
             placeholderTextColor={colors.muted}
             returnKeyType="send"
             onSubmitEditing={sendMessage}
@@ -327,7 +330,7 @@ export default function ChatRoomScreen() {
             onPress={toggleVoiceRecording}
             disabled={!hasValidConversationContext || sendVoiceMutation.isPending}
             accessibilityRole="button"
-            accessibilityLabel={recorderState.isRecording ? "Ses kaydını bitir ve gönder" : "Sesli mesaj kaydet"}
+            accessibilityLabel={recorderState.isRecording ? t("chat.stopRecordAndSend") : t("chat.recordVoice")}
             style={({ pressed }) => ({
               width: 42,
               height: 42,

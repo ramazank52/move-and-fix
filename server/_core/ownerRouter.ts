@@ -70,6 +70,7 @@ function adminAuthRequired() {
 }
 
 const mfaCodeSchema = z.string().regex(/^\d{6}$/, "6 haneli güvenlik kodunu girin");
+const ADMIN_MFA_REQUEST_COOLDOWN_MS = 60_000;
 
 function hashAdminMfaCode(userId: number, code: string): string {
   if (!ENV.cookieSecret) {
@@ -99,6 +100,13 @@ export const ownerRouter = router({
 
   requestMfa: adminProcedure.mutation(async ({ ctx }) => {
     requiresMfaSession(ctx);
+    const activeChallenge = await getLatestActiveAuthChallenge({ userId: ctx.user.id, purpose: "admin_mfa" });
+    if (activeChallenge?.createdAt && Date.now() - new Date(activeChallenge.createdAt).getTime() < ADMIN_MFA_REQUEST_COOLDOWN_MS) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "MFA kodu yakın zamanda gönderildi. Lütfen tekrar istemeden önce kısa süre bekleyin.",
+      });
+    }
     const code = randomInt(100_000, 1_000_000).toString();
     await createAuthChallenge({
       userId: ctx.user.id,

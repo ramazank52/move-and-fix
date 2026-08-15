@@ -299,3 +299,5 @@
 - [ ] Phase 10 i18n: müşteri, profesyonel, ödeme, cüzdan, mesaj, takip ve ayar ekranlarında kullanıcıya görünen sabit metinleri çeviri anahtarlarına taşı
 - [ ] Phase 10 sağlayıcı sandbox: gerçek credential olmadan Stripe/iyzico/OTP adapter’larının fail-closed önkoşullarını, callback sözleşmelerini ve uzlaştırma başlatma blokajlarını doğrula
 - [ ] Phase 10 MFA/i18n/sandbox hata, yetki, edge-case ve regresyon testlerini ekle; kalite kapılarını yeniden çalıştır
+- [x] Phase 10 geçersiz/eskimiş oturumda kök route yükleme ekranının takılı kalmadığını doğrula ve yönlendirme regresyonunu düzelt
+- [x] Phase 10 admin MFA kod isteğine kullanıcı ve amaç bağlı kısa aralıklı tekrar sınırı ekle; hata ve başarı sözleşmesini test et

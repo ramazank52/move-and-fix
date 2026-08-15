@@ -23,6 +23,8 @@ import type { TrackingCoordinate } from "@/components/job-tracking-map.types";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { readUriAsBase64 } from "@/lib/file-to-base64";
+import { useTranslation } from "@/lib/i18n";
+import { formatMoney, localeForLanguage, type Language, type TranslationKey, type TranslationValues } from "@/lib/i18n-core";
 import { trpc } from "@/lib/trpc";
 
 type LifecycleStatus =
@@ -65,23 +67,23 @@ function resolveCompletionMime(asset: ImagePicker.ImagePickerAsset): PendingComp
 
 const TIMELINE: readonly {
   status: Exclude<LifecycleStatus, "cancelled">;
-  label: string;
+  labelKey: TranslationKey;
   icon: keyof typeof MaterialIcons.glyphMap;
 }[] = [
-  { status: "scheduled", label: "Planlandı", icon: "event-available" },
-  { status: "on_the_way", label: "Yolda", icon: "directions-car" },
-  { status: "arrived", label: "Ulaştı", icon: "location-on" },
-  { status: "in_progress", label: "İş Başladı", icon: "handyman" },
-  { status: "completed", label: "Tamamlandı", icon: "check-circle" },
+  { status: "scheduled", labelKey: "tracking.timeline.scheduled", icon: "event-available" },
+  { status: "on_the_way", labelKey: "tracking.timeline.onTheWay", icon: "directions-car" },
+  { status: "arrived", labelKey: "tracking.timeline.arrived", icon: "location-on" },
+  { status: "in_progress", labelKey: "tracking.timeline.inProgress", icon: "handyman" },
+  { status: "completed", labelKey: "tracking.timeline.completed", icon: "check-circle" },
 ];
 
 const NEXT_ACTION: Partial<
-  Record<LifecycleStatus, { status: LifecycleStatus; label: string; icon: keyof typeof MaterialIcons.glyphMap }>
+  Record<LifecycleStatus, { status: LifecycleStatus; labelKey: TranslationKey; icon: keyof typeof MaterialIcons.glyphMap }>
 > = {
-  scheduled: { status: "on_the_way", label: "Yola Çık", icon: "directions-car" },
-  on_the_way: { status: "arrived", label: "Adrese Ulaştım", icon: "location-on" },
-  arrived: { status: "in_progress", label: "İşi Başlat", icon: "play-arrow" },
-  in_progress: { status: "completed", label: "İşi Tamamla", icon: "check" },
+  scheduled: { status: "on_the_way", labelKey: "tracking.action.depart", icon: "directions-car" },
+  on_the_way: { status: "arrived", labelKey: "tracking.action.arrived", icon: "location-on" },
+  arrived: { status: "in_progress", labelKey: "tracking.action.start", icon: "play-arrow" },
+  in_progress: { status: "completed", labelKey: "tracking.action.complete", icon: "check" },
 };
 
 function parseCoordinate(value: string | null | undefined) {
@@ -104,38 +106,40 @@ function getDistanceKm(start: TrackingCoordinate | null, end: TrackingCoordinate
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function getStatusCopy(status: LifecycleStatus, etaMinutes: number | null) {
+type Translate = (key: TranslationKey, values?: TranslationValues) => string;
+
+function getStatusCopy(t: Translate, status: LifecycleStatus, etaMinutes: number | null) {
   switch (status) {
     case "scheduled":
-      return { title: "Planlandı", subtitle: "Profesyonel hizmet için hazırlanıyor", color: "#8B5CF6" };
+      return { title: t("tracking.status.scheduledTitle"), subtitle: t("tracking.status.scheduledSubtitle"), color: "#8B5CF6" };
     case "on_the_way":
       return {
-        title: "Yolda",
-        subtitle: etaMinutes == null ? "Profesyonel konumunuza geliyor" : `Tahmini varış ${etaMinutes} dakika`,
+        title: t("tracking.status.onTheWayTitle"),
+        subtitle: etaMinutes == null ? t("tracking.status.onTheWaySubtitle") : t("tracking.status.etaSubtitle", { minutes: etaMinutes }),
         color: "#3B82F6",
       };
     case "arrived":
-      return { title: "Adrese Ulaştı", subtitle: "Profesyonel hizmet adresinde", color: "#22C55E" };
+      return { title: t("tracking.status.arrivedTitle"), subtitle: t("tracking.status.arrivedSubtitle"), color: "#22C55E" };
     case "in_progress":
-      return { title: "Hizmet Devam Ediyor", subtitle: "İşlem profesyonel tarafından başlatıldı", color: "#F59E0B" };
+      return { title: t("tracking.status.inProgressTitle"), subtitle: t("tracking.status.inProgressSubtitle"), color: "#F59E0B" };
     case "completed":
-      return { title: "Hizmet Tamamlandı", subtitle: "Deneyiminizi değerlendirebilirsiniz", color: "#22C55E" };
+      return { title: t("tracking.status.completedTitle"), subtitle: t("tracking.status.completedSubtitle"), color: "#22C55E" };
     case "cancelled":
-      return { title: "İş İptal Edildi", subtitle: "Bu iş için canlı takip sonlandırıldı", color: "#EF4444" };
+      return { title: t("tracking.status.cancelledTitle"), subtitle: t("tracking.status.cancelledSubtitle"), color: "#EF4444" };
   }
 }
 
-function formatPrice(amount: string | number | null | undefined) {
+function formatPrice(amount: string | number | null | undefined, language: Language) {
   const value = Number(amount);
   if (!Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(value);
+  return formatMoney(value, language);
 }
 
-function formatUpdatedAt(value: Date | string | null | undefined) {
-  if (!value) return "Henüz konum paylaşılmadı";
+function formatUpdatedAt(value: Date | string | null | undefined, language: Language, t: Translate) {
+  if (!value) return t("tracking.noLocation");
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Güncelleme zamanı bilinmiyor";
-  return `Son güncelleme ${date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`;
+  if (Number.isNaN(date.getTime())) return t("tracking.locationUnknown");
+  return t("tracking.lastUpdated", { time: date.toLocaleTimeString(localeForLanguage(language), { hour: "2-digit", minute: "2-digit" }) });
 }
 
 function parseAiAnalysisFlags(value: string | null | undefined): string[] {
@@ -157,6 +161,7 @@ function formatAiConfidence(value: string | number | null | undefined) {
 
 export default function LiveTrackingScreen() {
   const colors = useColors();
+  const { t, language } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ requestId?: string }>();
@@ -225,7 +230,7 @@ export default function LiveTrackingScreen() {
 
   const tracking = trackingQuery.data;
   const lifecycleStatus = (tracking?.lifecycleStatus ?? "scheduled") as LifecycleStatus;
-  const statusInfo = getStatusCopy(lifecycleStatus, tracking?.etaMinutes ?? null);
+  const statusInfo = getStatusCopy(t, lifecycleStatus, tracking?.etaMinutes ?? null);
   const providerCoordinate = useMemo<TrackingCoordinate | null>(() => {
     const latitude = parseCoordinate(tracking?.providerLatitude);
     const longitude = parseCoordinate(tracking?.providerLongitude);
@@ -520,7 +525,9 @@ export default function LiveTrackingScreen() {
           <View style={[styles.mapMeta, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <MaterialIcons name="my-location" size={15} color={colors.primary} />
             <Text style={[styles.mapMetaText, { color: colors.muted }]}>
-              {distanceKm == null ? formatUpdatedAt(tracking.lastLocationAt) : `${distanceKm.toFixed(1)} km · ${formatUpdatedAt(tracking.lastLocationAt)}`}
+              {distanceKm == null
+                ? formatUpdatedAt(tracking.lastLocationAt, language, t)
+                : `${distanceKm.toFixed(1)} km · ${formatUpdatedAt(tracking.lastLocationAt, language, t)}`}
             </Text>
           </View>
         </View>
@@ -559,7 +566,7 @@ export default function LiveTrackingScreen() {
         <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.detailHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Hizmet Detayı</Text>
-            <Text style={[styles.priceText, { color: colors.primary }]}>{formatPrice(tracking.acceptedPrice)}</Text>
+            <Text style={[styles.priceText, { color: colors.primary }]}>{formatPrice(tracking.acceptedPrice, language)}</Text>
           </View>
           <View style={styles.detailRow}>
             <MaterialIcons name="home-repair-service" size={19} color={colors.muted} />
@@ -572,7 +579,7 @@ export default function LiveTrackingScreen() {
             <MaterialIcons name="location-on" size={19} color={colors.muted} />
             <View style={styles.detailCopy}>
               <Text style={[styles.detailLabel, { color: colors.muted }]}>Adres</Text>
-              <Text style={[styles.detailValue, { color: colors.foreground }]}>{tracking.address || "Adres paylaşılmadı"}</Text>
+              <Text style={[styles.detailValue, { color: colors.foreground }]}>{tracking.address || t("tracking.addressMissing")}</Text>
             </View>
           </View>
         </View>
@@ -591,7 +598,7 @@ export default function LiveTrackingScreen() {
                       <MaterialIcons name={isComplete ? "check" : step.icon} size={isCurrent ? 15 : 13} color={isComplete ? "#FFFFFF" : colors.muted} />
                     </View>
                   </View>
-                  <Text style={[styles.timelineLabel, { color: isCurrent ? colors.foreground : colors.muted }]} numberOfLines={2}>{step.label}</Text>
+                  <Text style={[styles.timelineLabel, { color: isCurrent ? colors.foreground : colors.muted }]} numberOfLines={2}>{t(step.labelKey)}</Text>
                 </View>
               );
             })}
@@ -726,7 +733,7 @@ export default function LiveTrackingScreen() {
                 style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary, opacity: pressed || updateLifecycle.isPending ? 0.72 : 1 }]}
               >
                 {updateLifecycle.isPending ? <ActivityIndicator color="#FFFFFF" /> : <MaterialIcons name={nextAction.icon} size={20} color="#FFFFFF" />}
-                <Text style={styles.primaryButtonText}>{nextAction.label}</Text>
+                <Text style={styles.primaryButtonText}>{t(nextAction.labelKey)}</Text>
               </Pressable>
             ) : null}
           </View>

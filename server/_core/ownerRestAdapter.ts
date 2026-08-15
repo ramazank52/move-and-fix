@@ -73,6 +73,7 @@ function statusForOwnerError(error: unknown) {
   if (code === "FORBIDDEN") return 403;
   if (code === "NOT_FOUND") return 404;
   if (code === "PRECONDITION_FAILED") return 412;
+  if (code === "TOO_MANY_REQUESTS") return 429;
   if (code === "BAD_REQUEST" || code === "PARSE_ERROR") return 400;
   if (code === "CONFLICT") return 409;
   return 500;
