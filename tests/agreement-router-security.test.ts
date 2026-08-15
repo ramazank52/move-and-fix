@@ -8,6 +8,8 @@ vi.mock("../server/db", () => ({
   createJobChangeOrder: vi.fn(),
   respondToJobChangeOrder: vi.fn(),
   withdrawJobChangeOrder: vi.fn(),
+  listExpenseRefundRequestsForParticipant: vi.fn(),
+  resolveExpenseRefundRequest: vi.fn(),
   getJobCancellation: vi.fn(),
   openJobCancellation: vi.fn(),
   withdrawJobCancellation: vi.fn(),
@@ -94,6 +96,19 @@ describe("agreement router security", () => {
     expect(agreementDb.withdrawJobCancellation).toHaveBeenCalledWith(42, 81);
   });
 
+  it("derives an expense-refund decision identity only from the authenticated customer session", async () => {
+    vi.mocked(agreementDb.resolveExpenseRefundRequest).mockResolvedValue({ id: 91, status: "approved" } as never);
+    const caller = appRouter.createCaller(createContext(92));
+
+    await caller.agreements.resolveExpenseRefund({ refundRequestId: 91, decision: "approved" });
+
+    expect(agreementDb.resolveExpenseRefundRequest).toHaveBeenCalledWith({
+      refundRequestId: 91,
+      decision: "approved",
+      customerUserId: 92,
+    });
+  });
+
   it("rejects unauthenticated agreement access before database operations", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
     await expect(caller.agreements.changeOrders({ requestId: 42 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
@@ -104,13 +119,16 @@ describe("agreement router security", () => {
         description: "Geçerli bir iptal açıklaması ile gönderildi.",
       }),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.agreements.resolveExpenseRefund({ refundRequestId: 5, decision: "rejected" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(agreementDb.listJobChangeOrders).not.toHaveBeenCalled();
     expect(agreementDb.openJobCancellation).not.toHaveBeenCalled();
+    expect(agreementDb.resolveExpenseRefundRequest).not.toHaveBeenCalled();
   });
 
   it("rejects malformed identifiers, duplicate evidence and non-positive amount changes before database access", async () => {
     const caller = appRouter.createCaller(createContext(73));
     await expect(caller.agreements.changeOrders({ requestId: 0 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.agreements.resolveExpenseRefund({ refundRequestId: 0, decision: "approved" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(
       caller.agreements.createChangeOrder({
         requestId: 42,
@@ -135,6 +153,7 @@ describe("agreement router security", () => {
     vi.mocked(agreementDb.createJobChangeOrder).mockRejectedValue(new Error("JOB_AGREEMENT_FORBIDDEN"));
     vi.mocked(agreementDb.respondToJobChangeOrder).mockRejectedValue(new Error("CHANGE_ORDER_NOT_PENDING"));
     vi.mocked(agreementDb.openJobCancellation).mockRejectedValue(new Error("JOB_EVIDENCE_INVALID"));
+    vi.mocked(agreementDb.resolveExpenseRefundRequest).mockRejectedValue(new Error("EXPENSE_CUSTOMER_ONLY"));
     const caller = appRouter.createCaller(createContext(73));
 
     await expect(
@@ -155,5 +174,6 @@ describe("agreement router security", () => {
         description: "Geçerli bir iptal açıklaması ile gönderildi.",
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.agreements.resolveExpenseRefund({ refundRequestId: 11, decision: "approved" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

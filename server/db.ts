@@ -1571,7 +1571,7 @@ export async function getServiceRequestMedia(requestId: number) {
 export async function createServiceRequestMedia(data: {
   requestId: number;
   ownerUserId: number;
-  purpose: "request" | "before" | "after" | "completion" | "dispute";
+  purpose: "request" | "before" | "after" | "completion" | "dispute" | "expense";
   kind: "image" | "video" | "document";
   storageKey: string;
   originalName: string;
@@ -4729,6 +4729,12 @@ async function getExpenseJobContext(requestId: number, userId: number) {
   return { database, ...context, isCustomer, isProvider };
 }
 
+export async function assertExpenseMediaUpload(requestId: number, userId: number) {
+  const context = await getExpenseJobContext(requestId, userId);
+  if (!context.isProvider) throw new Error("EXPENSE_PROVIDER_ONLY");
+  return { agreementId: context.agreement.id };
+}
+
 export async function createJobExpense(input: { requestId: number; providerUserId: number; category: JobExpenseCategory; amount: number; description: string; purchasedAt: Date; vendorName?: string; brand?: string; model?: string; quantity?: number; locationUrl?: string; mediaIds: number[] }) {
   if (!Number.isInteger(input.amount) || input.amount <= 0) throw new Error("EXPENSE_AMOUNT_INVALID");
   const context = await getExpenseJobContext(input.requestId, input.providerUserId);
@@ -4762,4 +4768,54 @@ export async function submitExpenseRefundRequest(input: { expenseId: number; pro
   if (input.requestedAmount > expense.amount) throw new Error("EXPENSE_REFUND_EXCEEDS_EXPENSE");
   const result = await database.insert(expenseRefundRequests).values({ requestId: expense.requestId, expenseId: expense.id, providerId: expense.providerId, requestedAmount: input.requestedAmount, materialAssessmentJson: input.materialAssessmentJson, status: "submitted" });
   return Number(result[0].insertId);
+}
+
+export async function listExpenseRefundRequestsForParticipant(requestId: number, userId: number) {
+  const context = await getExpenseJobContext(requestId, userId);
+  return context.database
+    .select()
+    .from(expenseRefundRequests)
+    .where(eq(expenseRefundRequests.requestId, requestId))
+    .orderBy(expenseRefundRequests.createdAt, expenseRefundRequests.id);
+}
+
+/**
+ * An expense-reimbursement decision records customer consent only. It never
+ * creates a customer charge, wallet movement, or payment-gateway action.
+ */
+export async function resolveExpenseRefundRequest(input: {
+  refundRequestId: number;
+  customerUserId: number;
+  decision: "approved" | "rejected";
+  resolutionNote?: string;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select()
+    .from(expenseRefundRequests)
+    .where(eq(expenseRefundRequests.id, input.refundRequestId))
+    .limit(1);
+  const refundRequest = rows[0];
+  if (!refundRequest) throw new Error("EXPENSE_REFUND_NOT_FOUND");
+
+  const context = await getExpenseJobContext(refundRequest.requestId, input.customerUserId);
+  if (!context.isCustomer) throw new Error("EXPENSE_CUSTOMER_ONLY");
+
+  const result = await database
+    .update(expenseRefundRequests)
+    .set({
+      status: input.decision,
+      reviewedByUserId: input.customerUserId,
+      resolutionNote: input.resolutionNote,
+      resolvedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(expenseRefundRequests.id, input.refundRequestId),
+        inArray(expenseRefundRequests.status, ["submitted", "under_review"]),
+      ),
+    );
+  if (Number(result[0].affectedRows) !== 1) throw new Error("EXPENSE_REFUND_NOT_ACTIONABLE");
+  return { id: input.refundRequestId, status: input.decision };
 }

@@ -315,9 +315,11 @@
 - [x] Faz 3 versioned/prospective komisyon, immutable anlaşma snapshot, hold/settlement koşulları ve configurable completion review penceresini ekle
 - [ ] Faz 3 dispute, partial settlement, iptal, change request ve güvenli iş dosyası yaşam döngüsünü gerçek API/DB akışına bağla
 - [ ] Faz 3 ödeme webhook, idempotency, replay, race-condition ve server-side tutar/para birimi kontrollerini regresyon testleriyle doğrula
-- [ ] Faz 4 job-scoped expense record, ayrı reimbursement claim, müşteri borcu olmama kuralı ve hassas bilgi redaksiyonunu uygula
-- [ ] Faz 4 mesaj ve aktif iş bağlamına job expense file erişimi ile güvenli medya ilişkilendirmesini ekle
-- [ ] Faz 4 masraf sahipliği, medya yetkisi, masraf/claim ayrımı ve müşteri görünürlüğü regresyonlarını doğrula
+- [x] Faz 4 job-scoped expense record, ayrı reimbursement claim, müşteri borcu olmama kuralı ve hassas bilgi redaksiyonunu uygula
+- [x] Faz 4 mesaj ve aktif iş bağlamına job expense file erişimi ile güvenli medya ilişkilendirmesini ekle
+- [x] Faz 4 masraf sahipliği, medya yetkisi, masraf/claim ayrımı ve müşteri görünürlüğü regresyonlarını doğrula
+- [x] Faz 4 aktif işten erişilen gerçek masraf listesi, kanıt yükleme ve geri ödeme talebi mobil akışını ekle
+- [x] Faz 4 müşteri için masraf iade talebi onay/red kararı ve denetlenebilir durum görünümünü ekle
 - [ ] Faz 5 MoveAI taslak–özet–açık onay–request oluşturma akışını, sahte fiyat/ETA/usta üretmeme kuralıyla güçlendir
 - [ ] Faz 5 AI yetki sınırı, prompt injection veri ayrımı, trust/risk sinyalleri, itibar bütünlüğü ve iş güvenliği capability kontrollerini ekle
 - [ ] Faz 5 AI/risk etkilerinde human-review, açıklanabilir audit ve kritik finansal/hukuki işlem engellerini test et

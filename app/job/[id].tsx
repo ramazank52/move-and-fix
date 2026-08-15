@@ -187,6 +187,12 @@ export default function JobDetailScreen() {
                 <Text className="font-bold text-white">Canlı Takip</Text>
               </Pressable>
             </View>
+            <Pressable
+              onPress={() => router.push(`/expenses/${request.id}` as any)}
+              style={({ pressed }) => ({ marginTop: 10, minHeight: 42, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text style={{ color: colors.foreground, fontWeight: "700" }}>İş masraflarını görüntüle</Text>
+            </Pressable>
           </View>
         ) : null}
 

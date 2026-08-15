@@ -6,6 +6,7 @@ import type { TrpcContext } from "../server/_core/context";
 vi.mock("../server/db", () => ({
   createServiceRequest: vi.fn(),
   createServiceRequestMedia: vi.fn(),
+  assertExpenseMediaUpload: vi.fn(),
   getActiveServiceCategories: vi.fn(),
   getActiveServiceSubcategories: vi.fn(),
   getProviderProfile: vi.fn(),
@@ -193,6 +194,29 @@ describe("phase 31 service request contracts", () => {
 
     expect(requestDb.getServiceRequestMedia).not.toHaveBeenCalled();
     expect(storagePut).not.toHaveBeenCalled();
+  });
+
+  it("requires assigned-provider authorization before accepting expense evidence", async () => {
+    vi.mocked(requestDb.getServiceRequestById).mockResolvedValue({
+      id: 501,
+      userId: 99,
+      status: "active",
+    } as Awaited<ReturnType<typeof requestDb.getServiceRequestById>>);
+    vi.mocked(requestDb.assertExpenseMediaUpload).mockRejectedValue(new Error("EXPENSE_PROVIDER_ONLY"));
+    const caller = appRouter.createCaller(createContext(73));
+
+    await expect(
+      caller.requests.uploadMedia({
+        requestId: 501,
+        purpose: "expense",
+        originalName: "malzeme.png",
+        mimeType: "image/png",
+        base64: validPng.toString("base64"),
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    expect(storagePut).not.toHaveBeenCalled();
+    expect(requestDb.createServiceRequestMedia).not.toHaveBeenCalled();
   });
 
   it("rejects spoofed media content before storage", async () => {

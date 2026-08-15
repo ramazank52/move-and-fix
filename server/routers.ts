@@ -315,7 +315,12 @@ async function runAgreementOperation<T>(operation: () => Promise<T>): Promise<T>
     if (message.includes("NOT_FOUND")) {
       throw new TRPCError({ code: "NOT_FOUND", message: "İş veya anlaşma kaydı bulunamadı" });
     }
-    if (message.includes("FORBIDDEN")) {
+    if (
+      message.includes("FORBIDDEN") ||
+      message.includes("ACCESS_DENIED") ||
+      message.includes("PROVIDER_ONLY") ||
+      message.includes("CUSTOMER_ONLY")
+    ) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Bu iş anlaşması işlemine yetkiniz yok" });
     }
     if (message.includes("INVALID") || message.includes("MISMATCH") || message.includes("DESCRIPTION")) {
@@ -324,6 +329,7 @@ async function runAgreementOperation<T>(operation: () => Promise<T>): Promise<T>
     if (
       message.includes("CONFLICT") ||
       message.includes("NOT_PENDING") ||
+      message.includes("NOT_ACTIONABLE") ||
       message.includes("ALREADY_OPEN") ||
       message.includes("REQUEST_INVALID_STATUS")
     ) {
@@ -614,6 +620,7 @@ export const appRouter = router({
     uploadMedia: protectedProcedure
       .input(z.object({
         requestId: z.number().int().positive(),
+        purpose: z.enum(["request", "expense"]).default("request"),
         originalName: z
           .string()
           .trim()
@@ -634,11 +641,15 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const request = await db.getServiceRequestById(input.requestId);
         if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
-        if (request.userId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Bu talebe medya ekleme yetkiniz yok" });
-        }
-        if (request.status !== "pending") {
-          throw new TRPCError({ code: "CONFLICT", message: "Yalnız bekleyen taleplere medya eklenebilir" });
+        if (input.purpose === "request") {
+          if (request.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Bu talebe medya ekleme yetkiniz yok" });
+          }
+          if (request.status !== "pending") {
+            throw new TRPCError({ code: "CONFLICT", message: "Yalnız bekleyen taleplere medya eklenebilir" });
+          }
+        } else {
+          await runAgreementOperation(() => db.assertExpenseMediaUpload(input.requestId, ctx.user.id));
         }
 
         const existingMedia = await db.getServiceRequestMedia(input.requestId);
@@ -664,7 +675,7 @@ export const appRouter = router({
         const mediaId = await db.createServiceRequestMedia({
           requestId: input.requestId,
           ownerUserId: ctx.user.id,
-          purpose: "request",
+          purpose: input.purpose,
           kind: policy.kind,
           storageKey: uploaded.key,
           originalName: input.originalName,
@@ -843,6 +854,20 @@ export const appRouter = router({
       }))
       .mutation(({ ctx, input }) =>
         runAgreementOperation(() => db.submitExpenseRefundRequest({ ...input, providerUserId: ctx.user.id })),
+      ),
+    expenseRefunds: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        runAgreementOperation(() => db.listExpenseRefundRequestsForParticipant(input.requestId, ctx.user.id)),
+      ),
+    resolveExpenseRefund: protectedProcedure
+      .input(z.object({
+        refundRequestId: z.number().int().positive(),
+        decision: z.enum(["approved", "rejected"]),
+        resolutionNote: z.string().trim().min(3).max(2_000).optional(),
+      }))
+      .mutation(({ ctx, input }) =>
+        runAgreementOperation(() => db.resolveExpenseRefundRequest({ ...input, customerUserId: ctx.user.id })),
       ),
     cancellation: protectedProcedure
       .input(z.object({ requestId: z.number().int().positive() }))
