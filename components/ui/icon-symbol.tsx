@@ -125,6 +125,8 @@ const MAPPING = {
   "refrigerator.fill": "kitchen",
   "circle": "radio-button-unchecked",
   "play.circle.fill": "play-circle-filled",
+  "pause.circle.fill": "pause-circle-filled",
+  "mic.fill": "mic",
 } as unknown as IconMapping;
 
 /**

@@ -10,10 +10,19 @@ import {
 } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { VoiceAudioBubble } from "@/components/voice-audio-bubble";
 import { useColors } from "@/hooks/use-colors";
+import { readUriAsBase64 } from "@/lib/file-to-base64";
 import { trpc } from "@/lib/trpc";
 
 export default function ChatRoomScreen() {
@@ -28,6 +37,9 @@ export default function ChatRoomScreen() {
   const [input, setInput] = useState("");
   const flatListRef = useRef<FlatList>(null);
   const markedReadForRef = useRef("");
+  const voiceStartedAtRef = useRef<number | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
   const otherUid = Number(otherUserId);
   const parsedRequestId = Number(requestIdParam ?? id);
   const requestId = Number.isInteger(parsedRequestId) && parsedRequestId > 0 ? parsedRequestId : undefined;
@@ -55,6 +67,12 @@ export default function ChatRoomScreen() {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
     },
   });
+  const sendVoiceMutation = trpc.messages.sendVoice.useMutation({
+    onSuccess: async () => {
+      await Promise.all([messagesQuery.refetch(), utils.messages.list.invalidate()]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+    },
+  });
 
   useEffect(() => {
     if (
@@ -77,6 +95,39 @@ export default function ChatRoomScreen() {
       requestId,
     });
   }, [hasValidConversationContext, input, otherUid, requestId, sendMessageMutation]);
+
+  const toggleVoiceRecording = useCallback(async () => {
+    if (!hasValidConversationContext || sendVoiceMutation.isPending) return;
+    try {
+      if (!recorderState.isRecording) {
+        const permission = await requestRecordingPermissionsAsync();
+        if (!permission.granted) return;
+        await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+        await audioRecorder.prepareToRecordAsync();
+        audioRecorder.record();
+        voiceStartedAtRef.current = Date.now();
+        return;
+      }
+
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+      const startedAt = voiceStartedAtRef.current;
+      voiceStartedAtRef.current = null;
+      if (!uri || !startedAt) return;
+      const durationMs = Math.max(250, Math.min(5 * 60 * 1000, Date.now() - startedAt));
+      const mimeType = Platform.OS === "web" ? "audio/webm" : "audio/mp4";
+      const base64 = await readUriAsBase64(uri);
+      sendVoiceMutation.mutate({
+        receiverId: otherUid,
+        requestId: requestId!,
+        mimeType,
+        durationMs,
+        base64,
+      });
+    } catch {
+      voiceStartedAtRef.current = null;
+    }
+  }, [audioRecorder, hasValidConversationContext, otherUid, recorderState.isRecording, requestId, sendVoiceMutation]);
 
   const participantName = participantQuery.data?.displayName ?? "Profesyonel";
   const participantInitial = participantName.charAt(0).toLocaleUpperCase("tr-TR");
@@ -207,9 +258,13 @@ export default function ChatRoomScreen() {
                   borderColor: item.isOwn ? colors.primary : colors.border,
                 }}
               >
-                <Text style={{ fontSize: 14, color: item.isOwn ? "#FFFFFF" : colors.foreground, lineHeight: 20 }}>
-                  {item.content}
-                </Text>
+                {item.kind === "audio" && item.mediaUrl ? (
+                  <VoiceAudioBubble uri={item.mediaUrl} durationMs={item.mediaDurationMs} isOwn={item.isOwn} />
+                ) : (
+                  <Text style={{ fontSize: 14, color: item.isOwn ? "#FFFFFF" : colors.foreground, lineHeight: 20 }}>
+                    {item.content}
+                  </Text>
+                )}
                 <View style={{ marginTop: 4, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                   <Text style={{ fontSize: 10, color: item.isOwn ? "#FFFFFFB3" : colors.muted }}>
                     {item.createdAt
@@ -227,9 +282,9 @@ export default function ChatRoomScreen() {
           )}
         />
 
-        {sendMessageMutation.isError ? (
+        {sendMessageMutation.isError || sendVoiceMutation.isError ? (
           <Text style={{ paddingHorizontal: 16, paddingBottom: 6, color: colors.error, fontSize: 12 }}>
-            Mesaj gönderilemedi. Lütfen tekrar deneyin.
+            {sendVoiceMutation.isError ? "Sesli mesaj gönderilemedi. Lütfen tekrar deneyin." : "Mesaj gönderilemedi. Lütfen tekrar deneyin."}
           </Text>
         ) : null}
         <View
@@ -268,6 +323,25 @@ export default function ChatRoomScreen() {
               borderColor: colors.border,
             }}
           />
+          <Pressable
+            onPress={toggleVoiceRecording}
+            disabled={!hasValidConversationContext || sendVoiceMutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel={recorderState.isRecording ? "Ses kaydını bitir ve gönder" : "Sesli mesaj kaydet"}
+            style={({ pressed }) => ({
+              width: 42,
+              height: 42,
+              borderRadius: 15,
+              backgroundColor: recorderState.isRecording ? colors.error : colors.card,
+              borderWidth: recorderState.isRecording ? 0 : 0.5,
+              borderColor: colors.border,
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: pressed ? 0.76 : !hasValidConversationContext || sendVoiceMutation.isPending ? 0.48 : 1,
+            })}
+          >
+            {sendVoiceMutation.isPending ? <ActivityIndicator size="small" color={colors.primary} /> : <IconSymbol name="mic.fill" size={19} color={recorderState.isRecording ? "#FFFFFF" : colors.primary} />}
+          </Pressable>
           <Pressable
             onPress={sendMessage}
             disabled={!input.trim() || sendMessageMutation.isPending || otherUid <= 0}

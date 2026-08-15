@@ -1,0 +1,42 @@
+import { useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import { useRouter } from "expo-router";
+
+import { ScreenContainer } from "@/components/screen-container";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useColors } from "@/hooks/use-colors";
+import { readUriAsBase64 } from "@/lib/file-to-base64";
+import { trpc } from "@/lib/trpc";
+
+type DocumentType = "identity" | "driver_license" | "src_certificate" | "psychotechnic";
+const documentTypes: { type: DocumentType; title: string; description: string }[] = [
+  { type: "identity", title: "Kimlik belgesi", description: "T.C. kimlik kartı veya pasaport" },
+  { type: "driver_license", title: "Ehliyet", description: "Sürücü belgesi (uygunsa)" },
+  { type: "src_certificate", title: "SRC belgesi", description: "Kurye / taşımacılık hizmeti için" },
+  { type: "psychotechnic", title: "Psikoteknik belgesi", description: "Sürüş hizmetleri için" },
+];
+const supportedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
+
+export default function ProviderDocumentsScreen() {
+  const colors = useColors();
+  const router = useRouter();
+  const utils = trpc.useUtils();
+  const [uploadingType, setUploadingType] = useState<DocumentType | null>(null);
+  const documents = trpc.providers.getDocuments.useQuery();
+  const upload = trpc.providers.uploadDocument.useMutation({ onSuccess: async () => { await utils.providers.getDocuments.invalidate(); Alert.alert("Belge alındı", "Belgeniz incelenmek üzere güvenli biçimde kaydedildi."); }, onError: (error) => Alert.alert("Belge yüklenemedi", error.message), onSettled: () => setUploadingType(null) });
+  const uploadDocument = async (type: DocumentType) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: [...supportedTypes], copyToCacheDirectory: true, multiple: false });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset || !asset.mimeType || !supportedTypes.includes(asset.mimeType as (typeof supportedTypes)[number])) { Alert.alert("Desteklenmeyen dosya", "PDF, JPG, PNG veya WEBP türünde belge seçin."); return; }
+      if (asset.size != null && asset.size > 10 * 1024 * 1024) { Alert.alert("Dosya büyük", "Belge en fazla 10 MB olabilir."); return; }
+      setUploadingType(type);
+      const base64 = await readUriAsBase64(asset.uri);
+      await upload.mutateAsync({ type, fileName: asset.name || `${type}.${asset.mimeType.split("/")[1]}`, mimeType: asset.mimeType as (typeof supportedTypes)[number], base64 });
+    } catch (error) { setUploadingType(null); Alert.alert("Belge okunamadı", error instanceof Error ? error.message : "Seçilen dosya okunamadı"); }
+  };
+  const statusStyle = (status?: string) => status === "approved" ? colors.success : status === "rejected" ? colors.error : colors.warning;
+  return <ScreenContainer edges={["top", "bottom", "left", "right"]}><View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border }}><Pressable onPress={() => router.back()} style={{ padding: 5 }}><IconSymbol name="chevron.left" size={23} color={colors.foreground} /></Pressable><Text style={{ marginLeft: 10, color: colors.foreground, fontSize: 17, fontWeight: "800" }}>Profesyonel belgelerim</Text></View><ScrollView contentContainerStyle={{ padding: 18, gap: 14 }}><View style={{ backgroundColor: colors.primary + "12", borderRadius: 16, padding: 15, borderWidth: 1, borderColor: colors.primary + "35" }}><Text style={{ color: colors.foreground, fontWeight: "800", fontSize: 15 }}>Doğrulama için güvenli belge yükleyin</Text><Text style={{ color: colors.muted, marginTop: 5, fontSize: 13, lineHeight: 19 }}>Dosyalar 10 MB ile sınırlandırılır; içerik türü ve imzası sunucuda doğrulanır. İnceleme sonucu profilinize yansır.</Text></View>{documents.isLoading ? <ActivityIndicator color={colors.primary} /> : documentTypes.map((item) => { const document = documents.data?.find((value) => value.type === item.type); const loading = uploadingType === item.type; return <View key={item.type} style={{ backgroundColor: colors.card, borderRadius: 16, padding: 15, borderWidth: 1, borderColor: colors.border }}><View style={{ flexDirection: "row", alignItems: "flex-start" }}><View style={{ width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary + "18" }}><IconSymbol name="doc.text.fill" size={21} color={colors.primary} /></View><View style={{ flex: 1, marginLeft: 11 }}><Text style={{ color: colors.foreground, fontSize: 15, fontWeight: "800" }}>{item.title}</Text><Text style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>{item.description}</Text>{document ? <Text style={{ color: statusStyle(document.status), fontWeight: "700", fontSize: 12, marginTop: 7 }}>{document.status === "approved" ? "Onaylandı" : document.status === "rejected" ? `Reddedildi${document.rejectionReason ? `: ${document.rejectionReason}` : ""}` : "İnceleme bekliyor"}</Text> : <Text style={{ color: colors.muted, fontSize: 12, marginTop: 7 }}>Henüz yüklenmedi</Text>}</View></View><Pressable disabled={loading || upload.isPending} onPress={() => uploadDocument(item.type)} style={({ pressed }) => ({ marginTop: 13, minHeight: 42, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: document ? colors.surface : colors.primary, opacity: pressed ? 0.82 : 1 })}>{loading ? <ActivityIndicator color={document ? colors.primary : "#fff"} /> : <Text style={{ color: document ? colors.primary : "#fff", fontWeight: "800", fontSize: 13 }}>{document ? "Belgeyi güncelle" : "Belge yükle"}</Text>}</Pressable></View>; })}</ScrollView></ScreenContainer>;
+}

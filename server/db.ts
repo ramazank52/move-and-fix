@@ -3,6 +3,9 @@ import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
   users,
+  userCredentials,
+  authChallenges,
+  providerDocuments,
   walletAccounts,
   walletTransactions,
   walletWithdrawals,
@@ -100,6 +103,350 @@ export async function getUserByOpenId(openId: string) {
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+// Local credentials and verification challenges
+// Passwords and one-time codes must arrive here as hashes; plaintext values
+// are never persisted in the database.
+export type AuthChallengePurpose = "verify_email" | "verify_phone" | "password_reset";
+export type AuthChallengeChannel = "email" | "sms";
+
+export async function getUserByEmailNormalized(emailNormalized: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({ user: users, credential: userCredentials })
+    .from(userCredentials)
+    .innerJoin(users, eq(users.id, userCredentials.userId))
+    .where(eq(userCredentials.emailNormalized, emailNormalized))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createLocalUser(data: {
+  openId: string;
+  name: string;
+  email: string;
+  phone?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(users).values({
+    ...data,
+    loginMethod: "local",
+    role: "user",
+    lastSignedIn: new Date(),
+  });
+  const rows = await db.select().from(users).where(eq(users.id, result[0].insertId)).limit(1);
+  if (!rows[0]) throw new Error("LOCAL_USER_CREATE_FAILED");
+  return rows[0];
+}
+
+/** Creates the minimal profile required before a locally registered provider can upload documents. */
+export async function createLocalProviderProfile(data: { userId: number; displayName: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(providers).values({
+    userId: data.userId,
+    displayName: data.displayName,
+    verificationStatus: "unsubmitted",
+    isAvailable: 1,
+  });
+  const rows = await db.select().from(providers).where(eq(providers.id, result[0].insertId)).limit(1);
+  if (!rows[0]) throw new Error("LOCAL_PROVIDER_CREATE_FAILED");
+  return rows[0];
+}
+
+export async function getUserById(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateUserVerification(data: {
+  userId: number;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = new Date();
+  await db
+    .update(users)
+    .set({
+      ...(data.emailVerified ? { emailVerifiedAt: now } : {}),
+      ...(data.phoneVerified ? { phoneVerifiedAt: now } : {}),
+    })
+    .where(eq(users.id, data.userId));
+}
+
+export async function createLocalCredential(data: {
+  userId: number;
+  passwordHash: string;
+  emailNormalized?: string;
+  phoneE164?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(userCredentials).values(data);
+  return result[0].insertId;
+}
+
+export async function getLocalCredential(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(userCredentials)
+    .where(eq(userCredentials.userId, userId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateLocalCredentialPassword(userId: number, passwordHash: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(userCredentials)
+    .set({
+      passwordHash,
+      failedLoginCount: 0,
+      lockedUntil: null,
+      passwordUpdatedAt: new Date(),
+    })
+    .where(eq(userCredentials.userId, userId));
+  if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("LOCAL_CREDENTIAL_NOT_FOUND");
+}
+
+export async function recordLocalLoginFailure(userId: number, lockUntil?: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(userCredentials)
+    .set({
+      failedLoginCount: sql`${userCredentials.failedLoginCount} + 1`,
+      ...(lockUntil ? { lockedUntil: lockUntil } : {}),
+    })
+    .where(eq(userCredentials.userId, userId));
+}
+
+export async function resetLocalLoginFailures(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(userCredentials)
+    .set({ failedLoginCount: 0, lockedUntil: null })
+    .where(eq(userCredentials.userId, userId));
+}
+
+export async function createAuthChallenge(data: {
+  userId: number;
+  purpose: AuthChallengePurpose;
+  channel: AuthChallengeChannel;
+  destination: string;
+  codeHash: string;
+  expiresAt: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    // A new code invalidates previous unconsumed codes for the same security purpose.
+    await tx
+      .update(authChallenges)
+      .set({ consumedAt: new Date() })
+      .where(
+        and(
+          eq(authChallenges.userId, data.userId),
+          eq(authChallenges.purpose, data.purpose),
+          isNull(authChallenges.consumedAt),
+        ),
+      );
+    const result = await tx.insert(authChallenges).values(data);
+    return result[0].insertId;
+  });
+}
+
+export async function getActiveAuthChallenge(data: {
+  userId: number;
+  purpose: AuthChallengePurpose;
+  codeHash: string;
+  now?: Date;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(authChallenges)
+    .where(
+      and(
+        eq(authChallenges.userId, data.userId),
+        eq(authChallenges.purpose, data.purpose),
+        eq(authChallenges.codeHash, data.codeHash),
+        isNull(authChallenges.consumedAt),
+        gte(authChallenges.expiresAt, data.now ?? new Date()),
+      ),
+    )
+    .orderBy(desc(authChallenges.createdAt), desc(authChallenges.id))
+    .limit(1);
+  const challenge = rows[0];
+  if (!challenge || challenge.attempts >= challenge.maxAttempts) return null;
+  return challenge;
+}
+
+export async function getLatestActiveAuthChallenge(data: {
+  userId: number;
+  purpose: AuthChallengePurpose;
+  now?: Date;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(authChallenges)
+    .where(
+      and(
+        eq(authChallenges.userId, data.userId),
+        eq(authChallenges.purpose, data.purpose),
+        isNull(authChallenges.consumedAt),
+        gte(authChallenges.expiresAt, data.now ?? new Date()),
+      ),
+    )
+    .orderBy(desc(authChallenges.createdAt), desc(authChallenges.id))
+    .limit(1);
+  const challenge = rows[0];
+  if (!challenge || challenge.attempts >= challenge.maxAttempts) return null;
+  return challenge;
+}
+
+export async function incrementAuthChallengeAttempts(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(authChallenges)
+    .set({ attempts: sql`${authChallenges.attempts} + 1` })
+    .where(and(eq(authChallenges.id, id), isNull(authChallenges.consumedAt)));
+}
+
+export async function markAuthChallengeUsed(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(authChallenges)
+    .set({ consumedAt: new Date() })
+    .where(and(eq(authChallenges.id, id), isNull(authChallenges.consumedAt)));
+  if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("AUTH_CHALLENGE_ALREADY_CONSUMED");
+}
+
+export async function createProviderDocument(data: {
+  providerId: number;
+  ownerUserId: number;
+  type: "identity" | "driver_license" | "src_certificate" | "psychotechnic";
+  storageKey: string;
+  fileUrl: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .insert(providerDocuments)
+    .values({ ...data, status: "pending", rejectionReason: null, reviewedByUserId: null, reviewedAt: null })
+    .onDuplicateKeyUpdate({
+      set: {
+        ownerUserId: data.ownerUserId,
+        storageKey: data.storageKey,
+        fileUrl: data.fileUrl,
+        fileName: data.fileName,
+        mimeType: data.mimeType,
+        sizeBytes: data.sizeBytes,
+        sha256: data.sha256,
+        status: "pending",
+        rejectionReason: null,
+        reviewedByUserId: null,
+        reviewedAt: null,
+      },
+    });
+  const rows = await db
+    .select({ id: providerDocuments.id })
+    .from(providerDocuments)
+    .where(
+      and(
+        eq(providerDocuments.providerId, data.providerId),
+        eq(providerDocuments.type, data.type),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.id ?? result[0].insertId;
+}
+
+export async function getProviderDocuments(providerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(providerDocuments)
+    .where(eq(providerDocuments.providerId, providerId))
+    .orderBy(desc(providerDocuments.createdAt), desc(providerDocuments.id));
+}
+
+export async function updateProviderDocumentStatus(data: {
+  id: number;
+  status: "approved" | "rejected";
+  reviewNote?: string;
+  reviewedByUserId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(providerDocuments)
+    .set({
+      status: data.status,
+      rejectionReason: data.status === "rejected" ? data.reviewNote ?? "İnceleme reddedildi" : null,
+      reviewedByUserId: data.reviewedByUserId,
+      reviewedAt: new Date(),
+    })
+    .where(eq(providerDocuments.id, data.id));
+  if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("PROVIDER_DOCUMENT_NOT_FOUND");
+}
+
+export async function getProviderDocumentById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(providerDocuments)
+    .where(eq(providerDocuments.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function refreshProviderVerificationStatus(providerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const documents = await getProviderDocuments(providerId);
+  const identity = documents.find((document) => document.type === "identity");
+  const hasRejected = documents.some((document) => document.status === "rejected");
+  const hasPending = documents.some((document) => document.status === "pending");
+  const status = hasRejected
+    ? "rejected"
+    : identity?.status === "approved" && !hasPending
+      ? "approved"
+      : documents.length > 0
+        ? "pending"
+        : "unsubmitted";
+  await db
+    .update(providers)
+    .set({
+      verificationStatus: status,
+      isVerified: status === "approved" ? 1 : 0,
+      verificationSubmittedAt: status === "pending" ? new Date() : undefined,
+      verificationReviewedAt: status === "pending" ? null : new Date(),
+    })
+    .where(eq(providers.id, providerId));
+  return status;
 }
 
 // TODO: add feature queries here as your schema grows.
@@ -528,6 +875,16 @@ export async function assertMessageParticipant(
   }
 }
 
+export async function validateMessageParticipant(
+  requestId: number,
+  userId: number,
+  otherUserId: number,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await assertMessageParticipant(db, requestId, userId, otherUserId);
+}
+
 export async function sendMessage(data: {
   senderId: number;
   receiverId: number;
@@ -539,6 +896,63 @@ export async function sendMessage(data: {
   await assertMessageParticipant(db, data.requestId, data.senderId, data.receiverId);
   const result = await db.insert(messages).values(data);
   return result[0].insertId;
+}
+
+// Audio metadata lives on the message row in migration 0013. Keeping it on
+// the authoritative message record means conversation authorization cannot be
+// bypassed through a detached voice-message table.
+export async function createVoiceMessageMetadata(data: {
+  senderId: number;
+  receiverId: number;
+  requestId: number;
+  storageKey: string;
+  mediaUrl: string;
+  mimeType: string;
+  sizeBytes: number;
+  durationMs: number;
+  sha256: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await assertMessageParticipant(db, data.requestId, data.senderId, data.receiverId);
+  const result = await db.insert(messages).values({
+    senderId: data.senderId,
+    receiverId: data.receiverId,
+    requestId: data.requestId,
+    content: "Sesli mesaj",
+    kind: "audio",
+    mediaStorageKey: data.storageKey,
+    mediaUrl: data.mediaUrl,
+    mediaMimeType: data.mimeType,
+    mediaSizeBytes: data.sizeBytes,
+    mediaDurationMs: data.durationMs,
+    mediaSha256: data.sha256,
+  });
+  return result[0].insertId;
+}
+
+export async function getVoiceMessageMetadata(messageId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      id: messages.id,
+      requestId: messages.requestId,
+      senderId: messages.senderId,
+      receiverId: messages.receiverId,
+      kind: messages.kind,
+      storageKey: messages.mediaStorageKey,
+      mediaUrl: messages.mediaUrl,
+      mimeType: messages.mediaMimeType,
+      sizeBytes: messages.mediaSizeBytes,
+      durationMs: messages.mediaDurationMs,
+      sha256: messages.mediaSha256,
+      createdAt: messages.createdAt,
+    })
+    .from(messages)
+    .where(and(eq(messages.id, messageId), eq(messages.kind, "audio")))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export async function getConversation(requestId: number, userId1: number, userId2: number) {

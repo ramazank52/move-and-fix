@@ -1,6 +1,17 @@
 import { COOKIE_NAME } from "../shared/const.js";
-import { createHash, randomUUID } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  randomInt,
+  randomUUID,
+  scryptSync,
+  timingSafeEqual,
+} from "node:crypto";
+import { ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { ENV } from "./_core/env";
+import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { ownerRouter } from "./_core/ownerRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -9,7 +20,10 @@ import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { walletService } from "./services/WalletService";
 import { notificationService } from "./services/NotificationService";
-import { notificationServiceV2 } from "./services/NotificationServiceV2";
+import {
+  NotificationChannel,
+  notificationServiceV2,
+} from "./services/NotificationServiceV2";
 import { aiService } from "./services/AIService";
 import { eventService } from "./services/EventService";
 import { storagePut } from "./storage";
@@ -110,6 +124,121 @@ function decodeStrictBase64(value: string): Buffer {
   return buffer;
 }
 
+const emailSchema = z.string().trim().email().max(320).transform((value) => value.toLowerCase());
+const passwordSchema = z
+  .string()
+  .min(10, "Parola en az 10 karakter olmalıdır")
+  .max(128)
+  .refine(
+    (value) => /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value),
+    "Parola büyük harf, küçük harf ve rakam içermelidir",
+  );
+const verificationCodeSchema = z.string().regex(/^\d{6}$/, "6 haneli güvenlik kodunu girin");
+const verificationPurposeSchema = z.enum(["verify_email", "verify_phone"]);
+const providerDocumentTypeSchema = z.enum([
+  "identity",
+  "driver_license",
+  "src_certificate",
+  "psychotechnic",
+]);
+const voiceMimeTypeSchema = z.enum([
+  "audio/mp4",
+  "audio/m4a",
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/webm",
+  "audio/wav",
+]);
+
+function normalizeTurkishPhone(value: string): string {
+  const compact = value.replace(/[\s()-]/g, "");
+  const national = compact.replace(/^\+?90/, "").replace(/^0/, "");
+  if (!/^5\d{9}$/.test(national)) throw new TRPCError({ code: "BAD_REQUEST", message: "Geçerli bir Türkiye cep telefonu girin" });
+  return `+90${national}`;
+}
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const digest = scryptSync(password, salt, 64).toString("hex");
+  return `scrypt-v1$${salt}$${digest}`;
+}
+
+function verifyPassword(password: string, encoded: string): boolean {
+  const [version, salt, expected] = encoded.split("$");
+  if (version !== "scrypt-v1" || !salt || !expected) return false;
+  const actual = scryptSync(password, salt, 64).toString("hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  const actualBuffer = Buffer.from(actual, "hex");
+  return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
+}
+
+function hashVerificationCode(userId: number, purpose: db.AuthChallengePurpose, code: string): string {
+  if (!ENV.cookieSecret) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Oturum güvenlik yapılandırması eksik" });
+  return createHmac("sha256", ENV.cookieSecret)
+    .update(`${userId}:${purpose}:${code}`)
+    .digest("hex");
+}
+
+async function issueVerificationCode(data: {
+  userId: number;
+  purpose: db.AuthChallengePurpose;
+  destination: string;
+}) {
+  const channel = data.purpose === "verify_phone" ? NotificationChannel.SMS : NotificationChannel.EMAIL;
+  const code = randomInt(100_000, 1_000_000).toString();
+  await db.createAuthChallenge({
+    ...data,
+    channel: channel === NotificationChannel.SMS ? "sms" : "email",
+    codeHash: hashVerificationCode(data.userId, data.purpose, code),
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+  });
+  const delivery = await notificationServiceV2.sendVerificationCode({
+    channel,
+    destination: data.destination,
+    code,
+    purpose: data.purpose,
+  });
+  if (delivery.deliveryStatus !== "delivered") {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Doğrulama mesajı gönderilemedi. Bildirim sağlayıcısı yapılandırılmalıdır.",
+    });
+  }
+  return delivery;
+}
+
+async function setLocalSession(
+  ctx: { req: Parameters<typeof getSessionCookieOptions>[0]; res: { cookie: (name: string, value: string, options: Record<string, unknown>) => unknown } },
+  user: { id: number; openId: string; name: string | null; email: string | null; role: "user" | "admin"; emailVerifiedAt?: Date | null },
+  includeNativeToken = false,
+) {
+  const token = await sdk.createSessionToken(user.openId, { name: user.name ?? "Move&Fix kullanıcısı", expiresInMs: ONE_YEAR_MS });
+  ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+  const provider = await db.getProviderProfile(user.id);
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    emailVerified: Boolean(user.emailVerifiedAt),
+    accountType: user.role === "admin" ? "admin" : provider ? "provider" : "customer",
+    ...(includeNativeToken ? { sessionToken: token } : {}),
+  };
+}
+
+function hasExpectedProviderDocumentSignature(buffer: Buffer, mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp") {
+  if (mimeType === "application/pdf") return buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+  return hasExpectedMediaSignature(buffer, mimeType);
+}
+
+function hasExpectedVoiceSignature(buffer: Buffer, mimeType: z.infer<typeof voiceMimeTypeSchema>) {
+  if (mimeType === "audio/mpeg") return buffer.subarray(0, 3).toString("ascii") === "ID3" || (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0);
+  if (mimeType === "audio/ogg") return buffer.subarray(0, 4).toString("ascii") === "OggS";
+  if (mimeType === "audio/wav") return buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WAVE";
+  if (mimeType === "audio/webm") return buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+  return buffer.subarray(4, 8).toString("ascii") === "ftyp";
+}
+
 async function runTrackingOperation<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -162,6 +291,139 @@ export const appRouter = router({
   owner: ownerRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+    register: publicProcedure
+      .input(z.object({
+        name: z.string().trim().min(2).max(120),
+        email: emailSchema,
+        password: passwordSchema,
+        phone: z.string().trim().min(7).max(32).optional(),
+        accountType: z.enum(["customer", "provider"]).default("customer"),
+        nativeSession: z.boolean().default(false),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getUserByEmailNormalized(input.email);
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "Bu e-posta ile zaten bir hesap var" });
+        const phone = input.phone ? normalizeTurkishPhone(input.phone) : undefined;
+        const user = await db.createLocalUser({
+          openId: `local_${randomUUID()}`,
+          name: input.name,
+          email: input.email,
+          phone,
+        });
+        try {
+          await db.createLocalCredential({
+            userId: user.id,
+            emailNormalized: input.email,
+            phoneE164: phone,
+            passwordHash: hashPassword(input.password),
+          });
+          if (input.accountType === "provider") {
+            await db.createLocalProviderProfile({ userId: user.id, displayName: input.name });
+          }
+        } catch (error) {
+          throw new TRPCError({ code: "CONFLICT", message: "Bu hesap bilgileri zaten kullanılıyor", cause: error });
+        }
+        let verification: Awaited<ReturnType<typeof issueVerificationCode>> | null = null;
+        let verificationBlocker: string | null = null;
+        try {
+          verification = await issueVerificationCode({
+            userId: user.id,
+            purpose: "verify_email",
+            destination: input.email,
+          });
+        } catch (error) {
+          if (error instanceof TRPCError && error.code === "PRECONDITION_FAILED") {
+            verificationBlocker = error.message;
+          } else {
+            throw error;
+          }
+        }
+        return {
+          user: await setLocalSession(ctx, user, input.nativeSession),
+          verificationRequired: true,
+          verificationDelivery: verification,
+          verificationBlocker,
+        };
+      }),
+    login: publicProcedure
+      .input(z.object({
+        identifier: z.string().trim().min(3).max(320),
+        password: z.string().min(1).max(128),
+        nativeSession: z.boolean().default(false),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const email = input.identifier.toLowerCase();
+        const local = await db.getUserByEmailNormalized(email);
+        const credential = local?.credential;
+        if (!local || !credential || !verifyPassword(input.password, credential.passwordHash)) {
+          if (local?.user && credential) {
+            const lockUntil = credential.failedLoginCount >= 4 ? new Date(Date.now() + 15 * 60 * 1000) : undefined;
+            await db.recordLocalLoginFailure(local.user.id, lockUntil);
+          }
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "E-posta veya parola hatalı" });
+        }
+        if (credential.lockedUntil && credential.lockedUntil.getTime() > Date.now()) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Çok fazla hatalı deneme yapıldı. Lütfen sonra tekrar deneyin" });
+        }
+        await db.resetLocalLoginFailures(local.user.id);
+        return { user: await setLocalSession(ctx, local.user, input.nativeSession) };
+      }),
+    requestVerification: protectedProcedure
+      .input(z.object({ purpose: verificationPurposeSchema }))
+      .mutation(async ({ ctx, input }) => {
+        const destination = input.purpose === "verify_phone"
+          ? ctx.user.phone
+          : ctx.user.email;
+        if (!destination) throw new TRPCError({ code: "BAD_REQUEST", message: "Bu doğrulama için kayıtlı iletişim bilgisi yok" });
+        const verification = await issueVerificationCode({ userId: ctx.user.id, purpose: input.purpose, destination });
+        return { verificationDelivery: verification };
+      }),
+    verifyCode: protectedProcedure
+      .input(z.object({ purpose: verificationPurposeSchema, code: verificationCodeSchema }))
+      .mutation(async ({ ctx, input }) => {
+        const codeHash = hashVerificationCode(ctx.user.id, input.purpose, input.code);
+        const validChallenge = await db.getActiveAuthChallenge({ userId: ctx.user.id, purpose: input.purpose, codeHash });
+        if (!validChallenge) {
+          const activeChallenge = await db.getLatestActiveAuthChallenge({ userId: ctx.user.id, purpose: input.purpose });
+          if (activeChallenge) await db.incrementAuthChallengeAttempts(activeChallenge.id);
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Kod geçersiz, süresi dolmuş veya deneme sınırına ulaşmış" });
+        }
+        await db.markAuthChallengeUsed(validChallenge.id);
+        await db.updateUserVerification({
+          userId: ctx.user.id,
+          emailVerified: input.purpose === "verify_email",
+          phoneVerified: input.purpose === "verify_phone",
+        });
+        return { verified: input.purpose };
+      }),
+    requestPasswordReset: publicProcedure
+      .input(z.object({ email: emailSchema }))
+      .mutation(async ({ input }) => {
+        const local = await db.getUserByEmailNormalized(input.email);
+        if (!local) return { accepted: true as const };
+        const verification = await issueVerificationCode({
+          userId: local.user.id,
+          purpose: "password_reset",
+          destination: input.email,
+        });
+        return { accepted: true as const, verificationDelivery: verification };
+      }),
+    resetPassword: publicProcedure
+      .input(z.object({ email: emailSchema, code: verificationCodeSchema, password: passwordSchema }))
+      .mutation(async ({ input }) => {
+        const local = await db.getUserByEmailNormalized(input.email);
+        if (!local) throw new TRPCError({ code: "BAD_REQUEST", message: "Kod geçersiz veya süresi dolmuş" });
+        const codeHash = hashVerificationCode(local.user.id, "password_reset", input.code);
+        const validChallenge = await db.getActiveAuthChallenge({ userId: local.user.id, purpose: "password_reset", codeHash });
+        if (!validChallenge) {
+          const activeChallenge = await db.getLatestActiveAuthChallenge({ userId: local.user.id, purpose: "password_reset" });
+          if (activeChallenge) await db.incrementAuthChallengeAttempts(activeChallenge.id);
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Kod geçersiz, süresi dolmuş veya deneme sınırına ulaşmış" });
+        }
+        await db.updateLocalCredentialPassword(local.user.id, hashPassword(input.password));
+        await db.markAuthChallengeUsed(validChallenge.id);
+        return { success: true as const };
+      }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -518,6 +780,46 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         runMessageOperation(() => db.sendMessage({ ...input, senderId: ctx.user.id })),
       ),
+    sendVoice: protectedProcedure
+      .input(z.object({
+        receiverId: z.number().int().positive(),
+        requestId: z.number().int().positive(),
+        mimeType: voiceMimeTypeSchema,
+        durationMs: z.number().int().min(250).max(5 * 60 * 1000),
+        base64: z.string().min(4).max(14_000_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const buffer = decodeStrictBase64(input.base64);
+        if (buffer.length > 10 * 1024 * 1024) {
+          throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Sesli mesaj en fazla 10 MB olabilir" });
+        }
+        if (!hasExpectedVoiceSignature(buffer, input.mimeType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Ses dosyası türü doğrulanamadı" });
+        }
+        await runMessageOperation(() =>
+          db.validateMessageParticipant(input.requestId, ctx.user.id, input.receiverId),
+        );
+        const extension = input.mimeType === "audio/mpeg" ? "mp3" : input.mimeType === "audio/ogg" ? "ogg" : input.mimeType === "audio/webm" ? "webm" : input.mimeType === "audio/wav" ? "wav" : "m4a";
+        const uploaded = await storagePut(
+          `messages/${input.requestId}/${ctx.user.id}/${randomUUID()}.${extension}`,
+          buffer,
+          input.mimeType,
+        );
+        const id = await runMessageOperation(() =>
+          db.createVoiceMessageMetadata({
+            senderId: ctx.user.id,
+            receiverId: input.receiverId,
+            requestId: input.requestId,
+            storageKey: uploaded.key,
+            mediaUrl: uploaded.url,
+            mimeType: input.mimeType,
+            sizeBytes: buffer.length,
+            durationMs: input.durationMs,
+            sha256: createHash("sha256").update(buffer).digest("hex"),
+          }),
+        );
+        return { id, kind: "audio" as const, durationMs: input.durationMs };
+      }),
     markRead: protectedProcedure
       .input(z.object({
         requestId: z.number().int().positive(),
@@ -568,6 +870,48 @@ export const appRouter = router({
           throw error;
         }
       }),
+    uploadDocument: protectedProcedure
+      .input(z.object({
+        type: providerDocumentTypeSchema,
+        fileName: z.string().trim().min(1).max(255).regex(/^[^\\/\u0000-\u001f]+$/, "Geçersiz dosya adı"),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        base64: z.string().min(4).max(14_000_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const provider = await db.getProviderProfile(ctx.user.id);
+        if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+        const buffer = decodeStrictBase64(input.base64);
+        if (buffer.length > 10 * 1024 * 1024) {
+          throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Belge en fazla 10 MB olabilir" });
+        }
+        if (!hasExpectedProviderDocumentSignature(buffer, input.mimeType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Belge içeriği seçilen dosya türüyle uyuşmuyor" });
+        }
+        const extension = input.mimeType === "application/pdf" ? "pdf" : input.mimeType.split("/")[1];
+        const uploaded = await storagePut(
+          `provider-documents/${provider.id}/${input.type}/${randomUUID()}.${extension}`,
+          buffer,
+          input.mimeType,
+        );
+        const id = await db.createProviderDocument({
+          providerId: provider.id,
+          ownerUserId: ctx.user.id,
+          type: input.type,
+          storageKey: uploaded.key,
+          fileUrl: uploaded.url,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          sizeBytes: buffer.length,
+          sha256: createHash("sha256").update(buffer).digest("hex"),
+        });
+        const verificationStatus = await db.refreshProviderVerificationStatus(provider.id);
+        return { id, status: "pending" as const, verificationStatus };
+      }),
+    getDocuments: protectedProcedure.query(async ({ ctx }) => {
+      const provider = await db.getProviderProfile(ctx.user.id);
+      if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+      return db.getProviderDocuments(provider.id);
+    }),
     myJobs: protectedProcedure.query(({ ctx }) => {
       return db.getProviderJobs(ctx.user.id);
     }),
@@ -866,6 +1210,39 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       }),
   }),
 
+  admin: router({
+    reviewProviderDocument: protectedProcedure
+      .input(z.object({
+        documentId: z.number().int().positive(),
+        status: z.enum(["approved", "rejected"]),
+        reviewNote: z.string().trim().max(500).optional(),
+      }).superRefine((input, issue) => {
+        if (input.status === "rejected" && !input.reviewNote) {
+          issue.addIssue({
+            code: "custom",
+            path: ["reviewNote"],
+            message: "Red gerekçesi zorunludur",
+          });
+        }
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yönetici yetkisi gerektirir" });
+        }
+        const document = await db.getProviderDocumentById(input.documentId);
+        if (!document) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Profesyonel belgesi bulunamadı" });
+        }
+        await db.updateProviderDocumentStatus({
+          id: document.id,
+          status: input.status,
+          reviewNote: input.reviewNote,
+          reviewedByUserId: ctx.user.id,
+        });
+        const verificationStatus = await db.refreshProviderVerificationStatus(document.providerId);
+        return { id: document.id, status: input.status, verificationStatus };
+      }),
+  }),
   // MoveWallet — user-scoped balance, history and withdrawal workflow
   wallet: router({
     summary: protectedProcedure.query(({ ctx }) => {

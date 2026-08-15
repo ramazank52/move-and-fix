@@ -15,6 +15,9 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 32 }),
+  emailVerifiedAt: timestamp("emailVerifiedAt"),
+  phoneVerifiedAt: timestamp("phoneVerifiedAt"),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -75,6 +78,11 @@ export const providers = mysqlTable("providers", {
   completedJobs: int("completedJobs").default(0),
   moveScore: int("moveScore").default(50),
   isVerified: int("isVerified").default(0),
+  verificationStatus: mysqlEnum("verificationStatus", ["unsubmitted", "pending", "approved", "rejected"])
+    .default("unsubmitted")
+    .notNull(),
+  verificationSubmittedAt: timestamp("verificationSubmittedAt"),
+  verificationReviewedAt: timestamp("verificationReviewedAt"),
   isPremium: int("isPremium").default(0),
   isAvailable: int("isAvailable").default(1).notNull(),
   latitude: varchar("latitude", { length: 20 }),
@@ -93,6 +101,75 @@ export const providerFavorites = mysqlTable(
   },
   (table) => [
     uniqueIndex("provider_favorites_user_provider_unique").on(table.userId, table.providerId),
+  ],
+);
+
+export const userCredentials = mysqlTable(
+  "user_credentials",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    emailNormalized: varchar("emailNormalized", { length: 320 }),
+    phoneE164: varchar("phoneE164", { length: 32 }),
+    passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+    failedLoginCount: int("failedLoginCount").default(0).notNull(),
+    lockedUntil: timestamp("lockedUntil"),
+    passwordUpdatedAt: timestamp("passwordUpdatedAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_credentials_user_unique").on(table.userId),
+    uniqueIndex("user_credentials_email_unique").on(table.emailNormalized),
+    uniqueIndex("user_credentials_phone_unique").on(table.phoneE164),
+  ],
+);
+
+export const authChallenges = mysqlTable(
+  "auth_challenges",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    purpose: mysqlEnum("purpose", ["verify_email", "verify_phone", "password_reset"]).notNull(),
+    channel: mysqlEnum("channel", ["email", "sms"]).notNull(),
+    destination: varchar("destination", { length: 320 }).notNull(),
+    codeHash: varchar("codeHash", { length: 128 }).notNull(),
+    attempts: int("attempts").default(0).notNull(),
+    maxAttempts: int("maxAttempts").default(5).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    consumedAt: timestamp("consumedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("auth_challenges_user_purpose_idx").on(table.userId, table.purpose),
+    index("auth_challenges_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+export const providerDocuments = mysqlTable(
+  "provider_documents",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    providerId: int("providerId").notNull(),
+    ownerUserId: int("ownerUserId").notNull(),
+    type: mysqlEnum("type", ["identity", "driver_license", "src_certificate", "psychotechnic"]).notNull(),
+    storageKey: varchar("storageKey", { length: 512 }).notNull(),
+    fileUrl: text("fileUrl").notNull(),
+    fileName: varchar("fileName", { length: 255 }).notNull(),
+    mimeType: varchar("mimeType", { length: 96 }).notNull(),
+    sizeBytes: int("sizeBytes").notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+    rejectionReason: varchar("rejectionReason", { length: 500 }),
+    reviewedByUserId: int("reviewedByUserId"),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_documents_provider_type_unique").on(table.providerId, table.type),
+    index("provider_documents_status_idx").on(table.status, table.createdAt),
+    index("provider_documents_owner_idx").on(table.ownerUserId),
   ],
 );
 
@@ -231,6 +308,13 @@ export const messages = mysqlTable("messages", {
   receiverId: int("receiverId").notNull(),
   requestId: int("requestId"),
   content: text("content").notNull(),
+  kind: mysqlEnum("kind", ["text", "audio"]).default("text").notNull(),
+  mediaStorageKey: varchar("mediaStorageKey", { length: 512 }),
+  mediaUrl: text("mediaUrl"),
+  mediaMimeType: varchar("mediaMimeType", { length: 96 }),
+  mediaSizeBytes: int("mediaSizeBytes"),
+  mediaDurationMs: int("mediaDurationMs"),
+  mediaSha256: varchar("mediaSha256", { length: 64 }),
   isRead: int("isRead").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -336,6 +420,9 @@ export const walletWithdrawals = mysqlTable("wallet_withdrawals", {
 // Export types
 export type ServiceCategory = typeof serviceCategories.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
+export type UserCredential = typeof userCredentials.$inferSelect;
+export type AuthChallenge = typeof authChallenges.$inferSelect;
+export type ProviderDocument = typeof providerDocuments.$inferSelect;
 export type ProviderFavorite = typeof providerFavorites.$inferSelect;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;
 export type Offer = typeof offers.$inferSelect;

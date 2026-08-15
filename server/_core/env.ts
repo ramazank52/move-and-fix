@@ -21,4 +21,9 @@ export const ENV = {
     process.env.IYZICO_WEBHOOK_SECRET ?? process.env.IYZICO_SECRET_KEY ?? "",
   stripeSecretKey: process.env.STRIPE_API_KEY ?? process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  sendgridApiKey: process.env.SENDGRID_API_KEY ?? "",
+  verificationEmailFrom: process.env.VERIFICATION_EMAIL_FROM ?? "",
+  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID ?? "",
+  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? "",
+  twilioFromNumber: process.env.TWILIO_FROM_NUMBER ?? "",
 };

@@ -1,10 +1,12 @@
-import { Text, View, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { ActivityIndicator, Text, View, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { RegistrationConsent } from "@/components/registration-consent";
-import { startOAuthLogin } from "@/constants/oauth";
+import { setSessionToken } from "@/lib/_core/auth";
+import { useAuth } from "@/hooks/use-auth";
+import { trpc } from "@/lib/trpc";
 
 type UserRole = "customer" | "provider";
 
@@ -17,18 +19,28 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"form" | "consent">("form");
+  const [error, setError] = useState<string | null>(null);
+  const { refresh } = useAuth();
+  const localRegister = trpc.auth.register.useMutation({
+    onSuccess: async (result) => {
+      if (Platform.OS !== "web" && result.user.sessionToken) await setSessionToken(result.user.sessionToken);
+      await refresh();
+      router.replace("/verify-email" as never);
+    },
+    onError: (registrationError) => setError(registrationError.message),
+  });
 
   const handleRegister = () => {
+    setError(null);
+    if (name.trim().length < 2 || !email.includes("@") || password.length < 10) {
+      setError("Ad soyad, geçerli e-posta ve en az 10 karakterlik parola gereklidir.");
+      return;
+    }
     setStep("consent");
   };
 
   const handleConsentAccepted = async () => {
-    try {
-      await startOAuthLogin();
-    } catch (error) {
-      console.error("[Register] OAuth registration could not start:", error);
-      router.replace("/login" as any);
-    }
+    localRegister.mutate({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, password, accountType: role, nativeSession: Platform.OS !== "web" });
   };
 
   return (
@@ -90,6 +102,7 @@ export default function RegisterScreen() {
 
           {/* Form */}
           <View style={{ gap: 14 }}>
+            {error ? <View style={{ backgroundColor: colors.error + "18", borderRadius: 12, borderWidth: 1, borderColor: colors.error + "55", padding: 12 }}><Text style={{ color: colors.error, fontSize: 13, lineHeight: 19 }}>{error}</Text></View> : null}
             {step === "form" ? (
               <>
                 <TextInput
@@ -173,7 +186,11 @@ export default function RegisterScreen() {
                 </Pressable>
               </>
             ) : (
-              <RegistrationConsent onAllAccepted={handleConsentAccepted} />
+              <View style={{ gap: 14 }}>
+                <RegistrationConsent onAllAccepted={handleConsentAccepted} />
+                {localRegister.isPending ? <ActivityIndicator color={colors.primary} /> : null}
+                <Pressable onPress={() => setStep("form")} disabled={localRegister.isPending} style={{ alignSelf: "center" }}><Text style={{ color: colors.primary, fontSize: 13, fontWeight: "700" }}>Formu düzenle</Text></Pressable>
+              </View>
             )}
           </View>
 

@@ -92,6 +92,13 @@
       "when": 1786281988158,
       "tag": "0012_phase31_catalog_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1786283916750,
+      "tag": "0013_clumsy_celestials",
+      "breakpoints": true
     }
   ]
 }

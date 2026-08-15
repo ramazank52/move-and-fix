@@ -21,6 +21,7 @@ import {
   ExternalServiceError,
   getErrorMessage,
 } from '../_core/errors';
+import { ENV } from '../_core/env';
 import type { IEventPublisher } from './interfaces';
 import { EventType } from './EventService';
 
@@ -103,6 +104,10 @@ export interface NotificationTemplate {
   variables: string[]; // {{variable}} formatında
 }
 
+export type VerificationDeliveryResult =
+  | { deliveryStatus: 'delivered' }
+  | { deliveryStatus: 'blocked'; blocker: string };
+
 function asNotificationError(error: unknown, context: Record<string, unknown>): AppError {
   if (error instanceof AppError) {
     return error;
@@ -131,6 +136,72 @@ export class NotificationServiceV2 {
    */
   setEventPublisher(publisher: IEventPublisher): void {
     this.eventPublisher = publisher;
+  }
+
+  /**
+   * Güvenlik kodları genel kuyruğa bırakılmaz: sağlayıcı ayarlı değilse
+   * çağıran katman başarı yanıtı üretmek yerine blocker durumunu alır.
+   */
+  async sendVerificationCode(data: {
+    channel: NotificationChannel.EMAIL | NotificationChannel.SMS;
+    destination: string;
+    code: string;
+    purpose: 'verify_email' | 'verify_phone' | 'password_reset';
+  }): Promise<VerificationDeliveryResult> {
+    const title = data.purpose === 'password_reset'
+      ? 'Move&Fix parola sıfırlama kodu'
+      : 'Move&Fix doğrulama kodu';
+    const body = `Güvenlik kodunuz: ${data.code}. Kod 10 dakika geçerlidir. Bu işlemi siz yapmadıysanız bu mesajı yok sayın.`;
+
+    if (data.channel === NotificationChannel.EMAIL) {
+      if (!ENV.sendgridApiKey || !ENV.verificationEmailFrom) {
+        return { deliveryStatus: 'blocked', blocker: 'EMAIL_VERIFICATION_PROVIDER_REQUIRED' };
+      }
+      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${ENV.sendgridApiKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: data.destination }] }],
+          from: { email: ENV.verificationEmailFrom, name: 'Move&Fix' },
+          subject: title,
+          content: [{ type: 'text/plain', value: body }],
+        }),
+      });
+      if (!response.ok) {
+        throw new ExternalServiceError('SendGrid', 'Doğrulama e-postası teslim edilemedi', {
+          retryable: response.status >= 500,
+          context: { status: response.status, purpose: data.purpose },
+        });
+      }
+      return { deliveryStatus: 'delivered' };
+    }
+
+    if (!ENV.twilioAccountSid || !ENV.twilioAuthToken || !ENV.twilioFromNumber) {
+      return { deliveryStatus: 'blocked', blocker: 'SMS_VERIFICATION_PROVIDER_REQUIRED' };
+    }
+    const credentials = Buffer.from(`${ENV.twilioAccountSid}:${ENV.twilioAuthToken}`).toString('base64');
+    const form = new URLSearchParams({ To: data.destination, From: ENV.twilioFromNumber, Body: body });
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${ENV.twilioAccountSid}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          authorization: `Basic ${credentials}`,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: form.toString(),
+      },
+    );
+    if (!response.ok) {
+      throw new ExternalServiceError('Twilio', 'Doğrulama SMS’i teslim edilemedi', {
+        retryable: response.status >= 500,
+        context: { status: response.status, purpose: data.purpose },
+      });
+    }
+    return { deliveryStatus: 'delivered' };
   }
 
   /**

@@ -1,17 +1,32 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { startOAuthLogin } from "@/constants/oauth";
+import { setSessionToken } from "@/lib/_core/auth";
+import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
+import { trpc } from "@/lib/trpc";
 
 export default function LoginScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { refresh } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+
+  const localLogin = trpc.auth.login.useMutation({
+    onSuccess: async (result) => {
+      if (Platform.OS !== "web" && result.user.sessionToken) await setSessionToken(result.user.sessionToken);
+      await refresh();
+      router.replace((result.user.emailVerified ? "/" : "/verify-email") as never);
+    },
+    onError: (loginError) => setError(loginError.message),
+  });
 
   const handleLogin = async () => {
     try {
@@ -23,6 +38,12 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLocalLogin = () => {
+    if (!identifier.trim() || !password || localLogin.isPending) return;
+    setError(null);
+    localLogin.mutate({ identifier: identifier.trim(), password, nativeSession: Platform.OS !== "web" });
   };
 
   return (
@@ -65,10 +86,42 @@ export default function LoginScreen() {
           </View>
         ) : null}
 
+        <View style={{ gap: 12, marginBottom: 14 }}>
+          <TextInput
+            value={identifier}
+            onChangeText={setIdentifier}
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="E-posta adresi"
+            placeholderTextColor={colors.muted}
+            style={{ backgroundColor: colors.card, color: colors.foreground, borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 15, paddingVertical: 14, fontSize: 15 }}
+          />
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            autoComplete="current-password"
+            secureTextEntry
+            placeholder="Parola"
+            placeholderTextColor={colors.muted}
+            returnKeyType="done"
+            onSubmitEditing={handleLocalLogin}
+            style={{ backgroundColor: colors.card, color: colors.foreground, borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 15, paddingVertical: 14, fontSize: 15 }}
+          />
+          <Pressable onPress={handleLocalLogin} disabled={!identifier.trim() || !password || localLogin.isPending} style={({ pressed }) => ({ minHeight: 52, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: identifier.trim() && password ? colors.primary : colors.muted, opacity: pressed ? 0.86 : 1 })}>
+            {localLogin.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "800" }}>E-posta ile giriş yap</Text>}
+          </Pressable>
+          <Pressable onPress={() => router.push("/forgot-password" as never)} style={({ pressed }) => ({ alignSelf: "flex-end", opacity: pressed ? 0.65 : 1 })}>
+            <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "700" }}>Parolamı unuttum</Text>
+          </Pressable>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 10 }}><View style={{ flex: 1, height: 1, backgroundColor: colors.border }} /><Text style={{ color: colors.muted, fontSize: 12 }}>veya</Text><View style={{ flex: 1, height: 1, backgroundColor: colors.border }} /></View>
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Güvenli giriş yap"
-          disabled={loading}
+          disabled={loading || localLogin.isPending}
           onPress={handleLogin}
           style={({ pressed }) => ({
             minHeight: 54,
@@ -76,7 +129,7 @@ export default function LoginScreen() {
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: colors.primary,
-            opacity: loading ? 0.65 : pressed ? 0.9 : 1,
+            opacity: loading || localLogin.isPending ? 0.65 : pressed ? 0.9 : 1,
           })}
         >
           {loading ? (
