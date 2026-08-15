@@ -15,14 +15,14 @@ export default function GeneralSettingsScreen() {
   const router = useRouter();
   const { logout } = useAuth();
   const { colorScheme, setColorScheme } = useThemeContext();
-  const { language } = useLocalization();
+  const { language, translate } = useLocalization();
   const [notifications, setNotifications] = useState(true);
 
   const handleLogout = () => {
-    Alert.alert("Çıkış Yap", "Hesabınızdan çıkış yapmak istediğinize emin misiniz?", [
-      { text: "İptal", style: "cancel" },
+    Alert.alert(translate("logoutConfirmTitle"), translate("logoutConfirmBody"), [
+      { text: translate("cancel"), style: "cancel" },
       {
-        text: "Çıkış Yap",
+        text: translate("logout"),
         style: "destructive",
         onPress: async () => {
           await logout();
@@ -38,17 +38,17 @@ export default function GeneralSettingsScreen() {
         <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={styles.headerTitle}>Ayarlar & Güvenlik</Text>
+        <Text style={styles.headerTitle}>{translate("settingsSecurity")}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
-          <LinkRow label="Dil" value={language === "tr" ? "Türkçe" : language.toUpperCase()} onPress={() => router.push("/settings/language" as never)} styles={styles} colors={colors} />
+          <LinkRow label={translate("language")} value={language === "tr" ? "Türkçe" : language.toUpperCase()} onPress={() => router.push("/settings/language" as never)} styles={styles} colors={colors} />
           <View style={[styles.row, styles.divider]}>
-            <Text style={styles.rowLabel}>Karanlık Mod</Text>
+            <Text style={styles.rowLabel}>{translate("darkMode")}</Text>
             <Switch
-              accessibilityLabel="Karanlık mod"
+              accessibilityLabel={translate("darkMode")}
               value={colorScheme === "dark"}
               onValueChange={(enabled) => setColorScheme(enabled ? "dark" : "light")}
               trackColor={{ false: colors.border, true: colors.primary }}
@@ -56,23 +56,23 @@ export default function GeneralSettingsScreen() {
             />
           </View>
           <View style={[styles.row, styles.divider]}>
-            <Text style={styles.rowLabel}>Bildirimler</Text>
+            <Text style={styles.rowLabel}>{translate("notifications")}</Text>
             <Switch
-              accessibilityLabel="Bildirimler"
+              accessibilityLabel={translate("notifications")}
               value={notifications}
               onValueChange={setNotifications}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor="#FFFFFF"
             />
           </View>
-          <SettingValueRow label="Para Birimi" value="₺ TRY" styles={styles} isLast />
+          <SettingValueRow label={translate("currency")} value={translate("currencyTry")} styles={styles} isLast />
         </View>
 
         <View style={styles.card}>
-          <LinkRow label="Aktif Cihazlar" onPress={() => router.push("/settings/security" as never)} styles={styles} colors={colors} />
-          <LinkRow label="Hakkında" onPress={() => router.push("/settings/help" as never)} styles={styles} colors={colors} />
-          <LinkRow label="Gizlilik Politikası" onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} />
-          <LinkRow label="Kullanım Koşulları" onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} isLast />
+          <LinkRow label={translate("activeDevices")} onPress={() => router.push("/settings/security" as never)} styles={styles} colors={colors} />
+          <LinkRow label={translate("about")} onPress={() => router.push("/settings/help" as never)} styles={styles} colors={colors} />
+          <LinkRow label={translate("privacyPolicy")} onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} />
+          <LinkRow label={translate("terms")} onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} isLast />
         </View>
 
         <Pressable
@@ -81,10 +81,10 @@ export default function GeneralSettingsScreen() {
           style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
         >
           <IconSymbol name="rectangle.portrait.and.arrow.right" size={19} color={colors.error} />
-          <Text style={styles.logoutText}>Çıkış Yap</Text>
+          <Text style={styles.logoutText}>{translate("logout")}</Text>
         </Pressable>
 
-        <Text style={styles.version}>Move&Fix v1.0.0</Text>
+        <Text style={styles.version}>{translate("version")}</Text>
       </ScrollView>
     </ScreenContainer>
   );

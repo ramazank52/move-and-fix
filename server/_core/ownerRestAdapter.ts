@@ -9,11 +9,14 @@
 import type { Express, Request, Response } from "express";
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
+import { createContext } from "./context";
 import { ownerRouter } from "./ownerRouter";
 import { securityAuditLog } from "./security";
 
 type OwnerProcedure =
   | "logout"
+  | "requestMfa"
+  | "verifyMfa"
   | "dashboard"
   | "users"
   | "getUser"
@@ -50,7 +53,11 @@ async function callOwnerProcedure<T>(
   procedure: OwnerProcedure,
   input?: unknown,
 ): Promise<T> {
-  const caller = ownerRouter.createCaller({ req, res, user });
+  const context = await createContext({ req, res, info: {} as never });
+  if (!context.user || context.user.id !== user.id) {
+    throw new Error("Ortak platform oturumu yeniden doğrulanamadı");
+  }
+  const caller = ownerRouter.createCaller(context);
   // tRPC'nin dinamik REST köprüsünde yöntem adı runtime'da seçilir.
   const result = input === undefined
     ? await (caller[procedure] as () => Promise<unknown>)()
@@ -89,6 +96,26 @@ export function registerOwnerRestRoutes(app: Express) {
       error: "MoveOS doğrulaması ortak platform hesabı üzerinden yürütülür.",
       code: "GONE",
     });
+  });
+
+  app.post("/api/owner/mfa/request", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "requestMfa"));
+    } catch (error) {
+      sendOwnerError(res, error, "Yönetici MFA kodu gönderilemedi");
+    }
+  });
+
+  app.post("/api/owner/mfa/verify", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(await callOwnerProcedure(req, res, user, "verifyMfa", { code: req.body?.code }));
+    } catch (error) {
+      sendOwnerError(res, error, "Yönetici MFA kodu doğrulanamadı");
+    }
   });
 
   app.post("/api/owner/logout", async (req, res) => {

@@ -146,7 +146,7 @@ export class NotificationServiceV2 {
     channel: NotificationChannel.EMAIL | NotificationChannel.SMS;
     destination: string;
     code: string;
-    purpose: 'verify_email' | 'verify_phone' | 'password_reset' | 'sensitive_transaction';
+    purpose: 'verify_email' | 'verify_phone' | 'password_reset' | 'sensitive_transaction' | 'admin_mfa';
   }): Promise<VerificationDeliveryResult> {
     const title = data.purpose === 'password_reset'
       ? 'Move&Fix parola sıfırlama kodu'

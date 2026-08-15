@@ -12,6 +12,37 @@ describe("yerelleştirme sözleşmesi", () => {
     }
   });
 
+  it("ana ekranın TR, EN ve RU metinlerini ve parametrelerini doğru üretir", () => {
+    expect(t("home.greeting", { name: "Ramazan" })).toBe("Merhaba Ramazan 👋");
+    expect(t("home.greeting", "en", { name: "Sam" })).toBe("Hello Sam 👋");
+    expect(t("home.greeting", "ru", { name: "Сэм" })).toBe("Привет, Сэм 👋");
+    expect(t("home.searchPlaceholder", "en")).toBe("What are you looking for?");
+    expect(t("home.moveAITitle", "ru")).toBe("Расскажите MoveAI");
+    expect(t("home.serviceCount", { count: 3 })).toBe("3 hizmet");
+  });
+
+  it("öncelikli müşteri ve profesyonel akışlar için TR, EN ve RU anahtarlarını çözümleyebilir", () => {
+    const keys = [
+      "explore.title",
+      "ai.welcome",
+      "wallet.history",
+      "profile.personalInfo",
+      "checkout.serviceSummary",
+      "checkout.payWith",
+      "provider.dashboardLoading",
+      "provider.availability",
+    ] as const;
+
+    for (const language of ["tr", "en", "ru"] as const) {
+      for (const key of keys) {
+        expect(t(key, language, { amount: "₺1.250,00", provider: "iyzico" })).toBeTruthy();
+      }
+    }
+
+    expect(t("checkout.payWith", "en", { amount: "TRY 1,250.00", provider: "Stripe" })).toBe("Pay TRY 1,250.00 with Stripe");
+    expect(t("provider.totalEarnings", "ru", { amount: "₺1 250,00" })).toContain("₺1 250,00");
+  });
+
   it("yalnız Arapça için RTL yönünü etkinleştirir", () => {
     expect(isRightToLeft("ar")).toBe(true);
     expect(isRightToLeft("tr")).toBe(false);

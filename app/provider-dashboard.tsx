@@ -17,23 +17,21 @@ import { ProviderBottomNav } from "@/components/provider-bottom-nav";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "@/lib/i18n";
 import { trpc } from "@/lib/trpc";
 
 const MENU_ITEMS = [
-  { label: "Yeni İşler", icon: "briefcase.fill", color: "#FF7A1A", route: "/provider-opportunities" },
-  { label: "Aktif İşler", icon: "bolt.fill", color: "#4F8CFF", route: "/provider-jobs" },
-  { label: "Takvim", icon: "calendar", color: "#9B6CFF", route: "/calendar" },
-  { label: "Kazançlar", icon: "wallet.pass.fill", color: "#22C55E", route: "/(tabs)/wallet" },
-  { label: "Mesajlar", icon: "message.fill", color: "#31B7D8", route: "/(tabs)/messages" },
-  { label: "Profil", icon: "person.fill", color: "#F45B8A", route: "/(tabs)/profile" },
+  { labelKey: "provider.menuNewJobs", icon: "briefcase.fill", color: "#FF7A1A", route: "/provider-opportunities" },
+  { labelKey: "provider.menuActiveJobs", icon: "bolt.fill", color: "#4F8CFF", route: "/provider-jobs" },
+  { labelKey: "provider.menuCalendar", icon: "calendar", color: "#9B6CFF", route: "/calendar" },
+  { labelKey: "provider.menuEarnings", icon: "wallet.pass.fill", color: "#22C55E", route: "/(tabs)/wallet" },
+  { labelKey: "provider.menuMessages", icon: "message.fill", color: "#31B7D8", route: "/(tabs)/messages" },
+  { labelKey: "provider.menuProfile", icon: "person.fill", color: "#F45B8A", route: "/(tabs)/profile" },
 ] as const;
-
-function formatCurrency(value: number) {
-  return `₺${value.toLocaleString("tr-TR")}`;
-}
 
 export default function ProviderDashboardScreen() {
   const colors = useColors();
+  const { t, formatMoney } = useTranslation();
   const router = useRouter();
   const { height: viewportHeight } = useWindowDimensions();
   const [refreshing, setRefreshing] = useState(false);
@@ -76,7 +74,7 @@ export default function ProviderDashboardScreen() {
       setAvailabilityOverride(null);
     } catch {
       setAvailabilityOverride(null);
-      Alert.alert("Müsaitlik güncellenemedi", "Bağlantınızı kontrol edip yeniden deneyin.");
+      Alert.alert(t("provider.dashboardUnavailable"), t("provider.dashboardUnavailableBody"));
     }
   }, [availabilityMutation, isAvailable, opportunitiesQuery, profileQuery]);
 
@@ -100,16 +98,16 @@ export default function ProviderDashboardScreen() {
         {isLoading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12 }}>
             <ActivityIndicator size="large" color="#FF7A1A" />
-            <Text style={{ color: colors.muted, fontSize: 14 }}>Panel hazırlanıyor...</Text>
+            <Text style={{ color: colors.muted, fontSize: 14 }}>{t("provider.dashboardLoading")}</Text>
           </View>
         ) : hasError || !profile ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
             <IconSymbol name="wifi.exclamationmark" size={36} color={colors.error} />
             <Text style={{ color: colors.foreground, fontSize: 17, fontWeight: "700", marginTop: 14 }}>
-              Panel verileri yüklenemedi
+              {t("provider.dashboardUnavailable")}
             </Text>
             <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 6 }}>
-              Profesyonel profilinizi ve bağlantınızı kontrol edip tekrar deneyin.
+              {t("provider.dashboardUnavailableBody")}
             </Text>
             <Pressable
               onPress={onRefresh}
@@ -122,7 +120,7 @@ export default function ProviderDashboardScreen() {
                 opacity: pressed ? 0.75 : 1,
               })}
             >
-              <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>Tekrar Dene</Text>
+              <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>{t("explore.retry")}</Text>
             </Pressable>
           </View>
         ) : (
@@ -133,7 +131,7 @@ export default function ProviderDashboardScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF7A1A" />}
           >
             <Text style={{ color: colors.foreground, fontSize: 25, lineHeight: 31, fontWeight: "800", marginBottom: 12 }}>
-              Bugün
+              {t("provider.today")}
             </Text>
 
             <LinearGradient
@@ -143,13 +141,13 @@ export default function ProviderDashboardScreen() {
               style={{ borderRadius: 11, paddingHorizontal: 18, paddingVertical: 18, marginBottom: 12 }}
             >
               <Text style={{ color: "rgba(255,255,255,0.82)", fontSize: 13, lineHeight: 18, fontWeight: "600" }}>
-                Bugünkü Kazanç
+                {t("provider.todayEarnings")}
               </Text>
               <Text style={{ color: "#FFFFFF", fontSize: 31, lineHeight: 39, fontWeight: "800", marginTop: 3 }}>
-                {formatCurrency(earnings?.todayEarnings ?? 0)}
+                {formatMoney(earnings?.todayEarnings ?? 0)}
               </Text>
               <Text style={{ color: "rgba(255,255,255,0.72)", fontSize: 11, lineHeight: 16, marginTop: 2 }}>
-                Toplam kazanç: {formatCurrency(earnings?.totalEarnings ?? 0)}
+                {t("provider.totalEarnings", { amount: formatMoney(earnings?.totalEarnings ?? 0) })}
               </Text>
             </LinearGradient>
 
@@ -167,7 +165,7 @@ export default function ProviderDashboardScreen() {
                   opacity: pressed ? 0.75 : 1,
                 })}
               >
-                <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>Aktif İş</Text>
+                <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>{t("provider.activeJobs")}</Text>
                 <Text style={{ color: colors.foreground, fontSize: 24, lineHeight: 30, fontWeight: "800", marginTop: 2 }}>
                   {activeJobs.length}
                 </Text>
@@ -185,7 +183,7 @@ export default function ProviderDashboardScreen() {
                   opacity: pressed ? 0.75 : 1,
                 })}
               >
-                <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>Yeni Teklif</Text>
+                <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>{t("provider.newOffers")}</Text>
                 <Text style={{ color: colors.foreground, fontSize: 24, lineHeight: 30, fontWeight: "800", marginTop: 2 }}>
                   {opportunities.length}
                 </Text>
@@ -210,7 +208,7 @@ export default function ProviderDashboardScreen() {
                 opacity: pressed || availabilityMutation.isPending ? 0.68 : 1,
               })}
             >
-              <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "700" }}>Müsaitlik</Text>
+              <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "700" }}>{t("provider.availability")}</Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
                 {availabilityMutation.isPending ? (
                   <ActivityIndicator size="small" color="#22C55E" />
@@ -218,7 +216,7 @@ export default function ProviderDashboardScreen() {
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isAvailable ? "#22C55E" : colors.muted }} />
                 )}
                 <Text style={{ color: isAvailable ? "#22C55E" : colors.muted, fontSize: 12, fontWeight: "700" }}>
-                  {isAvailable ? "Müsait" : "Kapalı"}
+                  {isAvailable ? t("provider.available") : t("provider.unavailable")}
                 </Text>
               </View>
             </Pressable>
@@ -226,7 +224,7 @@ export default function ProviderDashboardScreen() {
             <View style={{ flex: 1, minHeight: 276, borderRadius: 10, backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.border, overflow: "hidden" }}>
               {MENU_ITEMS.map((item, index) => (
                 <Pressable
-                  key={item.label}
+                  key={item.labelKey}
                   onPress={() => router.push(item.route as never)}
                   style={({ pressed }) => ({
                     flex: 1,
@@ -241,7 +239,7 @@ export default function ProviderDashboardScreen() {
                 >
                   <IconSymbol name={item.icon} size={18} color={item.color} />
                   <Text style={{ flex: 1, color: colors.foreground, fontSize: 14, fontWeight: "600", marginLeft: 12 }}>
-                    {item.label}
+                    {t(item.labelKey)}
                   </Text>
                   <IconSymbol name="chevron.right" size={17} color={colors.muted} />
                 </Pressable>

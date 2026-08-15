@@ -12,11 +12,13 @@ import { useColors } from "@/hooks/use-colors";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useTranslation } from "@/lib/i18n";
 
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   // Fetch data
   const { data: activeJobs } = trpc.requests.list.useQuery(undefined, {
@@ -29,22 +31,22 @@ export default function HomeScreen() {
   );
 
   const activeJob = activeJobs?.find((j) => j.status === "active");
-  const userName = user?.name?.split(" ")[0] || "Kullanıcı";
+  const userName = user?.name?.split(" ")[0] || t("home.defaultName");
 
   // Quick access categories — referans görsele göre
   const quickAccess = [
-    { name: "Acil Yardım", icon: "exclamationmark.triangle.fill" as const, color: colors.error },
-    { name: "Araç", icon: "car.fill" as const, color: colors.primary },
-    { name: "Ev", icon: "house.fill" as const, color: colors.accentBlue },
-    { name: "Taşıma", icon: "shippingbox.fill" as const, color: colors.accentPurple },
+    { name: t("home.quickAccess_emergency"), icon: "exclamationmark.triangle.fill" as const, color: colors.error },
+    { name: t("home.quickAccess_vehicle"), icon: "car.fill" as const, color: colors.primary },
+    { name: t("home.quickAccess_home"), icon: "house.fill" as const, color: colors.accentBlue },
+    { name: t("home.quickAccess_moving"), icon: "shippingbox.fill" as const, color: colors.accentPurple },
   ];
 
   // Popular services — referans görsele göre
   const popularServices = [
-    { name: "Temizlik", count: 234, icon: "sparkles" as const },
-    { name: "Su Tesisatı", count: 156, icon: "wrench.fill" as const },
-    { name: "Elektrik", count: 189, icon: "bolt.fill" as const },
-    { name: "Klima", count: 142, icon: "sun.max.fill" as const },
+    { name: t("home.service.cleaning"), count: 234, icon: "sparkles" as const },
+    { name: t("home.service.plumbing"), count: 156, icon: "wrench.fill" as const },
+    { name: t("home.service.electricity"), count: 189, icon: "bolt.fill" as const },
+    { name: t("home.service.airConditioning"), count: 142, icon: "sun.max.fill" as const },
   ];
 
   return (
@@ -56,10 +58,10 @@ export default function HomeScreen() {
         {/* 1. Karşılama Başlığı */}
         <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 }}>
           <Text style={{ fontSize: 28, fontWeight: "800", color: colors.foreground }}>
-            Merhaba {userName} 👋
+            {t("home.greeting", { name: userName })}
           </Text>
           <Text style={{ fontSize: 14, color: colors.muted, marginTop: 6, lineHeight: 20 }}>
-            Bugün sana nasıl yardımcı olabilirim?
+            {t("home.subtitle")}
           </Text>
         </View>
 
@@ -79,7 +81,7 @@ export default function HomeScreen() {
           >
             <IconSymbol size={16} name="magnifyingglass" color={colors.muted} />
             <TextInput
-              placeholder="Ne arıyorsun?"
+              placeholder={t("home.searchPlaceholder")}
               placeholderTextColor={colors.muted}
               style={{
                 flex: 1,
@@ -123,10 +125,10 @@ export default function HomeScreen() {
               </View>
               <View style={{ marginLeft: 12, flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF" }}>
-                  MoveAI ile anlat
+                  {t("home.moveAITitle")}
                 </Text>
                 <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 3 }}>
-                  Doğal dille söyle, biz halledelim
+                  {t("home.moveAISubtitle")}
                 </Text>
               </View>
             </View>
@@ -137,7 +139,7 @@ export default function HomeScreen() {
         {/* 4. Hızlı Erişim — 4 renkli kart */}
         <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
-            Hızlı Erişim
+            {t("home.quickAccess")}
           </Text>
           <View style={{ flexDirection: "row", gap: 10 }}>
             {quickAccess.map((cat, idx) => (
@@ -196,7 +198,7 @@ export default function HomeScreen() {
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 11, color: colors.muted }}>Aktif İş</Text>
+                  <Text style={{ fontSize: 11, color: colors.muted }}>{t("home.activeJob")}</Text>
                   <Text style={{ fontSize: 15, fontWeight: "700", color: colors.foreground, marginTop: 4 }}>
                     Hizmet Talebi #{activeJob.id}
                   </Text>
@@ -241,10 +243,10 @@ export default function HomeScreen() {
         <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
-              Yakındaki Ustalar
+              {t("home.nearbyProviders")}
             </Text>
             <Pressable onPress={() => router.push("/explore" as any)}>
-              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>Tümü</Text>
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>{t("common.seeAll")}</Text>
             </Pressable>
           </View>
 
@@ -312,7 +314,7 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={{ alignItems: "center", paddingVertical: 20 }}>
-              <Text style={{ fontSize: 14, color: colors.muted }}>Yakında profesyonel bulunamadı</Text>
+              <Text style={{ fontSize: 14, color: colors.muted }}>{t("home.noNearbyProviders")}</Text>
             </View>
           )}
         </View>
@@ -321,10 +323,10 @@ export default function HomeScreen() {
         <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>
-              Popüler Hizmetler
+              {t("home.popularServices")}
             </Text>
             <Pressable onPress={() => router.push("/explore" as any)}>
-              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>Tümü</Text>
+              <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>{t("common.seeAll")}</Text>
             </Pressable>
           </View>
 
@@ -367,7 +369,7 @@ export default function HomeScreen() {
                       {service.name}
                     </Text>
                     <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                      {service.count} hizmet
+                      {t("home.serviceCount", { count: service.count })}
                     </Text>
                   </View>
                 </View>

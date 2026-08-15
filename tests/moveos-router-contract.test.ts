@@ -8,6 +8,7 @@ const db = vi.hoisted(() => ({
   updateMoveOsCategory: vi.fn(),
   getMoveOsService: vi.fn(),
   getMoveOsUser: vi.fn(),
+  hasValidAdminMfaGrant: vi.fn(),
   listMoveOsServices: vi.fn(),
   listMoveOsUsers: vi.fn(),
   updateMoveOsUser: vi.fn(),
@@ -28,13 +29,22 @@ const metrics = {
   risks: [],
 };
 
-const adminCaller = () => ownerRouter.createCaller({ user: { id: 7, role: "admin" } } as never);
-const customerCaller = () => ownerRouter.createCaller({ user: { id: 8, role: "user" } } as never);
+const adminCaller = () =>
+  ownerRouter.createCaller({ user: { id: 7, role: "admin" }, sessionFingerprint: "test-admin-session" } as never);
+const customerCaller = () =>
+  ownerRouter.createCaller({ user: { id: 8, role: "user" }, sessionFingerprint: "test-user-session" } as never);
 
 describe("MoveOS ortak API sözleşmesi", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     db.getMoveOsDashboardMetrics.mockResolvedValue(metrics);
+    db.hasValidAdminMfaGrant.mockResolvedValue(true);
+  });
+
+  it("MFA grant’i olmayan yönetici oturumunun MoveOS verisine erişimini reddeder", async () => {
+    db.hasValidAdminMfaGrant.mockResolvedValue(false);
+    await expect(adminCaller().dashboard()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(db.getMoveOsDashboardMetrics).not.toHaveBeenCalled();
   });
 
   it("dashboard’u sabit değerler yerine veri katmanındaki gerçek özetten üretir", async () => {

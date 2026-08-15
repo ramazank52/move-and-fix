@@ -5,6 +5,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
+import { useTranslation } from "@/lib/i18n";
 
 type FilterTab = "all" | "emergency" | "km_based";
 
@@ -34,6 +35,7 @@ const EMERGENCY_SLUGS = new Set(["plumbing", "electrical", "locksmith", "roadsid
 
 export default function ExploreScreen() {
   const colors = useColors();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ q?: string; filter?: string }>();
   const [searchQuery, setSearchQuery] = useState(params.q || "");
   const [activeFilter, setActiveFilter] = useState<FilterTab>(
@@ -61,20 +63,20 @@ export default function ExploreScreen() {
   }, [providersQuery.data, searchQuery]);
 
   const filterTabs: { id: FilterTab; label: string; icon: string }[] = [
-    { id: "all", label: "Tümü", icon: "house.fill" },
-    { id: "emergency", label: "Acil", icon: "exclamationmark.triangle.fill" },
-    { id: "km_based", label: "Araç", icon: "car.fill" },
+    { id: "all", label: t("explore.all"), icon: "house.fill" },
+    { id: "emergency", label: t("explore.emergency"), icon: "exclamationmark.triangle.fill" },
+    { id: "km_based", label: t("explore.vehicle"), icon: "car.fill" },
   ];
 
   return (
     <ScreenContainer className="p-0">
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
-          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.foreground, marginBottom: 12 }}>Ne arıyorsun?</Text>
+          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.foreground, marginBottom: 12 }}>{t("explore.title")}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, borderWidth: 0.5, borderColor: colors.border }}>
             <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
             <TextInput
-              placeholder="Hizmet veya usta ara..."
+              placeholder={t("search")}
               placeholderTextColor={colors.muted}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -119,23 +121,23 @@ export default function ExploreScreen() {
         </View>
 
         <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
-          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>Kategoriler</Text>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{t("categories")}</Text>
         </View>
 
         {categoriesQuery.isLoading ? (
           <View style={{ paddingVertical: 36, alignItems: "center", gap: 10 }}>
             <ActivityIndicator color={colors.primary} />
-            <Text style={{ color: colors.muted }}>Hizmetler yükleniyor...</Text>
+            <Text style={{ color: colors.muted }}>{t("explore.loadingServices")}</Text>
           </View>
         ) : categoriesQuery.error ? (
           <Pressable onPress={() => categoriesQuery.refetch()} style={{ marginHorizontal: 16, padding: 18, borderRadius: 14, backgroundColor: colors.surface, alignItems: "center" }}>
-            <Text style={{ color: colors.error, fontWeight: "600" }}>Kategoriler yüklenemedi</Text>
-            <Text style={{ color: colors.primary, marginTop: 6 }}>Yeniden dene</Text>
+            <Text style={{ color: colors.error, fontWeight: "600" }}>{t("explore.categoriesFailed")}</Text>
+            <Text style={{ color: colors.primary, marginTop: 6 }}>{t("explore.retry")}</Text>
           </Pressable>
         ) : filteredCategories.length === 0 ? (
           <View style={{ marginHorizontal: 16, padding: 28, borderRadius: 14, backgroundColor: colors.surface, alignItems: "center" }}>
             <IconSymbol name="magnifyingglass" size={28} color={colors.muted} />
-            <Text style={{ color: colors.muted, marginTop: 8 }}>Aramana uygun hizmet bulunamadı.</Text>
+            <Text style={{ color: colors.muted, marginTop: 8 }}>{t("explore.noServices")}</Text>
           </View>
         ) : (
           <View style={{ paddingHorizontal: 16, marginBottom: 20, gap: 8 }}>
@@ -154,7 +156,7 @@ export default function ExploreScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{category.name}</Text>
                       <Text style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                        {Number(category.professionalCount)} profesyonel
+                        {t("explore.providerCount", { count: Number(category.professionalCount) })}
                       </Text>
                     </View>
                   </View>
@@ -167,10 +169,10 @@ export default function ExploreScreen() {
 
         <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>Önerilen Ustalar</Text>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{t("explore.recommendedProviders")}</Text>
             {searchQuery ? (
               <Pressable onPress={() => setSearchQuery("")} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>Tümü</Text>
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "700" }}>{t("common.seeAll")}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -178,12 +180,12 @@ export default function ExploreScreen() {
             <ActivityIndicator color={colors.primary} />
           ) : providersQuery.error ? (
             <Pressable onPress={() => providersQuery.refetch()} style={{ padding: 16, borderRadius: 14, backgroundColor: colors.surface }}>
-              <Text style={{ color: colors.error, textAlign: "center" }}>Profesyoneller yüklenemedi. Yeniden dene.</Text>
+              <Text style={{ color: colors.error, textAlign: "center" }}>{t("explore.loadingProvidersFailed")}</Text>
             </Pressable>
           ) : filteredProviders.length === 0 ? (
             <View style={{ padding: 20, borderRadius: 14, backgroundColor: colors.surface, alignItems: "center" }}>
               <IconSymbol name="person.fill" size={26} color={colors.muted} />
-              <Text style={{ color: colors.muted, marginTop: 8 }}>Uygun profesyonel bulunamadı.</Text>
+              <Text style={{ color: colors.muted, marginTop: 8 }}>{t("explore.noProviders")}</Text>
             </View>
           ) : (
             <View style={{ gap: 10 }}>
@@ -204,7 +206,7 @@ export default function ExploreScreen() {
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
                       <IconSymbol name="star.fill" size={10} color={colors.warning} />
                       <Text style={{ fontSize: 11, color: colors.muted }}>{provider.rating ?? 0}</Text>
-                      <Text style={{ fontSize: 11, color: colors.muted }}>· MoveScore {provider.moveScore ?? 0}</Text>
+                      <Text style={{ fontSize: 11, color: colors.muted }}>· {t("explore.moveScore", { score: provider.moveScore ?? 0 })}</Text>
                     </View>
                   </View>
                   <IconSymbol name="chevron.right" size={16} color={colors.muted} />

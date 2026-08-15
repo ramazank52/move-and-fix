@@ -16,6 +16,9 @@ h2 { font-size: 1.1rem; }
 .notice { min-height: 0; }
 .notice:not(:empty) { border: 1px solid #503d70; background: #201a2b; border-radius: 12px; margin-bottom: 22px; padding: 14px; }
 .notice.error { border-color: #a74452; color: #ffc7cb; }
+.mfa-panel { margin: 20px auto; max-width: 760px; }
+.secondary-action { background: transparent; border: 1px solid #675879; color: #e1d7f3; }
+.secondary-action:hover { background: rgba(255,255,255,.06); }
 .metrics { display: grid; gap: 14px; grid-template-columns: repeat(6, minmax(120px, 1fr)); margin-bottom: 20px; }
 .metric, .panel { background: rgba(30, 27, 42, .9); border: 1px solid #393149; border-radius: 16px; box-shadow: 0 10px 24px rgba(0,0,0,.16); }
 .metric { min-height: 112px; padding: 18px; }

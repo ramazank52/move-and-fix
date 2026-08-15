@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
+import { useTranslation } from "@/lib/i18n";
 
 interface Message {
   id: string;
@@ -27,38 +28,40 @@ interface Message {
   requestId?: number;
 }
 
-const QUICK_PROMPTS = [
-  "Evimin suyu akıyor",
-  "Arabam yolda kaldı",
-  "Klima soğutmuyor",
-  "Çekici lazım",
-  "Kurye lazım",
-  "Fiyat tahmini",
-];
-
 export default function AIAssistantScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { t, locale } = useTranslation();
   const { height: viewportHeight } = useWindowDimensions();
+  const quickPrompts = useMemo(
+    () => [t("ai.prompt.plumbing"), t("ai.prompt.roadside"), t("ai.prompt.airConditioning"), t("ai.prompt.towTruck"), t("ai.prompt.courier"), t("ai.prompt.priceEstimate")],
+    [t],
+  );
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Merhaba! Ben MoveAI 🤖 Size nasıl yardımcı olabilirim? Acil bir sorun mu var, hizmet mi arıyorsunuz?",
+      text: t("ai.welcome"),
       isUser: false,
       timestamp: new Date().toISOString(),
-      suggestions: QUICK_PROMPTS,
+      suggestions: quickPrompts,
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  useEffect(() => {
+    setMessages((current) => current.length === 1 && !current[0]?.isUser
+      ? [{ ...current[0], text: t("ai.welcome"), suggestions: quickPrompts }]
+      : current);
+  }, [t, quickPrompts]);
+
   const aiCommandMutation = trpc.ai.command.useMutation({
     onSuccess: (data: any) => {
       setLoading(false);
       const response: Message = {
         id: Date.now().toString() + "-ai",
-        text: data.response || data.message || "Size yardımcı olmaya çalışıyorum. Lütfen biraz daha açıklayıcı olur musunuz?",
+        text: data.response || data.message || t("ai.fallback"),
         isUser: false,
         timestamp: new Date().toISOString(),
         suggestions: data.suggestions || undefined,
@@ -69,12 +72,12 @@ export default function AIAssistantScreen() {
 
       if (data.requestId) {
         Alert.alert(
-          "Hizmet Talebi Oluşturuldu",
-          "MoveAI talebinizi oluşturdu. Şimdi uygun ustaları görüntülemek ister misiniz?",
+          t("ai.requestCreatedTitle"),
+          t("ai.requestCreatedBody"),
           [
-            { text: "Sonra", style: "cancel" },
+            { text: t("ai.later"), style: "cancel" },
             {
-              text: "Ustaları Gör",
+              text: t("ai.viewProviders"),
               onPress: () => router.push(`/category/${data.category || 1}` as any),
             },
           ]
@@ -143,7 +146,7 @@ export default function AIAssistantScreen() {
     }
     return {
       text: "Sorununuzu anladım. Size yardımcı olmak istiyorum. Hangi hizmete ihtiyacınız var? Acil bir durum mu yoksa randevulu bir hizmet mi?",
-      suggestions: QUICK_PROMPTS,
+      suggestions: quickPrompts,
     };
   };
 
@@ -229,7 +232,7 @@ export default function AIAssistantScreen() {
                   marginRight: 4,
                 }}
               />
-              <Text style={{ fontSize: 11, color: colors.muted }}>Çevrimiçi</Text>
+              <Text style={{ fontSize: 11, color: colors.muted }}>{t("ai.online")}</Text>
             </View>
           </View>
         </View>
@@ -341,7 +344,7 @@ export default function AIAssistantScreen() {
                   marginLeft: msg.isUser ? 0 : 36,
                 }}
               >
-                {new Date(msg.timestamp).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                {new Date(msg.timestamp).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
               </Text>
             </View>
           ))}
@@ -376,7 +379,7 @@ export default function AIAssistantScreen() {
               >
                 <ActivityIndicator size="small" color={colors.accentPurple} />
                 <Text style={{ marginLeft: 8, fontSize: 13, color: colors.muted }}>
-                  MoveAI düşünüyor...
+                  {t("ai.thinking")}
                 </Text>
               </View>
             </View>
@@ -398,7 +401,7 @@ export default function AIAssistantScreen() {
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Sorunuzu yazın..."
+            placeholder={t("ai.inputPlaceholder")}
             placeholderTextColor={colors.muted}
             style={{
               flex: 1,

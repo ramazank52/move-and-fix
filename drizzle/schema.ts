@@ -130,7 +130,7 @@ export const authChallenges = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     userId: int("userId").notNull(),
-    purpose: mysqlEnum("purpose", ["verify_email", "verify_phone", "password_reset", "sensitive_transaction"]).notNull(),
+    purpose: mysqlEnum("purpose", ["verify_email", "verify_phone", "password_reset", "sensitive_transaction", "admin_mfa"]).notNull(),
     channel: mysqlEnum("channel", ["email", "sms"]).notNull(),
     destination: varchar("destination", { length: 320 }).notNull(),
     codeHash: varchar("codeHash", { length: 128 }).notNull(),
@@ -165,6 +165,25 @@ export const localAuthSessions = mysqlTable(
   (table) => [
     uniqueIndex("local_auth_sessions_token_hash_unique").on(table.tokenHash),
     index("local_auth_sessions_user_active_idx").on(table.userId, table.revokedAt, table.expiresAt),
+  ],
+);
+
+// MFA grants are bound to the exact authenticated session fingerprint. They are
+// intentionally short-lived and are invalidated when the underlying session changes.
+export const adminMfaGrants = mysqlTable(
+  "admin_mfa_grants",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    userId: int("userId").notNull(),
+    sessionFingerprint: varchar("sessionFingerprint", { length: 64 }).notNull(),
+    challengeId: int("challengeId").notNull(),
+    verifiedAt: timestamp("verifiedAt").defaultNow().notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    revokedAt: timestamp("revokedAt"),
+  },
+  (table) => [
+    uniqueIndex("admin_mfa_grants_session_unique").on(table.userId, table.sessionFingerprint),
+    index("admin_mfa_grants_active_idx").on(table.userId, table.expiresAt, table.revokedAt),
   ],
 );
 

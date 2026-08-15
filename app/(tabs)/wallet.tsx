@@ -15,23 +15,12 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { WalletTransactionCard } from "@/components/wallet-transaction-card";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "@/lib/i18n";
 import { trpc } from "@/lib/trpc";
-
-const QUICK_ACTIONS = [
-  { label: "Para Ekle", icon: "plus", route: "/wallet/add-money" },
-  { label: "Para Çek", icon: "arrow.up.right", route: "/wallet/withdraw" },
-  { label: "İşlem Geçmişi", icon: "creditcard.fill", route: "/wallet/transactions" },
-] as const;
-
-function formatMoney(value: number) {
-  return `₺${value.toLocaleString("tr-TR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 export default function WalletScreen() {
   const colors = useColors();
+  const { t, formatMoney } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
   const summaryQuery = trpc.wallet.summary.useQuery();
   const transactionsQuery = trpc.wallet.transactions.useQuery({ limit: 5, offset: 0 });
@@ -46,6 +35,11 @@ export default function WalletScreen() {
   }, [summaryQuery, transactionsQuery]);
 
   const screenStyle = { flex: 1, backgroundColor: colors.background } as const;
+  const quickActions = [
+    { label: t("wallet.addMoney"), icon: "plus", route: "/wallet/add-money" },
+    { label: t("wallet.withdraw"), icon: "arrow.up.right", route: "/wallet/withdraw" },
+    { label: t("wallet.history"), icon: "creditcard.fill", route: "/wallet/transactions" },
+  ] as const;
 
   if (summaryQuery.isLoading || transactionsQuery.isLoading) {
     return (
@@ -56,7 +50,7 @@ export default function WalletScreen() {
         style={screenStyle}
       >
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.stateBody, { color: colors.muted }]}>MoveWallet yükleniyor…</Text>
+        <Text style={[styles.stateBody, { color: colors.muted }]}>{t("wallet.loading")}</Text>
       </ScreenContainer>
     );
   }
@@ -70,15 +64,15 @@ export default function WalletScreen() {
         style={screenStyle}
       >
         <IconSymbol name="wifi.exclamationmark" size={40} color={colors.error} />
-        <Text style={[styles.stateTitle, { color: colors.foreground }]}>Cüzdan bilgileri alınamadı</Text>
-        <Text style={[styles.stateDescription, { color: colors.muted }]}>Güvenli bağlantınızı kontrol edip yeniden deneyin.</Text>
+        <Text style={[styles.stateTitle, { color: colors.foreground }]}>{t("wallet.loadFailedTitle")}</Text>
+        <Text style={[styles.stateDescription, { color: colors.muted }]}>{t("wallet.loadFailedBody")}</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Cüzdan bilgilerini yeniden yükle"
+          accessibilityLabel={t("wallet.retryAccessibility")}
           onPress={onRefresh}
           style={({ pressed }) => [styles.retryButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}
         >
-          <Text style={styles.retryText}>Yeniden Dene</Text>
+          <Text style={styles.retryText}>{t("wallet.retry")}</Text>
         </Pressable>
       </ScreenContainer>
     );
@@ -109,12 +103,12 @@ export default function WalletScreen() {
         ListHeaderComponent={
           <View>
             <View style={[styles.header, Platform.OS === "web" && styles.webHeader]}>
-              <Text style={[styles.screenTitle, { color: colors.foreground }]}>MoveWallet</Text>
+              <Text style={[styles.screenTitle, { color: colors.foreground }]}>{t("wallet")}</Text>
             </View>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="MoveWallet işlem geçmişini aç"
+              accessibilityLabel={t("wallet.historyAccessibility")}
               onPress={() => router.push("/wallet/transactions" as never)}
               style={({ pressed }) => [
                 styles.balanceCard,
@@ -123,18 +117,18 @@ export default function WalletScreen() {
               ]}
             >
               <View style={styles.balanceCopy}>
-                <Text style={[styles.balanceLabel, { color: colors.muted }]}>Bakiye</Text>
+                <Text style={[styles.balanceLabel, { color: colors.muted }]}>{t("wallet.balance")}</Text>
                 <Text style={[styles.balanceAmount, { color: colors.foreground }]}>{formatMoney(balance)}</Text>
                 <View style={styles.pendingRow}>
                   <View style={[styles.pendingDot, { backgroundColor: colors.warning }]} />
-                  <Text style={[styles.pendingText, { color: colors.muted }]}>Emanette bekleyen {formatMoney(pendingBalance)}</Text>
+                  <Text style={[styles.pendingText, { color: colors.muted }]}>{t("wallet.pendingEscrow", { amount: formatMoney(pendingBalance) })}</Text>
                 </View>
               </View>
               <IconSymbol name="chevron.right" size={20} color={colors.muted} />
             </Pressable>
 
             <View style={styles.quickActions}>
-              {QUICK_ACTIONS.map((action) => (
+              {quickActions.map((action) => (
                 <Pressable
                   key={action.label}
                   accessibilityRole="button"
@@ -151,14 +145,14 @@ export default function WalletScreen() {
             </View>
 
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Son İşlemler</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("wallet.recentTransactions")}</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Tüm cüzdan işlemlerini görüntüle"
+                accessibilityLabel={t("wallet.allTransactionsAccessibility")}
                 onPress={() => router.push("/wallet/transactions" as never)}
                 style={({ pressed }) => pressed && styles.pressed}
               >
-                <Text style={[styles.allLink, { color: colors.primary }]}>Tümü</Text>
+                <Text style={[styles.allLink, { color: colors.primary }]}>{t("common.seeAll")}</Text>
               </Pressable>
             </View>
           </View>
@@ -166,8 +160,8 @@ export default function WalletScreen() {
         ListEmptyComponent={
           <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <IconSymbol name="wallet.pass.fill" size={28} color={colors.muted} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Henüz cüzdan işlemi yok</Text>
-            <Text style={[styles.emptyBody, { color: colors.muted }]}>Ödeme, iade ve para çekme kayıtları burada görüntülenecek.</Text>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{t("wallet.emptyTitle")}</Text>
+            <Text style={[styles.emptyBody, { color: colors.muted }]}>{t("wallet.emptyBody")}</Text>
           </View>
         }
         ListFooterComponent={<View style={styles.footerSpace} />}

@@ -6,27 +6,29 @@ import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "@/lib/i18n";
 import { trpc } from "@/lib/trpc";
 
 type MenuIcon = Parameters<typeof IconSymbol>[0]["name"];
 
 const PROFILE_MENU: {
-  label: string;
+  labelKey: "profile.personalInfo" | "profile.addresses" | "profile.paymentMethods" | "wallet" | "profile.favorites" | "profile.pastJobs" | "profile.settingsSecurity";
   icon: MenuIcon;
   color: string;
   route: string;
 }[] = [
-  { label: "Kişisel Bilgiler", icon: "person.fill", color: "#8B5CF6", route: "/settings/profile-edit" },
-  { label: "Adreslerim", icon: "location.fill", color: "#3B82F6", route: "/settings/addresses" },
-  { label: "Ödeme Yöntemleri", icon: "creditcard.fill", color: "#10B981", route: "/settings/payments" },
-  { label: "MoveWallet", icon: "wallet.pass.fill", color: "#A855F7", route: "/(tabs)/wallet" },
-  { label: "Favoriler", icon: "heart.fill", color: "#EF4444", route: "/settings/favorites" },
-  { label: "Geçmiş İşler", icon: "briefcase.fill", color: "#F59E0B", route: "/my-jobs" },
-  { label: "Ayarlar & Güvenlik", icon: "gearshape.fill", color: "#64748B", route: "/settings/general" },
+  { labelKey: "profile.personalInfo", icon: "person.fill", color: "#8B5CF6", route: "/settings/profile-edit" },
+  { labelKey: "profile.addresses", icon: "location.fill", color: "#3B82F6", route: "/settings/addresses" },
+  { labelKey: "profile.paymentMethods", icon: "creditcard.fill", color: "#10B981", route: "/settings/payments" },
+  { labelKey: "wallet", icon: "wallet.pass.fill", color: "#A855F7", route: "/(tabs)/wallet" },
+  { labelKey: "profile.favorites", icon: "heart.fill", color: "#EF4444", route: "/settings/favorites" },
+  { labelKey: "profile.pastJobs", icon: "briefcase.fill", color: "#F59E0B", route: "/my-jobs" },
+  { labelKey: "profile.settingsSecurity", icon: "gearshape.fill", color: "#64748B", route: "/settings/general" },
 ];
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const { t, locale } = useTranslation();
   const { user } = useAuth();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const providerQuery = trpc.providers.myProfile.useQuery(undefined, {
@@ -34,8 +36,8 @@ export default function ProfileScreen() {
     retry: false,
   });
 
-  const displayName = user?.name?.trim() || "Move&Fix Kullanıcısı";
-  const initial = displayName.charAt(0).toLocaleUpperCase("tr-TR");
+  const displayName = user?.name?.trim() || t("profile.defaultName");
+  const initial = displayName.charAt(0).toLocaleUpperCase(locale);
   const provider = providerQuery.data;
   const rawRating = Number(provider?.rating ?? 0);
   const rating = rawRating > 5 ? rawRating / 10 : rawRating;
@@ -45,13 +47,13 @@ export default function ProfileScreen() {
     <ScreenContainer className="flex-1" safeAreaClassName="flex-1" style={styles.screen}>
       <FlatList
         data={PROFILE_MENU}
-        keyExtractor={(item) => item.label}
+        keyExtractor={(item) => item.labelKey}
         style={styles.screen}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={(
           <>
-            <Text style={styles.title}>Profil</Text>
+            <Text style={styles.title}>{t("profile")}</Text>
             <View style={styles.identityCard}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{initial}</Text>
@@ -67,11 +69,11 @@ export default function ProfileScreen() {
                   <View style={styles.ratingRow}>
                     <IconSymbol name="star.fill" size={15} color="#FBBF24" />
                     <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
-                    <Text style={styles.secondaryText}>({reviewCount} değerlendirme)</Text>
+                    <Text style={styles.secondaryText}>({t("profile.reviewCount", { count: reviewCount })})</Text>
                   </View>
                 ) : (
                   <Text numberOfLines={1} style={styles.secondaryText}>
-                    {user?.email || "Move&Fix üyesi"}
+                    {user?.email || t("profile.defaultMember")}
                   </Text>
                 )}
               </View>
@@ -82,7 +84,7 @@ export default function ProfileScreen() {
           <View style={[styles.menuCard, index === 0 && styles.menuCardTop, index === PROFILE_MENU.length - 1 && styles.menuCardBottom]}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={item.label}
+              accessibilityLabel={t(item.labelKey)}
               onPress={() => router.push(item.route as never)}
               style={({ pressed }) => [
                 styles.menuRow,
@@ -93,7 +95,7 @@ export default function ProfileScreen() {
               <View style={[styles.iconBox, { backgroundColor: `${item.color}1A` }]}>
                 <IconSymbol name={item.icon} size={18} color={item.color} />
               </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
+              <Text style={styles.menuLabel}>{t(item.labelKey)}</Text>
               <IconSymbol name="chevron.right" size={16} color={colors.muted} />
             </Pressable>
           </View>

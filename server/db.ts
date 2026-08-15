@@ -6,6 +6,7 @@ import {
   userCredentials,
   authChallenges,
   localAuthSessions,
+  adminMfaGrants,
   providerDocuments,
   walletAccounts,
   walletTransactions,
@@ -115,7 +116,7 @@ export async function getUserByOpenId(openId: string) {
 // Local credentials and verification challenges
 // Passwords and one-time codes must arrive here as hashes; plaintext values
 // are never persisted in the database.
-export type AuthChallengePurpose = "verify_email" | "verify_phone" | "password_reset" | "sensitive_transaction";
+export type AuthChallengePurpose = "verify_email" | "verify_phone" | "password_reset" | "sensitive_transaction" | "admin_mfa";
 export type AuthChallengeChannel = "email" | "sms";
 
 export async function getUserByEmailNormalized(emailNormalized: string) {
@@ -319,6 +320,55 @@ export async function revokeOtherLocalAuthSessions(data: { userId: number; curre
     .set({ revokedAt: new Date(), revokeReason: data.reason })
     .where(and(...conditions));
   return result[0]?.affectedRows ?? 0;
+}
+
+export async function createAdminMfaGrant(data: {
+  id: string;
+  userId: number;
+  sessionFingerprint: string;
+  challengeId: number;
+  expiresAt: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .insert(adminMfaGrants)
+    .values(data)
+    .onDuplicateKeyUpdate({
+      set: {
+        challengeId: data.challengeId,
+        verifiedAt: new Date(),
+        expiresAt: data.expiresAt,
+        revokedAt: null,
+      },
+    });
+}
+
+export async function hasValidAdminMfaGrant(data: { userId: number; sessionFingerprint: string; now?: Date }) {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db
+    .select({ id: adminMfaGrants.id })
+    .from(adminMfaGrants)
+    .where(
+      and(
+        eq(adminMfaGrants.userId, data.userId),
+        eq(adminMfaGrants.sessionFingerprint, data.sessionFingerprint),
+        isNull(adminMfaGrants.revokedAt),
+        gte(adminMfaGrants.expiresAt, data.now ?? new Date()),
+      ),
+    )
+    .limit(1);
+  return Boolean(rows[0]);
+}
+
+export async function revokeAdminMfaGrantsForSession(data: { userId: number; sessionFingerprint: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db
+    .update(adminMfaGrants)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(adminMfaGrants.userId, data.userId), eq(adminMfaGrants.sessionFingerprint, data.sessionFingerprint), isNull(adminMfaGrants.revokedAt)));
 }
 
 export async function createAuthChallenge(data: {

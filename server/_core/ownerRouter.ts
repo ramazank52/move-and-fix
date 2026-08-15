@@ -6,22 +6,30 @@
  */
 
 import { TRPCError } from "@trpc/server";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 import {
   archiveMoveOsCategory,
+  createAdminMfaGrant,
+  createAuthChallenge,
   createMoveOsCategory,
+  getLatestActiveAuthChallenge,
   getMoveOsDashboardMetrics,
   getMoveOsService,
   getMoveOsUser,
   listMoveOsCategories,
   listMoveOsServices,
   listMoveOsUsers,
+  incrementAuthChallengeAttempts,
+  markAuthChallengeUsed,
   updateMoveOsCategory,
   updateMoveOsUser,
 } from "../db";
+import { ENV } from "./env";
 import { STANDARD_COMMISSION_RATE_BPS } from "../payments/policy";
-import { adminProcedure, publicProcedure, router } from "./trpc";
+import { adminMfaProcedure, adminProcedure, publicProcedure, router } from "./trpc";
+import { NotificationChannel, notificationServiceV2 } from "../services/NotificationServiceV2";
 
 const listInput = z.object({
   limit: z.number().int().min(1).max(100).default(20),
@@ -61,6 +69,24 @@ function adminAuthRequired() {
   });
 }
 
+const mfaCodeSchema = z.string().regex(/^\d{6}$/, "6 haneli güvenlik kodunu girin");
+
+function hashAdminMfaCode(userId: number, code: string): string {
+  if (!ENV.cookieSecret) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "MFA güvenlik yapılandırması eksik" });
+  }
+  return createHmac("sha256", ENV.cookieSecret).update(`${userId}:admin_mfa:${code}`).digest("hex");
+}
+
+function requiresMfaSession(ctx: { sessionFingerprint?: string | null; user?: { email?: string | null } | null }) {
+  if (!ctx.sessionFingerprint || !ctx.user?.email) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "MoveOS MFA için e-posta doğrulanmış ortak platform oturumu gerekli",
+    });
+  }
+}
+
 export const ownerRouter = router({
   /** Legacy password endpoints are intentionally fail-closed. */
   login: publicProcedure
@@ -71,11 +97,61 @@ export const ownerRouter = router({
     .input(z.object({ email: z.string().email(), otpCode: z.string().length(6) }))
     .mutation(adminAuthRequired),
 
+  requestMfa: adminProcedure.mutation(async ({ ctx }) => {
+    requiresMfaSession(ctx);
+    const code = randomInt(100_000, 1_000_000).toString();
+    await createAuthChallenge({
+      userId: ctx.user.id,
+      purpose: "admin_mfa",
+      channel: "email",
+      destination: ctx.user.email!,
+      codeHash: hashAdminMfaCode(ctx.user.id, code),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    });
+    const delivery = await notificationServiceV2.sendVerificationCode({
+      channel: NotificationChannel.EMAIL,
+      destination: ctx.user.email!,
+      code,
+      purpose: "admin_mfa",
+    });
+    if (delivery.deliveryStatus !== "delivered") {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "MFA kodu gönderilemedi. E-posta sağlayıcısı yapılandırılmalıdır.",
+      });
+    }
+    return { success: true, expiresInSeconds: 600 };
+  }),
+
+  verifyMfa: adminProcedure.input(z.object({ code: mfaCodeSchema })).mutation(async ({ ctx, input }) => {
+    requiresMfaSession(ctx);
+    const challenge = await getLatestActiveAuthChallenge({ userId: ctx.user.id, purpose: "admin_mfa" });
+    if (!challenge) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Geçerli bir MFA kodu isteyin" });
+    }
+    const expected = Buffer.from(challenge.codeHash, "hex");
+    const received = Buffer.from(hashAdminMfaCode(ctx.user.id, input.code), "hex");
+    const matches = expected.length === received.length && timingSafeEqual(expected, received);
+    if (!matches) {
+      await incrementAuthChallengeAttempts(challenge.id);
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "MFA kodu geçersiz veya süresi dolmuş" });
+    }
+    await markAuthChallengeUsed(challenge.id);
+    await createAdminMfaGrant({
+      id: randomUUID(),
+      userId: ctx.user.id,
+      sessionFingerprint: ctx.sessionFingerprint!,
+      challengeId: challenge.id,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    });
+    return { success: true, expiresInSeconds: 1800 };
+  }),
+
   logout: adminProcedure.mutation(async () => ({ success: true })),
 
-  dashboard: adminProcedure.query(async () => getMoveOsDashboardMetrics()),
+  dashboard: adminMfaProcedure.query(async () => getMoveOsDashboardMetrics()),
 
-  users: adminProcedure
+  users: adminMfaProcedure
     .input(
       listInput.extend({
         role: z.enum(["admin", "customer", "provider"]).optional(),
@@ -84,7 +160,7 @@ export const ownerRouter = router({
     )
     .query(async ({ input }) => listMoveOsUsers(input)),
 
-  getUser: adminProcedure
+  getUser: adminMfaProcedure
     .input(z.object({ userId: z.number().int().positive() }))
     .query(async ({ input }) => {
       const user = await getMoveOsUser(input.userId);
@@ -92,7 +168,7 @@ export const ownerRouter = router({
       return user;
     }),
 
-  updateUser: adminProcedure
+  updateUser: adminMfaProcedure
     .input(
       z.object({
         userId: z.number().int().positive(),
@@ -101,7 +177,11 @@ export const ownerRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user.id === input.userId && input.role === "user") {
+      const currentUser = ctx.user;
+      if (!currentUser) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Geçerli bir yönetici oturumu gerekli" });
+      }
+      if (currentUser.id === input.userId && input.role === "user") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Yönetici kendi yönetici yetkisini kaldıramaz" });
       }
       const updated = await updateMoveOsUser(input);
@@ -109,7 +189,7 @@ export const ownerRouter = router({
       return updated;
     }),
 
-  categories: adminProcedure.query(async () => {
+  categories: adminMfaProcedure.query(async () => {
     const categories = await listMoveOsCategories();
     return categories.map((category) => ({
       ...category,
@@ -117,7 +197,7 @@ export const ownerRouter = router({
     }));
   }),
 
-  createCategory: adminProcedure.input(categoryInput).mutation(async ({ input }) => {
+  createCategory: adminMfaProcedure.input(categoryInput).mutation(async ({ input }) => {
     const slug = input.slug ?? createSlug(input.name);
     if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "Geçerli kategori adı gerekli" });
     const category = await createMoveOsCategory({ ...input, slug });
@@ -125,7 +205,7 @@ export const ownerRouter = router({
     return { ...category, commissionRateBps: STANDARD_COMMISSION_RATE_BPS };
   }),
 
-  updateCategory: adminProcedure
+  updateCategory: adminMfaProcedure
     .input(categoryInput.partial().extend({ categoryId: z.number().int().positive(), isActive: z.boolean().optional() }))
     .mutation(async ({ input }) => {
       const { categoryId, isActive, ...changes } = input;
@@ -143,7 +223,7 @@ export const ownerRouter = router({
       return { ...category, commissionRateBps: STANDARD_COMMISSION_RATE_BPS };
     }),
 
-  archiveCategory: adminProcedure
+  archiveCategory: adminMfaProcedure
     .input(z.object({ categoryId: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       const category = await archiveMoveOsCategory(input.categoryId);
@@ -151,7 +231,7 @@ export const ownerRouter = router({
       return { ...category, commissionRateBps: STANDARD_COMMISSION_RATE_BPS };
     }),
 
-  aiCommand: adminProcedure
+  aiCommand: adminMfaProcedure
     .input(z.object({ command: z.string().trim().min(3).max(2_000) }))
     .mutation(async ({ input }) => ({
       command: input.command,
@@ -161,7 +241,7 @@ export const ownerRouter = router({
         "Yönetim komutu alındı. Etkili işlemler için MoveOS onaylı komut yürütücüsü henüz yapılandırılmadığından hiçbir veri değiştirilmedi.",
     })),
 
-  wallet: adminProcedure.query(async () => {
+  wallet: adminMfaProcedure.query(async () => {
     const metrics = await getMoveOsDashboardMetrics();
     return {
       balance: metrics.commissionRevenue,
@@ -175,7 +255,7 @@ export const ownerRouter = router({
     };
   }),
 
-  withdrawFunds: adminProcedure
+  withdrawFunds: adminMfaProcedure
     .input(z.object({ amount: z.number().int().positive(), bankAccountId: z.string().trim().min(1).max(96) }))
     .mutation(async () => {
       throw new TRPCError({
@@ -184,7 +264,7 @@ export const ownerRouter = router({
       });
     }),
 
-  analytics: adminProcedure
+  analytics: adminMfaProcedure
     .input(z.object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() }).optional())
     .query(async ({ input }) => {
       if (input?.from && input.to && input.from > input.to) {
@@ -203,9 +283,9 @@ export const ownerRouter = router({
       };
     }),
 
-  services: adminProcedure.input(listInput).query(async ({ input }) => listMoveOsServices(input)),
+  services: adminMfaProcedure.input(listInput).query(async ({ input }) => listMoveOsServices(input)),
 
-  getService: adminProcedure
+  getService: adminMfaProcedure
     .input(z.object({ serviceId: z.number().int().positive() }))
     .query(async ({ input }) => {
       const service = await getMoveOsService(input.serviceId);

@@ -257,6 +257,7 @@
 - [x] Phase 5 mobil doğrulama, hesap kurtarma, belge yükleme ve sesli mesaj arayüzlerini gerçek tRPC akışlarına bağla
 - [x] Phase 5 yerel auth, belge yetkilendirme ve sesli mesaj güvenlik testlerini ekle
 - [ ] Phase 5 kalite kapıları, mobil export ve render regresyonunu tekrar doğrula
+- [x] Phase 10 ana ekran ve öncelikli akış metinlerini TR/EN/RU sözlüğüne taşı; parametrik metin, RTL ve dil tercihi regresyonlarını doğrula
 - [x] Phase 5 TypeScript, lint, sunucu build, 273 testlik regresyon paketi ve iOS/Android Expo export kalite kapılarını doğrula
 - [x] İş başlangıç/bitiş, İşi Bitirdim, fotoğraf/kanıt, AI kanıt analizi, müşteri onayı, dispute ve 48 saatlik otomatik serbest bırakma yaşam döngüsünü tamamla
 - [x] Phase 6 iş kanıtı, müşteri onayı, itiraz ve 48 saatlik emanet serbest bırakma veri modelini migration ile ekle
@@ -294,3 +295,7 @@
 - [ ] Phase 9 hesap ve sır güvenliği: MFA, cihaz/oturum listesi, oturum iptali, şüpheli giriş ve hassas işlem re-auth kapsamını denetle; gerçekçi biçimde eksikleri tamamla
 - [x] Phase 9 yerel oturum cihaz listesi, sahiplik denetimli oturum iptali, token rotasyonu, hassas para çekme parola + tek kullanımlık kod re-auth ve istemci sır sızıntısı korumalarını uygula
 - [x] Phase 9 güvenlik-finans unit, integration, authorization, hata ve edge-case regresyonlarını ekle; kalite kapılarını tekrar çalıştır
+- [ ] Phase 10 yönetici MFA: admin oturumları için zorunlu, tek kullanımlık ikinci faktör challenge’ı ve rol-uyumlu yeniden doğrulama uygula
+- [ ] Phase 10 i18n: müşteri, profesyonel, ödeme, cüzdan, mesaj, takip ve ayar ekranlarında kullanıcıya görünen sabit metinleri çeviri anahtarlarına taşı
+- [ ] Phase 10 sağlayıcı sandbox: gerçek credential olmadan Stripe/iyzico/OTP adapter’larının fail-closed önkoşullarını, callback sözleşmelerini ve uzlaştırma başlatma blokajlarını doğrula
+- [ ] Phase 10 MFA/i18n/sandbox hata, yetki, edge-case ve regresyon testlerini ekle; kalite kapılarını yeniden çalıştır

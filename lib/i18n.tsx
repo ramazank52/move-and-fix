@@ -3,7 +3,7 @@ import { I18nManager, Platform } from "react-native";
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
 
 import { isRightToLeft, localeForLanguage, formatLocalDate, formatMoney, t } from "./i18n-core";
-import type { Language, SupportedCurrency, TranslationKey } from "./i18n-core";
+import type { Language, SupportedCurrency, TranslationKey, TranslationValues } from "./i18n-core";
 
 export * from "./i18n-core";
 
@@ -17,7 +17,7 @@ type LocalizationContextValue = {
   ready: boolean;
   setLanguage: (language: Language) => Promise<void>;
   setCurrency: (currency: SupportedCurrency) => Promise<void>;
-  translate: (key: TranslationKey) => string;
+  translate: (key: TranslationKey, values?: TranslationValues) => string;
   formatMoney: (amount: number) => string;
   formatDate: (value: Date | string | number) => string;
 };
@@ -32,7 +32,7 @@ export function LocalizationProvider({ children }: PropsWithChildren) {
     let active = true;
     void AsyncStorage.getItem(LANGUAGE_STORAGE_KEY)
       .then((saved) => {
-        if (!active || !["tr", "en", "de", "fr", "ar"].includes(saved ?? "")) return;
+        if (!active || !["tr", "en", "de", "fr", "ar", "ru"].includes(saved ?? "")) return;
         setLanguageState(saved as Language);
       })
       .finally(() => { if (active) setReady(true); });
@@ -54,7 +54,7 @@ export function LocalizationProvider({ children }: PropsWithChildren) {
       }
     },
     setCurrency: async (currency) => { if (currency !== "TRY") throw new Error("UNSUPPORTED_TRANSACTION_CURRENCY"); },
-    translate: (key) => t(key, language),
+    translate: (key, values) => t(key, language, values),
     formatMoney: (amount) => formatMoney(amount, language),
     formatDate: (date) => formatLocalDate(date, language),
   }), [language, ready]);
@@ -66,4 +66,9 @@ export function useLocalization() {
   const context = useContext(LocalizationContext);
   if (!context) throw new Error("useLocalization must be used inside LocalizationProvider");
   return context;
+}
+
+export function useTranslation() {
+  const localization = useLocalization();
+  return { ...localization, t: localization.translate };
 }

@@ -3,6 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { AppError } from "./errors";
+import { hasValidAdminMfaGrant } from "../db";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -81,5 +82,19 @@ export const adminProcedure = t.procedure.use(mapAppErrors).use(
         user: ctx.user,
       },
     });
+  }),
+);
+
+/** Applies to data-changing and sensitive MoveOS operations after base admin authorization. */
+export const adminMfaProcedure = adminProcedure.use(
+  t.middleware(async ({ ctx, next }) => {
+    if (!ctx.user || !ctx.sessionFingerprint) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "MoveOS için bu oturumda ikinci faktör doğrulaması gerekli" });
+    }
+    const granted = await hasValidAdminMfaGrant({ userId: ctx.user.id, sessionFingerprint: ctx.sessionFingerprint });
+    if (!granted) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "MoveOS için ikinci faktör doğrulaması gerekli" });
+    }
+    return next({ ctx });
   }),
 );

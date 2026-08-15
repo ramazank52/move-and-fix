@@ -10,6 +10,7 @@ export type TrpcContext = {
   res: CreateExpressContextOptions["res"];
   user: User | null;
   localSessionId?: string | null;
+  sessionFingerprint?: string | null;
 };
 
 function getSessionToken(req: CreateExpressContextOptions["req"]) {
@@ -27,12 +28,14 @@ function getSessionToken(req: CreateExpressContextOptions["req"]) {
 export async function createContext(opts: CreateExpressContextOptions): Promise<TrpcContext> {
   let user: User | null = null;
   let localSessionId: string | null = null;
+  let sessionFingerprint: string | null = null;
 
   try {
     user = await sdk.authenticateRequest(opts.req);
     const sessionToken = getSessionToken(opts.req);
     if (user && sessionToken) {
       const tokenHash = createHash("sha256").update(sessionToken).digest("hex");
+      sessionFingerprint = tokenHash;
       const localSession = await getLocalAuthSessionByTokenHash(tokenHash);
       if (localSession) {
         const valid =
@@ -57,5 +60,6 @@ export async function createContext(opts: CreateExpressContextOptions): Promise<
     res: opts.res,
     user,
     localSessionId,
+    sessionFingerprint,
   };
 }

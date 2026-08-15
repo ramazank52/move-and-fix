@@ -19,6 +19,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useTranslation } from "@/lib/i18n";
 import { ESCROW_FLOW_STEPS } from "@/lib/payment";
 import { useStripePaymentSheet } from "@/lib/stripe-sdk";
 import { trpc } from "@/lib/trpc";
@@ -94,6 +95,7 @@ function validateBuyer(form: IyzicoBuyer) {
 
 export default function CheckoutScreen() {
   const colors = useColors();
+  const { t, formatMoney } = useTranslation();
   const router = useRouter();
   const { initPaymentSheet, presentPaymentSheet } = useStripePaymentSheet();
   const params = useLocalSearchParams<{ requestId?: string }>();
@@ -275,11 +277,11 @@ export default function CheckoutScreen() {
     if (!Number.isInteger(requestId) || requestId <= 0) {
       return (
         <StateView
-          title="Geçersiz ödeme bağlantısı"
-          body="İş numarası eksik veya hatalı."
+          title={t("checkout.invalidLink")}
+          body={t("checkout.invalidLinkBody")}
           icon="exclamationmark.triangle.fill"
           iconColor={colors.error}
-          actionLabel="Geri Dön"
+          actionLabel={t("back")}
           onAction={() => router.back()}
           colors={colors}
         />
@@ -289,18 +291,18 @@ export default function CheckoutScreen() {
       return (
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.stateBody, { color: colors.muted }]}>Güvenli ödeme özeti hazırlanıyor…</Text>
+          <Text style={[styles.stateBody, { color: colors.muted }]}>{t("checkout.loadingQuote")}</Text>
         </View>
       );
     }
     if (quoteQuery.isError || !quoteQuery.data) {
       return (
         <StateView
-          title="Ödeme özeti alınamadı"
+          title={t("checkout.quoteUnavailable")}
           body={quoteQuery.error?.message ?? "Lütfen tekrar deneyin."}
           icon="wifi.exclamationmark"
           iconColor={colors.error}
-          actionLabel="Yeniden Dene"
+          actionLabel={t("explore.retry")}
           onAction={() => quoteQuery.refetch()}
           colors={colors}
           primary
@@ -317,20 +319,20 @@ export default function CheckoutScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Hizmet Özeti</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("checkout.serviceSummary")}</Text>
           <View style={[styles.infoHeader, { marginBottom: 12 }]}> 
             <View style={[styles.infoIcon, { backgroundColor: `${colors.primary}18` }]}> 
               <IconSymbol name="wrench.and.screwdriver.fill" size={18} color={colors.primary} />
             </View>
             <View style={styles.flowCopy}>
               <Text style={[styles.flowTitle, { color: colors.foreground }]}>{quote.requestTitle}</Text>
-              <Text style={[styles.flowDescription, { color: colors.muted }]}>Profesyonel: {quote.providerName}</Text>
+              <Text style={[styles.flowDescription, { color: colors.muted }]}>{t("checkout.provider", { name: quote.providerName })}</Text>
             </View>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryRow}>
-            <Text style={[styles.totalLabel, { color: colors.foreground }]}>Toplam</Text>
-            <Text style={[styles.totalValue, { color: colors.primary }]}>₺{quote.amount.toLocaleString("tr-TR")}</Text>
+            <Text style={[styles.totalLabel, { color: colors.foreground }]}>{t("checkout.total")}</Text>
+            <Text style={[styles.totalValue, { color: colors.primary }]}>{formatMoney(quote.amount)}</Text>
           </View>
         </View>
 
@@ -339,7 +341,7 @@ export default function CheckoutScreen() {
             <View style={[styles.infoIcon, { backgroundColor: `${colors.primary}18` }]}>
               <IconSymbol name="shield.fill" size={18} color={colors.primary} />
             </View>
-            <Text style={[styles.infoTitle, { color: colors.primary }]}>Move&Fix Emanet Güvencesi</Text>
+            <Text style={[styles.infoTitle, { color: colors.primary }]}>{t("checkout.escrowGuarantee")}</Text>
           </View>
           {ESCROW_FLOW_STEPS.map((step) => (
             <View key={step.step} style={styles.flowRow}>
@@ -354,27 +356,27 @@ export default function CheckoutScreen() {
           ))}
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Ücret Dökümü</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("checkout.feeBreakdown")}</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-          <SummaryRow label="Hizmet bedeli" value={`₺${quote.amount.toLocaleString("tr-TR")}`} colors={colors} />
-          <SummaryRow label={`Platform komisyonu (%${commissionPercent})`} value={`₺${quote.commissionAmount.toLocaleString("tr-TR")}`} colors={colors} />
-          <Text style={[styles.helperText, { color: colors.muted }]}>Komisyon hizmet bedelinden kesilir; müşteriye ayrıca yansıtılmaz.</Text>
+          <SummaryRow label={t("checkout.serviceFee")} value={formatMoney(quote.amount)} colors={colors} />
+          <SummaryRow label={t("checkout.platformCommission", { rate: commissionPercent })} value={formatMoney(quote.commissionAmount)} colors={colors} />
+          <Text style={[styles.helperText, { color: colors.muted }]}>{t("checkout.commissionInfo")}</Text>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryRow}>
-            <Text style={[styles.totalLabel, { color: colors.foreground }]}>Ödenecek Toplam</Text>
-            <Text style={[styles.totalValue, { color: colors.primary }]}>₺{quote.amount.toLocaleString("tr-TR")}</Text>
+            <Text style={[styles.totalLabel, { color: colors.foreground }]}>{t("checkout.totalPayable")}</Text>
+            <Text style={[styles.totalValue, { color: colors.primary }]}>{formatMoney(quote.amount)}</Text>
           </View>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Ödeme Yöntemi</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("checkout.paymentMethod")}</Text>
         <ProviderOption
           title="MoveWallet"
           subtitle={
             walletSummaryQuery.isLoading
-              ? "Bakiye doğrulanıyor…"
+              ? t("checkout.walletVerifying")
               : walletSummaryQuery.isError || !walletSummaryQuery.data
-                ? "Bakiye alınamadı · Ödeme BLOCKER"
-                : `Kullanılabilir: ₺${walletSummaryQuery.data.availableBalance.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · Ödeme BLOCKER`
+                ? t("checkout.walletUnavailable")
+                : t("checkout.walletAvailable", { amount: formatMoney(walletSummaryQuery.data.availableBalance) })
           }
           icon="wallet.pass.fill"
           selected={false}
@@ -385,7 +387,7 @@ export default function CheckoutScreen() {
         />
         <ProviderOption
           title="iyzico"
-          subtitle="Türkiye için güvenli hosted checkout"
+          subtitle={t("checkout.iyzicoSubtitle")}
           icon="creditcard.fill"
           selected={provider === "iyzico"}
           disabled={processing}
@@ -394,7 +396,7 @@ export default function CheckoutScreen() {
         />
         <ProviderOption
           title="Stripe"
-          subtitle={STRIPE_CLIENT_READY ? "Uluslararası kart · PaymentSheet" : "Publishable key BLOCKER"}
+          subtitle={STRIPE_CLIENT_READY ? t("checkout.stripeReady") : t("checkout.stripeBlocked")}
           icon="globe"
           selected={provider === "stripe"}
           disabled={processing}
@@ -405,21 +407,21 @@ export default function CheckoutScreen() {
 
         {provider === "iyzico" ? (
           <View style={[styles.formCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Fatura Bilgileri</Text>
-            <Text style={[styles.helperText, { color: colors.muted }]}>Kart bilgileri Move&Fix’e girilmez. Bu bilgiler iyzico oturumunu açmak için şifreli bağlantıyla sunucuya gönderilir.</Text>
-            <CheckoutInput value={buyerForm.gsmNumber} onChangeText={(value) => updateBuyer("gsmNumber", value)} placeholder="Cep telefonu (05xx xxx xx xx)" keyboardType="phone-pad" maxLength={16} colors={colors} />
-            <CheckoutInput value={buyerForm.identityNumber} onChangeText={(value) => updateBuyer("identityNumber", value.replace(/\D/g, ""))} placeholder="T.C. kimlik numarası" keyboardType="number-pad" maxLength={11} colors={colors} />
-            <CheckoutInput value={buyerForm.address} onChangeText={(value) => updateBuyer("address", value)} placeholder="Fatura adresi" multiline maxLength={500} colors={colors} />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{t("checkout.billingInfo")}</Text>
+            <Text style={[styles.helperText, { color: colors.muted }]}>{t("checkout.billingInfoBody")}</Text>
+            <CheckoutInput value={buyerForm.gsmNumber} onChangeText={(value) => updateBuyer("gsmNumber", value)} placeholder={t("checkout.phonePlaceholder")} keyboardType="phone-pad" maxLength={16} colors={colors} />
+            <CheckoutInput value={buyerForm.identityNumber} onChangeText={(value) => updateBuyer("identityNumber", value.replace(/\D/g, ""))} placeholder={t("checkout.identityPlaceholder")} keyboardType="number-pad" maxLength={11} colors={colors} />
+            <CheckoutInput value={buyerForm.address} onChangeText={(value) => updateBuyer("address", value)} placeholder={t("checkout.addressPlaceholder")} multiline maxLength={500} colors={colors} />
             <View style={styles.formRow}>
-              <CheckoutInput value={buyerForm.city} onChangeText={(value) => updateBuyer("city", value)} placeholder="Şehir" maxLength={100} colors={colors} flex />
-              <CheckoutInput value={buyerForm.zipCode} onChangeText={(value) => updateBuyer("zipCode", value.replace(/\D/g, ""))} placeholder="Posta kodu" keyboardType="number-pad" maxLength={5} colors={colors} compact />
+              <CheckoutInput value={buyerForm.city} onChangeText={(value) => updateBuyer("city", value)} placeholder={t("checkout.cityPlaceholder")} maxLength={100} colors={colors} flex />
+              <CheckoutInput value={buyerForm.zipCode} onChangeText={(value) => updateBuyer("zipCode", value.replace(/\D/g, ""))} placeholder={t("checkout.zipPlaceholder")} keyboardType="number-pad" maxLength={5} colors={colors} compact />
             </View>
           </View>
         ) : null}
 
         <View style={[styles.securityNotice, { backgroundColor: `${colors.success}10`, borderColor: `${colors.success}30` }]}>
           <IconSymbol name="lock.shield.fill" size={17} color={colors.success} />
-          <Text style={[styles.securityText, { color: colors.muted }]}>Tutar ve komisyon yalnızca sunucudaki kabul edilmiş tekliften hesaplanır. Emanet durumu sadece doğrulanmış webhook ile değişir.</Text>
+          <Text style={[styles.securityText, { color: colors.muted }]}>{t("checkout.securityNotice")}</Text>
         </View>
       </ScrollView>
     );
@@ -432,7 +434,7 @@ export default function CheckoutScreen() {
         <Pressable onPress={() => router.back()} style={styles.headerButton}>
           <IconSymbol name="chevron.left" size={20} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Güvenli Ödeme</Text>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{t("checkout.title")}</Text>
         <View style={styles.headerSpacer} />
       </View>
       <KeyboardAvoidingView style={styles.content} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={54}>
@@ -442,10 +444,10 @@ export default function CheckoutScreen() {
         <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
           <Pressable onPress={handlePayment} disabled={!canSubmit} style={({ pressed }) => [styles.payButton, { backgroundColor: canSubmit ? colors.primary : colors.muted }, pressed && canSubmit && styles.pressed]}>
             {processing ? (
-              <View style={styles.processingRow}><ActivityIndicator color="#FFFFFF" /><Text style={styles.processingText}>Güvenli oturum hazırlanıyor…</Text></View>
+              <View style={styles.processingRow}><ActivityIndicator color="#FFFFFF" /><Text style={styles.processingText}>{t("checkout.processing")}</Text></View>
             ) : (
               <Text style={styles.primaryButtonText}>
-                {provider === "iyzico" ? "iyzico" : "Stripe"} ile ₺{quoteQuery.data.amount.toLocaleString("tr-TR")} Öde
+                {t("checkout.payWith", { provider: provider === "iyzico" ? "iyzico" : "Stripe", amount: formatMoney(quoteQuery.data.amount) })}
               </Text>
             )}
           </Pressable>

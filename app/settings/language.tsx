@@ -14,7 +14,7 @@ export default function LanguageSettingsScreen() {
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Geri dön">
+        <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel={translate("back")}>
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
         <Text style={[styles.title, { color: colors.foreground, textAlign: isRTL ? "right" : "center" }]}>{translate("language")}</Text>
@@ -24,7 +24,7 @@ export default function LanguageSettingsScreen() {
         <View style={styles.loading}><ActivityIndicator color={colors.primary} /></View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <Text style={[styles.description, { color: colors.muted, textAlign: isRTL ? "right" : "left" }]}>Uygulama dilini seçin. Arapça yön değişikliğinin tamamlanması için uygulamayı yeniden açmanız gerekir.</Text>
+          <Text style={[styles.description, { color: colors.muted, textAlign: isRTL ? "right" : "left" }]}>{translate("languageSelectionHelp")}</Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {LANGUAGES.map((item, index) => {
               const selected = item.code === language;
