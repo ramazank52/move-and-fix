@@ -1,6 +1,16 @@
 export type EscrowPaymentStatus = "pending" | "held" | "released" | "refunded";
 
-export const STANDARD_COMMISSION_RATE_BPS = 1_500;
+/**
+ * Move&Fix'in mevcut muhasebe sözleşmesi: veritabanında ve domain katmanında
+ * tutarlar tam TRY cinsindedir (ör. 125 = ₺125). Ürün şu an kuruşlu fiyatı
+ * kabul etmez; gateway adaptörleri sağlayıcının minor-unit gereksinimini
+ * sınırda dönüştürür. Kuruş desteği eklenirse bu sözleşme tek bir migration
+ * ile uçtan uca değiştirilmelidir.
+ */
+export const MONETARY_UNIT = "whole_try" as const;
+
+// Ürün sözleşmesi: standart ve premium profesyonel işlemlerinde platform komisyonu %10'dur.
+export const STANDARD_COMMISSION_RATE_BPS = 1_000;
 export const PREMIUM_COMMISSION_RATE_BPS = 1_000;
 
 export function calculatePaymentBreakdown(amount: number, commissionRateBps: number) {

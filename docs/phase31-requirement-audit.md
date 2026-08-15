@@ -73,6 +73,16 @@ Aşağıdaki production alanları için henüz ayrı ve kalıcı model bulunmuyo
 
 Gerçek Stripe/iyzico, FCM/APNs, SMS, e-posta, telekom proxy/voice, production domain/callback URL ve fiziksel cihaz erişimi sağlanmadan canlı teslimat veya ödeme başarısı üretilmeyecek. Bu bağımlılıklar kod eksikliğiyle karıştırılmayacak; sandbox içinde adapter, fail-closed sözleşme ve test-double doğrulamaları tamamlanacak.
 
+## Phase 7 Ödeme ve Para Çekme Sertleştirmesi — 15 Ağustos 2026
+
+| Kontrol | Uygulama ve doğrulama kanıtı |
+|---|---|
+| Profesyonel yetkisi | `wallet.withdraw` profesyonel profilini router’da zorunlu tutar; veri katmanı ayrıca `isVerified = 1`, `verificationStatus = approved` ve inceleme zaman damgasını transaction içinde yeniden doğrular. |
+| IBAN sözleşmesi | Boşlukları temizlenmiş, büyük harfe çevrilmiş yalnız `TR` + 24 rakam biçimi kabul edilir; saklanan metadata ve para çekme kaydı normalize IBAN’ı kullanır. |
+| Bakiye güvenliği | Koşullu bakiye düşümü yalnız yeterli kullanılabilir bakiye varsa başarılı olur; yetersiz bakiye fail-closed `FORBIDDEN` sonucu verir. |
+| Gerileme testleri | Yeni `payment-withdrawal-security.test.ts`: normalizasyon, onaylı profesyonel koşulu, müşteri reddi, geçersiz IBAN, yetersiz bakiye ve auth-bound payload senaryolarını kapsar. |
+| Kalite kapıları | `pnpm check`, `pnpm lint`, `pnpm build`, tam `pnpm test` paketi: 35 dosya / 292 test geçti. iOS ve Android Expo export ile hedefli istemci sır taraması geçti. |
+
 ## Uygulama Sırası
 
 1. Additive şema/migration: alt kategori, request detail/media, provider document, verification challenge, job evidence, completion approval/dispute, audit/settings/country/currency.

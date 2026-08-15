@@ -422,7 +422,7 @@ export const messages = mysqlTable("messages", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-// Payments (escrow)
+// Payments (escrow) — amounts are whole TRY major units. Gateway adapters convert at their boundary.
 export const payments = mysqlTable("payments", {
   id: int("id").autoincrement().primaryKey(),
   requestId: int("requestId").notNull().unique(),
@@ -474,7 +474,7 @@ export const reviews = mysqlTable("reviews", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-// User wallet balances — amounts are stored in the currency's minor unit.
+// User wallet balances — amounts are stored as whole TRY major units, matching the payment domain contract.
 export const walletAccounts = mysqlTable("wallet_accounts", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),

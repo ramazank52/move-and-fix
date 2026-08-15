@@ -2435,6 +2435,30 @@ export async function reservePaymentGateway(data: {
   });
 }
 
+/**
+ * Compatibility bridge for the legacy payments.release endpoint. A customer
+ * cannot release held funds directly: the release must follow a submitted
+ * completion proof and then reuse the canonical Phase 6 escrow transaction.
+ */
+export async function approveCompletionProofForPayment(data: {
+  paymentId: number;
+  userId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const rows = await db
+    .select({ requestId: payments.requestId, userId: payments.userId })
+    .from(payments)
+    .where(eq(payments.id, data.paymentId))
+    .limit(1);
+  const payment = rows[0];
+  if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+  if (payment.userId !== data.userId) throw new Error("PAYMENT_FORBIDDEN");
+
+  return approveCompletionProof({ requestId: payment.requestId, userId: data.userId });
+}
+
 export async function attachPaymentGatewayTransaction(data: {
   paymentId: number;
   userId: number;
@@ -2843,6 +2867,34 @@ export async function getWalletTransactions(userId: number, limit = 50, offset =
     .offset(offset);
 }
 
+export class WalletWithdrawalError extends Error {
+  constructor(
+    public readonly reason: "INVALID_IBAN" | "PROVIDER_NOT_VERIFIED" | "INSUFFICIENT_BALANCE",
+    message: string,
+  ) {
+    super(message);
+    this.name = "WalletWithdrawalError";
+  }
+}
+
+export function normalizeTurkishIban(bankAccountId: string) {
+  const normalized = bankAccountId.trim().replace(/\s+/g, "").toUpperCase();
+  return /^TR\d{24}$/.test(normalized) ? normalized : null;
+}
+
+export function isWalletWithdrawalProviderEligible(provider: {
+  isVerified: number | null;
+  verificationStatus: string;
+  verificationReviewedAt: Date | null;
+} | null | undefined) {
+  return Boolean(
+    provider &&
+    provider.isVerified === 1 &&
+    provider.verificationStatus === "approved" &&
+    provider.verificationReviewedAt,
+  );
+}
+
 export async function requestWalletWithdrawal(data: {
   userId: number;
   amount: number;
@@ -2851,6 +2903,14 @@ export async function requestWalletWithdrawal(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
+  const normalizedBankAccountId = normalizeTurkishIban(data.bankAccountId);
+  if (!normalizedBankAccountId) {
+    throw new WalletWithdrawalError(
+      "INVALID_IBAN",
+      "Para çekme için TR ile başlayan 26 karakterli geçerli bir IBAN gereklidir",
+    );
+  }
 
   const scopedKey = `${data.userId}:${data.idempotencyKey}`;
   const existing = await db
@@ -2869,6 +2929,25 @@ export async function requestWalletWithdrawal(data: {
   }
 
   return db.transaction(async (tx) => {
+    const providerRows = await tx
+      .select({
+        id: providers.id,
+        isVerified: providers.isVerified,
+        verificationStatus: providers.verificationStatus,
+        verificationReviewedAt: providers.verificationReviewedAt,
+      })
+      .from(providers)
+      .where(eq(providers.userId, data.userId))
+      .limit(1);
+    const provider = providerRows[0];
+
+    if (!isWalletWithdrawalProviderEligible(provider)) {
+      throw new WalletWithdrawalError(
+        "PROVIDER_NOT_VERIFIED",
+        "Para çekme yalnızca doğrulanmış profesyonel hesaplara açıktır",
+      );
+    }
+
     await tx
       .insert(walletAccounts)
       .values({ userId: data.userId, currency: "TRY" })
@@ -2888,7 +2967,7 @@ export async function requestWalletWithdrawal(data: {
 
     const affectedRows = debitResult[0]?.affectedRows ?? 0;
     if (affectedRows !== 1) {
-      throw new Error("Yetersiz kullanılabilir bakiye");
+      throw new WalletWithdrawalError("INSUFFICIENT_BALANCE", "Yetersiz kullanılabilir bakiye");
     }
 
     const transactionResult = await tx.insert(walletTransactions).values({
@@ -2898,7 +2977,7 @@ export async function requestWalletWithdrawal(data: {
       amount: data.amount,
       description: "Banka hesabına para çekme talebi",
       idempotencyKey: scopedKey,
-      metadata: JSON.stringify({ bankAccountId: data.bankAccountId }),
+      metadata: JSON.stringify({ bankAccountId: normalizedBankAccountId }),
     });
     const transactionId = transactionResult[0].insertId;
 
@@ -2906,7 +2985,7 @@ export async function requestWalletWithdrawal(data: {
       userId: data.userId,
       transactionId,
       amount: data.amount,
-      bankAccountId: data.bankAccountId,
+      bankAccountId: normalizedBankAccountId,
       status: "pending",
     });
 

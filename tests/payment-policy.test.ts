@@ -13,9 +13,9 @@ describe("payment policy", () => {
   it("calculates standard commission and provider payout in integer minor units", () => {
     expect(calculatePaymentBreakdown(1_000, STANDARD_COMMISSION_RATE_BPS)).toEqual({
       amount: 1_000,
-      commissionRateBps: 1_500,
-      commissionAmount: 150,
-      providerPayout: 850,
+      commissionRateBps: 1_000,
+      commissionAmount: 100,
+      providerPayout: 900,
     });
   });
 
@@ -26,7 +26,7 @@ describe("payment policy", () => {
 
   it("rounds commission once and preserves the exact total", () => {
     const result = calculatePaymentBreakdown(999, STANDARD_COMMISSION_RATE_BPS);
-    expect(result.commissionAmount).toBe(150);
+    expect(result.commissionAmount).toBe(100);
     expect(result.providerPayout + result.commissionAmount).toBe(result.amount);
   });
 

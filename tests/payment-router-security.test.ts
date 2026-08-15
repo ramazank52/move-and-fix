@@ -4,6 +4,7 @@ import type { TrpcContext } from "../server/_core/context";
 vi.mock("../server/db", () => ({
   getPaymentQuote: vi.fn(),
   createPayment: vi.fn(),
+  approveCompletionProofForPayment: vi.fn(),
   transitionPaymentStatus: vi.fn(),
 }));
 
@@ -41,9 +42,9 @@ const quote = {
   offerId: 31,
   currency: "TRY" as const,
   amount: 850,
-  commissionRateBps: 1_500,
-  commissionAmount: 128,
-  providerPayout: 722,
+  commissionRateBps: 1_000,
+  commissionAmount: 85,
+  providerPayout: 765,
 };
 
 describe("payments router security", () => {
@@ -84,24 +85,24 @@ describe("payments router security", () => {
     });
   });
 
-  it("passes release actor identity and never accepts a client-selected status", async () => {
-    vi.mocked(paymentDb.transitionPaymentStatus).mockResolvedValue({
+  it("routes release through proof-based idempotent escrow resolution", async () => {
+    vi.mocked(paymentDb.approveCompletionProofForPayment).mockResolvedValue({
       payment: { id: 71, status: "released" } as never,
-      duplicated: false,
-    });
+      resolution: "customer_approved",
+    } as never);
     const caller = appRouter.createCaller(createContext("user", 41));
 
     await caller.payments.release({ paymentId: 71 });
 
-    expect(paymentDb.transitionPaymentStatus).toHaveBeenCalledWith({
+    expect(paymentDb.approveCompletionProofForPayment).toHaveBeenCalledWith({
       paymentId: 71,
-      actorUserId: 41,
-      nextStatus: "released",
+      userId: 41,
     });
+    expect(paymentDb.transitionPaymentStatus).not.toHaveBeenCalled();
   });
 
   it("maps cross-user payment access to FORBIDDEN", async () => {
-    vi.mocked(paymentDb.transitionPaymentStatus).mockRejectedValue(new Error("PAYMENT_FORBIDDEN"));
+    vi.mocked(paymentDb.approveCompletionProofForPayment).mockRejectedValue(new Error("PAYMENT_FORBIDDEN"));
     const caller = appRouter.createCaller(createContext("user", 42));
 
     await expect(caller.payments.release({ paymentId: 71 })).rejects.toMatchObject({ code: "FORBIDDEN" });

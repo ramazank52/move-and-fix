@@ -125,6 +125,28 @@ describe("payment webhook processor", () => {
     );
   });
 
+  it("aynı doğrulanmış payload daha önce failed kaydı bıraktıysa güvenle yeniden işler", async () => {
+    dbMocks.claimPaymentWebhookEvent.mockResolvedValue({
+      claimed: true,
+      duplicated: true,
+      event: { status: "failed" },
+    });
+
+    const result = await processVerifiedPaymentWebhook("stripe", stripePayload());
+
+    expect(dbMocks.resolvePaymentForGatewayWebhook).toHaveBeenCalledTimes(1);
+    expect(dbMocks.transitionPaymentFromVerifiedWebhook).toHaveBeenCalledWith({
+      paymentId: 42,
+      nextStatus: "held",
+    });
+    expect(dbMocks.completePaymentWebhookEvent).toHaveBeenCalledWith({
+      provider: "stripe",
+      eventId: "evt_123",
+      status: "processed",
+    });
+    expect(result).toMatchObject({ received: true, duplicated: true, paymentStatus: "held" });
+  });
+
   it("iyzico başarılı eventini kalıcı referans koduyla claim eder", async () => {
     dbMocks.resolvePaymentForGatewayWebhook.mockResolvedValue({
       ...payment,

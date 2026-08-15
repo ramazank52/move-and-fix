@@ -1315,17 +1315,19 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       }))
       .mutation(async ({ ctx, input }) => {
         try {
-          return await db.transitionPaymentStatus({
+          return await db.approveCompletionProofForPayment({
             paymentId: input.paymentId,
-            actorUserId: ctx.user.id,
-            nextStatus: "released",
+            userId: ctx.user.id,
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "PAYMENT_RELEASE_FAILED";
           if (message === "PAYMENT_NOT_FOUND") throw new TRPCError({ code: "NOT_FOUND", message: "Ödeme bulunamadı" });
           if (message === "PAYMENT_FORBIDDEN") throw new TRPCError({ code: "FORBIDDEN", message: "Bu ödemeyi serbest bırakma yetkiniz yok" });
-          if (message.includes("INVALID_TRANSITION") || message === "PAYMENT_JOB_NOT_COMPLETED") {
-            throw new TRPCError({ code: "CONFLICT", message: "Ödeme mevcut durumda serbest bırakılamaz" });
+          if (message.startsWith("COMPLETION_") || message === "ESCROW_NOT_HELD") {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Ödeme yalnızca teslim kanıtı ve müşteri onayı sonrasında serbest bırakılabilir",
+            });
           }
           throw error;
         }
@@ -1450,15 +1452,20 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
     withdraw: protectedProcedure
       .input(z.object({
         amount: z.number().int().min(100).max(1_000_000),
-        bankAccountId: z.string().trim().min(10).max(96).regex(/^[A-Za-z0-9 -]+$/),
+        bankAccountId: z.string().trim().regex(/^TR\d{24}$/, "TR ile başlayan 26 karakterli geçerli bir IBAN girin"),
         idempotencyKey: z.string().trim().min(16).max(96),
       }))
       .mutation(async ({ ctx, input }) => {
+        const provider = await db.getProviderProfile(ctx.user.id);
+        if (!provider) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Para çekme yalnızca profesyonel hesaplara açıktır" });
+        }
         try {
           return await db.requestWalletWithdrawal({ ...input, userId: ctx.user.id });
         } catch (error) {
-          if (error instanceof Error && error.message.includes("Yetersiz")) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          if (error instanceof db.WalletWithdrawalError) {
+            const code = error.reason === "INVALID_IBAN" ? "BAD_REQUEST" : "FORBIDDEN";
+            throw new TRPCError({ code, message: error.message });
           }
           throw error;
         }

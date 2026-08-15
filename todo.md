@@ -265,7 +265,18 @@
 - [x] Phase 6 AI kanıt analizinin yardımcı niteliğini canlı takipte şeffaf biçimde göster
 - [x] Phase 6 yetki, geçersiz durum, kanıt medya ve escrow süre testlerini ekle
 - [x] Phase 6 TypeScript, lint, build, test ve iOS/Android export kalite kapılarını doğrula
-- [ ] Escrow, yüzde 10 komisyon, profesyonel cüzdanı, para çekme, ödeme güvenliği, webhook doğrulama, idempotency ve double-payment korumasını production standardında doğrula
+- [x] Escrow, yüzde 10 komisyon, profesyonel cüzdanı, para çekme, ödeme güvenliği, webhook doğrulama, idempotency ve double-payment korumasını production standardında doğrula
+- [x] Phase 7 ödeme, escrow, komisyon ve profesyonel cüzdan akışının veri bütünlüğü ile rol sınırlarını bağımsız denetle
+- [x] Phase 7 standart profesyonel komisyonunu ürün sözleşmesindeki yüzde 10 oranına hizala
+- [x] Phase 7 eksik webhook, idempotency, ödeme tutarı ve para çekme korumalarını fail-closed olarak güçlendir
+- [x] Phase 7 aktif owner para çekme endpointinin gerçek cüzdan transaction akışını kullandığını doğrula; eski mock servislerin üretim yolunda olmadığını teyit et
+- [x] Phase 7 para çekmeyi yalnız doğrulanmış profesyonel ve geçerli banka hesabı ile sınırla
+- [x] Phase 7 tüm cüzdan ve escrow muhasebesinde merkezi TRY major-unit sözleşmesini politika testiyle zorunlu kıl
+- [x] Phase 7 legacy ödeme serbest bırakma endpointini kanıt-temelli idempotent escrow çözüm yoluna yönlendir
+- [x] Phase 7 ödeme ve cüzdan güvenlik regresyon testlerini tamamla
+- [x] Phase 7 başarısız ödeme webhook’unun aynı doğrulanmış payload ile güvenle yeniden işlenmesini test et
+- [x] Phase 7 TypeScript, lint, build ve ödeme/cüzdan hedef testlerini doğrula
+- [x] Phase 7 para çekme: veri katmanında doğrulanmış profesyonel, TR IBAN ve yetersiz bakiye kontrollerini fail-closed uygula; router rol sınırını ve yetkilendirme regresyonlarını doğrula
 - [ ] MoveOS içinde içerik, kategori, ücret, komisyon, kullanıcı, hizmet ve sistem ayarlarının gerçek ortak API üzerinden yönetimini tamamla
 - [ ] Türkçe, İngilizce, Almanca, Fransızca, Arapça ve Rusça; RTL; ülke, para birimi, tarih/saat ve ölçü yerelleştirme altyapısını tamamla
 - [ ] Yetkilendirme, fraud/abuse, rate-limit, audit log, hata yönetimi, performans ve deployment hazırlığını denetleyip eksikleri gider
