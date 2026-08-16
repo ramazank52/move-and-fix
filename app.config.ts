@@ -2,10 +2,8 @@
 import "./scripts/load-env.js";
 import type { ExpoConfig } from "expo/config";
 
-// Bundle ID format: space.manus.<project_name_dots>.<timestamp>
-// e.g., "my-app" created at 2024-01-15 10:30:45 -> "space.manus.my.app.t20240115103045"
-// Bundle ID can only contain letters, numbers, and dots
-// Android requires each dot-separated segment to start with a letter
+// Bundle/package identifiers must only include letters, digits and periods.
+// Android also requires every period-separated segment to start with a letter.
 const rawBundleId = "com.app.moveandfix";
 const bundleId =
   rawBundleId
@@ -20,22 +18,22 @@ const bundleId =
       // Prefix with 'x' if segment starts with a digit
       return /^[a-zA-Z]/.test(segment) ? segment : "x" + segment;
     })
-    .join(".") || "space.manus.app";
-// Extract timestamp from bundle ID and prefix with "manus" for deep link scheme
-// e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
-const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
-const schemeFromBundleId = `manus${timestamp}`;
-const paymentScheme = "moveandfix";
+    .join(".") || "com.app.moveandfix";
+
+// This is the single deep-link and payment-return scheme shipped by Move&Fix.
+const moveAndFixScheme = "moveandfix";
+// The actual Apple Pay merchant registration remains an external production gate.
+const stripeMerchantIdentifier = "merchant.com.moveandfix";
 
 const env = {
-  // App branding - update these values directly (do not use env vars)
+  // App branding is intentionally source-controlled rather than environment-dependent.
   appName: "Move&Fix",
   appSlug: "move-and-fix",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
   logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663875455116/EHwKtCbZUjvNkcyU.png",
-  scheme: schemeFromBundleId,
-  paymentScheme,
+  scheme: moveAndFixScheme,
+  stripeMerchantIdentifier,
   iosBundleId: bundleId,
   androidPackage: bundleId,
 };
@@ -46,7 +44,7 @@ const config: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: [env.scheme, env.paymentScheme],
+  scheme: env.scheme,
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
@@ -78,10 +76,6 @@ const config: ExpoConfig = {
             scheme: env.scheme,
             host: "*",
           },
-          {
-            scheme: env.paymentScheme,
-            host: "*",
-          },
         ],
         category: ["BROWSABLE", "DEFAULT"],
       },
@@ -108,7 +102,7 @@ const config: ExpoConfig = {
     [
       "@stripe/stripe-react-native",
       {
-        merchantIdentifier: "merchant.space.manus.moveandfix",
+        merchantIdentifier: env.stripeMerchantIdentifier,
         enableGooglePay: false,
       },
     ],

@@ -8,6 +8,10 @@ import type {
 } from "./stripe-sdk.types";
 
 const PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() ?? "";
+// Must match app.config.ts. Apple Pay merchant registration is intentionally
+// not simulated when Stripe credentials or Apple merchant provisioning are absent.
+const STRIPE_MERCHANT_IDENTIFIER = "merchant.com.moveandfix";
+const MOVE_AND_FIX_URL_SCHEME = "moveandfix";
 
 const unavailableStripePaymentSheetController: StripePaymentSheetController = {
   initPaymentSheet: async () => ({
@@ -57,8 +61,8 @@ export function StripeAppProvider({ children }: StripeAppProviderProps) {
   return (
     <StripeProvider
       publishableKey={PUBLISHABLE_KEY}
-      merchantIdentifier="merchant.space.manus.moveandfix"
-      urlScheme="moveandfix"
+      merchantIdentifier={STRIPE_MERCHANT_IDENTIFIER}
+      urlScheme={MOVE_AND_FIX_URL_SCHEME}
     >
       <StripePaymentSheetControllerProvider>{children}</StripePaymentSheetControllerProvider>
     </StripeProvider>

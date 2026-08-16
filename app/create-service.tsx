@@ -20,6 +20,7 @@ import type { RequestRouteCoordinate } from "@/components/request-route-map.type
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
+import { useLocalization } from "@/lib/i18n";
 
 type ServiceType =
   | "generic"
@@ -96,6 +97,14 @@ function parseOptionalInteger(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function formatTryAmount(amount: number): string {
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 function calculateStraightLineDistanceKm(
   pickup: RequestRouteCoordinate,
   destination: RequestRouteCoordinate,
@@ -157,6 +166,7 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
 export default function CreateServiceScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { language } = useLocalization();
   const { height: viewportHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ categoryId?: string; categoryLabel?: string }>();
 
@@ -219,6 +229,15 @@ export default function CreateServiceScreen() {
   }, [categoryId]);
 
   const uploadMediaMutation = trpc.requests.uploadMedia.useMutation();
+  const priceEstimateMutation = trpc.priceIntelligence.estimate.useMutation();
+  const priceEstimate = priceEstimateMutation.data;
+  const priceEstimateRange =
+    priceEstimate?.status === "available"
+    && typeof priceEstimate.lowAmount === "number"
+    && typeof priceEstimate.highAmount === "number"
+      ? { lowAmount: priceEstimate.lowAmount, highAmount: priceEstimate.highAmount }
+      : null;
+  const priceEstimateLocale = language === "en" || language === "ru" ? language : "tr";
 
   const handleUseCurrentLocation = useCallback(async () => {
     setIsLocating(true);
@@ -953,6 +972,121 @@ export default function CreateServiceScreen() {
                     }}
                   />
                 </View>
+              </View>
+
+              <View
+                style={{
+                  backgroundColor: colors.primary + "0D",
+                  borderWidth: 1,
+                  borderColor: colors.primary + "35",
+                  borderRadius: 16,
+                  padding: 14,
+                  gap: 10,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+                  <View
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 11,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: colors.primary + "1C",
+                    }}
+                  >
+                    <IconSymbol name={"sparkles" as any} size={18} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "800" }}>
+                      AI Fiyat Zekâsı
+                    </Text>
+                    <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
+                      Benzer tamamlanmış işlerden türetilen gösterge aralığıdır; teklif veya ödeme tutarı değildir.
+                    </Text>
+                  </View>
+                </View>
+
+                {priceEstimate ? (
+                  <View
+                    style={{
+                      backgroundColor: colors.card,
+                      borderRadius: 12,
+                      borderWidth: 0.5,
+                      borderColor: colors.border,
+                      padding: 12,
+                      gap: 7,
+                    }}
+                  >
+                    {priceEstimateRange ? (
+                      <>
+                        <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: "800" }}>
+                          {formatTryAmount(priceEstimateRange.lowAmount)} – {formatTryAmount(priceEstimateRange.highAmount)}
+                        </Text>
+                        <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>
+                          {priceEstimate.sampleSize} benzer iş kaydı üzerinden hesaplandı. Nihai üst fiyat, yalnız teklif kabul edildiğinde No Surprise Price olarak sabitlenir.
+                        </Text>
+                        {priceEstimate.narrative?.status === "available" && priceEstimate.narrative.summary ? (
+                          <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>
+                            {priceEstimate.narrative.summary}
+                          </Text>
+                        ) : null}
+                        <Pressable
+                          onPress={() => {
+                            setBudgetMin(String(priceEstimateRange.lowAmount));
+                            setBudgetMax(String(priceEstimateRange.highAmount));
+                          }}
+                          style={({ pressed }) => ({
+                            alignSelf: "flex-start",
+                            borderRadius: 10,
+                            paddingHorizontal: 11,
+                            paddingVertical: 8,
+                            backgroundColor: colors.primary + "16",
+                            opacity: pressed ? 0.78 : 1,
+                          })}
+                        >
+                          <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "800" }}>Bu aralığı bütçeme uygula</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>
+                        Bu hizmet için yeterli doğrulanmış fiyat verisi henüz oluşmadı. Bütçenizi kendiniz belirleyebilir ve teklifleri karşılaştırabilirsiniz.
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
+
+                {priceEstimateMutation.isError ? (
+                  <Text style={{ color: colors.error, fontSize: 12, lineHeight: 17 }}>
+                    Fiyat tahmini şu anda alınamadı. Talebinizi yine de oluşturabilir ve profesyonel tekliflerini karşılaştırabilirsiniz.
+                  </Text>
+                ) : null}
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="AI fiyat tahmini al"
+                  disabled={priceEstimateMutation.isPending || categoryId <= 0}
+                  onPress={() => priceEstimateMutation.mutate({
+                    categoryId,
+                    countryCode: "TR",
+                    currency: "TRY",
+                    locale: priceEstimateLocale,
+                  })}
+                  style={({ pressed }) => ({
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "row",
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    backgroundColor: colors.primary,
+                    opacity: pressed || priceEstimateMutation.isPending || categoryId <= 0 ? 0.65 : 1,
+                  })}
+                >
+                  {priceEstimateMutation.isPending ? <ActivityIndicator color="#FFFFFF" size="small" /> : <IconSymbol name={"sparkles" as any} size={17} color="#FFFFFF" />}
+                  <Text style={{ marginLeft: 7, color: "#FFFFFF", fontSize: 13, fontWeight: "800" }}>
+                    {priceEstimateMutation.isPending ? "Tahmin hesaplanıyor…" : "AI fiyat aralığını göster"}
+                  </Text>
+                </Pressable>
               </View>
             </View>
           </View>

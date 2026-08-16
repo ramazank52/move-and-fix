@@ -35,6 +35,7 @@ import {
   postFinancialLedgerEntry,
 } from "./payments/FinancialLedgerService";
 import { rankServiceOpportunitiesByLocation } from "./matching/location";
+import { buildJobCompletionTimelineEvent } from "./jobs/JobCapsuleLifecycle";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -831,6 +832,19 @@ import {
   organizationMembers,
   adminRoles,
   maskedCommunicationSessions,
+  jobTimelineEvents,
+  priceGuarantees,
+  priceIntelligenceAssessments,
+  safetyTrustedContacts,
+  safetyCheckIns,
+  safetyIncidents,
+  organizationSites,
+  organizationManagedAssets,
+  organizationMaintenanceSchedules,
+  organizationRequestApprovals,
+  organizationRequestBatches,
+  organizationRequestBatchItems,
+  organizationInvoices,
 } from "../drizzle/schema";
 import {
   type MaskedCommunicationChannel,
@@ -842,6 +856,7 @@ import {
   type PaymentProviderOperationalRecord,
   type PaymentProviderOperationalStatus,
 } from "./payments/ProviderOperationalPolicy";
+import { EncryptionService } from "./_core/security";
 
 export type OrganizationType = "corporate" | "fleet" | "facility";
 export type OrganizationMemberRole = "owner" | "admin" | "member";
@@ -3692,6 +3707,12 @@ export async function acceptOffer(offerId: number, userId: number) {
         currency: "TRY",
         holdRequiredBeforeWork: true,
         agreedAmount: breakdown.amount,
+        noSurprisePrice: {
+          policyVersion: "no_surprise_price_v1",
+          guaranteedAmount: breakdown.amount,
+          maximumAmount: breakdown.amount,
+          changeRule: "customer_approved_change_order_required",
+        },
         commissionRateBps: breakdown.commissionRateBps,
         commissionAmount: breakdown.commissionAmount,
         providerPayout: breakdown.providerPayout,
@@ -3725,8 +3746,21 @@ export async function acceptOffer(offerId: number, userId: number) {
     });
     const agreementId = Number(agreementResult[0].insertId);
     if (!agreementId) throw new Error("AGREEMENT_CREATE_FAILED");
+    const priceGuaranteeResult = await tx.insert(priceGuarantees).values({
+      requestId: request.id,
+      agreementId,
+      customerUserId: userId,
+      providerId: provider.id,
+      currency: "TRY",
+      guaranteedAmount: breakdown.amount,
+      maximumAmount: breakdown.amount,
+      status: "active",
+      policyVersion: "no_surprise_price_v1",
+    });
+    const priceGuaranteeId = Number(priceGuaranteeResult[0].insertId);
+    if (!priceGuaranteeId) throw new Error("PRICE_GUARANTEE_CREATE_FAILED");
 
-    return { success: true, offerId: offer.id, requestId: request.id, agreementId };
+    return { success: true, offerId: offer.id, requestId: request.id, agreementId, priceGuaranteeId };
   });
 }
 
@@ -4330,7 +4364,14 @@ export async function updateJobStatus(requestId: number, status: "pending" | "ac
     throw new Error("Not authorized to update this job status");
   }
 
-  await db.update(serviceRequests).set({ status }).where(eq(serviceRequests.id, requestId));
+  await db.transaction(async (tx) => {
+    await tx.update(serviceRequests).set({ status }).where(eq(serviceRequests.id, requestId));
+    if (status === "completed" && request.status !== "completed") {
+      await tx.insert(jobTimelineEvents).values(
+        buildJobCompletionTimelineEvent({ requestId, actorUserId: userId, source: "job_status_update" }),
+      ).onDuplicateKeyUpdate({ set: { eventType: "job_completed" } });
+    }
+  });
   return { success: true, requestId, status };
 }
 
@@ -4348,7 +4389,14 @@ export async function completeJob(requestId: number, userId: number) {
     throw new Error("Only the assigned provider can complete this job");
   }
 
-  await db.update(serviceRequests).set({ status: "completed" }).where(eq(serviceRequests.id, requestId));
+  if (request.status === "completed") return { success: true, requestId, alreadyCompleted: true };
+
+  await db.transaction(async (tx) => {
+    await tx.update(serviceRequests).set({ status: "completed" }).where(eq(serviceRequests.id, requestId));
+    await tx.insert(jobTimelineEvents).values(
+      buildJobCompletionTimelineEvent({ requestId, actorUserId: userId, source: "provider_completion" }),
+    ).onDuplicateKeyUpdate({ set: { eventType: "job_completed" } });
+  });
 
   // Increment provider's completedJobs
   if (request.assignedProviderId) {
@@ -4359,7 +4407,7 @@ export async function completeJob(requestId: number, userId: number) {
     }
   }
 
-  return { success: true, requestId };
+  return { success: true, requestId, alreadyCompleted: false };
 }
 
 // Reviews
@@ -4490,6 +4538,35 @@ export async function getProviderEarnings(providerId: number) {
   };
 }
 
+/** Provider-owned operating summary; derives all values from authoritative job, payment and review records. */
+export async function getProviderBusinessCockpit(userId: number) {
+  const provider = await getProviderProfile(userId);
+  if (!provider) throw new Error("PROVIDER_PROFILE_NOT_FOUND");
+
+  const [jobs, earnings, recentReviews] = await Promise.all([
+    getProviderJobs(userId),
+    getProviderEarnings(userId),
+    getProviderReviews(provider.id, 20, 0),
+  ]);
+  const completed = jobs.filter((job) => job.status === "completed").length;
+  const cancelled = jobs.filter((job) => job.status === "cancelled").length;
+  const active = jobs.filter((job) => ["accepted", "scheduled", "on_the_way", "arrived", "in_progress", "active"].includes(job.status)).length;
+  const completedOrCancelled = completed + cancelled;
+
+  return {
+    availability: provider.isAvailable === 1,
+    activeJobs: active,
+    // The current service-request lifecycle has no separate scheduled state.
+    // Do not infer one from an unrelated status or present a fabricated count.
+    scheduledJobs: null,
+    completedJobs: completed,
+    cancellationRate: completedOrCancelled === 0 ? null : Math.round((cancelled / completedOrCancelled) * 10_000) / 100,
+    averageRating: provider.rating ?? null,
+    recentReviewCount: recentReviews.length,
+    earnings,
+  };
+}
+
 // Get new jobs for a provider (pending requests in their category)
 export async function getNewJobsForProvider(providerId: number) {
   const db = await getDb();
@@ -4557,6 +4634,27 @@ export async function getPaymentQuote(requestId: number, userId: number) {
     throw new Error("PAYMENT_AGREEMENT_MISMATCH");
   }
   if (agreement.currency !== "TRY") throw new Error("PAYMENT_CURRENCY_UNSUPPORTED");
+  const guaranteeRows = await db
+    .select()
+    .from(priceGuarantees)
+    .where(
+      and(
+        eq(priceGuarantees.requestId, request.id),
+        eq(priceGuarantees.agreementId, agreement.id),
+        eq(priceGuarantees.customerUserId, userId),
+        eq(priceGuarantees.status, "active"),
+      ),
+    )
+    .limit(1);
+  const guarantee = guaranteeRows[0];
+  if (!guarantee) throw new Error("PAYMENT_PRICE_GUARANTEE_NOT_FOUND");
+  if (
+    guarantee.currency !== "TRY" ||
+    guarantee.guaranteedAmount !== agreement.agreedAmount ||
+    guarantee.maximumAmount !== agreement.agreedAmount
+  ) {
+    throw new Error("PAYMENT_PRICE_GUARANTEE_MISMATCH");
+  }
 
   const providerRows = await db
     .select()
@@ -4576,9 +4674,42 @@ export async function getPaymentQuote(requestId: number, userId: number) {
     completionReviewHours: agreement.completionReviewHours,
     currency: "TRY" as const,
     amount: agreement.agreedAmount,
+    priceGuarantee: {
+      id: guarantee.id,
+      policyVersion: guarantee.policyVersion,
+      guaranteedAmount: guarantee.guaranteedAmount,
+      maximumAmount: guarantee.maximumAmount,
+      status: guarantee.status,
+    },
     commissionRateBps: agreement.commissionRateBps,
     commissionAmount: agreement.commissionAmount,
     providerPayout: agreement.providerPayout,
+  };
+}
+
+/** Returns the immutable, customer-visible price ceiling to an authorized job participant. */
+export async function getPriceGuarantee(input: { requestId: number; userId: number }) {
+  await assertPhaseDRequestParticipant(input.requestId, input.userId);
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select()
+    .from(priceGuarantees)
+    .where(eq(priceGuarantees.requestId, input.requestId))
+    .limit(1);
+  const guarantee = rows[0];
+  if (!guarantee) throw new Error("PRICE_GUARANTEE_NOT_FOUND");
+  return {
+    id: guarantee.id,
+    requestId: guarantee.requestId,
+    agreementId: guarantee.agreementId,
+    currency: guarantee.currency,
+    guaranteedAmount: guarantee.guaranteedAmount,
+    maximumAmount: guarantee.maximumAmount,
+    status: guarantee.status,
+    policyVersion: guarantee.policyVersion,
+    acceptedAt: guarantee.acceptedAt,
+    supersededAt: guarantee.supersededAt,
   };
 }
 
@@ -4639,6 +4770,27 @@ export async function createPayment(data: {
       agreement.providerPayout !== quote.providerPayout
     ) {
       throw new Error("PAYMENT_AGREEMENT_MISMATCH");
+    }
+    const guaranteeRows = await tx
+      .select()
+      .from(priceGuarantees)
+      .where(
+        and(
+          eq(priceGuarantees.requestId, agreement.requestId),
+          eq(priceGuarantees.agreementId, agreement.id),
+          eq(priceGuarantees.customerUserId, data.userId),
+          eq(priceGuarantees.status, "active"),
+        ),
+      )
+      .limit(1);
+    const guarantee = guaranteeRows[0];
+    if (
+      !guarantee ||
+      guarantee.currency !== "TRY" ||
+      guarantee.guaranteedAmount !== agreement.agreedAmount ||
+      guarantee.maximumAmount !== agreement.agreedAmount
+    ) {
+      throw new Error("PAYMENT_PRICE_GUARANTEE_MISMATCH");
     }
 
     const result = await tx.insert(payments).values({
@@ -5946,4 +6098,694 @@ export async function logOperationEvent(input: {
     // safety transition. The structured console error remains observable.
     console.error("[Operations] Failed to persist event", { eventType, error });
   }
+}
+
+type PhaseDRequestParticipant = {
+  requestId: number;
+  customerUserId: number;
+  providerUserId: number | null;
+  organizationId: number | null;
+};
+
+async function assertPhaseDRequestParticipant(requestId: number, userId: number): Promise<PhaseDRequestParticipant> {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select({
+      requestId: serviceRequests.id,
+      customerUserId: serviceRequests.userId,
+      providerUserId: providers.userId,
+      organizationId: serviceRequests.organizationId,
+    })
+    .from(serviceRequests)
+    .leftJoin(providers, eq(serviceRequests.assignedProviderId, providers.id))
+    .where(eq(serviceRequests.id, requestId))
+    .limit(1);
+  const request = rows[0];
+  if (!request) throw new Error("SERVICE_REQUEST_NOT_FOUND");
+  if (request.customerUserId !== userId && request.providerUserId !== userId) {
+    throw new Error("SERVICE_REQUEST_PARTICIPANT_FORBIDDEN");
+  }
+  return request;
+}
+
+/** Writes one append-only Job Capsule event for an already-authoritative record. */
+export async function recordJobTimelineEvent(input: {
+  requestId: number;
+  eventType: string;
+  actorUserId?: number;
+  referenceType: string;
+  referenceId?: number;
+  metadata: Record<string, unknown>;
+}) {
+  const eventType = input.eventType.trim();
+  const referenceType = input.referenceType.trim();
+  if (!eventType || eventType.length > 96 || !referenceType || referenceType.length > 64) {
+    throw new Error("JOB_TIMELINE_EVENT_INVALID");
+  }
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const existing = await database
+    .select({ id: jobTimelineEvents.id })
+    .from(jobTimelineEvents)
+    .where(
+      and(
+        eq(jobTimelineEvents.requestId, input.requestId),
+        eq(jobTimelineEvents.referenceType, referenceType),
+        input.referenceId == null ? isNull(jobTimelineEvents.referenceId) : eq(jobTimelineEvents.referenceId, input.referenceId),
+      ),
+    )
+    .limit(1);
+  if (existing[0]) return { id: existing[0].id, created: false } as const;
+  const result = await database.insert(jobTimelineEvents).values({
+    requestId: input.requestId,
+    eventType,
+    actorUserId: input.actorUserId,
+    referenceType,
+    referenceId: input.referenceId,
+    metadataJson: input.metadata,
+  });
+  return { id: result[0].insertId, created: true } as const;
+}
+
+/** Returns a participant-scoped, read-only Job Capsule. Source records remain authoritative. */
+export async function getJobCapsule(input: { requestId: number; userId: number }) {
+  await assertPhaseDRequestParticipant(input.requestId, input.userId);
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const [request] = await database
+    .select()
+    .from(serviceRequests)
+    .where(eq(serviceRequests.id, input.requestId))
+    .limit(1);
+  if (!request) throw new Error("SERVICE_REQUEST_NOT_FOUND");
+  const [agreement] = await database
+    .select()
+    .from(serviceAgreements)
+    .where(eq(serviceAgreements.requestId, input.requestId))
+    .limit(1);
+  const [payment] = await database
+    .select()
+    .from(payments)
+    .where(eq(payments.requestId, input.requestId))
+    .limit(1);
+  const [completionProof] = await database
+    .select()
+    .from(jobCompletionProofs)
+    .where(eq(jobCompletionProofs.requestId, input.requestId))
+    .orderBy(desc(jobCompletionProofs.createdAt))
+    .limit(1);
+  const timeline = await database
+    .select()
+    .from(jobTimelineEvents)
+    .where(eq(jobTimelineEvents.requestId, input.requestId))
+    .orderBy(jobTimelineEvents.occurredAt);
+  const reviewRows = await database
+    .select({ id: reviews.id, rating: reviews.rating, comment: reviews.comment, createdAt: reviews.createdAt })
+    .from(reviews)
+    .where(eq(reviews.requestId, input.requestId))
+    .limit(1);
+  return {
+    request: {
+      id: request.id,
+      status: request.status,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+    },
+    agreement: agreement
+      ? {
+          id: agreement.id,
+          currency: agreement.currency,
+          agreedAmount: agreement.agreedAmount,
+          acceptedAt: agreement.acceptedAt,
+          snapshotJson: agreement.snapshotJson,
+        }
+      : null,
+    payment: payment
+      ? { id: payment.id, status: payment.status, amount: payment.amount, gatewayProvider: payment.gatewayProvider }
+      : null,
+    completionProof: completionProof
+      ? { id: completionProof.id, status: completionProof.status, createdAt: completionProof.createdAt, releasedAt: completionProof.releasedAt }
+      : null,
+    review: reviewRows[0] ?? null,
+    timeline,
+  };
+}
+
+/** A customer-safe trust passport: aggregate signals only, never raw complaints or documents. */
+export async function getMoveTrustPassport(providerUserId: number) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const profile = await getProviderProfile(providerUserId);
+  if (!profile) throw new Error("PROVIDER_NOT_FOUND");
+  const [trust] = await database
+    .select()
+    .from(trustProfiles)
+    .where(eq(trustProfiles.userId, providerUserId))
+    .limit(1);
+  const documents = await database
+    .select({ type: providerDocuments.type, status: providerDocuments.status })
+    .from(providerDocuments)
+    .where(eq(providerDocuments.providerId, profile.id));
+  const [complaints] = await database
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(riskFlags)
+    .where(
+      and(
+        eq(riskFlags.subjectUserId, providerUserId),
+        eq(riskFlags.source, "report"),
+        inArray(riskFlags.status, ["open", "under_review"]),
+      ),
+    );
+  return {
+    provider: {
+      id: profile.id,
+      displayName: profile.displayName,
+      rating: profile.rating,
+      reviewCount: profile.reviewCount,
+      completedJobs: profile.completedJobs,
+      isAvailable: profile.isAvailable === 1,
+    },
+    verification: {
+      isVerified: profile.isVerified === 1,
+      documentStatus: documents.map((document) => ({ type: document.type, status: document.status })),
+    },
+    trust: {
+      score: trust?.score ?? 100,
+      status: trust?.status ?? "active",
+      activeComplaintCount: Number(complaints?.count ?? 0),
+      lastEvaluatedAt: trust?.lastEvaluatedAt ?? null,
+    },
+  };
+}
+
+function percentile(sortedAmounts: number[], p: number) {
+  const index = Math.max(0, Math.min(sortedAmounts.length - 1, Math.round((sortedAmounts.length - 1) * p)));
+  return sortedAmounts[index] ?? null;
+}
+
+/** Creates an auditable, non-binding price range from completed settled jobs only. */
+export async function createPriceIntelligenceAssessment(input: {
+  requestedByUserId: number;
+  requestId?: number;
+  categoryId: number;
+  countryCode?: string;
+  currency?: string;
+}) {
+  const currency = (input.currency ?? "TRY").toUpperCase();
+  if (currency !== "TRY") throw new Error("PRICE_INTELLIGENCE_CURRENCY_NOT_SUPPORTED");
+  const countryCode = (input.countryCode ?? "TR").toUpperCase();
+  if (!/^[A-Z]{2}$/.test(countryCode) || input.categoryId < 1) {
+    throw new Error("PRICE_INTELLIGENCE_INPUT_INVALID");
+  }
+  if (input.requestId != null) await assertPhaseDRequestParticipant(input.requestId, input.requestedByUserId);
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select({ amount: serviceAgreements.agreedAmount, acceptedAt: serviceAgreements.acceptedAt })
+    .from(serviceAgreements)
+    .innerJoin(serviceRequests, eq(serviceRequests.id, serviceAgreements.requestId))
+    .innerJoin(payments, eq(payments.requestId, serviceAgreements.requestId))
+    .where(
+      and(
+        eq(serviceRequests.categoryId, input.categoryId),
+        eq(serviceAgreements.currency, currency),
+        eq(payments.status, "released"),
+      ),
+    )
+    .orderBy(serviceAgreements.acceptedAt)
+    .limit(200);
+  const amounts = rows.map((row) => row.amount).filter((amount) => amount > 0).sort((a, b) => a - b);
+  const isAvailable = amounts.length >= 5;
+  const first = rows[0]?.acceptedAt ?? null;
+  const last = rows.at(-1)?.acceptedAt ?? null;
+  const explanationJson = {
+    method: "completed_released_agreement_percentiles_v1",
+    nonBinding: true,
+    sampleThreshold: 5,
+    sampleSize: amounts.length,
+    excluded: "pending, held, refunded, cancelled, external quotes",
+  };
+  const result = {
+    status: isAvailable ? "available" as const : "insufficient_data" as const,
+    sampleSize: amounts.length,
+    medianAmount: isAvailable ? percentile(amounts, 0.5) : null,
+    lowAmount: isAvailable ? percentile(amounts, 0.25) : null,
+    highAmount: isAvailable ? percentile(amounts, 0.75) : null,
+    explanationJson,
+  };
+  const insert = await database.insert(priceIntelligenceAssessments).values({
+    requestId: input.requestId,
+    requestedByUserId: input.requestedByUserId,
+    categoryId: input.categoryId,
+    countryCode,
+    currency,
+    ...result,
+    dataWindowStartedAt: first,
+    dataWindowEndedAt: last,
+  });
+  return { id: insert[0].insertId, ...result, currency, countryCode, dataWindowStartedAt: first, dataWindowEndedAt: last };
+}
+
+export async function createSafetyTrustedContact(input: {
+  userId: number;
+  name: string;
+  phone: string;
+  label?: string;
+}) {
+  const normalizedName = input.name.trim();
+  const normalizedPhone = input.phone.replace(/[^0-9+]/g, "");
+  if (!normalizedName || normalizedName.length > 120 || !/^\+?[0-9]{7,20}$/.test(normalizedPhone)) {
+    throw new Error("SAFETY_CONTACT_INVALID");
+  }
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const encryptedContactJson = new EncryptionService().encrypt(JSON.stringify({ name: normalizedName, phone: normalizedPhone }));
+  const result = await database.insert(safetyTrustedContacts).values({
+    userId: input.userId,
+    encryptedContactJson,
+    label: input.label?.trim().slice(0, 80) || null,
+  });
+  return { id: result[0].insertId, label: input.label?.trim().slice(0, 80) || null, status: "active" as const };
+}
+
+export async function listSafetyTrustedContacts(userId: number) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database
+    .select({ id: safetyTrustedContacts.id, label: safetyTrustedContacts.label, status: safetyTrustedContacts.status, createdAt: safetyTrustedContacts.createdAt })
+    .from(safetyTrustedContacts)
+    .where(and(eq(safetyTrustedContacts.userId, userId), eq(safetyTrustedContacts.status, "active")))
+    .orderBy(desc(safetyTrustedContacts.createdAt));
+}
+
+export async function revokeSafetyTrustedContact(input: { id: number; userId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const result = await database
+    .update(safetyTrustedContacts)
+    .set({ status: "revoked", revokedAt: new Date() })
+    .where(and(eq(safetyTrustedContacts.id, input.id), eq(safetyTrustedContacts.userId, input.userId), eq(safetyTrustedContacts.status, "active")));
+  if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("SAFETY_CONTACT_NOT_FOUND");
+  return { success: true } as const;
+}
+
+export async function createSafetyCheckIn(input: { requestId: number; userId: number; dueAt: Date }) {
+  await assertPhaseDRequestParticipant(input.requestId, input.userId);
+  if (input.dueAt.getTime() <= Date.now() || input.dueAt.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+    throw new Error("SAFETY_CHECK_IN_DUE_INVALID");
+  }
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const result = await database.insert(safetyCheckIns).values(input);
+  await recordJobTimelineEvent({
+    requestId: input.requestId,
+    eventType: "safety_check_in_requested",
+    actorUserId: input.userId,
+    referenceType: "safety_check_in",
+    referenceId: result[0].insertId,
+    metadata: { dueAt: input.dueAt.toISOString() },
+  });
+  return { id: result[0].insertId, status: "requested" as const };
+}
+
+export async function acknowledgeSafetyCheckIn(input: { id: number; userId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database.select().from(safetyCheckIns).where(eq(safetyCheckIns.id, input.id)).limit(1);
+  const checkIn = rows[0];
+  if (!checkIn || checkIn.userId !== input.userId) throw new Error("SAFETY_CHECK_IN_NOT_FOUND");
+  if (checkIn.status !== "requested") throw new Error("SAFETY_CHECK_IN_NOT_PENDING");
+  await database.update(safetyCheckIns).set({ status: "acknowledged", acknowledgedAt: new Date() }).where(eq(safetyCheckIns.id, input.id));
+  await recordJobTimelineEvent({
+    requestId: checkIn.requestId,
+    eventType: "safety_check_in_acknowledged",
+    actorUserId: input.userId,
+    referenceType: "safety_check_in_acknowledgement",
+    referenceId: input.id,
+    metadata: {},
+  });
+  return { success: true } as const;
+}
+
+export async function createSafetyIncident(input: {
+  reporterUserId: number;
+  requestId?: number;
+  category: "conduct" | "identity" | "unsafe_condition" | "harassment" | "other";
+  severity: "low" | "medium" | "high" | "critical";
+  description: string;
+}) {
+  if (input.requestId != null) await assertPhaseDRequestParticipant(input.requestId, input.reporterUserId);
+  const description = input.description.trim();
+  if (description.length < 10 || description.length > 4000) throw new Error("SAFETY_INCIDENT_DESCRIPTION_INVALID");
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const result = await database.insert(safetyIncidents).values({ ...input, description });
+  if (input.requestId != null) {
+    await recordJobTimelineEvent({
+      requestId: input.requestId,
+      eventType: "safety_incident_reported",
+      actorUserId: input.reporterUserId,
+      referenceType: "safety_incident",
+      referenceId: result[0].insertId,
+      metadata: { category: input.category, severity: input.severity },
+    });
+  }
+  await logOperationEvent({ eventType: "safety_incident_created", actorId: input.reporterUserId, subjectId: input.requestId, severity: input.severity === "critical" ? "error" : "warning" });
+  return { id: result[0].insertId, status: "open" as const, externalDeliveryStatus: "not_configured" as const };
+}
+
+export async function listMySafetyIncidents(userId: number) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database
+    .select({ id: safetyIncidents.id, requestId: safetyIncidents.requestId, category: safetyIncidents.category, severity: safetyIncidents.severity, status: safetyIncidents.status, externalDeliveryStatus: safetyIncidents.externalDeliveryStatus, createdAt: safetyIncidents.createdAt, resolvedAt: safetyIncidents.resolvedAt })
+    .from(safetyIncidents)
+    .where(eq(safetyIncidents.reporterUserId, userId))
+    .orderBy(desc(safetyIncidents.createdAt));
+}
+
+async function assertOrganizationManager(input: { organizationId: number; userId: number }) {
+  const access = await getOrganizationAccess(input);
+  if (access.member.role !== "owner" && access.member.role !== "admin") {
+    throw new Error("ORGANIZATION_MANAGEMENT_FORBIDDEN");
+  }
+  return access;
+}
+
+async function assertOrganizationSite(input: { organizationId: number; siteId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select({ id: organizationSites.id })
+    .from(organizationSites)
+    .where(and(eq(organizationSites.id, input.siteId), eq(organizationSites.organizationId, input.organizationId), eq(organizationSites.status, "active")))
+    .limit(1);
+  if (!rows[0]) throw new Error("ORGANIZATION_SITE_NOT_FOUND");
+}
+
+async function assertOrganizationAsset(input: { organizationId: number; assetId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select({ id: organizationManagedAssets.id })
+    .from(organizationManagedAssets)
+    .where(and(eq(organizationManagedAssets.id, input.assetId), eq(organizationManagedAssets.organizationId, input.organizationId), eq(organizationManagedAssets.status, "active")))
+    .limit(1);
+  if (!rows[0]) throw new Error("ORGANIZATION_ASSET_NOT_FOUND");
+}
+
+export async function createOrganizationSite(input: {
+  organizationId: number;
+  actorUserId: number;
+  name: string;
+  address: string;
+  latitude?: string;
+  longitude?: string;
+}) {
+  await assertOrganizationManager({ organizationId: input.organizationId, userId: input.actorUserId });
+  const name = input.name.trim();
+  const address = input.address.trim();
+  if (!name || name.length > 160 || !address || address.length > 2000) throw new Error("ORGANIZATION_SITE_INVALID");
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const result = await database.insert(organizationSites).values({
+    organizationId: input.organizationId,
+    name,
+    address,
+    latitude: input.latitude?.trim() || null,
+    longitude: input.longitude?.trim() || null,
+    createdByUserId: input.actorUserId,
+  });
+  return { id: result[0].insertId };
+}
+
+export async function listOrganizationSites(input: { organizationId: number; userId: number }) {
+  await getOrganizationAccess({ organizationId: input.organizationId, userId: input.userId });
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database
+    .select()
+    .from(organizationSites)
+    .where(and(eq(organizationSites.organizationId, input.organizationId), eq(organizationSites.status, "active")))
+    .orderBy(organizationSites.name);
+}
+
+export async function createOrganizationManagedAsset(input: {
+  organizationId: number;
+  actorUserId: number;
+  siteId?: number;
+  kind: "property" | "vehicle" | "equipment" | "other";
+  name: string;
+  externalReference?: string;
+  detailsJson?: Record<string, unknown>;
+}) {
+  await assertOrganizationManager({ organizationId: input.organizationId, userId: input.actorUserId });
+  if (input.siteId != null) await assertOrganizationSite({ organizationId: input.organizationId, siteId: input.siteId });
+  const name = input.name.trim();
+  if (!name || name.length > 160) throw new Error("ORGANIZATION_ASSET_INVALID");
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const result = await database.insert(organizationManagedAssets).values({
+    organizationId: input.organizationId,
+    siteId: input.siteId ?? null,
+    kind: input.kind,
+    name,
+    externalReference: input.externalReference?.trim().slice(0, 128) || null,
+    detailsJson: input.detailsJson ?? {},
+    createdByUserId: input.actorUserId,
+  });
+  return { id: result[0].insertId };
+}
+
+export async function listOrganizationManagedAssets(input: { organizationId: number; userId: number; siteId?: number }) {
+  await getOrganizationAccess({ organizationId: input.organizationId, userId: input.userId });
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database
+    .select()
+    .from(organizationManagedAssets)
+    .where(
+      and(
+        eq(organizationManagedAssets.organizationId, input.organizationId),
+        eq(organizationManagedAssets.status, "active"),
+        input.siteId == null ? undefined : eq(organizationManagedAssets.siteId, input.siteId),
+      ),
+    )
+    .orderBy(organizationManagedAssets.name);
+}
+
+export async function createOrganizationMaintenanceSchedule(input: {
+  organizationId: number;
+  actorUserId: number;
+  siteId?: number;
+  assetId?: number;
+  categoryId: number;
+  title: string;
+  description?: string;
+  cadence: "weekly" | "monthly" | "quarterly" | "annual";
+  nextRunAt: Date;
+}) {
+  await assertOrganizationManager({ organizationId: input.organizationId, userId: input.actorUserId });
+  if (input.siteId != null) await assertOrganizationSite({ organizationId: input.organizationId, siteId: input.siteId });
+  if (input.assetId != null) await assertOrganizationAsset({ organizationId: input.organizationId, assetId: input.assetId });
+  const title = input.title.trim();
+  if (!title || title.length > 255 || input.categoryId < 1 || input.nextRunAt.getTime() <= Date.now()) {
+    throw new Error("ORGANIZATION_MAINTENANCE_SCHEDULE_INVALID");
+  }
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const result = await database.insert(organizationMaintenanceSchedules).values({
+    organizationId: input.organizationId,
+    siteId: input.siteId ?? null,
+    assetId: input.assetId ?? null,
+    categoryId: input.categoryId,
+    title,
+    description: input.description?.trim().slice(0, 4000) || null,
+    cadence: input.cadence,
+    nextRunAt: input.nextRunAt,
+    createdByUserId: input.actorUserId,
+  });
+  return { id: result[0].insertId };
+}
+
+export async function listOrganizationMaintenanceSchedules(input: { organizationId: number; userId: number }) {
+  await getOrganizationAccess({ organizationId: input.organizationId, userId: input.userId });
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database
+    .select()
+    .from(organizationMaintenanceSchedules)
+    .where(and(eq(organizationMaintenanceSchedules.organizationId, input.organizationId), eq(organizationMaintenanceSchedules.status, "active")))
+    .orderBy(organizationMaintenanceSchedules.nextRunAt);
+}
+
+export async function createOrganizationRequestApproval(input: { requestId: number; actorUserId: number }) {
+  const request = await getServiceRequestById(input.requestId);
+  if (!request?.organizationId) throw new Error("ORGANIZATION_REQUEST_REQUIRED");
+  const access = await getOrganizationAccess({ organizationId: request.organizationId, userId: input.actorUserId });
+  if (request.userId !== input.actorUserId && access.member.role === "member") throw new Error("ORGANIZATION_APPROVAL_CREATE_FORBIDDEN");
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const existing = await database.select({ id: organizationRequestApprovals.id }).from(organizationRequestApprovals).where(eq(organizationRequestApprovals.requestId, input.requestId)).limit(1);
+  if (existing[0]) throw new Error("ORGANIZATION_APPROVAL_ALREADY_EXISTS");
+  const result = await database.insert(organizationRequestApprovals).values({
+    requestId: input.requestId,
+    organizationId: request.organizationId,
+    requestedByUserId: input.actorUserId,
+  });
+  return { id: result[0].insertId, status: "pending" as const };
+}
+
+export async function decideOrganizationRequestApproval(input: {
+  approvalId: number;
+  actorUserId: number;
+  decision: "approved" | "rejected" | "cancelled";
+  note?: string;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database.select().from(organizationRequestApprovals).where(eq(organizationRequestApprovals.id, input.approvalId)).limit(1);
+  const approval = rows[0];
+  if (!approval) throw new Error("ORGANIZATION_APPROVAL_NOT_FOUND");
+  const access = await getOrganizationAccess({ organizationId: approval.organizationId, userId: input.actorUserId });
+  const isRequester = approval.requestedByUserId === input.actorUserId;
+  if (input.decision === "cancelled") {
+    if (!isRequester || approval.status !== "pending") throw new Error("ORGANIZATION_APPROVAL_CANCEL_FORBIDDEN");
+  } else if (access.member.role !== "owner" && access.member.role !== "admin") {
+    throw new Error("ORGANIZATION_APPROVAL_DECISION_FORBIDDEN");
+  }
+  if (approval.status !== "pending") throw new Error("ORGANIZATION_APPROVAL_NOT_PENDING");
+  await database.update(organizationRequestApprovals).set({
+    status: input.decision,
+    reviewedByUserId: input.decision === "cancelled" ? null : input.actorUserId,
+    decisionNote: input.note?.trim().slice(0, 1000) || null,
+    decidedAt: new Date(),
+  }).where(eq(organizationRequestApprovals.id, input.approvalId));
+  await recordJobTimelineEvent({
+    requestId: approval.requestId,
+    eventType: `organization_approval_${input.decision}`,
+    actorUserId: input.actorUserId,
+    referenceType: "organization_request_approval",
+    referenceId: approval.id,
+    metadata: {},
+  });
+  return { success: true } as const;
+}
+
+export async function listOrganizationRequestApprovals(input: { organizationId: number; userId: number; status?: "pending" | "approved" | "rejected" | "cancelled" }) {
+  await getOrganizationAccess({ organizationId: input.organizationId, userId: input.userId });
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database
+    .select()
+    .from(organizationRequestApprovals)
+    .where(and(eq(organizationRequestApprovals.organizationId, input.organizationId), input.status == null ? undefined : eq(organizationRequestApprovals.status, input.status)))
+    .orderBy(desc(organizationRequestApprovals.createdAt));
+}
+
+export async function createOrganizationRequestBatch(input: {
+  organizationId: number;
+  actorUserId: number;
+  title: string;
+  categoryId: number;
+  siteId?: number;
+  description?: string;
+  requestedForAt?: Date;
+}) {
+  await assertOrganizationManager({ organizationId: input.organizationId, userId: input.actorUserId });
+  if (input.siteId != null) await assertOrganizationSite({ organizationId: input.organizationId, siteId: input.siteId });
+  const title = input.title.trim();
+  if (!title || title.length > 255 || input.categoryId < 1 || (input.requestedForAt && input.requestedForAt.getTime() <= Date.now())) {
+    throw new Error("ORGANIZATION_BATCH_INVALID");
+  }
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const result = await database.insert(organizationRequestBatches).values({
+    organizationId: input.organizationId,
+    createdByUserId: input.actorUserId,
+    title,
+    categoryId: input.categoryId,
+    siteId: input.siteId ?? null,
+    description: input.description?.trim().slice(0, 4000) || null,
+    requestedForAt: input.requestedForAt ?? null,
+  });
+  return { id: result[0].insertId, status: "draft" as const };
+}
+
+export async function addOrganizationRequestToBatch(input: { batchId: number; requestId: number; actorUserId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const batch = (await database.select().from(organizationRequestBatches).where(eq(organizationRequestBatches.id, input.batchId)).limit(1))[0];
+  if (!batch) throw new Error("ORGANIZATION_BATCH_NOT_FOUND");
+  await assertOrganizationManager({ organizationId: batch.organizationId, userId: input.actorUserId });
+  if (batch.status !== "draft") throw new Error("ORGANIZATION_BATCH_NOT_EDITABLE");
+  const request = await getServiceRequestById(input.requestId);
+  if (!request || request.organizationId !== batch.organizationId) throw new Error("ORGANIZATION_BATCH_REQUEST_FORBIDDEN");
+  try {
+    const result = await database.insert(organizationRequestBatchItems).values({ batchId: batch.id, requestId: input.requestId });
+    return { id: result[0].insertId };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/duplicate|unique/i.test(message)) throw new Error("ORGANIZATION_BATCH_REQUEST_ALREADY_LINKED");
+    throw error;
+  }
+}
+
+export async function submitOrganizationRequestBatch(input: { batchId: number; actorUserId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const batch = (await database.select().from(organizationRequestBatches).where(eq(organizationRequestBatches.id, input.batchId)).limit(1))[0];
+  if (!batch) throw new Error("ORGANIZATION_BATCH_NOT_FOUND");
+  await assertOrganizationManager({ organizationId: batch.organizationId, userId: input.actorUserId });
+  if (batch.status !== "draft") throw new Error("ORGANIZATION_BATCH_NOT_EDITABLE");
+  const items = await database.select({ id: organizationRequestBatchItems.id }).from(organizationRequestBatchItems).where(eq(organizationRequestBatchItems.batchId, batch.id)).limit(1);
+  if (!items[0]) throw new Error("ORGANIZATION_BATCH_EMPTY");
+  await database.update(organizationRequestBatches).set({ status: "submitted" }).where(eq(organizationRequestBatches.id, batch.id));
+  return { success: true as const, status: "submitted" as const };
+}
+
+export async function listOrganizationRequestBatches(input: { organizationId: number; userId: number }) {
+  await getOrganizationAccess({ organizationId: input.organizationId, userId: input.userId });
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const batches = await database.select().from(organizationRequestBatches).where(eq(organizationRequestBatches.organizationId, input.organizationId)).orderBy(desc(organizationRequestBatches.createdAt));
+  return Promise.all(batches.map(async (batch) => {
+    const items = await database.select({ requestId: organizationRequestBatchItems.requestId }).from(organizationRequestBatchItems).where(eq(organizationRequestBatchItems.batchId, batch.id));
+    return { ...batch, requestIds: items.map((item) => item.requestId) };
+  }));
+}
+
+export async function issueOrganizationInvoiceForRequest(input: { organizationId: number; requestId: number; actorUserId: number }) {
+  await assertOrganizationManager({ organizationId: input.organizationId, userId: input.actorUserId });
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const request = await getServiceRequestById(input.requestId);
+  if (!request || request.organizationId !== input.organizationId) throw new Error("ORGANIZATION_INVOICE_REQUEST_FORBIDDEN");
+  const payment = (await database.select().from(payments).where(eq(payments.requestId, input.requestId)).limit(1))[0];
+  if (!payment || (payment.status !== "held" && payment.status !== "released")) throw new Error("ORGANIZATION_INVOICE_PAYMENT_NOT_SETTLED");
+  const existing = await database.select({ id: organizationInvoices.id }).from(organizationInvoices).where(eq(organizationInvoices.requestId, input.requestId)).limit(1);
+  if (existing[0]) throw new Error("ORGANIZATION_INVOICE_ALREADY_EXISTS");
+  const invoiceNumber = `MF-${input.organizationId}-${input.requestId}-${payment.id}`;
+  const result = await database.insert(organizationInvoices).values({
+    organizationId: input.organizationId,
+    requestId: input.requestId,
+    invoiceNumber,
+    currency: "TRY",
+    subtotalAmount: payment.amount,
+    taxAmount: 0,
+    totalAmount: payment.amount,
+    status: payment.status === "released" ? "paid" : "issued",
+    issuedAt: new Date(),
+    paidAt: payment.status === "released" ? new Date() : null,
+    createdByUserId: input.actorUserId,
+  });
+  return { id: result[0].insertId, invoiceNumber, status: payment.status === "released" ? "paid" as const : "issued" as const };
+}
+
+export async function listOrganizationInvoices(input: { organizationId: number; userId: number }) {
+  await getOrganizationAccess({ organizationId: input.organizationId, userId: input.userId });
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database.select().from(organizationInvoices).where(eq(organizationInvoices.organizationId, input.organizationId)).orderBy(desc(organizationInvoices.createdAt));
 }

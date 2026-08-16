@@ -117,6 +117,278 @@ export const maskedCommunicationSessions = mysqlTable(
   ],
 );
 
+// Immutable, denormalized references to already-authoritative job records.
+// This is a read model for the Job Capsule; it never replaces agreement,
+// payment, media, completion, review or dispute source tables.
+export const jobTimelineEvents = mysqlTable(
+  "job_timeline_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    eventType: varchar("eventType", { length: 96 }).notNull(),
+    actorUserId: int("actorUserId"),
+    referenceType: varchar("referenceType", { length: 64 }).notNull(),
+    referenceId: int("referenceId"),
+    metadataJson: json("metadataJson").notNull(),
+    occurredAt: timestamp("occurredAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("job_timeline_events_reference_unique").on(table.requestId, table.referenceType, table.referenceId),
+    index("job_timeline_events_request_time_idx").on(table.requestId, table.occurredAt),
+    index("job_timeline_events_actor_time_idx").on(table.actorUserId, table.occurredAt),
+  ],
+);
+
+// An auditable, non-binding outcome of explainable statistical price analysis.
+// It never writes a request, agreement, payment or settlement amount.
+export const priceIntelligenceAssessments = mysqlTable(
+  "price_intelligence_assessments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId"),
+    requestedByUserId: int("requestedByUserId").notNull(),
+    categoryId: int("categoryId").notNull(),
+    countryCode: varchar("countryCode", { length: 2 }).default("TR").notNull(),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    status: mysqlEnum("status", ["available", "insufficient_data", "unavailable", "failed"])
+      .default("insufficient_data")
+      .notNull(),
+    sampleSize: int("sampleSize").default(0).notNull(),
+    medianAmount: int("medianAmount"),
+    lowAmount: int("lowAmount"),
+    highAmount: int("highAmount"),
+    explanationJson: json("explanationJson").notNull(),
+    dataWindowStartedAt: timestamp("dataWindowStartedAt"),
+    dataWindowEndedAt: timestamp("dataWindowEndedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("price_intelligence_request_idx").on(table.requestId, table.createdAt),
+    index("price_intelligence_category_status_idx").on(table.categoryId, table.status, table.createdAt),
+    index("price_intelligence_requester_idx").on(table.requestedByUserId, table.createdAt),
+  ],
+);
+
+// Safety records are platform incidents and check-ins, not emergency-service
+// dispatch records. Sensitive trusted-contact details are encrypted before write.
+export const safetyTrustedContacts = mysqlTable(
+  "safety_trusted_contacts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    encryptedContactJson: text("encryptedContactJson").notNull(),
+    label: varchar("label", { length: 80 }),
+    status: mysqlEnum("status", ["active", "revoked"]).default("active").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    revokedAt: timestamp("revokedAt"),
+  },
+  (table) => [
+    index("safety_trusted_contacts_user_status_idx").on(table.userId, table.status, table.createdAt),
+  ],
+);
+
+export const safetyCheckIns = mysqlTable(
+  "safety_check_ins",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    userId: int("userId").notNull(),
+    status: mysqlEnum("status", ["requested", "acknowledged", "missed", "cancelled"])
+      .default("requested")
+      .notNull(),
+    dueAt: timestamp("dueAt").notNull(),
+    acknowledgedAt: timestamp("acknowledgedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("safety_check_ins_request_user_idx").on(table.requestId, table.userId, table.status),
+    index("safety_check_ins_due_idx").on(table.status, table.dueAt),
+  ],
+);
+
+export const safetyIncidents = mysqlTable(
+  "safety_incidents",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId"),
+    reporterUserId: int("reporterUserId").notNull(),
+    category: mysqlEnum("category", ["conduct", "identity", "unsafe_condition", "harassment", "other"]).notNull(),
+    severity: mysqlEnum("severity", ["low", "medium", "high", "critical"]).notNull(),
+    description: text("description").notNull(),
+    status: mysqlEnum("status", ["open", "under_review", "resolved", "dismissed"])
+      .default("open")
+      .notNull(),
+    externalDeliveryStatus: mysqlEnum("externalDeliveryStatus", ["not_configured", "not_requested", "queued", "delivered", "failed"])
+      .default("not_configured")
+      .notNull(),
+    reviewedByUserId: int("reviewedByUserId"),
+    resolutionNote: text("resolutionNote"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("safety_incidents_request_status_idx").on(table.requestId, table.status, table.createdAt),
+    index("safety_incidents_reporter_idx").on(table.reporterUserId, table.createdAt),
+    index("safety_incidents_status_severity_idx").on(table.status, table.severity, table.createdAt),
+  ],
+);
+
+// Fleet/facility extensions intentionally reuse organizationId and the existing
+// service request domain; none of these tables creates a parallel job system.
+export const organizationSites = mysqlTable(
+  "organization_sites",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    address: text("address").notNull(),
+    latitude: varchar("latitude", { length: 20 }),
+    longitude: varchar("longitude", { length: 20 }),
+    status: mysqlEnum("status", ["active", "archived"]).default("active").notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("organization_sites_org_status_idx").on(table.organizationId, table.status),
+  ],
+);
+
+export const organizationManagedAssets = mysqlTable(
+  "organization_managed_assets",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    siteId: int("siteId"),
+    kind: mysqlEnum("kind", ["property", "vehicle", "equipment", "other"]).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    externalReference: varchar("externalReference", { length: 128 }),
+    detailsJson: json("detailsJson").notNull(),
+    status: mysqlEnum("status", ["active", "archived"]).default("active").notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("organization_assets_org_status_idx").on(table.organizationId, table.status),
+    index("organization_assets_site_idx").on(table.siteId, table.status),
+  ],
+);
+
+export const organizationMaintenanceSchedules = mysqlTable(
+  "organization_maintenance_schedules",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    siteId: int("siteId"),
+    assetId: int("assetId"),
+    categoryId: int("categoryId").notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    cadence: mysqlEnum("cadence", ["weekly", "monthly", "quarterly", "annual"]).notNull(),
+    nextRunAt: timestamp("nextRunAt").notNull(),
+    status: mysqlEnum("status", ["active", "paused", "archived"]).default("active").notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("organization_maintenance_due_idx").on(table.status, table.nextRunAt),
+    index("organization_maintenance_org_idx").on(table.organizationId, table.status),
+  ],
+);
+
+export const organizationRequestApprovals = mysqlTable(
+  "organization_request_approvals",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    organizationId: int("organizationId").notNull(),
+    requestedByUserId: int("requestedByUserId").notNull(),
+    status: mysqlEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending").notNull(),
+    reviewedByUserId: int("reviewedByUserId"),
+    decisionNote: text("decisionNote"),
+    decidedAt: timestamp("decidedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("organization_request_approvals_request_unique").on(table.requestId),
+    index("organization_request_approvals_org_status_idx").on(table.organizationId, table.status, table.createdAt),
+  ],
+);
+
+// A batch coordinates multiple normal service requests; it does not replace the
+// existing request lifecycle. Each child request keeps its own actor, agreement,
+// escrow and authorization checks.
+export const organizationRequestBatches = mysqlTable(
+  "organization_request_batches",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    categoryId: int("categoryId").notNull(),
+    siteId: int("siteId"),
+    description: text("description"),
+    requestedForAt: timestamp("requestedForAt"),
+    status: mysqlEnum("status", ["draft", "submitted", "cancelled", "completed"]).default("draft").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("organization_request_batches_org_status_idx").on(table.organizationId, table.status, table.createdAt),
+    index("organization_request_batches_creator_idx").on(table.createdByUserId, table.createdAt),
+  ],
+);
+
+export const organizationRequestBatchItems = mysqlTable(
+  "organization_request_batch_items",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    batchId: int("batchId").notNull(),
+    requestId: int("requestId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("organization_batch_items_request_unique").on(table.requestId),
+    uniqueIndex("organization_batch_items_batch_request_unique").on(table.batchId, table.requestId),
+    index("organization_batch_items_batch_idx").on(table.batchId, table.createdAt),
+  ],
+);
+
+// Corporate invoices are financial documents generated from already-authoritative
+// request/payment facts. All settlement remains TRY until a regulated FX source is
+// explicitly configured and approved.
+export const organizationInvoices = mysqlTable(
+  "organization_invoices",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    requestId: int("requestId"),
+    batchId: int("batchId"),
+    invoiceNumber: varchar("invoiceNumber", { length: 96 }).notNull(),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    subtotalAmount: int("subtotalAmount").notNull(),
+    taxAmount: int("taxAmount").default(0).notNull(),
+    totalAmount: int("totalAmount").notNull(),
+    status: mysqlEnum("status", ["draft", "issued", "paid", "void"]).default("draft").notNull(),
+    issuedAt: timestamp("issuedAt"),
+    paidAt: timestamp("paidAt"),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("organization_invoices_number_unique").on(table.invoiceNumber),
+    uniqueIndex("organization_invoices_request_unique").on(table.requestId),
+    index("organization_invoices_org_status_idx").on(table.organizationId, table.status, table.createdAt),
+    index("organization_invoices_batch_idx").on(table.batchId, table.createdAt),
+  ],
+);
+
 // Append-only consent evidence. A withdrawal is a new event; previously granted
 // evidence is intentionally never overwritten or deleted.
 export const consentEvents = mysqlTable(
@@ -942,6 +1214,37 @@ export const serviceAgreements = mysqlTable(
     uniqueIndex("service_agreements_request_unique").on(table.requestId),
     uniqueIndex("service_agreements_offer_unique").on(table.offerId),
     index("service_agreements_provider_idx").on(table.providerId, table.createdAt),
+  ],
+);
+
+// A customer-visible, immutable price ceiling created alongside the accepted
+// agreement. Any scope or amount change must remain separately auditable via a
+// change order; no service flow may silently increase this amount.
+export const priceGuarantees = mysqlTable(
+  "price_guarantees",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    agreementId: int("agreementId").notNull(),
+    customerUserId: int("customerUserId").notNull(),
+    providerId: int("providerId").notNull(),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    guaranteedAmount: int("guaranteedAmount").notNull(),
+    maximumAmount: int("maximumAmount").notNull(),
+    status: mysqlEnum("status", ["active", "superseded", "cancelled", "completed"])
+      .default("active")
+      .notNull(),
+    policyVersion: varchar("policyVersion", { length: 64 }).default("no_surprise_price_v1").notNull(),
+    acceptedAt: timestamp("acceptedAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    supersededAt: timestamp("supersededAt"),
+    cancellationReason: varchar("cancellationReason", { length: 255 }),
+  },
+  (table) => [
+    uniqueIndex("price_guarantees_request_unique").on(table.requestId),
+    uniqueIndex("price_guarantees_agreement_unique").on(table.agreementId),
+    index("price_guarantees_customer_status_idx").on(table.customerUserId, table.status, table.createdAt),
+    index("price_guarantees_provider_status_idx").on(table.providerId, table.status, table.createdAt),
   ],
 );
 

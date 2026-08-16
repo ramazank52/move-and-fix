@@ -22,7 +22,6 @@ const POLICY_LANGUAGE_LABELS: Record<PolicyLanguage, string> = {
 export default function PrivacyPolicyScreen() {
   const colors = useColors();
   const [language, setLanguage] = useState<PolicyLanguage>("tr");
-  const isTurkish = language === "tr";
   const policy = PRIVACY_POLICY_TRANSLATIONS[language];
 
   const pageTitle = t("privacy.title", language);

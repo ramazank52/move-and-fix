@@ -41,10 +41,12 @@ export default function ProviderDashboardScreen() {
   const jobsQuery = trpc.providers.myJobs.useQuery(undefined, { refetchOnMount: true });
   const earningsQuery = trpc.providers.myEarnings.useQuery(undefined, { refetchOnMount: true });
   const opportunitiesQuery = trpc.providers.newJobs.useQuery(undefined, { refetchOnMount: true });
+  const cockpitQuery = trpc.providers.businessCockpit.useQuery(undefined, { refetchOnMount: true });
   const availabilityMutation = trpc.providers.updateAvailability.useMutation();
 
   const profile = profileQuery.data;
   const earnings = earningsQuery.data;
+  const cockpit = cockpitQuery.data;
   const opportunities = opportunitiesQuery.data ?? [];
   const activeJobs = useMemo(
     () => (jobsQuery.data ?? []).filter((job) => job.status === "active"),
@@ -59,10 +61,11 @@ export default function ProviderDashboardScreen() {
       jobsQuery.refetch(),
       earningsQuery.refetch(),
       opportunitiesQuery.refetch(),
+      cockpitQuery.refetch(),
     ]);
     setAvailabilityOverride(null);
     setRefreshing(false);
-  }, [earningsQuery, jobsQuery, opportunitiesQuery, profileQuery]);
+  }, [cockpitQuery, earningsQuery, jobsQuery, opportunitiesQuery, profileQuery]);
 
   const toggleAvailability = useCallback(async () => {
     if (availabilityMutation.isPending) return;
@@ -188,6 +191,30 @@ export default function ProviderDashboardScreen() {
                   {opportunities.length}
                 </Text>
               </Pressable>
+            </View>
+
+            <View style={{ borderRadius: 10, backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.border, padding: 14, marginBottom: 10 }}>
+              <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: "800", marginBottom: 12 }}>{t("provider.cockpitTitle")}</Text>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1, borderRadius: 8, padding: 10, backgroundColor: `${colors.primary}0D` }}>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>{t("provider.pendingPayments")}</Text>
+                  <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 15, fontWeight: "800", marginTop: 4 }}>{formatMoney(cockpit?.earnings.pendingPayments ?? 0)}</Text>
+                </View>
+                <View style={{ flex: 1, borderRadius: 8, padding: 10, backgroundColor: `${colors.primary}0D` }}>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>{t("provider.averageRating")}</Text>
+                  <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 15, fontWeight: "800", marginTop: 4 }}>{cockpit?.averageRating == null ? t("provider.metricUnavailable") : cockpit.averageRating.toFixed(1)}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                <View style={{ flex: 1, borderRadius: 8, padding: 10, backgroundColor: `${colors.primary}0D` }}>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>{t("provider.cancellationRate")}</Text>
+                  <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 15, fontWeight: "800", marginTop: 4 }}>{cockpit?.cancellationRate == null ? t("provider.metricUnavailable") : `%${cockpit.cancellationRate.toFixed(2)}`}</Text>
+                </View>
+                <View style={{ flex: 1, borderRadius: 8, padding: 10, backgroundColor: `${colors.primary}0D` }}>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>{t("provider.activeJobs")}</Text>
+                  <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 15, fontWeight: "800", marginTop: 4 }}>{String(cockpit?.activeJobs ?? 0)}</Text>
+                </View>
+              </View>
             </View>
 
             <Pressable

@@ -336,6 +336,23 @@ export default function CheckoutScreen() {
           </View>
         </View>
 
+        <View style={[styles.infoCard, { backgroundColor: `${colors.success}10`, borderColor: `${colors.success}30` }]}>
+          <View style={styles.infoHeader}>
+            <View style={[styles.infoIcon, { backgroundColor: `${colors.success}18` }]}>
+              <IconSymbol name="shield.fill" size={18} color={colors.success} />
+            </View>
+            <Text style={[styles.infoTitle, { color: colors.success }]}>{t("checkout.priceGuaranteeTitle")}</Text>
+          </View>
+          <Text style={[styles.flowDescription, { color: colors.muted, marginTop: 8 }]}>
+            {t("checkout.priceGuaranteeBody")}
+          </Text>
+          <View style={[styles.divider, { backgroundColor: `${colors.success}24`, marginTop: 12 }]} />
+          <View style={[styles.summaryRow, { marginTop: 10 }]}>
+            <Text style={[styles.flowTitle, { color: colors.foreground }]}>{t("checkout.priceGuaranteeMaximum")}</Text>
+            <Text style={[styles.flowTitle, { color: colors.success }]}>{formatMoney(quote.priceGuarantee.maximumAmount)}</Text>
+          </View>
+        </View>
+
         <View style={[styles.infoCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}30` }]}>
           <View style={styles.infoHeader}>
             <View style={[styles.infoIcon, { backgroundColor: `${colors.primary}18` }]}>

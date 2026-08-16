@@ -78,6 +78,36 @@ export default function ProfileScreen() {
                 )}
               </View>
             </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Safety Center"
+              onPress={() => router.push("/safety-center" as never)}
+              style={({ pressed }) => [styles.safetyEntry, pressed && styles.pressed]}
+            >
+              <View style={[styles.iconBox, { backgroundColor: "#EF44441A" }]}>
+                <IconSymbol name="exclamationmark.shield.fill" size={18} color="#EF4444" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 13 }}>
+                <Text style={styles.menuLabel}>Safety Center</Text>
+                <Text style={styles.safetyCaption}>Güvenilir kişiler ve güvenlik bildirimi</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={locale === "en" ? "Organization management" : locale === "ru" ? "Управление организацией" : "Kurumsal yönetim"}
+              onPress={() => router.push("/organization-management" as never)}
+              style={({ pressed }) => [styles.safetyEntry, pressed && styles.pressed]}
+            >
+              <View style={[styles.iconBox, { backgroundColor: `${colors.primary}1A` }]}>
+                <IconSymbol name="building.2.fill" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 13 }}>
+                <Text style={styles.menuLabel}>{locale === "en" ? "Organization management" : locale === "ru" ? "Управление организацией" : "Kurumsal Yönetim"}</Text>
+                <Text style={styles.safetyCaption}>{locale === "en" ? "Facilities, assets and planned maintenance" : locale === "ru" ? "Объекты, активы и плановое обслуживание" : "Tesis, varlık ve planlı bakım"}</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+            </Pressable>
           </>
         )}
         renderItem={({ item, index }) => (
@@ -120,6 +150,8 @@ function createStyles(colors: ReturnType<typeof useColors>) {
       padding: 14,
       marginBottom: 12,
     },
+    safetyEntry: { minHeight: 64, marginBottom: 12, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, borderRadius: 10, backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.border },
+    safetyCaption: { marginTop: 2, color: colors.muted, fontSize: 11, lineHeight: 15 },
     avatar: {
       width: 64,
       height: 64,

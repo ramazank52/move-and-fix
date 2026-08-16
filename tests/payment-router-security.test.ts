@@ -46,6 +46,13 @@ const quote = {
   completionReviewHours: 48,
   currency: "TRY" as const,
   amount: 850,
+  priceGuarantee: {
+    id: 81,
+    policyVersion: "no_surprise_price_v1",
+    guaranteedAmount: 850,
+    maximumAmount: 850,
+    status: "active" as const,
+  },
   commissionRateBps: 1_000,
   commissionAmount: 85,
   providerPayout: 765,

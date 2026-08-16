@@ -35,6 +35,7 @@ import {
   GatewayCheckoutError,
 } from "./payments/GatewayCheckoutService";
 import { getMaskedCommunicationReadiness } from "./communications/MaskedCommunicationService";
+import { createPriceIntelligenceNarrative } from "./services/PriceIntelligenceNarrativeService";
 
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
 // Döngüsel import'u önlemek için servisler burada birbirine bağlanır.
@@ -179,6 +180,28 @@ function mapOrganizationError(error: unknown): never {
   }
   if (message === "ORGANIZATION_SELF_INVITE_FORBIDDEN" || message === "ORGANIZATION_OWNER_ROLE_IMMUTABLE") {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Kurumsal üyelik kuralı bu işlemi engelliyor" });
+  }
+  throw error;
+}
+
+function mapPhaseDError(error: unknown): never {
+  const message = error instanceof Error ? error.message : "PHASE_D_OPERATION_FAILED";
+  if (message.endsWith("_FORBIDDEN") || message.endsWith("_REQUIRED")) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem için gerekli erişim yetkiniz yok" });
+  }
+  if (message.endsWith("_NOT_FOUND")) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "İstenen kayıt bulunamadı" });
+  }
+  if (message.includes("ALREADY_EXISTS")) {
+    throw new TRPCError({ code: "CONFLICT", message: "Bu kayıt zaten mevcut" });
+  }
+  if (
+    message.includes("INVALID") ||
+    message.includes("NOT_PENDING") ||
+    message.includes("UNSUPPORTED") ||
+    message.includes("CURRENCY_NOT_SUPPORTED")
+  ) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Gönderilen veri veya işlem durumu geçersiz" });
   }
   throw error;
 }
@@ -696,6 +719,150 @@ export const appRouter = router({
           return await db.archiveOrganization({ organizationId: input.organizationId, actorUserId: ctx.user.id });
         } catch (error) {
           return mapOrganizationError(error);
+        }
+      }),
+    sites: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.listOrganizationSites({ organizationId: input.organizationId, userId: ctx.user.id })),
+    createSite: protectedProcedure
+      .input(z.object({
+        organizationId: z.number().int().positive(),
+        name: z.string().trim().min(1).max(160),
+        address: z.string().trim().min(3).max(2000),
+        latitude: coordinateSchema.optional(),
+        longitude: coordinateSchema.optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createOrganizationSite({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    assets: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive(), siteId: z.number().int().positive().optional() }))
+      .query(({ ctx, input }) => db.listOrganizationManagedAssets({ ...input, userId: ctx.user.id })),
+    createAsset: protectedProcedure
+      .input(z.object({
+        organizationId: z.number().int().positive(),
+        siteId: z.number().int().positive().optional(),
+        kind: z.enum(["property", "vehicle", "equipment", "other"]),
+        name: z.string().trim().min(1).max(160),
+        externalReference: z.string().trim().max(128).optional(),
+        detailsJson: z.record(z.string().trim().min(1).max(80), requestAttributeValueSchema).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createOrganizationManagedAsset({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    maintenanceSchedules: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.listOrganizationMaintenanceSchedules({ organizationId: input.organizationId, userId: ctx.user.id })),
+    createMaintenanceSchedule: protectedProcedure
+      .input(z.object({
+        organizationId: z.number().int().positive(),
+        siteId: z.number().int().positive().optional(),
+        assetId: z.number().int().positive().optional(),
+        categoryId: z.number().int().positive(),
+        title: z.string().trim().min(1).max(255),
+        description: z.string().trim().max(4000).optional(),
+        cadence: z.enum(["weekly", "monthly", "quarterly", "annual"]),
+        nextRunAt: z.coerce.date(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createOrganizationMaintenanceSchedule({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    requestApprovals: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive(), status: z.enum(["pending", "approved", "rejected", "cancelled"]).optional() }))
+      .query(({ ctx, input }) => db.listOrganizationRequestApprovals({ ...input, userId: ctx.user.id })),
+    createRequestApproval: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createOrganizationRequestApproval({ requestId: input.requestId, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    decideRequestApproval: protectedProcedure
+      .input(z.object({
+        approvalId: z.number().int().positive(),
+        decision: z.enum(["approved", "rejected", "cancelled"]),
+        note: z.string().trim().max(1000).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.decideOrganizationRequestApproval({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    requestBatches: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        try {
+          return await db.listOrganizationRequestBatches({ organizationId: input.organizationId, userId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    createRequestBatch: protectedProcedure
+      .input(z.object({
+        organizationId: z.number().int().positive(),
+        title: z.string().trim().min(1).max(255),
+        categoryId: z.number().int().positive(),
+        siteId: z.number().int().positive().optional(),
+        description: z.string().trim().max(4000).optional(),
+        requestedForAt: z.coerce.date().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createOrganizationRequestBatch({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    addRequestToBatch: protectedProcedure
+      .input(z.object({ batchId: z.number().int().positive(), requestId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.addOrganizationRequestToBatch({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    submitRequestBatch: protectedProcedure
+      .input(z.object({ batchId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.submitOrganizationRequestBatch({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    invoices: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        try {
+          return await db.listOrganizationInvoices({ organizationId: input.organizationId, userId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    issueInvoice: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive(), requestId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.issueOrganizationInvoiceForRequest({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
         }
       }),
   }),
@@ -1358,6 +1525,7 @@ export const appRouter = router({
   }),
   // Providers
   providers: router({
+    businessCockpit: protectedProcedure.query(({ ctx }) => db.getProviderBusinessCockpit(ctx.user.id)),
     nearby: publicProcedure
       .input(z.object({ lat: z.string().optional(), lng: z.string().optional() }).optional())
       .query(({ input }) => {
@@ -1908,6 +2076,134 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           }),
         );
       }),
+  }),
+  moveTrust: router({
+    passport: protectedProcedure
+      .input(z.object({ providerUserId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        try {
+          return await db.getMoveTrustPassport(input.providerUserId);
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+  }),
+  jobCapsules: router({
+    get: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        try {
+          return await db.getJobCapsule({ requestId: input.requestId, userId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+  }),
+  priceIntelligence: router({
+    guarantee: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        try {
+          return await db.getPriceGuarantee({ requestId: input.requestId, userId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    estimate: protectedProcedure
+      .input(z.object({
+        categoryId: z.number().int().positive(),
+        requestId: z.number().int().positive().optional(),
+        countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/).optional(),
+        currency: z.string().trim().regex(/^[A-Za-z]{3}$/).optional(),
+        locale: z.enum(["tr", "en", "ru"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const assessment = await db.createPriceIntelligenceAssessment({
+            categoryId: input.categoryId,
+            requestId: input.requestId,
+            countryCode: input.countryCode,
+            currency: input.currency,
+            requestedByUserId: ctx.user.id,
+          });
+          const narrative =
+            assessment.status === "available"
+            && typeof assessment.lowAmount === "number"
+            && typeof assessment.medianAmount === "number"
+            && typeof assessment.highAmount === "number"
+              ? await createPriceIntelligenceNarrative({
+                  userId: ctx.user.id,
+                  locale: input.locale,
+                  currency: "TRY",
+                  sampleSize: assessment.sampleSize,
+                  lowAmount: assessment.lowAmount,
+                  medianAmount: assessment.medianAmount,
+                  highAmount: assessment.highAmount,
+                })
+              : { status: "insufficient_data" as const, summary: null };
+          return { ...assessment, narrative };
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+  }),
+  safety: router({
+    trustedContacts: protectedProcedure.query(({ ctx }) => db.listSafetyTrustedContacts(ctx.user.id)),
+    createTrustedContact: protectedProcedure
+      .input(z.object({ name: z.string().trim().min(1).max(120), phone: z.string().trim().min(7).max(32), label: z.string().trim().max(80).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createSafetyTrustedContact({ ...input, userId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    revokeTrustedContact: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.revokeSafetyTrustedContact({ id: input.id, userId: ctx.user.id });
+        } catch (error) {
+          return mapPhaseDError(error);
+        }
+      }),
+    checkIns: router({
+      create: protectedProcedure
+        .input(z.object({ requestId: z.number().int().positive(), dueAt: z.coerce.date() }))
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await db.createSafetyCheckIn({ ...input, userId: ctx.user.id });
+          } catch (error) {
+            return mapPhaseDError(error);
+          }
+        }),
+      acknowledge: protectedProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await db.acknowledgeSafetyCheckIn({ id: input.id, userId: ctx.user.id });
+          } catch (error) {
+            return mapPhaseDError(error);
+          }
+        }),
+    }),
+    incidents: router({
+      listMine: protectedProcedure.query(({ ctx }) => db.listMySafetyIncidents(ctx.user.id)),
+      report: protectedProcedure
+        .input(z.object({
+          requestId: z.number().int().positive().optional(),
+          category: z.enum(["conduct", "identity", "unsafe_condition", "harassment", "other"]),
+          severity: z.enum(["low", "medium", "high", "critical"]),
+          description: z.string().trim().min(10).max(4000),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await db.createSafetyIncident({ ...input, reporterUserId: ctx.user.id });
+          } catch (error) {
+            return mapPhaseDError(error);
+          }
+        }),
+    }),
   }),
   // MoveWallet — user-scoped balance, history and withdrawal workflow
   wallet: router({

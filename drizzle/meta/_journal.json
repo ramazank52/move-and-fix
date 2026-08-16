@@ -288,6 +288,27 @@
       "when": 1786842634665,
       "tag": "0041_mushy_warhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1786843327112,
+      "tag": "0042_flawless_moira_mactaggert",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "5",
+      "when": 1786844119900,
+      "tag": "0043_glossy_elektra",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "5",
+      "when": 1786845505953,
+      "tag": "0044_blue_silver_sable",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TrpcContext } from "../server/_core/context";
 
-vi.mock("../server/db", () => ({ updateProviderAvailability: vi.fn() }));
+vi.mock("../server/db", () => ({ updateProviderAvailability: vi.fn(), getProviderBusinessCockpit: vi.fn() }));
 
 import * as providerDb from "../server/db";
 import { appRouter } from "../server/routers";
@@ -57,5 +57,28 @@ describe("provider availability router security", () => {
     vi.mocked(providerDb.updateProviderAvailability).mockRejectedValue(new Error("PROVIDER_NOT_FOUND"));
     const caller = appRouter.createCaller(createContext(99));
     await expect(caller.providers.updateAvailability({ isAvailable: true })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("derives Business Cockpit ownership from the authenticated provider session", async () => {
+    vi.mocked(providerDb.getProviderBusinessCockpit).mockResolvedValue({
+      availability: true,
+      activeJobs: 2,
+      scheduledJobs: null,
+      completedJobs: 7,
+      cancellationRate: 0,
+      averageRating: 4.8,
+      recentReviewCount: 5,
+      earnings: { totalEarnings: 1200, todayEarnings: 300, pendingPayments: 50, completedJobs: 7 },
+    });
+    const caller = appRouter.createCaller(createContext(77));
+
+    await expect(caller.providers.businessCockpit()).resolves.toMatchObject({ activeJobs: 2, averageRating: 4.8 });
+    expect(providerDb.getProviderBusinessCockpit).toHaveBeenCalledWith(77);
+  });
+
+  it("rejects unauthenticated Business Cockpit access", async () => {
+    const caller = appRouter.createCaller({ ...createContext(), user: null });
+    await expect(caller.providers.businessCockpit()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(providerDb.getProviderBusinessCockpit).not.toHaveBeenCalled();
   });
 });

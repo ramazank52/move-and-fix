@@ -366,6 +366,11 @@
 - [x] Master Phase C — Super Admin rol ayrımı ve MoveOS kritik yetki sınırlarını IDOR regresyonlarıyla güçlendir
 - [x] Master Phase C — Merkezi TR/EN/RU i18n kapsamını, çoklu para birimi fail-closed sözleşmesini ve maskeli iletişim adapterini tamamla
 - [x] Master Phase C — TypeScript, lint, build, migration, authorization ve edge-case kalite kapılarını çalıştırıp checkpoint al
+- [x] Master Phase D — MoveTrust Passport ve Job Capsule için açıklanabilir, sahiplikli veri ve API katmanını uygula
+- [x] Master Phase D — No Surprise Price ve fail-safe AI Price Intelligence katmanını anlaşma/fiyat yaşam döngüsüne bağla
+- [x] Master Phase D — Safety Center ve Provider Business Cockpit yüzeylerini yetki, audit ve hata sınırlarıyla uygula
+- [x] Master Phase D — Corporate Fleet/Facility için çoklu lokasyon, toplu talep ve kurumsal fatura altyapısını ekle
+- [x] Master Phase D — Yetki, idempotency, hata ve edge-case regresyonları ile kalite kapılarını çalıştırıp checkpoint al
 - [x] İstemci dışa aktarımları ve izlenen Git geçmişinde sağlayıcı sırrı/private key bulunmadığını değer göstermeden doğrula
 - [ ] EXTERNAL BLOCKER — Onaylı İngilizce KVKK/GDPR gizlilik politikası metni sağlandığında /privacy-policy TR/EN public rotasında metni değiştirmeden yayınla
 - [ ] EXTERNAL BLOCKER — moveandfix.app için DNS ve HTTPS yayınlaması tamamlandığında app.config.ts içindeki privacyPolicyUrl altında public gizlilik rotasını doğrula
@@ -374,8 +379,8 @@
 - [x] Master Phase A — P0 güvenlik, yetki, oturum, webhook ve secret regresyonlarını çalıştır; PASS olmadan finansal/kimlik özelliklerini değiştirme
 - [x] Master Phase B — Consent ledger, TR/EN privacy, IYS iletişim tercihleri, provider retention, ülke/sağlayıcı regülasyon takibi ve dayanıklı scheduler altyapısını tamamla
 - [x] Master Phase B — Kısmi iade ve payout yaşam döngüsünü gerçek gateway callback’ine idempotent, uzlaştırılabilir ve fail-closed bağla
-- [ ] Master Phase C — Organization/corporate account, RBAC/Super Admin, uluslararasılaştırma, çoklu para birimi ve branding source-of-truth işlerini tamamla
-- [ ] Master Phase D — MoveTrust Passport, Job Capsule, No Surprise Price, AI Price Intelligence, Safety Center ve Provider Business Cockpit güven katmanını uygula
+- [x] Master Phase C — Organization/corporate account, RBAC/Super Admin, uluslararasılaştırma, çoklu para birimi ve branding source-of-truth işlerini tamamla
+- [x] Master Phase D — MoveTrust Passport, Job Capsule, No Surprise Price, AI Price Intelligence, Safety Center ve Provider Business Cockpit güven katmanını uygula
 - [ ] Master Phase D — Corporate Fleet/Facility ve MoveOS Operations Control yüzeylerini ortak API/DB/MFA güvenlik modeliyle tamamla
 - [ ] Master Phase E — SBOM/SCA, gözlemlenebilirlik, dead/legacy code temizliği, OpenAPI, tam regresyon, Android/iOS/web doğrulaması ve mock/fake final taramasını tamamla
 - [ ] Master final — Her faz için gerçek PASS/PARTIAL/BLOCKED raporu, checkpoint ve production-readiness kararını yalnız doğrulanmış bulgularla sun
@@ -389,8 +394,8 @@
 - [x] Master Phase B — Ödeme sağlayıcısı sağlık ve düzenleyici uygunluk durumunu fail-closed ülke/para birimi aktivasyon kapısına bağla
 - [x] Master Phase B — TR/EN gizlilik politikası kataloğunu sürümlü, public ve kayıt onayıyla ilişkilendirilebilir hale getir
 - [x] Master Phase B — Belge sürümü değişiminde yalnız güncel belge kataloğuna dayanan yeniden-onay sorgu ve kayıt akışını uygula
-- [ ] Master Phase C — Organizasyon, corporate account, üyelik ve sahiplikli kurumsal iş erişimi veri/API temelini uygula
-- [ ] Master Phase C — Super Admin/RBAC izin politikasını backend enforcement ve immutable audit olaylarıyla uygula
-- [ ] Master Phase C — Merkezi i18n kapsamını tamamla ve TRY-only modelini çoklu para birimi biçimleme/validasyon temeliyle genişlet
-- [ ] Master Phase C — Maskeli iletişim sağlayıcı adaptörünü NOT_CONFIGURED fail-closed durumda hazırla
-- [ ] Master Phase C — Uygulama branding source-of-truth, bundle/payment kimliği ve template kalıntılarını güvenli biçimde temizle
+- [x] Master Phase C — Organizasyon, corporate account, üyelik ve sahiplikli kurumsal iş erişimi veri/API temelini uygula
+- [x] Master Phase C — Super Admin/RBAC izin politikasını backend enforcement ve immutable audit olaylarıyla uygula
+- [x] Master Phase C — Merkezi i18n kapsamını tamamla ve TRY-only modelini çoklu para birimi biçimleme/validasyon temeliyle genişlet
+- [x] Master Phase C — Maskeli iletişim sağlayıcı adaptörünü NOT_CONFIGURED fail-closed durumda hazırla
+- [x] Master Phase C — Uygulama branding source-of-truth, bundle/payment kimliği ve template kalıntılarını güvenli biçimde temizle

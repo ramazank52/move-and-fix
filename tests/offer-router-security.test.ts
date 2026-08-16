@@ -39,11 +39,23 @@ describe("offer router security", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("derives accept and reject ownership from the authenticated session", async () => {
-    vi.mocked(offerDb.acceptOffer).mockResolvedValue({ success: true, offerId: 91, requestId: 12, agreementId: 71 });
+    vi.mocked(offerDb.acceptOffer).mockResolvedValue({
+      success: true,
+      offerId: 91,
+      requestId: 12,
+      agreementId: 71,
+      priceGuaranteeId: 81,
+    });
     vi.mocked(offerDb.rejectOffer).mockResolvedValue({ success: true, offerId: 92, requestId: 12 });
     const caller = appRouter.createCaller(createContext(73));
 
-    await expect(caller.offers.accept({ offerId: 91 })).resolves.toEqual({ success: true, offerId: 91, requestId: 12, agreementId: 71 });
+    await expect(caller.offers.accept({ offerId: 91 })).resolves.toEqual({
+      success: true,
+      offerId: 91,
+      requestId: 12,
+      agreementId: 71,
+      priceGuaranteeId: 81,
+    });
     await expect(caller.offers.reject({ offerId: 92 })).resolves.toEqual({ success: true, offerId: 92, requestId: 12 });
 
     expect(offerDb.acceptOffer).toHaveBeenCalledWith(91, 73);

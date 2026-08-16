@@ -112,25 +112,6 @@ export default function GeneralSettingsScreen() {
   );
 }
 
-function SettingValueRow({
-  label,
-  value,
-  styles,
-  isLast = false,
-}: {
-  label: string;
-  value: string;
-  styles: ReturnType<typeof createStyles>;
-  isLast?: boolean;
-}) {
-  return (
-    <View style={[styles.row, !isLast && styles.divider]}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  );
-}
-
 function LinkRow({
   label,
   value,

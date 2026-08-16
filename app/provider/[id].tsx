@@ -39,6 +39,10 @@ export default function ProviderDetailScreen() {
     { providerId, limit: 10, offset: 0 },
     { enabled: validProviderId }
   );
+  const passportQuery = trpc.moveTrust.passport.useQuery(
+    { providerUserId: providerQuery.data?.providerUserId ?? 0 },
+    { enabled: validProviderId && Boolean(providerQuery.data?.providerUserId) },
+  );
   const favoriteQuery = trpc.providers.favoriteStatus.useQuery(
     { providerId },
     { enabled: validProviderId && Boolean(providerQuery.data) }
@@ -214,6 +218,36 @@ export default function ProviderDetailScreen() {
               <Text style={{ fontSize: 20, fontWeight: "800", color: colors.foreground }}>{provider.moveScore ?? 0}</Text>
               <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>MoveScore</Text>
             </View>
+          </View>
+        </View>
+
+        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>MoveTrust Passport</Text>
+          <View style={{ borderRadius: 18, padding: 16, borderWidth: 0.5, borderColor: passportQuery.data?.verification.isVerified ? `${colors.success}55` : colors.border, backgroundColor: passportQuery.data?.verification.isVerified ? `${colors.success}0C` : colors.card }}>
+            {passportQuery.isLoading ? (
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={{ marginLeft: 9, color: colors.muted, fontSize: 13 }}>Güven özeti yükleniyor…</Text>
+              </View>
+            ) : passportQuery.isError || !passportQuery.data ? (
+              <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 19 }}>Güven özeti şu anda görüntülenemiyor. İşlem bilgileri için profil ve değerlendirmeleri inceleyebilirsiniz.</Text>
+            ) : (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <IconSymbol name={passportQuery.data.verification.isVerified ? "checkmark.seal.fill" : "exclamationmark.shield.fill"} size={20} color={passportQuery.data.verification.isVerified ? colors.success : colors.warning} />
+                  <Text style={{ marginLeft: 8, flex: 1, color: colors.foreground, fontSize: 14, fontWeight: "800" }}>
+                    {passportQuery.data.verification.isVerified ? "Kimlik ve belge doğrulaması tamamlandı" : "Doğrulama süreci tamamlanmadı"}
+                  </Text>
+                  <Text style={{ color: colors.primary, fontSize: 15, fontWeight: "900" }}>{passportQuery.data.trust.score}/100</Text>
+                </View>
+                <Text style={{ marginTop: 9, color: colors.muted, fontSize: 12, lineHeight: 18 }}>
+                  {passportQuery.data.provider.completedJobs} tamamlanan iş · {passportQuery.data.provider.reviewCount ?? 0} değerlendirme · {passportQuery.data.trust.activeComplaintCount === 0 ? "Açık şikâyet yok" : `${passportQuery.data.trust.activeComplaintCount} açık inceleme`}
+                </Text>
+                {passportQuery.data.verification.documentStatus.length > 0 ? (
+                  <Text style={{ marginTop: 5, color: colors.muted, fontSize: 11 }}>Belge durumu: {passportQuery.data.verification.documentStatus.map((item) => `${item.type} (${item.status})`).join(" · ")}</Text>
+                ) : null}
+              </>
+            )}
           </View>
         </View>
 

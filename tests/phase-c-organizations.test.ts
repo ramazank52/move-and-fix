@@ -18,6 +18,12 @@ vi.mock("../server/db", () => ({
   getServiceRequestMedia: vi.fn(),
   getActiveServiceCategories: vi.fn(),
   createServiceRequest: vi.fn(),
+  listOrganizationRequestBatches: vi.fn(),
+  createOrganizationRequestBatch: vi.fn(),
+  addOrganizationRequestToBatch: vi.fn(),
+  submitOrganizationRequestBatch: vi.fn(),
+  listOrganizationInvoices: vi.fn(),
+  issueOrganizationInvoiceForRequest: vi.fn(),
 }));
 
 import * as organizationDb from "../server/db";
@@ -124,5 +130,36 @@ describe("Phase C organization router", () => {
     await expect(caller.requests.create({ categoryId: 1, title: "Kısa", organizationId: 0 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(organizationDb.listOrganizationMembers).not.toHaveBeenCalled();
     expect(organizationDb.createServiceRequest).not.toHaveBeenCalled();
+  });
+
+  it("derives batch and invoice authority exclusively from the authenticated organization member", async () => {
+    vi.mocked(organizationDb.createOrganizationRequestBatch).mockResolvedValue({ id: 801, status: "draft" });
+    vi.mocked(organizationDb.issueOrganizationInvoiceForRequest).mockResolvedValue({ id: 901, invoiceNumber: "MF-24-18-7", status: "issued" });
+    const caller = appRouter.createCaller(createContext(61));
+
+    await expect(caller.organizations.createRequestBatch({
+      organizationId: 24,
+      title: "Bölgesel bakım turu",
+      categoryId: 7,
+    })).resolves.toEqual({ id: 801, status: "draft" });
+    await expect(caller.organizations.issueInvoice({ organizationId: 24, requestId: 18 }))
+      .resolves.toEqual({ id: 901, invoiceNumber: "MF-24-18-7", status: "issued" });
+
+    expect(organizationDb.createOrganizationRequestBatch).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 24, actorUserId: 61 }));
+    expect(organizationDb.issueOrganizationInvoiceForRequest).toHaveBeenCalledWith({ organizationId: 24, requestId: 18, actorUserId: 61 });
+  });
+
+  it("rejects malformed batch or invoice identifiers before helper invocation", async () => {
+    const caller = appRouter.createCaller(createContext(61));
+    await expect(caller.organizations.addRequestToBatch({ batchId: 0, requestId: 1 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.organizations.issueInvoice({ organizationId: 24, requestId: 0 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(organizationDb.addOrganizationRequestToBatch).not.toHaveBeenCalled();
+    expect(organizationDb.issueOrganizationInvoiceForRequest).not.toHaveBeenCalled();
+  });
+
+  it("keeps invoice issuance fail-closed when no settled payment supports the request", async () => {
+    vi.mocked(organizationDb.issueOrganizationInvoiceForRequest).mockRejectedValue(new Error("ORGANIZATION_INVOICE_PAYMENT_NOT_SETTLED"));
+    await expect(appRouter.createCaller(createContext(61)).organizations.issueInvoice({ organizationId: 24, requestId: 18 }))
+      .rejects.toThrow("ORGANIZATION_INVOICE_PAYMENT_NOT_SETTLED");
   });
 });
