@@ -52,6 +52,7 @@ import {
   reviewInsuranceClaim,
   listSupportTicketsForReview,
   reviewSupportTicket,
+  listMoveOsReviewQueue,
 } from "../db";
 import {
   createCountryCompliancePackage,
@@ -339,6 +340,13 @@ export const ownerRouter = router({
         throw new TRPCError({ code: message === "INSURANCE_CLAIM_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
       }
     }),
+
+  operationalReviewQueue: superAdminMfaProcedure
+    .input(z.object({
+      limit: z.number().int().min(1).max(100).default(50),
+      sources: z.array(z.enum(["support", "insurance_claim"])).max(2).optional(),
+    }).default({ limit: 50 }))
+    .query(({ input }) => listMoveOsReviewQueue(input)),
 
   createTurkeyVatRule: superAdminMfaProcedure
     .input(z.object({

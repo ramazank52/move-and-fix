@@ -23,13 +23,14 @@ export default function AdminDashboardScreen() {
   const router = useRouter();
   const dashboardQuery = trpc.owner.dashboard.useQuery(undefined, { staleTime: 30_000 });
   const categoriesQuery = trpc.owner.categories.useQuery(undefined, { staleTime: 60_000 });
+  const reviewQueueQuery = trpc.owner.operationalReviewQueue.useQuery({ limit: 12 }, { staleTime: 20_000, retry: false });
   const dashboard = dashboardQuery.data;
   const categories = categoriesQuery.data ?? [];
   const isRefreshing = dashboardQuery.isRefetching || categoriesQuery.isRefetching;
   const error = dashboardQuery.error ?? categoriesQuery.error;
 
   const refresh = () => {
-    void Promise.all([dashboardQuery.refetch(), categoriesQuery.refetch()]);
+    void Promise.all([dashboardQuery.refetch(), categoriesQuery.refetch(), reviewQueueQuery.refetch()]);
   };
 
   const stats = dashboard
@@ -160,6 +161,40 @@ export default function AdminDashboardScreen() {
                 dashboard.risks.map((risk) => <Text key={risk} style={{ color: colors.warning, lineHeight: 20 }}>• {risk}</Text>)
               ) : (
                 <Text style={{ color: colors.muted }}>Bu özet için kaydedilmiş açık risk sinyali yok.</Text>
+              )}
+            </View>
+
+            <View style={{ marginTop: 20, backgroundColor: colors.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>Operasyon Vaka Kuyruğu</Text>
+              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17, marginBottom: 12 }}>
+                Destek ve claim kayıtlarının veri-minimize inceleme özeti. Ayrıntılar ilgili korumalı işlem ekranında açılır.
+              </Text>
+              {reviewQueueQuery.isLoading ? (
+                <View style={{ paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={{ color: colors.muted }}>Kuyruk yükleniyor…</Text>
+                </View>
+              ) : reviewQueueQuery.error ? (
+                <Text style={{ color: colors.muted, lineHeight: 19 }}>
+                  Operasyon vaka kuyruğu bu oturum için kullanılamıyor. Bu yüzey Super Admin ve MFA doğrulaması gerektirir.
+                </Text>
+              ) : reviewQueueQuery.data?.length ? (
+                reviewQueueQuery.data.map((item, index) => (
+                  <View
+                    key={`${item.source}-${item.caseId}`}
+                    style={{ borderTopWidth: index === 0 ? 0 : 0.5, borderTopColor: colors.border, paddingTop: index === 0 ? 0 : 11, marginTop: index === 0 ? 0 : 11 }}
+                  >
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+                      <Text style={{ color: colors.foreground, fontWeight: "600", flex: 1 }}>
+                        {item.source === "insurance_claim" ? "Sigorta / Claim" : "Destek"} #{item.caseId}
+                      </Text>
+                      <Text style={{ color: item.requiresSuperAdmin ? colors.warning : colors.primary, fontSize: 12, fontWeight: "700" }}>{item.status.toUpperCase()}</Text>
+                    </View>
+                    <Text style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>İş dosyası #{item.requestId}{item.priority ? ` · ${item.priority}` : ""}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={{ color: colors.muted }}>İnceleme bekleyen veri-minimize vaka özeti bulunmuyor.</Text>
               )}
             </View>
           </>

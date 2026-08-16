@@ -36,6 +36,7 @@ const db = vi.hoisted(() => ({
   listPrivacyLegalHolds: vi.fn(),
   createPrivacyLegalHold: vi.fn(),
   releasePrivacyLegalHold: vi.fn(),
+  listMoveOsReviewQueue: vi.fn(),
 }));
 
 vi.mock("../server/db", () => db);
@@ -191,6 +192,28 @@ describe("MoveOS ortak API sözleşmesi", () => {
 
     await expect(adminCaller().operationsControl({ eventLimit: 12, caseLimit: 8 })).resolves.toEqual(snapshot);
     expect(db.getOperationsControlSnapshot).toHaveBeenCalledWith({ eventLimit: 12, caseLimit: 8 });
+  });
+
+  it("birleşik operasyon vaka kuyruğunu Super Admin + MFA olmadan fail-closed reddeder", async () => {
+    await expect(adminCaller().operationalReviewQueue()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.listMoveOsReviewQueue).not.toHaveBeenCalled();
+  });
+
+  it("birleşik operasyon vaka kuyruğunu yalnız doğrulanmış Super Admin için veri-minimize filtrelerle üretir", async () => {
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+    const queue = [{ source: "insurance_claim", caseId: 12, requestId: 44, status: "under_review", priority: null, requiresSuperAdmin: true }];
+    db.listMoveOsReviewQueue.mockResolvedValue(queue);
+
+    await expect(adminCaller().operationalReviewQueue({ limit: 20, sources: ["insurance_claim"] })).resolves.toEqual(queue);
+    expect(db.listMoveOsReviewQueue).toHaveBeenCalledWith({ limit: 20, sources: ["insurance_claim"] });
+  });
+
+  it("birleşik operasyon vaka kuyruğu geçersiz limit veya bilinmeyen kaynakta veri katmanına erişmez", async () => {
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+
+    await expect(adminCaller().operationalReviewQueue({ limit: 0 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(adminCaller().operationalReviewQueue({ limit: 10, sources: ["other"] as never })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(db.listMoveOsReviewQueue).not.toHaveBeenCalled();
   });
 
   it("Operations Control için sıfır, kesirli veya üst sınırı aşan vaka limitlerini veri katmanına erişmeden reddeder", async () => {

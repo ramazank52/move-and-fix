@@ -8010,6 +8010,12 @@ export async function reviewSupportTicket(input: {
       metadataJson: JSON.stringify({ status: input.status }),
     });
   });
+  await logOperationEvent({
+    eventType: "support_ticket_reviewed",
+    subjectId: ticket.id,
+    actorId: input.reviewerUserId,
+    payload: { status: input.status, hasResolutionNote: Boolean(note) },
+  });
   return { id: ticket.id, status: input.status };
 }
 
@@ -8079,9 +8085,45 @@ export async function reviewInsuranceClaim(input: { claimId: number; reviewerUse
   const claim = (await database.select().from(insuranceClaims).where(eq(insuranceClaims.id, input.claimId)).limit(1))[0];
   if (!claim) throw new Error("INSURANCE_CLAIM_NOT_FOUND");
   if (claim.status === "accepted" || claim.status === "rejected" || claim.status === "withdrawn") throw new Error("INSURANCE_CLAIM_FINALIZED");
-  await database.update(insuranceClaims).set({ status: input.status, reviewedByUserId: input.reviewerUserId, decisionNote: note, decidedAt: input.status === "accepted" || input.status === "rejected" ? new Date() : null }).where(eq(insuranceClaims.id, input.claimId));
+  await database.update(insuranceClaims).set({ status: input.status, reviewedByUserId: input.reviewerUserId, decisionNote: note, decidedAt: input.status === "accepted" || input.status === "rejected" ? new Date() : null }).where(eq(insuranceClaims.id, claim.id));
   await recordJobTimelineEvent({ requestId: claim.requestId, eventType: "insurance_claim_reviewed", actorUserId: input.reviewerUserId, referenceType: "insurance_claim", referenceId: claim.id, metadata: { status: input.status, hasDecisionNote: Boolean(note) } });
+  await logOperationEvent({
+    eventType: "insurance_claim_reviewed",
+    subjectId: claim.id,
+    actorId: input.reviewerUserId,
+    payload: { requestId: claim.requestId, status: input.status, hasDecisionNote: Boolean(note) },
+    severity: input.status === "rejected" ? "warning" : "info",
+  });
   return { id: claim.id, status: input.status };
+}
+
+export type MoveOsReviewQueueSource = "support" | "insurance_claim";
+
+/**
+ * MoveOS için yalnız operasyonel karar vermeye yetecek metadata’yı döndürür.
+ * Açıklama, çözüm notu, kullanıcı bilgisi ve kanıt URL’leri bu listeye özellikle
+ * dahil edilmez; ayrıntı ekranı ilgili ayrı yetki sınırında kalır.
+ */
+export async function listMoveOsReviewQueue(input: {
+  limit?: number;
+  sources?: MoveOsReviewQueueSource[];
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const sourceSet = new Set(input.sources?.length ? input.sources : ["support", "insurance_claim"]);
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
+  const [tickets, claims] = await Promise.all([
+    sourceSet.has("support")
+      ? database.select({ id: supportTickets.id, requestId: supportTickets.requestId, status: supportTickets.status, priority: supportTickets.priority, createdAt: supportTickets.createdAt, updatedAt: supportTickets.updatedAt }).from(supportTickets).orderBy(desc(supportTickets.updatedAt)).limit(limit)
+      : Promise.resolve([]),
+    sourceSet.has("insurance_claim")
+      ? database.select({ id: insuranceClaims.id, requestId: insuranceClaims.requestId, status: insuranceClaims.status, createdAt: insuranceClaims.createdAt, updatedAt: insuranceClaims.updatedAt }).from(insuranceClaims).orderBy(desc(insuranceClaims.updatedAt)).limit(limit)
+      : Promise.resolve([]),
+  ]);
+  return [
+    ...tickets.map((ticket) => ({ source: "support" as const, caseId: ticket.id, requestId: ticket.requestId, status: ticket.status, priority: ticket.priority, requiresSuperAdmin: false, createdAt: ticket.createdAt, updatedAt: ticket.updatedAt })),
+    ...claims.map((claim) => ({ source: "insurance_claim" as const, caseId: claim.id, requestId: claim.requestId, status: claim.status, priority: null, requiresSuperAdmin: true, createdAt: claim.createdAt, updatedAt: claim.updatedAt })),
+  ].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()).slice(0, limit);
 }
 
 export async function createTaxRule(input: {
