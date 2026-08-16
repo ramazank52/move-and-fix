@@ -193,6 +193,61 @@ describe("payment webhook processor", () => {
     });
   });
 
+  it("Stripe kısmi refund callback’ini yalnız ana ödeme referansı ve TRY ana birim tutarıyla settlement akışına iletir", async () => {
+    dbMocks.transitionPaymentFromVerifiedWebhook.mockResolvedValue({
+      duplicated: false,
+      payment: { ...payment, status: "released" },
+    });
+    const payload = JSON.stringify({
+      id: "evt_refund_1",
+      type: "refund.succeeded",
+      data: {
+        object: {
+          id: "re_123",
+          payment_intent: "pi_123",
+          amount: 5_000,
+          currency: "try",
+          metadata: {},
+        },
+      },
+    });
+
+    await processVerifiedPaymentWebhook("stripe", payload);
+
+    expect(dbMocks.resolvePaymentForGatewayWebhook).toHaveBeenCalledWith({
+      provider: "stripe",
+      gatewayPaymentId: "pi_123",
+      internalPaymentId: undefined,
+    });
+    expect(dbMocks.transitionPaymentFromVerifiedWebhook).toHaveBeenCalledWith({
+      paymentId: 42,
+      nextStatus: "refunded",
+      partialRefund: { refundAmount: 50, gatewayReference: "stripe:evt_refund_1" },
+    });
+  });
+
+  it("kısmi refund callback’i orijinal tahsilatı aşarsa fail-closed reddeder", async () => {
+    const payload = JSON.stringify({
+      id: "evt_refund_oversize",
+      type: "refund.succeeded",
+      data: {
+        object: {
+          id: "re_oversize",
+          payment_intent: "pi_123",
+          amount: 12_501,
+          currency: "try",
+          metadata: {},
+        },
+      },
+    });
+
+    await expect(processVerifiedPaymentWebhook("stripe", payload)).rejects.toMatchObject({
+      code: "PAYMENT_MISMATCH",
+      httpStatus: 409,
+    });
+    expect(dbMocks.transitionPaymentFromVerifiedWebhook).not.toHaveBeenCalled();
+  });
+
   it("durum değiştirmeyen sağlayıcı eventlerini güvenle processed olarak işaretler", async () => {
     const parsed = JSON.parse(stripePayload()) as { type: string };
     parsed.type = "payment_intent.processing";

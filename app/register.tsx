@@ -39,8 +39,8 @@ export default function RegisterScreen() {
     setStep("consent");
   };
 
-  const handleConsentAccepted = async () => {
-    localRegister.mutate({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, password, accountType: role, nativeSession: Platform.OS !== "web" });
+  const handleConsentAccepted = async (acceptedConsentKeys: string[]) => {
+    localRegister.mutate({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, password, accountType: role, nativeSession: Platform.OS !== "web", acceptedConsentKeys: acceptedConsentKeys as ("terms" | "privacy" | "kvkk" | "cookies" | "mediation" | "electronic")[] });
   };
 
   return (

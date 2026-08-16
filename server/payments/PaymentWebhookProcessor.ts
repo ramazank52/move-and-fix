@@ -10,6 +10,7 @@ type NormalizedPaymentEvent = {
   gatewayPaymentId: string;
   internalPaymentId?: number;
   amountMinor?: number;
+  refundAmountMinor?: number;
   currency?: string;
   nextStatus?: "held" | "refunded";
 };
@@ -73,22 +74,29 @@ function parseStripeEvent(parsed: Record<string, unknown>): NormalizedPaymentEve
 
   const eventType = requiredString(parsed, "type");
   const metadata = asRecord(object.metadata) ?? {};
+  const isRefundEvent = eventType === "charge.refunded" || eventType === "refund.succeeded";
+  const paymentIntentReference = typeof object.payment_intent === "string" ? object.payment_intent : undefined;
   const nextStatus =
     eventType === "payment_intent.succeeded"
       ? "held"
       : eventType === "payment_intent.payment_failed" || eventType === "payment_intent.canceled"
         ? "refunded"
+        : isRefundEvent
+          ? "refunded"
         : undefined;
 
   return {
     eventId: requiredString(parsed, "id"),
     eventType,
-    gatewayPaymentId: requiredString(object, "id"),
+    gatewayPaymentId: paymentIntentReference ?? requiredString(object, "id"),
     internalPaymentId: parseInternalPaymentId(metadata.internalPaymentId),
     amountMinor: parseAmountMinor(
       object.amount_received ?? object.amount ?? object.amount_capturable,
       true,
     ),
+    refundAmountMinor: isRefundEvent
+      ? parseAmountMinor(object.amount_refunded ?? object.amount, true)
+      : undefined,
     currency: typeof object.currency === "string" ? object.currency.toUpperCase() : undefined,
     nextStatus,
   };
@@ -144,7 +152,11 @@ function assertPaymentMatchesEvent(
     );
   }
   const expectedAmountMinor = Math.round(Number(payment.amount) * 100);
-  if (event.amountMinor !== expectedAmountMinor || event.currency !== "TRY") {
+  const reportedAmountMinor = event.refundAmountMinor ?? event.amountMinor;
+  const amountMatches = event.refundAmountMinor != null
+    ? reportedAmountMinor > 0 && reportedAmountMinor <= expectedAmountMinor
+    : reportedAmountMinor === expectedAmountMinor;
+  if (!amountMatches || event.currency !== "TRY") {
     throw new PaymentWebhookProcessingError(
       "PAYMENT_MISMATCH",
       "Ödeme webhook tutarı veya para birimi eşleşmiyor",
@@ -205,9 +217,22 @@ export async function processVerifiedPaymentWebhook(
       internalPaymentId: event.internalPaymentId,
     });
     assertPaymentMatchesEvent(payment, event);
+    const partialRefund = event.refundAmountMinor != null && event.refundAmountMinor < Math.round(Number(payment.amount) * 100)
+      ? event.refundAmountMinor
+      : undefined;
+    if (partialRefund != null && partialRefund % 100 !== 0) {
+      throw new PaymentWebhookProcessingError(
+        "PAYMENT_MISMATCH",
+        "Kısmi iade tutarı TRY ana birim sözleşmesiyle eşleşmiyor",
+        409,
+      );
+    }
     const transition = await db.transitionPaymentFromVerifiedWebhook({
       paymentId: payment.id,
       nextStatus: event.nextStatus,
+      ...(partialRefund != null
+        ? { partialRefund: { refundAmount: partialRefund / 100, gatewayReference: `${provider}:${event.eventId}` } }
+        : {}),
     });
     await db.completePaymentWebhookEvent({ provider, eventId: event.eventId, status: "processed" });
 

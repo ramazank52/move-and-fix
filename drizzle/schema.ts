@@ -28,6 +28,26 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+// Append-only consent evidence. A withdrawal is a new event; previously granted
+// evidence is intentionally never overwritten or deleted.
+export const consentEvents = mysqlTable(
+  "consent_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    consentKey: varchar("consentKey", { length: 96 }).notNull(),
+    documentVersion: varchar("documentVersion", { length: 64 }).notNull(),
+    purpose: mysqlEnum("purpose", ["legal", "marketing", "transactional"]).notNull(),
+    action: mysqlEnum("action", ["granted", "withdrawn"]).notNull(),
+    source: varchar("source", { length: 80 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("consent_events_user_key_created_idx").on(table.userId, table.consentKey, table.createdAt),
+    index("consent_events_purpose_action_idx").on(table.purpose, table.action, table.createdAt),
+  ],
+);
+
 // Service categories
 export const serviceCategories = mysqlTable("service_categories", {
   id: int("id").autoincrement().primaryKey(),
@@ -220,6 +240,7 @@ export const providerDocuments = mysqlTable(
     uniqueIndex("provider_documents_provider_type_unique").on(table.providerId, table.type),
     index("provider_documents_status_idx").on(table.status, table.createdAt),
     index("provider_documents_owner_idx").on(table.ownerUserId),
+    index("provider_documents_retention_idx").on(table.retentionDueAt, table.contentPurgedAt, table.purgeStatus),
   ],
 );
 
@@ -778,6 +799,33 @@ export const payments = mysqlTable("payments", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+// Country and currency scoped readiness is separate from credential presence.
+// Missing, stale, or suspended records must block new checkout initialization.
+export const paymentProviderWatch = mysqlTable(
+  "payment_provider_watch",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    provider: mysqlEnum("provider", ["iyzico", "stripe"]).notNull(),
+    countryCode: varchar("countryCode", { length: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    status: mysqlEnum("status", ["not_configured", "regulatory_review", "operational", "suspended"])
+      .default("not_configured")
+      .notNull(),
+    configVersion: varchar("configVersion", { length: 64 }).notNull(),
+    healthCheckedAt: timestamp("healthCheckedAt"),
+    regulatoryReviewedAt: timestamp("regulatoryReviewedAt"),
+    nextReviewAt: timestamp("nextReviewAt"),
+    blockingReason: text("blockingReason"),
+    reviewedByUserId: int("reviewedByUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("payment_provider_watch_scope_unique").on(table.provider, table.countryCode, table.currency),
+    index("payment_provider_watch_status_idx").on(table.status, table.nextReviewAt),
+  ],
+);
 
 // Immutable commercial snapshot captured when an offer is accepted. Financial
 // policy changes apply prospectively; historical agreements keep their terms.

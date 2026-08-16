@@ -368,8 +368,8 @@
 - [x] Salt-okunur denetim dışa aktarımı: tam kaynak kod ZIP’ini .env, sır, token, credential ve çalışma çıktıları hariç oluşturup içerik taramasıyla doğrula
 - [x] Master Phase A — CORS allowlist, CSRF kapsamı, env doğrulaması, legacy Wallet/AI kaynakları, Stripe tutarlılığı ve oturum iptalini P0 güvenlik sınırında denetle/düzelt
 - [x] Master Phase A — P0 güvenlik, yetki, oturum, webhook ve secret regresyonlarını çalıştır; PASS olmadan finansal/kimlik özelliklerini değiştirme
-- [ ] Master Phase B — Consent ledger, TR/EN privacy, IYS iletişim tercihleri, provider retention, ülke/sağlayıcı regülasyon takibi ve dayanıklı scheduler altyapısını tamamla
-- [ ] Master Phase B — Kısmi iade ve payout yaşam döngüsünü gerçek gateway callback’ine idempotent, uzlaştırılabilir ve fail-closed bağla
+- [x] Master Phase B — Consent ledger, TR/EN privacy, IYS iletişim tercihleri, provider retention, ülke/sağlayıcı regülasyon takibi ve dayanıklı scheduler altyapısını tamamla
+- [x] Master Phase B — Kısmi iade ve payout yaşam döngüsünü gerçek gateway callback’ine idempotent, uzlaştırılabilir ve fail-closed bağla
 - [ ] Master Phase C — Organization/corporate account, RBAC/Super Admin, uluslararasılaştırma, çoklu para birimi ve branding source-of-truth işlerini tamamla
 - [ ] Master Phase D — MoveTrust Passport, Job Capsule, No Surprise Price, AI Price Intelligence, Safety Center ve Provider Business Cockpit güven katmanını uygula
 - [ ] Master Phase D — Corporate Fleet/Facility ve MoveOS Operations Control yüzeylerini ortak API/DB/MFA güvenlik modeliyle tamamla
@@ -377,3 +377,11 @@
 - [ ] Master final — Her faz için gerçek PASS/PARTIAL/BLOCKED raporu, checkpoint ve production-readiness kararını yalnız doğrulanmış bulgularla sun
 - [x] Master Phase A P0 — CORS allowlist’i fail-closed uygula; cookie tabanlı tRPC ve MoveOS mutasyonlarında CSRF’yi gerçek oturum bağlamıyla zorunlu kıl
 - [x] Master Phase A P0 — ENCRYPTION_KEY üretimde zorunlu, legacy REST logout oturum iptalli, token rotasyonu ve Stripe/Wallet kaynakları denetlenmiş hale getir
+- [x] Master Phase B — Rol/ülke/belge sürümüne bağlı immutable yasal onay defteri ve yeniden-onay akışını uygula
+- [x] Master Phase B — TR/EN gizlilik politikası durumu, marketing/transactional ayrımı ve İYS-uyumlu opt-in/out defterini uygula
+- [x] Master Phase B — Sağlayıcı belge retention silme yaşam döngüsü, ödeme sağlayıcısı health/regülasyon kapısı ve idempotent callback zamanlamasını uygula
+- [x] Master Phase B — Kısmi iade, kalan sağlayıcı ödemesi, anlaşmazlık kilidi ve uzlaştırma mismatch akışını gerçek ledger state machine ile tamamla
+- [ ] Master Phase B–E — Yeni gerçek secret veya credential istemeden dış bağımlı yüzeyleri NOT_CONFIGURED / EXTERNAL_CONFIGURATION_REQUIRED fail-closed durumda tut; finalde tek pending listede topla
+- [x] Master Phase B — Ödeme sağlayıcısı sağlık ve düzenleyici uygunluk durumunu fail-closed ülke/para birimi aktivasyon kapısına bağla
+- [x] Master Phase B — TR/EN gizlilik politikası kataloğunu sürümlü, public ve kayıt onayıyla ilişkilendirilebilir hale getir
+- [x] Master Phase B — Belge sürümü değişiminde yalnız güncel belge kataloğuna dayanan yeniden-onay sorgu ve kayıt akışını uygula

@@ -213,6 +213,54 @@ async function startServer() {
     }
   });
 
+  // Retention uses a logical-first purge. Content is hidden before an external
+  // storage eraser is asked to remove bytes, and no physical erase is claimed
+  // without a confirmed storage-provider acknowledgement.
+  app.post("/api/scheduled/document-retention", async (req, res) => {
+    const configuredSecret = ENV.documentRetentionSecret;
+    const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
+    const actualAuthorization = String(req.headers.authorization ?? "");
+    const callbackToken = String(req.body?.token ?? "");
+    const hasBearerMatch =
+      expectedAuthorization.length > 0 &&
+      actualAuthorization.length === expectedAuthorization.length &&
+      timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
+    const hasPayloadMatch =
+      configuredSecret.length > 0 &&
+      callbackToken.length === configuredSecret.length &&
+      timingSafeEqual(Buffer.from(callbackToken), Buffer.from(configuredSecret));
+    if (!hasBearerMatch && !hasPayloadMatch) {
+      res.status(configuredSecret ? 401 : 503).json({
+        error: configuredSecret ? "Unauthorized scheduled callback" : "Document retention is not configured",
+      });
+      return;
+    }
+
+    const requestedLimit = Number(req.body?.limit ?? 100);
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 500) {
+      res.status(400).json({ error: "limit must be an integer between 1 and 500" });
+      return;
+    }
+
+    try {
+      const dueDocuments = await db.listDueProviderDocumentRetention(new Date(), requestedLimit);
+      let logicallyPurged = 0;
+      for (const document of dueDocuments) {
+        if (await db.logicalPurgeProviderDocument({ id: document.id })) logicallyPurged += 1;
+      }
+      console.info("[document-retention] processed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        dueDocuments: dueDocuments.length,
+        logicallyPurged,
+        storageErasePending: logicallyPurged,
+      });
+      res.status(200).json({ dueDocuments: dueDocuments.length, logicallyPurged, storageErasePending: logicallyPurged });
+    } catch (error) {
+      console.error("[document-retention] failed", { requestId: req.header("x-request-id") ?? "unknown", error });
+      res.status(500).json({ error: "Document retention processing failed" });
+    }
+  });
+
   // A due credential is never treated as implicitly verified. This callback
   // removes only the credential-linked capability scopes until a reviewer
   // records a new decision; it never auto-enables capability access.

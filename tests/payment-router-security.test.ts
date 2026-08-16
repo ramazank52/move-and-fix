@@ -4,6 +4,8 @@ import type { TrpcContext } from "../server/_core/context";
 vi.mock("../server/db", () => ({
   getPaymentQuote: vi.fn(),
   createPayment: vi.fn(),
+  assertPaymentProviderOperational: vi.fn(),
+  reservePaymentGateway: vi.fn(),
   approveCompletionProofForPayment: vi.fn(),
   transitionPaymentStatus: vi.fn(),
 }));
@@ -166,5 +168,20 @@ describe("payments router security", () => {
       provider: "iyzico",
       buyer: {},
     })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("fails closed before reserving a checkout when the provider scope is not operational", async () => {
+    vi.mocked(paymentDb.assertPaymentProviderOperational).mockRejectedValue(
+      new Error("PAYMENT_PROVIDER_NOT_CONFIGURED"),
+    );
+    const caller = appRouter.createCaller(createContext("user", 41));
+
+    await expect(caller.payments.initializeGateway({
+      paymentId: 71,
+      provider: "stripe",
+      buyer: {},
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+
+    expect(paymentDb.reservePaymentGateway).not.toHaveBeenCalled();
   });
 });

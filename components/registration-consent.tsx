@@ -5,7 +5,7 @@ import { useColors } from "@/hooks/use-colors";
 import { REGISTRATION_CONSENTS } from "@/lib/data/legal";
 
 interface RegistrationConsentProps {
-  onAllAccepted: () => void;
+  onAllAccepted: (acceptedConsentKeys: string[]) => void;
 }
 
 export function RegistrationConsent({ onAllAccepted }: RegistrationConsentProps) {
@@ -84,7 +84,7 @@ export function RegistrationConsent({ onAllAccepted }: RegistrationConsentProps)
       ))}
 
       <Pressable
-        onPress={allAccepted ? onAllAccepted : undefined}
+        onPress={allAccepted ? () => onAllAccepted(Object.entries(consents).filter(([, accepted]) => accepted).map(([id]) => id)) : undefined}
         disabled={!allAccepted}
         style={({ pressed }) => [
           {

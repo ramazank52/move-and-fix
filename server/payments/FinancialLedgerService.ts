@@ -245,4 +245,82 @@ export function buildRefundLedgerEntry(payment: EscrowPayment): LedgerEntryInput
   };
 }
 
+/**
+ * A verified gateway refund may settle only a portion of the held escrow.
+ * The refund and the remaining provider settlement are deliberately separate
+ * journal entries: each is balanced and independently idempotent.
+ */
+export function buildCancellationPartialRefundLedgerEntry(
+  payment: EscrowPayment,
+  input: { refundAmount: number; gatewayReference: string },
+): LedgerEntryInput {
+  if (!Number.isSafeInteger(input.refundAmount) || input.refundAmount <= 0 || input.refundAmount >= payment.amount) {
+    throw new Error("FINANCIAL_LEDGER_PARTIAL_REFUND_AMOUNT_INVALID");
+  }
+  return {
+    eventType: "partial_refund",
+    paymentId: payment.id,
+    requestId: payment.requestId,
+    referenceType: "cancellation_refund",
+    referenceId: input.gatewayReference,
+    externalReference: input.gatewayReference,
+    idempotencyKey: `ledger:payment:${payment.id}:partial-refund:${input.gatewayReference}`,
+    metadata: { state: "partial_refund", currency: FINANCIAL_CURRENCY, refundAmount: input.refundAmount },
+    lines: [
+      { accountCode: ACCOUNT.escrow(payment.id), accountType: "liability", direction: "debit", amount: input.refundAmount },
+      { accountCode: ACCOUNT.gatewayClearing, accountType: "asset", direction: "credit", amount: input.refundAmount },
+    ],
+  };
+}
+
+export function buildCancellationProviderSettlementLedgerEntry(
+  payment: EscrowPayment,
+  input: { providerGrossAmount: number; commissionAmount: number; providerPayoutAmount: number; gatewayReference: string },
+): LedgerEntryInput {
+  const { providerGrossAmount, commissionAmount, providerPayoutAmount } = input;
+  if (
+    !Number.isSafeInteger(providerGrossAmount) ||
+    !Number.isSafeInteger(commissionAmount) ||
+    !Number.isSafeInteger(providerPayoutAmount) ||
+    providerGrossAmount <= 0 ||
+    commissionAmount < 0 ||
+    providerPayoutAmount < 0 ||
+    commissionAmount + providerPayoutAmount !== providerGrossAmount
+  ) {
+    throw new Error("FINANCIAL_LEDGER_CANCELLATION_SETTLEMENT_INVALID");
+  }
+  const lines: LedgerLineInput[] = [
+    { accountCode: ACCOUNT.escrow(payment.id), accountType: "liability", direction: "debit", amount: providerGrossAmount },
+  ];
+  if (commissionAmount > 0) {
+    lines.push({ accountCode: ACCOUNT.platformRevenue, accountType: "revenue", direction: "credit", amount: commissionAmount });
+  }
+  if (providerPayoutAmount > 0) {
+    lines.push({
+      accountCode: ACCOUNT.providerPayable(payment.providerId),
+      accountType: "liability",
+      ownerUserId: payment.providerId,
+      direction: "credit",
+      amount: providerPayoutAmount,
+    });
+  }
+  return {
+    eventType: "settlement",
+    paymentId: payment.id,
+    requestId: payment.requestId,
+    referenceType: "cancellation_settlement",
+    referenceId: input.gatewayReference,
+    externalReference: input.gatewayReference,
+    idempotencyKey: `ledger:payment:${payment.id}:cancellation-settlement:${input.gatewayReference}`,
+    metadata: {
+      state: "cancellation_settlement",
+      currency: FINANCIAL_CURRENCY,
+      providerGrossAmount,
+      commissionAmount,
+      providerPayoutAmount,
+    },
+    lines,
+  };
+}
+
 export { ACCOUNT as FINANCIAL_LEDGER_ACCOUNTS };

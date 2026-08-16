@@ -9,6 +9,15 @@ export interface LegalDocument {
   lastUpdated: string;
 }
 
+export type LegalDocumentLocale = "tr" | "en";
+export type LegalReviewStatus = "approved" | "pending_legal_review";
+
+export interface LocalizedLegalDocument extends LegalDocument {
+  locale: LegalDocumentLocale;
+  reviewStatus: LegalReviewStatus;
+  authoritative: boolean;
+}
+
 export const LEGAL_DOCUMENTS: LegalDocument[] = [
   {
     id: "terms",
@@ -315,6 +324,85 @@ Not: Bu madde, yürürlükteki zorunlu hukuk kurallarını ortadan kaldırmaz. T
   },
 ];
 
+/**
+ * Public policy variants are versioned independently from the registration
+ * consent record. The canonical Turkish version is approved; the English
+ * translation is intentionally labelled for legal review instead of being
+ * presented as an approved legal instrument.
+ */
+export const PRIVACY_POLICY_TRANSLATIONS: Record<LegalDocumentLocale, LocalizedLegalDocument> = {
+  tr: {
+    id: "privacy",
+    locale: "tr",
+    title: "Gizlilik Politikası",
+    version: "1.0",
+    lastUpdated: "2026-08-01",
+    reviewStatus: "approved",
+    authoritative: true,
+    content: `MOVE&FIX GİZLİLİK POLİTİKASI
+
+1. VERİ TOPLAMA
+
+Kullanıcı verileri aşağıdaki amaçlarla işlenebilir:
+• Hesap oluşturma ve yönetimi
+• Güvenlik ve doğrulama
+• Hizmet sunumu ve iyileştirme
+• Yasal yükümlülüklerin yerine getirilmesi
+• Dolandırıcılığı önleme
+
+2. VERİ KORUMA
+
+Veriler ilgili mevzuata uygun şekilde korunmaktadır. Şifreleme, erişim kontrolü ve düzenli güvenlik denetimleri uygulanmaktadır.
+
+3. VERİ PAYLAŞIMI
+
+Kullanıcı verileri, yalnızca hizmet sunumu için gerekli olduğu durumlarda ve kullanıcının onayı dahilinde üçüncü taraflarla paylaşılabilir.
+
+4. VERİ SAKLAMA SÜRESİ
+
+Veriler, hizmet sunumu için gerekli olan süre boyunca ve yasal yükümlülükler kapsamında saklanır.
+
+5. KULLANICI HAKLARI
+
+Kullanıcılar verilerine erişim, düzeltme, silme ve taşınabilirlik haklarına sahiptir.`,
+  },
+  en: {
+    id: "privacy",
+    locale: "en",
+    title: "Privacy Policy",
+    version: "1.0",
+    lastUpdated: "2026-08-01",
+    reviewStatus: "pending_legal_review",
+    authoritative: false,
+    content: `MOVE&FIX PRIVACY POLICY
+
+1. DATA COLLECTION
+
+User data may be processed for the following purposes:
+• Creating and managing accounts
+• Security and verification
+• Providing and improving services
+• Meeting legal obligations
+• Preventing fraud
+
+2. DATA PROTECTION
+
+Data is protected in accordance with applicable legislation. Encryption, access controls, and regular security reviews are applied.
+
+3. DATA SHARING
+
+User data may be shared with third parties only where necessary to provide the service and subject to the user's consent where required.
+
+4. DATA RETENTION
+
+Data is retained for as long as necessary to provide the service and to meet legal obligations.
+
+5. USER RIGHTS
+
+Users may have rights to access, correct, erase, and obtain portability of their data.`,
+  },
+};
+
 // Registration consent items
 export const REGISTRATION_CONSENTS = [
   { id: "terms", label: "Kullanım Koşullarını okudum ve kabul ediyorum.", required: true, documentId: "terms" },
@@ -324,6 +412,22 @@ export const REGISTRATION_CONSENTS = [
   { id: "mediation", label: "Move&Fix'in yalnızca müşteri ile hizmet sağlayıcıları buluşturan dijital aracılık platformu olduğunu anladım.", required: true, documentId: null },
   { id: "electronic", label: "Elektronik sözleşmeyi kabul ediyorum.", required: true, documentId: null },
 ];
+
+/**
+ * The server derives the current consent version from this catalog. Clients may
+ * request outstanding consent keys, but they never supply a trusted version.
+ */
+export function getRequiredRegistrationConsentDocuments() {
+  return REGISTRATION_CONSENTS
+    .filter((consent) => consent.required)
+    .map((consent) => ({
+      consentKey: consent.id,
+      documentVersion: consent.documentId
+        ? LEGAL_DOCUMENTS.find((document) => document.id === consent.documentId)?.version ?? "1.0"
+        : "1.0",
+      purpose: "legal" as const,
+    }));
+}
 
 // Mediation declaration content
 export const MEDIATION_DECLARATION = {

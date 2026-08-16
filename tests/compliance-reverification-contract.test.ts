@@ -32,4 +32,9 @@ describe("compliance reverification contract", () => {
     expect(mayReturnEvidenceLink({ evidencePurgedAt: null, retentionDueAt: NOW }, NOW)).toBe(false);
     expect(mayReturnEvidenceLink({ evidencePurgedAt: NOW, retentionDueAt: null }, NOW)).toBe(false);
   });
+
+  it("never makes a due document retrievable while physical storage erasure is pending", () => {
+    expect(mayReturnEvidenceLink({ evidencePurgedAt: NOW, retentionDueAt: NOW }, NOW)).toBe(false);
+    expect(mayReturnEvidenceLink({ evidencePurgedAt: null, retentionDueAt: NOW }, NOW)).toBe(false);
+  });
 });

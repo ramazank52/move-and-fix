@@ -22,7 +22,7 @@ import {
   normalizeError,
 } from '../_core/errors';
 import { ENV } from "../_core/env";
-import { getUserById } from "../db";
+import { getUserById, recordConsentEvents } from "../db";
 import {
   deactivatePushToken,
   getActivePushTokens,
@@ -410,6 +410,17 @@ export class NotificationService {
       channels: { ...current.channels, ...preferences.channels },
       notificationTypes: { ...current.notificationTypes, ...preferences.notificationTypes },
     };
+    const promotionPreference = preferences.notificationTypes?.[NotificationType.PROMOTION];
+    if (promotionPreference) {
+      await recordConsentEvents([{
+        userId: numericUserId,
+        consentKey: "marketing_notifications",
+        documentVersion: "1.0",
+        purpose: "marketing",
+        action: promotionPreference.enabled ? "granted" : "withdrawn",
+        source: "notification_preferences",
+      }]);
+    }
     await saveNotificationPreferences({
       userId: numericUserId,
       preferences: {

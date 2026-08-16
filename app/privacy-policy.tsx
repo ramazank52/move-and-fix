@@ -1,10 +1,10 @@
 import { Head } from "expo-router/build/head";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { LEGAL_DOCUMENTS } from "@/lib/data/legal";
+import { PRIVACY_POLICY_TRANSLATIONS } from "@/lib/data/legal";
 
 type PolicyLanguage = "tr" | "en";
 
@@ -16,17 +16,13 @@ const POLICY_LANGUAGE_LABELS: Record<PolicyLanguage, string> = {
 /**
  * Public, unauthenticated privacy-policy route for store crawlers and direct links.
  * The legal policy body is deliberately sourced only from the existing approved
- * legal document catalog; no legal wording is generated in this screen.
+ * legal document catalog; review state is never hidden from the public.
  */
 export default function PrivacyPolicyScreen() {
   const colors = useColors();
   const [language, setLanguage] = useState<PolicyLanguage>("tr");
-  const turkishPolicy = useMemo(
-    () => LEGAL_DOCUMENTS.find((document) => document.id === "privacy"),
-    [],
-  );
-  const hasApprovedEnglishPolicy = false;
   const isTurkish = language === "tr";
+  const policy = PRIVACY_POLICY_TRANSLATIONS[language];
 
   const pageTitle = isTurkish ? "Move&Fix Gizlilik Politikası" : "Move&Fix Privacy Policy";
   const updatedLabel = isTurkish ? "Son güncelleme" : "Last updated";
@@ -111,7 +107,31 @@ export default function PrivacyPolicyScreen() {
             })}
           </View>
 
-          {isTurkish && turkishPolicy ? (
+          <View
+            accessibilityRole={policy.reviewStatus === "approved" ? undefined : "alert"}
+            style={{
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: policy.reviewStatus === "approved" ? colors.border : colors.warning,
+              backgroundColor: colors.surface,
+              padding: 14,
+              marginBottom: 14,
+              gap: 4,
+            }}
+          >
+            <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "800" }}>
+              {policy.authoritative
+                ? (isTurkish ? "Onaylı metin" : "Approved text")
+                : "Translation pending legal review"}
+            </Text>
+            {!policy.authoritative ? (
+              <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 19 }}>
+                This English translation is provided for accessibility. The Turkish policy remains the approved, authoritative version until legal review is completed.
+              </Text>
+            ) : null}
+          </View>
+
+          {policy ? (
             <View
               style={{
                 borderRadius: 18,
@@ -123,13 +143,13 @@ export default function PrivacyPolicyScreen() {
               }}
             >
               <View style={{ gap: 4, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "800" }}>{turkishPolicy.title}</Text>
+                <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "800" }}>{policy.title}</Text>
                 <Text style={{ color: colors.muted, fontSize: 13 }}>
-                  {updatedLabel}: {turkishPolicy.lastUpdated} · {turkishPolicy.version}
+                  {updatedLabel}: {policy.lastUpdated} · {policy.version}
                 </Text>
               </View>
               <Text selectable style={{ color: colors.foreground, fontSize: 15, lineHeight: 24 }}>
-                {turkishPolicy.content}
+                {policy.content}
               </Text>
             </View>
           ) : (
@@ -144,14 +164,8 @@ export default function PrivacyPolicyScreen() {
                 gap: 10,
               }}
             >
-              <Text accessibilityRole="header" style={{ color: colors.foreground, fontSize: 18, fontWeight: "800" }}>
-                Privacy Policy
-              </Text>
-              <Text style={{ color: colors.foreground, fontSize: 15, lineHeight: 24 }}>
-                {hasApprovedEnglishPolicy
-                  ? ""
-                  : "The approved English privacy policy text is not included in the current legal document catalog. The Turkish policy remains available while the approved English text is supplied."}
-              </Text>
+              <Text accessibilityRole="header" style={{ color: colors.foreground, fontSize: 18, fontWeight: "800" }}>Policy unavailable</Text>
+              <Text style={{ color: colors.foreground, fontSize: 15, lineHeight: 24 }}>The requested policy version is not available.</Text>
             </View>
           )}
         </View>

@@ -371,6 +371,33 @@ export const appRouter = router({
   owner: ownerRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+    pendingLegalConsents: protectedProcedure.query(async ({ ctx }) => {
+      return db.getOutstandingRequiredLegalConsents(ctx.user.id);
+    }),
+    confirmCurrentLegalConsents: protectedProcedure
+      .input(z.object({ consentKeys: z.array(z.string().trim().min(1).max(96)).min(1).max(8) }))
+      .mutation(async ({ ctx, input }) => {
+        const outstanding = await db.getOutstandingRequiredLegalConsents(ctx.user.id);
+        const submitted = new Set(input.consentKeys);
+        if (
+          submitted.size !== outstanding.length ||
+          outstanding.some((consent) => !submitted.has(consent.consentKey))
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Yalnız güncel ve eksik zorunlu yasal onaylar kaydedilebilir",
+          });
+        }
+        await db.recordConsentEvents(outstanding.map((consent) => ({
+          userId: ctx.user.id,
+          consentKey: consent.consentKey,
+          documentVersion: consent.documentVersion,
+          purpose: consent.purpose,
+          action: "granted" as const,
+          source: "document_version_reconsent",
+        })));
+        return { recorded: outstanding.length };
+      }),
     register: publicProcedure
       .input(z.object({
         name: z.string().trim().min(2).max(120),
@@ -379,8 +406,15 @@ export const appRouter = router({
         phone: z.string().trim().min(7).max(32).optional(),
         accountType: z.enum(["customer", "provider"]).default("customer"),
         nativeSession: z.boolean().default(false),
+        acceptedConsentKeys: z.array(z.enum(["terms", "privacy", "kvkk", "cookies", "mediation", "electronic"]))
+          .min(6)
+          .max(6),
       }))
       .mutation(async ({ ctx, input }) => {
+        const requiredConsentKeys = ["terms", "privacy", "kvkk", "cookies", "mediation", "electronic"] as const;
+        if (new Set(input.acceptedConsentKeys).size !== requiredConsentKeys.length || !requiredConsentKeys.every((key) => input.acceptedConsentKeys.includes(key))) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Zorunlu yasal onaylar eksik veya geçersiz" });
+        }
         const existing = await db.getUserByEmailNormalized(input.email);
         if (existing) throw new TRPCError({ code: "CONFLICT", message: "Bu e-posta ile zaten bir hesap var" });
         const phone = input.phone ? normalizeTurkishPhone(input.phone) : undefined;
@@ -400,6 +434,15 @@ export const appRouter = router({
           if (input.accountType === "provider") {
             await db.createLocalProviderProfile({ userId: user.id, displayName: input.name });
           }
+          const consentDocuments = await db.getOutstandingRequiredLegalConsents(user.id);
+          await db.recordConsentEvents(consentDocuments.map((consent) => ({
+            userId: user.id,
+            consentKey: consent.consentKey,
+            documentVersion: consent.documentVersion,
+            purpose: consent.purpose,
+            action: "granted" as const,
+            source: "account_registration",
+          })));
         } catch (error) {
           throw new TRPCError({ code: "CONFLICT", message: "Bu hesap bilgileri zaten kullanılıyor", cause: error });
         }
@@ -1465,6 +1508,11 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       }))
       .mutation(async ({ ctx, input }) => {
         try {
+          await db.assertPaymentProviderOperational({
+            provider: input.provider,
+            countryCode: "TR",
+            currency: "TRY",
+          });
           const payment = await db.reservePaymentGateway({
             paymentId: input.paymentId,
             userId: ctx.user.id,
@@ -1507,6 +1555,12 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           }
           if (message.includes("INVALID_STATUS") || message.includes("CONFLICT")) {
             throw new TRPCError({ code: "CONFLICT", message: "Ödeme sağlayıcısı mevcut ödeme durumunda başlatılamaz" });
+          }
+          if (message.startsWith("PAYMENT_PROVIDER_")) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Ödeme sağlayıcısı bu ülke ve para birimi için kullanıma hazır değil",
+            });
           }
           if (error instanceof GatewayCheckoutError) {
             if (error.code === "GATEWAY_NOT_CONFIGURED") {

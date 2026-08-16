@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getUserById: vi.fn(),
+  recordConsentEvents: vi.fn(),
   getActivePushTokens: vi.fn(),
   deactivatePushToken: vi.fn(),
   getStoredNotificationPreferences: vi.fn(),
+  saveNotificationPreferences: vi.fn(),
   saveInAppNotification: vi.fn(),
 }));
 
@@ -21,11 +23,12 @@ vi.mock("../server/_core/env", () => ({
   },
 }));
 
-vi.mock("../server/db", () => ({ getUserById: mocks.getUserById }));
+vi.mock("../server/db", () => ({ getUserById: mocks.getUserById, recordConsentEvents: mocks.recordConsentEvents }));
 vi.mock("../server/notifications/push-store", () => ({
   getActivePushTokens: mocks.getActivePushTokens,
   deactivatePushToken: mocks.deactivatePushToken,
   getStoredNotificationPreferences: mocks.getStoredNotificationPreferences,
+  saveNotificationPreferences: mocks.saveNotificationPreferences,
   saveInAppNotification: mocks.saveInAppNotification,
 }));
 
@@ -37,6 +40,8 @@ describe("çok kanallı bildirim teslimatı sözleşmesi", () => {
     mocks.getUserById.mockResolvedValue({ id: 7, email: "customer@example.test", phone: "+905555555555" });
     mocks.getActivePushTokens.mockResolvedValue([{ token: "ExponentPushToken[test-token]" }]);
     mocks.getStoredNotificationPreferences.mockResolvedValue(null);
+    mocks.saveNotificationPreferences.mockResolvedValue(undefined);
+    mocks.recordConsentEvents.mockResolvedValue(undefined);
     mocks.saveInAppNotification.mockResolvedValue(1);
   });
 
@@ -71,5 +76,20 @@ describe("çok kanallı bildirim teslimatı sözleşmesi", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(result.status).toBe("failed");
+  });
+
+  it("pazarlama bildirimi tercihini immutable opt-in/out kanıtı olmadan güncellemez", async () => {
+    await new NotificationService().updateUserPreferences("7", {
+      notificationTypes: { [NotificationType.PROMOTION]: { enabled: true } },
+    });
+
+    expect(mocks.recordConsentEvents).toHaveBeenCalledWith([expect.objectContaining({
+      userId: 7,
+      consentKey: "marketing_notifications",
+      purpose: "marketing",
+      action: "granted",
+      source: "notification_preferences",
+    })]);
+    expect(mocks.saveNotificationPreferences).toHaveBeenCalledTimes(1);
   });
 });

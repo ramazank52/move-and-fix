@@ -1,8 +1,10 @@
 import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { getRequiredRegistrationConsentDocuments } from "../lib/data/legal";
 import {
   InsertUser,
   users,
+  consentEvents,
   userCredentials,
   authChallenges,
   localAuthSessions,
@@ -25,6 +27,8 @@ import {
 } from "./payments/policy";
 import { trustRestrictionForReviewedRisk } from "./trust/policy";
 import {
+  buildCancellationPartialRefundLedgerEntry,
+  buildCancellationProviderSettlementLedgerEntry,
   buildEscrowReleasedLedgerEntry,
   buildPaymentHeldLedgerEntry,
   buildRefundLedgerEntry,
@@ -153,6 +157,49 @@ export async function createLocalUser(data: {
   const rows = await db.select().from(users).where(eq(users.id, result[0].insertId)).limit(1);
   if (!rows[0]) throw new Error("LOCAL_USER_CREATE_FAILED");
   return rows[0];
+}
+
+/** Persists immutable, server-validated consent evidence. Never update these rows. */
+export async function recordConsentEvents(data: Array<{
+  userId: number;
+  consentKey: string;
+  documentVersion: string;
+  purpose: "legal" | "marketing" | "transactional";
+  action: "granted" | "withdrawn";
+  source: string;
+}>) {
+  if (data.length === 0) return;
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(consentEvents).values(data);
+}
+
+/** Returns only legal consents whose latest immutable evidence is not the catalog's current granted version. */
+export async function getOutstandingRequiredLegalConsents(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const history = await db
+    .select({
+      consentKey: consentEvents.consentKey,
+      documentVersion: consentEvents.documentVersion,
+      action: consentEvents.action,
+      createdAt: consentEvents.createdAt,
+      id: consentEvents.id,
+    })
+    .from(consentEvents)
+    .where(eq(consentEvents.userId, userId))
+    .orderBy(desc(consentEvents.createdAt), desc(consentEvents.id));
+
+  const latestByConsentKey = new Map<string, (typeof history)[number]>();
+  for (const event of history) {
+    if (!latestByConsentKey.has(event.consentKey)) latestByConsentKey.set(event.consentKey, event);
+  }
+
+  return getRequiredRegistrationConsentDocuments().filter((required) => {
+    const latest = latestByConsentKey.get(required.consentKey);
+    return !latest || latest.action !== "granted" || latest.documentVersion !== required.documentVersion;
+  });
 }
 
 /** Creates the minimal profile required before a locally registered provider can upload documents. */
@@ -564,6 +611,50 @@ export async function updateProviderDocumentStatus(data: {
   if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("PROVIDER_DOCUMENT_NOT_FOUND");
 }
 
+/**
+ * Returns only documents whose approved retention window has ended. Callers must
+ * execute the logical purge before attempting an external storage erase; this
+ * prevents stale document links being returned while a storage provider erases
+ * the bytes asynchronously.
+ */
+export async function listDueProviderDocumentRetention(now: Date, limit: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(providerDocuments)
+    .where(
+      and(
+        isNotNull(providerDocuments.retentionDueAt),
+        lte(providerDocuments.retentionDueAt, now),
+        isNull(providerDocuments.contentPurgedAt),
+        inArray(providerDocuments.purgeStatus, ["not_scheduled", "scheduled"]),
+      ),
+    )
+    .orderBy(providerDocuments.retentionDueAt, providerDocuments.id)
+    .limit(limit);
+}
+
+/**
+ * Idempotent, fail-closed logical purge. Storage bytes are never claimed erased
+ * by this method: a separate configured storage eraser must confirm deletion.
+ */
+export async function logicalPurgeProviderDocument(input: { id: number; now?: Date }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = input.now ?? new Date();
+  const result = await db
+    .update(providerDocuments)
+    .set({
+      storageKey: "",
+      fileUrl: "",
+      contentPurgedAt: now,
+      purgeStatus: "storage_erase_pending",
+    })
+    .where(and(eq(providerDocuments.id, input.id), isNull(providerDocuments.contentPurgedAt)));
+  return (result[0]?.affectedRows ?? 0) === 1;
+}
+
 export async function getProviderDocumentById(id: number) {
   const db = await getDb();
   if (!db) return null;
@@ -735,13 +826,77 @@ import {
   moveAiDrafts,
   trustProfiles,
   riskFlags,
+  paymentProviderWatch,
 } from "../drizzle/schema";
+import {
+  decidePaymentProviderOperationalStatus,
+  type PaymentProviderId,
+  type PaymentProviderOperationalRecord,
+  type PaymentProviderOperationalStatus,
+} from "./payments/ProviderOperationalPolicy";
 
 // Service Categories
 
 export type FinancialReconciliationProvider = "iyzico" | "stripe";
 const DEFAULT_SETTLEMENT_COUNTRY_CODE = "TR";
 const DEFAULT_SETTLEMENT_CONTRACT_TYPE = "standard";
+
+export async function getPaymentProviderOperationalDecision(input: {
+  provider: PaymentProviderId;
+  countryCode: string;
+  currency: string;
+  now?: Date;
+}) {
+  const db = await getDb();
+  if (!db) return decidePaymentProviderOperationalStatus(null, input.now);
+  const [record] = await db
+    .select()
+    .from(paymentProviderWatch)
+    .where(and(
+      eq(paymentProviderWatch.provider, input.provider),
+      eq(paymentProviderWatch.countryCode, input.countryCode.trim().toUpperCase()),
+      eq(paymentProviderWatch.currency, input.currency.trim().toUpperCase()),
+    ))
+    .limit(1);
+  return decidePaymentProviderOperationalStatus(record as PaymentProviderOperationalRecord | undefined, input.now);
+}
+
+export async function assertPaymentProviderOperational(input: {
+  provider: PaymentProviderId;
+  countryCode: string;
+  currency: string;
+}) {
+  const decision = await getPaymentProviderOperationalDecision(input);
+  if (!decision.allowed) {
+    const error = new Error(`PAYMENT_PROVIDER_${decision.status.toUpperCase()}`);
+    error.cause = decision.reason;
+    throw error;
+  }
+  return decision;
+}
+
+export async function upsertPaymentProviderWatch(input: {
+  provider: PaymentProviderId;
+  countryCode: string;
+  currency: string;
+  status: PaymentProviderOperationalStatus;
+  configVersion: string;
+  healthCheckedAt?: Date | null;
+  regulatoryReviewedAt?: Date | null;
+  nextReviewAt?: Date | null;
+  blockingReason?: string | null;
+  reviewedByUserId?: number | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_UNAVAILABLE");
+  const values = {
+    ...input,
+    countryCode: input.countryCode.trim().toUpperCase(),
+    currency: input.currency.trim().toUpperCase(),
+    updatedAt: new Date(),
+  };
+  await db.insert(paymentProviderWatch).values(values).onDuplicateKeyUpdate({ set: values });
+}
 
 function isValidCompletionReviewHours(value: number) {
   return Number.isInteger(value) && value >= 1 && value <= 168;
@@ -3659,6 +3814,106 @@ async function resolveRefundCancellationInTransaction(
   return true;
 }
 
+async function resolvePartialRefundCancellationInTransaction(
+  tx: DatabaseTransaction,
+  payment: typeof payments.$inferSelect,
+  data: { refundAmount: number; gatewayReference: string },
+) {
+  const cancellationRows = await tx
+    .select()
+    .from(jobCancellationCases)
+    .where(eq(jobCancellationCases.requestId, payment.requestId))
+    .limit(1);
+  const cancellation = cancellationRows[0];
+  if (
+    !cancellation ||
+    cancellation.status !== "under_review" ||
+    cancellation.settlementOutcome !== "partial_refund" ||
+    !cancellation.reviewedByUserId ||
+    cancellation.refundAmount !== data.refundAmount ||
+    !cancellation.providerGrossAmount ||
+    cancellation.commissionAmount == null ||
+    cancellation.providerPayoutAmount == null
+  ) {
+    throw new Error("CANCELLATION_PARTIAL_REFUND_PLAN_MISMATCH");
+  }
+  if (payment.status !== "held") throw new Error("CANCELLATION_SETTLEMENT_REQUIRES_HELD_PAYMENT");
+  if (data.refundAmount <= 0 || data.refundAmount >= payment.amount) {
+    throw new Error("CANCELLATION_PARTIAL_REFUND_AMOUNT_INVALID");
+  }
+
+  const providerRows = await tx
+    .select({ userId: providers.userId })
+    .from(providers)
+    .where(eq(providers.id, payment.providerId))
+    .limit(1);
+  const providerUserId = providerRows[0]?.userId;
+  if (!providerUserId) throw new Error("CANCELLATION_PROVIDER_NOT_FOUND");
+
+  const paymentUpdate = await tx
+    .update(payments)
+    .set({ status: "released" })
+    .where(and(eq(payments.id, payment.id), eq(payments.status, "held")));
+  if ((paymentUpdate[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_PARTIAL_PAYMENT_CONFLICT");
+
+  await postFinancialLedgerEntry(
+    tx,
+    buildCancellationPartialRefundLedgerEntry(payment, {
+      refundAmount: data.refundAmount,
+      gatewayReference: data.gatewayReference,
+    }),
+  );
+  await postFinancialLedgerEntry(
+    tx,
+    buildCancellationProviderSettlementLedgerEntry(payment, {
+      providerGrossAmount: cancellation.providerGrossAmount,
+      commissionAmount: cancellation.commissionAmount,
+      providerPayoutAmount: cancellation.providerPayoutAmount,
+      gatewayReference: data.gatewayReference,
+    }),
+  );
+
+  const walletIdempotencyKey = `cancellation-settlement:${payment.id}:${data.gatewayReference}`;
+  await tx
+    .insert(walletAccounts)
+    .values({ userId: providerUserId, currency: "TRY" })
+    .onDuplicateKeyUpdate({ set: { userId: providerUserId } });
+  if (cancellation.providerPayoutAmount > 0) {
+    await tx
+      .update(walletAccounts)
+      .set({ availableBalance: sql`${walletAccounts.availableBalance} + ${cancellation.providerPayoutAmount}` })
+      .where(eq(walletAccounts.userId, providerUserId));
+    await tx.insert(walletTransactions).values({
+      userId: providerUserId,
+      type: "provider_payout",
+      status: "completed",
+      amount: cancellation.providerPayoutAmount,
+      description: "Kısmi iade sonrası sağlayıcı ödemesi",
+      reference: `payment:${payment.id}`,
+      idempotencyKey: walletIdempotencyKey,
+      metadata: JSON.stringify({
+        requestId: payment.requestId,
+        cancellationId: cancellation.id,
+        gatewayReference: data.gatewayReference,
+        refundAmount: data.refundAmount,
+      }),
+    });
+  }
+
+  const now = new Date();
+  const resolved = await tx
+    .update(jobCancellationCases)
+    .set({ status: "resolved", resolvedByUserId: cancellation.reviewedByUserId, resolvedAt: now })
+    .where(and(eq(jobCancellationCases.id, cancellation.id), eq(jobCancellationCases.status, "under_review")));
+  if ((resolved[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_PARTIAL_REFUND_RESOLUTION_CONFLICT");
+  const requestResult = await tx
+    .update(serviceRequests)
+    .set({ status: "cancelled" })
+    .where(and(eq(serviceRequests.id, payment.requestId), eq(serviceRequests.status, "active")));
+  if ((requestResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REQUEST_UPDATE_CONFLICT");
+  return true;
+}
+
 export async function rejectOffer(offerId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -4407,6 +4662,7 @@ export async function resolvePaymentForGatewayWebhook(data: {
 export async function transitionPaymentFromVerifiedWebhook(data: {
   paymentId: number;
   nextStatus: "held" | "refunded";
+  partialRefund?: { refundAmount: number; gatewayReference: string };
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -4420,6 +4676,20 @@ export async function transitionPaymentFromVerifiedWebhook(data: {
     const payment = rows[0];
     if (!payment) throw new Error("PAYMENT_NOT_FOUND");
     if (payment.status === data.nextStatus) return { payment, duplicated: true };
+
+    if (data.partialRefund) {
+      if (data.nextStatus !== "refunded") throw new Error("PAYMENT_PARTIAL_REFUND_STATUS_INVALID");
+      if (payment.status === "released") return { payment, duplicated: true };
+      await getAgreementForPaymentInTransaction(tx, payment);
+      await resolvePartialRefundCancellationInTransaction(tx, payment, data.partialRefund);
+      const settledRows = await tx
+        .select()
+        .from(payments)
+        .where(eq(payments.id, payment.id))
+        .limit(1);
+      if (!settledRows[0]) throw new Error("PAYMENT_UPDATE_FAILED");
+      return { payment: settledRows[0], duplicated: false };
+    }
 
     if (data.nextStatus === "held") {
       const requestRows = await tx

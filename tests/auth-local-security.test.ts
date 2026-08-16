@@ -15,6 +15,8 @@ vi.mock("../server/db", async () => {
     getLatestActiveAuthChallenge: vi.fn(),
     updateLocalCredentialPassword: vi.fn(),
     markAuthChallengeUsed: vi.fn(),
+    getOutstandingRequiredLegalConsents: vi.fn(),
+    recordConsentEvents: vi.fn(),
   };
 });
 
@@ -57,7 +59,22 @@ describe("local authentication security", () => {
       password: "short",
       accountType: "customer",
       nativeSession: true,
+      acceptedConsentKeys: ["terms", "privacy", "kvkk", "cookies", "mediation", "electronic"],
     })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(authDb.createLocalUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects registration before account creation when a mandatory legal consent is absent", async () => {
+    const caller = appRouter.createCaller(createContext({ user: null }));
+
+    await expect(caller.auth.register({
+      name: "Yeni Kullanıcı",
+      email: "yeni@example.com",
+      password: "GuvenliParola123",
+      accountType: "customer",
+      nativeSession: true,
+      acceptedConsentKeys: ["terms", "privacy", "kvkk", "cookies", "mediation"],
+    } as never)).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(authDb.createLocalUser).not.toHaveBeenCalled();
   });
 
@@ -111,6 +128,34 @@ describe("local authentication security", () => {
     const signedInWithoutPhone = appRouter.createCaller(createContext({ phone: null }));
     await expect(signedInWithoutPhone.auth.requestVerification({ purpose: "verify_phone" }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("returns only the authenticated user's server-derived outstanding legal consent versions", async () => {
+    vi.mocked(authDb.getOutstandingRequiredLegalConsents).mockResolvedValue([
+      { consentKey: "privacy", documentVersion: "2026.08", purpose: "legal" },
+    ] as never);
+
+    await expect(appRouter.createCaller(createContext()).auth.pendingLegalConsents())
+      .resolves.toEqual([{ consentKey: "privacy", documentVersion: "2026.08", purpose: "legal" }]);
+    expect(authDb.getOutstandingRequiredLegalConsents).toHaveBeenCalledWith(71);
+  });
+
+  it("records re-consent only when the caller submits every current outstanding consent key", async () => {
+    vi.mocked(authDb.getOutstandingRequiredLegalConsents).mockResolvedValue([
+      { consentKey: "privacy", documentVersion: "2026.08", purpose: "legal" },
+      { consentKey: "terms", documentVersion: "2026.08", purpose: "legal" },
+    ] as never);
+    vi.mocked(authDb.recordConsentEvents).mockResolvedValue(undefined);
+    const caller = appRouter.createCaller(createContext());
+
+    await expect(caller.auth.confirmCurrentLegalConsents({ consentKeys: ["privacy"] }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.auth.confirmCurrentLegalConsents({ consentKeys: ["terms", "privacy"] }))
+      .resolves.toEqual({ recorded: 2 });
+    expect(authDb.recordConsentEvents).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ userId: 71, consentKey: "privacy", documentVersion: "2026.08", source: "document_version_reconsent" }),
+      expect.objectContaining({ userId: 71, consentKey: "terms", documentVersion: "2026.08", source: "document_version_reconsent" }),
+    ]));
   });
 
   it("lists only the caller-owned server-side local sessions and exposes the current session marker", async () => {
