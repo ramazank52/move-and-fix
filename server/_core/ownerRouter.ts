@@ -108,6 +108,7 @@ const countryLaunchChecklistInput = z.object({
   platform_law: z.boolean(),
   payments: z.boolean(),
   payment_provider_license: z.boolean(),
+  operational_payment_provider: z.boolean(),
   tax: z.boolean(),
   privacy: z.boolean(),
   worker_classification: z.boolean(),
@@ -375,7 +376,11 @@ export const ownerRouter = router({
       try {
         return await enableCountryProfessionalMarketplace({ ...input, enabledByUserId: ctx.user!.id });
       } catch (error) {
-        if (error instanceof Error && error.message === "COUNTRY_PROFESSIONAL_MARKETPLACE_BLOCKED") {
+        if (
+          error instanceof Error &&
+          (error.message === "COUNTRY_PROFESSIONAL_MARKETPLACE_BLOCKED" ||
+            error.message === "COUNTRY_PAYMENT_PROVIDER_NOT_READY")
+        ) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ülke açma kapısı tamamlanmadan profesyonel pazaryeri etkinleştirilemez" });
         }
         throw error;

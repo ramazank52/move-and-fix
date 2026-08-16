@@ -5,6 +5,7 @@ export const COUNTRY_LAUNCH_REQUIREMENTS = [
   "platform_law",
   "payments",
   "payment_provider_license",
+  "operational_payment_provider",
   "tax",
   "privacy",
   "worker_classification",
@@ -44,6 +45,8 @@ export function evaluateCountryLaunch(input: {
   checklist: CountryLaunchChecklist;
   compliancePackageStatus: "draft" | "legal_review" | "approved" | "enabled" | "blocked" | "retired" | null;
   hasVerifiedOfficialSource: boolean;
+  countryCode?: string;
+  hasOperationalPaymentProvider?: boolean;
 }) {
   const missing = COUNTRY_LAUNCH_REQUIREMENTS.filter((key) => !input.checklist[key]);
   if (input.compliancePackageStatus !== "approved" && input.compliancePackageStatus !== "enabled") {
@@ -51,6 +54,12 @@ export function evaluateCountryLaunch(input: {
   }
   if (!input.hasVerifiedOfficialSource) {
     missing.unshift("verified_official_source" as CountryLaunchRequirement);
+  }
+  if (
+    input.countryCode?.trim().toUpperCase() === "TR" &&
+    input.hasOperationalPaymentProvider !== true
+  ) {
+    missing.unshift("operational_payment_provider");
   }
   return {
     ready: missing.length === 0,

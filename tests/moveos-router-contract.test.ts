@@ -258,6 +258,42 @@ describe("MoveOS ortak API sözleşmesi", () => {
     await expect(adminCaller().enableCountryProfessionalMarketplace({ jurisdictionId: 4 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 
+  it("Türkiye ödeme sağlayıcısı hazır olmadığında ülke açmayı aynı fail-closed önkoşulla reddeder", async () => {
+    countryCompliance.enableCountryProfessionalMarketplace.mockRejectedValue(new Error("COUNTRY_PAYMENT_PROVIDER_NOT_READY"));
+    await expect(adminCaller().enableCountryProfessionalMarketplace({ jurisdictionId: 4 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("operasyonel ödeme sağlayıcısı checklist kanıtı olmadan ülke kapısı kaydını veri katmanına iletmez", async () => {
+    await expect(
+      adminCaller().saveCountryLaunchGate({
+        jurisdictionId: 4,
+        checklist: {
+          service_compliance: true,
+          credential_rules: true,
+          official_sources: true,
+          platform_law: true,
+          payments: true,
+          payment_provider_license: true,
+          tax: true,
+          privacy: true,
+          worker_classification: true,
+          insurance: true,
+          consumer_rules: true,
+          ai_rules: true,
+          safety: true,
+          support: true,
+          store_compliance: true,
+          legal_sign_off: true,
+          privacy_sign_off: true,
+          payment_sign_off: true,
+          security_sign_off: true,
+          production_tests: true,
+        },
+      } as never),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(countryCompliance.saveCountryLaunchChecklist).not.toHaveBeenCalled();
+  });
+
   it("yönetici olmayan ortak oturumun yönetim verisine erişimini reddeder", async () => {
     await expect(customerCaller().dashboard()).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(db.getMoveOsDashboardMetrics).not.toHaveBeenCalled();

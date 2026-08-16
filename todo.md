@@ -440,3 +440,9 @@
 - [x] P4 — Taslak-medya staging, kullanıcı sahipliği, açık rıza ve onayda güvenli request-media aktarımını additive şema ve tRPC yüzeyleriyle uygula
 - [x] P4 — MoveAI ekranına izinli görsel seçimi, ses kaydı, rıza bilgisi ve gönderim durumlarını gerçek API akışıyla ekle
 - [x] P4 — Çoklu ortam, rıza, yetki, redaksiyon, hata ve profesyonel AI sınırı regresyonlarını ekle; kalite kapılarını çalıştır
+
+## FINAL MASTER COMMAND P5
+- [x] Türkiye ödeme sağlayıcısı seçimi, TRY-only settlement kuralları, tutar/tarife doğrulaması ve idempotent escrow başlatma sınırlarını denetle ve sertleştir
+- [x] iyzico/Stripe credential, webhook ve reconciliation yüzeylerini yapılandırılmadığında NOT_CONFIGURED/fail-closed bırak; gerçek teslimat üretmeden sağlık durumunu görünür kıl
+- [x] Türkiye country launch gate, sürümlü kategori/hizmet/capability/credential/fiyat-komisyon/vergi kaynak denetimini yönetsel kontrol ve immutable audit ile güçlendir
+- [x] P5 için birim, entegrasyon, yetki, hata ve edge-case ödeme/ledger/lansman regresyonlarını ekle; kalite kapılarını çalıştır
