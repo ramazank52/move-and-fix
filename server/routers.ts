@@ -34,6 +34,7 @@ import {
   gatewayCheckoutService,
   GatewayCheckoutError,
 } from "./payments/GatewayCheckoutService";
+import { getMaskedCommunicationReadiness } from "./communications/MaskedCommunicationService";
 
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
 // Döngüsel import'u önlemek için servisler burada birbirine bağlanır.
@@ -163,6 +164,23 @@ function normalizeTurkishPhone(value: string): string {
   const national = compact.replace(/^\+?90/, "").replace(/^0/, "");
   if (!/^5\d{9}$/.test(national)) throw new TRPCError({ code: "BAD_REQUEST", message: "Geçerli bir Türkiye cep telefonu girin" });
   return `+90${national}`;
+}
+
+function mapOrganizationError(error: unknown): never {
+  const message = error instanceof Error ? error.message : "ORGANIZATION_OPERATION_FAILED";
+  if (message === "ORGANIZATION_ACCESS_FORBIDDEN" || message.endsWith("_FORBIDDEN") || message.endsWith("_REQUIRED")) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Kurumsal hesap üzerinde bu işlem için yetkiniz yok" });
+  }
+  if (message.endsWith("_NOT_FOUND")) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Kurumsal kayıt bulunamadı" });
+  }
+  if (message.includes("DUPLICATE") || message.includes("Duplicate")) {
+    throw new TRPCError({ code: "CONFLICT", message: "Bu kullanıcı için bekleyen veya mevcut bir kurumsal üyelik zaten var" });
+  }
+  if (message === "ORGANIZATION_SELF_INVITE_FORBIDDEN" || message === "ORGANIZATION_OWNER_ROLE_IMMUTABLE") {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Kurumsal üyelik kuralı bu işlemi engelliyor" });
+  }
+  throw error;
 }
 
 function hashPassword(password: string): string {
@@ -361,6 +379,25 @@ async function runMessageOperation<T>(operation: () => Promise<T>): Promise<T> {
       code: "INTERNAL_SERVER_ERROR",
       message: "Mesajlaşma işlemi tamamlanamadı",
     });
+  }
+}
+
+async function runMaskedCommunicationOperation<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "MASKED_COMMUNICATION_OPERATION_FAILED";
+    if (message === "MASKED_COMMUNICATION_REQUEST_NOT_FOUND" || message === "MASKED_COMMUNICATION_SESSION_NOT_FOUND") {
+      throw new TRPCError({ code: "NOT_FOUND", message: "İletişim oturumu bulunamadı" });
+    }
+    if (
+      message === "MASKED_COMMUNICATION_FORBIDDEN" ||
+      message === "MASKED_COMMUNICATION_REQUEST_NOT_ASSIGNED" ||
+      message === "MASKED_COMMUNICATION_REQUEST_INACTIVE"
+    ) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Bu iş için maskeli iletişim yetkiniz yok" });
+    }
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Maskeli iletişim işlemi tamamlanamadı" });
   }
 }
 
@@ -586,6 +623,83 @@ export const appRouter = router({
     }),
   }),
 
+  organizations: router({
+    list: protectedProcedure.query(({ ctx }) => db.listOrganizationsForUser(ctx.user.id)),
+    invitations: protectedProcedure.query(({ ctx }) => db.listOrganizationInvitations(ctx.user.id)),
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().trim().min(2).max(200),
+          taxId: z.string().trim().min(2).max(64).optional(),
+          type: z.enum(["corporate", "fleet", "facility"]),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.createOrganization({ ownerId: ctx.user.id, ...input });
+        } catch (error) {
+          return mapOrganizationError(error);
+        }
+      }),
+    members: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        try {
+          return await db.listOrganizationMembers({ organizationId: input.organizationId, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapOrganizationError(error);
+        }
+      }),
+    invite: protectedProcedure
+      .input(
+        z.object({
+          organizationId: z.number().int().positive(),
+          userId: z.number().int().positive(),
+          role: z.enum(["admin", "member"]),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.inviteOrganizationMember({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapOrganizationError(error);
+        }
+      }),
+    acceptInvitation: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.acceptOrganizationInvitation({ organizationId: input.organizationId, userId: ctx.user.id });
+        } catch (error) {
+          return mapOrganizationError(error);
+        }
+      }),
+    setMemberRole: protectedProcedure
+      .input(
+        z.object({
+          organizationId: z.number().int().positive(),
+          userId: z.number().int().positive(),
+          role: z.enum(["admin", "member"]),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.updateOrganizationMemberRole({ ...input, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapOrganizationError(error);
+        }
+      }),
+    archive: protectedProcedure
+      .input(z.object({ organizationId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.archiveOrganization({ organizationId: input.organizationId, actorUserId: ctx.user.id });
+        } catch (error) {
+          return mapOrganizationError(error);
+        }
+      }),
+  }),
+
   // Service Requests
   requests: router({
     list: protectedProcedure.query(({ ctx }) => {
@@ -598,9 +712,13 @@ export const appRouter = router({
         if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "İş kaydı bulunamadı" });
 
         const provider = await db.getProviderProfile(ctx.user.id);
+        const organizationCanRead = request.organizationId
+          ? await db.canAccessOrganizationRequest({ organizationId: request.organizationId, userId: ctx.user.id })
+          : false;
         const canRead =
           request.userId === ctx.user.id ||
-          (provider != null && request.assignedProviderId === provider.id);
+          (provider != null && request.assignedProviderId === provider.id) ||
+          organizationCanRead;
         if (!canRead) throw new TRPCError({ code: "FORBIDDEN", message: "Bu iş kaydına erişim yetkiniz yok" });
         const [details, media] = await Promise.all([
           db.getServiceRequestDetails(input.id),
@@ -620,6 +738,7 @@ export const appRouter = router({
         budgetMax: z.number().int().min(0).max(10_000_000).optional(),
         distanceKm: z.number().int().min(0).max(5000).optional(),
         estimatedPrice: z.number().int().min(0).max(10_000_000).optional(),
+        organizationId: z.number().int().positive().optional(),
         details: serviceRequestDetailsSchema.optional(),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -1209,6 +1328,34 @@ export const appRouter = router({
       ),
   }),
 
+  maskedCommunications: router({
+    status: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive(), channel: z.enum(["phone", "message"]) }))
+      .query(async ({ ctx, input }) => {
+        const session = await runMaskedCommunicationOperation(() =>
+          db.getMaskedCommunicationSession({ ...input, actorUserId: ctx.user.id }),
+        );
+        return { session, readiness: getMaskedCommunicationReadiness() };
+      }),
+    create: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive(), channel: z.enum(["phone", "message"]) }))
+      .mutation(async ({ ctx, input }) => {
+        await runMaskedCommunicationOperation(() =>
+          db.createMaskedCommunicationSession({ ...input, actorUserId: ctx.user.id }),
+        );
+        const session = await runMaskedCommunicationOperation(() =>
+          db.getMaskedCommunicationSession({ ...input, actorUserId: ctx.user.id }),
+        );
+        return { session, readiness: getMaskedCommunicationReadiness() };
+      }),
+    release: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive(), channel: z.enum(["phone", "message"]) }))
+      .mutation(({ ctx, input }) =>
+        runMaskedCommunicationOperation(() =>
+          db.releaseMaskedCommunicationSession({ ...input, actorUserId: ctx.user.id }),
+        ),
+      ),
+  }),
   // Providers
   providers: router({
     nearby: publicProcedure

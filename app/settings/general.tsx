@@ -15,7 +15,7 @@ export default function GeneralSettingsScreen() {
   const router = useRouter();
   const { logout } = useAuth();
   const { colorScheme, setColorScheme } = useThemeContext();
-  const { language, translate } = useLocalization();
+  const { language, currency, setCurrency, translate } = useLocalization();
   const [notifications, setNotifications] = useState(true);
 
   const handleLogout = () => {
@@ -29,6 +29,21 @@ export default function GeneralSettingsScreen() {
           router.replace("/" as never);
         },
       },
+    ]);
+  };
+
+  const chooseCurrency = () => {
+    Alert.alert(translate("currency"), translate("currencySettlementNotice"), [
+      { text: translate("currencyTry"), onPress: () => void setCurrency("TRY") },
+      {
+        text: translate("currencyUsd"),
+        onPress: () => Alert.alert(translate("currencyUnavailableTitle"), translate("currencyUnavailableBody", { currency: "USD" })),
+      },
+      {
+        text: translate("currencyEur"),
+        onPress: () => Alert.alert(translate("currencyUnavailableTitle"), translate("currencyUnavailableBody", { currency: "EUR" })),
+      },
+      { text: translate("cancel"), style: "cancel" },
     ]);
   };
 
@@ -65,7 +80,14 @@ export default function GeneralSettingsScreen() {
               thumbColor="#FFFFFF"
             />
           </View>
-          <SettingValueRow label={translate("currency")} value={translate("currencyTry")} styles={styles} isLast />
+          <LinkRow
+            label={translate("currency")}
+            value={currency === "TRY" ? translate("currencyTry") : currency}
+            onPress={chooseCurrency}
+            styles={styles}
+            colors={colors}
+            isLast
+          />
         </View>
 
         <View style={styles.card}>

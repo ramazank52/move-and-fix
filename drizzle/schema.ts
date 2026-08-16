@@ -28,6 +28,95 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+// An organization is a separately auditable customer account. It never replaces
+// the natural person who created a request: request.userId remains the acting
+// member while organizationId identifies the billed/operating entity.
+export const organizations = mysqlTable(
+  "organizations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 200 }).notNull(),
+    taxId: varchar("taxId", { length: 64 }),
+    type: mysqlEnum("type", ["corporate", "fleet", "facility"]).notNull(),
+    ownerId: int("ownerId").notNull(),
+    status: mysqlEnum("status", ["active", "suspended", "archived"]).default("active").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("organizations_owner_status_idx").on(table.ownerId, table.status),
+    uniqueIndex("organizations_owner_tax_id_unique").on(table.ownerId, table.taxId),
+  ],
+);
+
+export const organizationMembers = mysqlTable(
+  "organization_members",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    organizationId: int("organizationId").notNull(),
+    userId: int("userId").notNull(),
+    role: mysqlEnum("role", ["owner", "admin", "member"]).notNull(),
+    invitedByUserId: int("invitedByUserId").notNull(),
+    invitedAt: timestamp("invitedAt").defaultNow().notNull(),
+    joinedAt: timestamp("joinedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("organization_members_org_user_unique").on(table.organizationId, table.userId),
+    index("organization_members_user_idx").on(table.userId, table.organizationId),
+    index("organization_members_org_role_idx").on(table.organizationId, table.role),
+  ],
+);
+
+// The primary platform role remains users.role for backward compatibility.
+// This narrow table records the elevated administrative scope required for
+// destructive, cross-tenant MoveOS actions.
+export const adminRoles = mysqlTable(
+  "admin_roles",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    role: mysqlEnum("role", ["super_admin"]).notNull(),
+    grantedByUserId: int("grantedByUserId").notNull(),
+    grantedAt: timestamp("grantedAt").defaultNow().notNull(),
+    revokedAt: timestamp("revokedAt"),
+  },
+  (table) => [
+    uniqueIndex("admin_roles_user_role_unique").on(table.userId, table.role),
+    index("admin_roles_active_idx").on(table.role, table.revokedAt),
+  ],
+);
+
+// Contains only an opaque provider-side reference; actual telephone numbers or
+// message addresses are never copied into the application database. A proxy
+// session can be created only for an assigned job's two participants.
+export const maskedCommunicationSessions = mysqlTable(
+  "masked_communication_sessions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    customerUserId: int("customerUserId").notNull(),
+    providerUserId: int("providerUserId").notNull(),
+    channel: mysqlEnum("channel", ["phone", "message"]).notNull(),
+    status: mysqlEnum("status", ["not_configured", "pending", "active", "released", "expired"])
+      .default("not_configured")
+      .notNull(),
+    providerSessionReference: varchar("providerSessionReference", { length: 191 }),
+    expiresAt: timestamp("expiresAt"),
+    releasedAt: timestamp("releasedAt"),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("masked_communication_request_channel_unique").on(table.requestId, table.channel),
+    index("masked_communication_customer_idx").on(table.customerUserId, table.status),
+    index("masked_communication_provider_idx").on(table.providerUserId, table.status),
+    index("masked_communication_expiry_idx").on(table.status, table.expiresAt),
+  ],
+);
+
 // Append-only consent evidence. A withdrawal is a new event; previously granted
 // evidence is intentionally never overwritten or deleted.
 export const consentEvents = mysqlTable(
@@ -497,6 +586,7 @@ export const jurisdictionLaunchGates = mysqlTable(
 export const serviceRequests = mysqlTable("service_requests", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
+  organizationId: int("organizationId"),
   categoryId: int("categoryId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
@@ -511,7 +601,7 @@ export const serviceRequests = mysqlTable("service_requests", {
   assignedProviderId: int("assignedProviderId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [index("service_requests_organization_status_idx").on(table.organizationId, table.status)]);
 
 // Structured, service-specific information kept outside the legacy request row.
 export const serviceRequestDetails = mysqlTable(

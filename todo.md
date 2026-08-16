@@ -362,6 +362,10 @@
 - [x] Bildirim tercihlerini, geçmişini ve okunma durumunu sahiplik denetimli kalıcı veri modeli ve gerçek tRPC prosedürleriyle tamamla
 - [x] NetGSM, SendGrid ve Expo/FCM kod yollarını credential yokken fail-closed; credential sağlandığında gerçek sağlayıcı çağrısına hazır hale getir ve sözleşme testleriyle doğrula
 - [x] iyzico sandbox checkout başlangıcını gerçek credential ile tahsilatsız doğrula; eksik/geçersiz credential yollarının fail-closed kaldığını doğrula
+- [x] Master Phase C — Kurumsal/organizasyon hesabı, üyelik yetkileri ve kurumsal hizmet talebi sahipliğini additive şema, API ve testlerle uygula
+- [x] Master Phase C — Super Admin rol ayrımı ve MoveOS kritik yetki sınırlarını IDOR regresyonlarıyla güçlendir
+- [x] Master Phase C — Merkezi TR/EN/RU i18n kapsamını, çoklu para birimi fail-closed sözleşmesini ve maskeli iletişim adapterini tamamla
+- [x] Master Phase C — TypeScript, lint, build, migration, authorization ve edge-case kalite kapılarını çalıştırıp checkpoint al
 - [x] İstemci dışa aktarımları ve izlenen Git geçmişinde sağlayıcı sırrı/private key bulunmadığını değer göstermeden doğrula
 - [ ] EXTERNAL BLOCKER — Onaylı İngilizce KVKK/GDPR gizlilik politikası metni sağlandığında /privacy-policy TR/EN public rotasında metni değiştirmeden yayınla
 - [ ] EXTERNAL BLOCKER — moveandfix.app için DNS ve HTTPS yayınlaması tamamlandığında app.config.ts içindeki privacyPolicyUrl altında public gizlilik rotasını doğrula
@@ -385,3 +389,8 @@
 - [x] Master Phase B — Ödeme sağlayıcısı sağlık ve düzenleyici uygunluk durumunu fail-closed ülke/para birimi aktivasyon kapısına bağla
 - [x] Master Phase B — TR/EN gizlilik politikası kataloğunu sürümlü, public ve kayıt onayıyla ilişkilendirilebilir hale getir
 - [x] Master Phase B — Belge sürümü değişiminde yalnız güncel belge kataloğuna dayanan yeniden-onay sorgu ve kayıt akışını uygula
+- [ ] Master Phase C — Organizasyon, corporate account, üyelik ve sahiplikli kurumsal iş erişimi veri/API temelini uygula
+- [ ] Master Phase C — Super Admin/RBAC izin politikasını backend enforcement ve immutable audit olaylarıyla uygula
+- [ ] Master Phase C — Merkezi i18n kapsamını tamamla ve TRY-only modelini çoklu para birimi biçimleme/validasyon temeliyle genişlet
+- [ ] Master Phase C — Maskeli iletişim sağlayıcı adaptörünü NOT_CONFIGURED fail-closed durumda hazırla
+- [ ] Master Phase C — Uygulama branding source-of-truth, bundle/payment kimliği ve template kalıntılarını güvenli biçimde temizle

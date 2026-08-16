@@ -827,13 +827,271 @@ import {
   trustProfiles,
   riskFlags,
   paymentProviderWatch,
+  organizations,
+  organizationMembers,
+  adminRoles,
+  maskedCommunicationSessions,
 } from "../drizzle/schema";
+import {
+  type MaskedCommunicationChannel,
+  sanitizeMaskedMessageContent,
+} from "./communications/MaskedCommunicationService";
 import {
   decidePaymentProviderOperationalStatus,
   type PaymentProviderId,
   type PaymentProviderOperationalRecord,
   type PaymentProviderOperationalStatus,
 } from "./payments/ProviderOperationalPolicy";
+
+export type OrganizationType = "corporate" | "fleet" | "facility";
+export type OrganizationMemberRole = "owner" | "admin" | "member";
+
+async function getOrganizationAccess(input: { organizationId: number; userId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db
+    .select({ organization: organizations, member: organizationMembers })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
+    .where(
+      and(
+        eq(organizationMembers.organizationId, input.organizationId),
+        eq(organizationMembers.userId, input.userId),
+        isNotNull(organizationMembers.joinedAt),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row || row.organization.status !== "active") throw new Error("ORGANIZATION_ACCESS_FORBIDDEN");
+  return row;
+}
+
+export async function assertOrganizationRequestAccess(input: { organizationId: number; userId: number }) {
+  return getOrganizationAccess(input);
+}
+
+export async function canAccessOrganizationRequest(input: { organizationId: number; userId: number }) {
+  try {
+    await getOrganizationAccess(input);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message === "ORGANIZATION_ACCESS_FORBIDDEN") return false;
+    throw error;
+  }
+}
+
+export async function createOrganization(input: {
+  ownerId: number;
+  name: string;
+  taxId?: string;
+  type: OrganizationType;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    const result = await tx.insert(organizations).values({
+      ownerId: input.ownerId,
+      name: input.name,
+      taxId: input.taxId ?? null,
+      type: input.type,
+      status: "active",
+    });
+    const organizationId = result[0].insertId;
+    await tx.insert(organizationMembers).values({
+      organizationId,
+      userId: input.ownerId,
+      role: "owner",
+      invitedByUserId: input.ownerId,
+      joinedAt: new Date(),
+    });
+    return organizationId;
+  });
+}
+
+export async function listOrganizationsForUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ organization: organizations, member: organizationMembers })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
+    .where(and(eq(organizationMembers.userId, userId), isNotNull(organizationMembers.joinedAt)))
+    .orderBy(desc(organizations.updatedAt), desc(organizations.id));
+  return rows.filter((row) => row.organization.status === "active").map((row) => ({
+    ...row.organization,
+    memberRole: row.member.role,
+    joinedAt: row.member.joinedAt,
+  }));
+}
+
+export async function listOrganizationInvitations(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ organization: organizations, member: organizationMembers })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
+    .where(and(eq(organizationMembers.userId, userId), isNull(organizationMembers.joinedAt)))
+    .orderBy(desc(organizationMembers.invitedAt));
+  return rows.filter((row) => row.organization.status === "active").map((row) => ({
+    organizationId: row.organization.id,
+    organizationName: row.organization.name,
+    organizationType: row.organization.type,
+    role: row.member.role,
+    invitedAt: row.member.invitedAt,
+  }));
+}
+
+export async function listOrganizationMembers(input: { organizationId: number; actorUserId: number }) {
+  await getOrganizationAccess({ organizationId: input.organizationId, userId: input.actorUserId });
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      userId: organizationMembers.userId,
+      role: organizationMembers.role,
+      invitedAt: organizationMembers.invitedAt,
+      joinedAt: organizationMembers.joinedAt,
+      name: users.name,
+      email: users.email,
+    })
+    .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .where(eq(organizationMembers.organizationId, input.organizationId))
+    .orderBy(organizationMembers.role, organizationMembers.createdAt);
+}
+
+function canManageOrganizationMembers(role: OrganizationMemberRole) {
+  return role === "owner" || role === "admin";
+}
+
+export async function inviteOrganizationMember(input: {
+  organizationId: number;
+  actorUserId: number;
+  userId: number;
+  role: Exclude<OrganizationMemberRole, "owner">;
+}) {
+  if (input.actorUserId === input.userId) throw new Error("ORGANIZATION_SELF_INVITE_FORBIDDEN");
+  const access = await getOrganizationAccess({ organizationId: input.organizationId, userId: input.actorUserId });
+  if (!canManageOrganizationMembers(access.member.role)) throw new Error("ORGANIZATION_MEMBER_MANAGEMENT_FORBIDDEN");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const target = await db.select({ id: users.id }).from(users).where(eq(users.id, input.userId)).limit(1);
+  if (!target[0]) throw new Error("ORGANIZATION_INVITEE_NOT_FOUND");
+  const result = await db.insert(organizationMembers).values({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    role: input.role,
+    invitedByUserId: input.actorUserId,
+  });
+  return result[0].insertId;
+}
+
+export async function acceptOrganizationInvitation(input: { organizationId: number; userId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(organizationMembers)
+    .set({ joinedAt: new Date() })
+    .where(
+      and(
+        eq(organizationMembers.organizationId, input.organizationId),
+        eq(organizationMembers.userId, input.userId),
+        isNull(organizationMembers.joinedAt),
+      ),
+    );
+  if (result[0].affectedRows !== 1) throw new Error("ORGANIZATION_INVITATION_NOT_FOUND");
+  return { organizationId: input.organizationId, joinedAt: new Date() };
+}
+
+export async function updateOrganizationMemberRole(input: {
+  organizationId: number;
+  actorUserId: number;
+  userId: number;
+  role: Exclude<OrganizationMemberRole, "owner">;
+}) {
+  const access = await getOrganizationAccess({ organizationId: input.organizationId, userId: input.actorUserId });
+  if (access.member.role !== "owner") throw new Error("ORGANIZATION_OWNER_REQUIRED");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const member = await db
+    .select()
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.organizationId, input.organizationId), eq(organizationMembers.userId, input.userId)))
+    .limit(1);
+  if (!member[0]) throw new Error("ORGANIZATION_MEMBER_NOT_FOUND");
+  if (member[0].role === "owner") throw new Error("ORGANIZATION_OWNER_ROLE_IMMUTABLE");
+  await db
+    .update(organizationMembers)
+    .set({ role: input.role })
+    .where(eq(organizationMembers.id, member[0].id));
+  return { organizationId: input.organizationId, userId: input.userId, role: input.role };
+}
+
+export async function archiveOrganization(input: { organizationId: number; actorUserId: number }) {
+  const access = await getOrganizationAccess({ organizationId: input.organizationId, userId: input.actorUserId });
+  if (access.member.role !== "owner") throw new Error("ORGANIZATION_OWNER_REQUIRED");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(organizations).set({ status: "archived" }).where(eq(organizations.id, input.organizationId));
+  return { organizationId: input.organizationId, status: "archived" as const };
+}
+
+export async function hasActiveSuperAdminRole(userId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const row = await db
+    .select({ id: adminRoles.id })
+    .from(adminRoles)
+    .where(and(eq(adminRoles.userId, userId), eq(adminRoles.role, "super_admin"), isNull(adminRoles.revokedAt)))
+    .limit(1);
+  return Boolean(row[0]);
+}
+
+export async function listActiveSuperAdmins() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ userId: adminRoles.userId, name: users.name, email: users.email, grantedAt: adminRoles.grantedAt })
+    .from(adminRoles)
+    .innerJoin(users, eq(users.id, adminRoles.userId))
+    .where(and(eq(adminRoles.role, "super_admin"), isNull(adminRoles.revokedAt)))
+    .orderBy(desc(adminRoles.grantedAt));
+}
+
+export async function grantSuperAdminRole(input: { actorUserId: number; userId: number }) {
+  if (!(await hasActiveSuperAdminRole(input.actorUserId))) throw new Error("SUPER_ADMIN_REQUIRED");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const target = await db.select({ role: users.role }).from(users).where(eq(users.id, input.userId)).limit(1);
+  if (!target[0]) throw new Error("SUPER_ADMIN_TARGET_NOT_FOUND");
+  if (target[0].role !== "admin") throw new Error("SUPER_ADMIN_TARGET_MUST_BE_ADMIN");
+  const existing = await db
+    .select({ id: adminRoles.id, revokedAt: adminRoles.revokedAt })
+    .from(adminRoles)
+    .where(and(eq(adminRoles.userId, input.userId), eq(adminRoles.role, "super_admin")))
+    .limit(1);
+  if (existing[0]?.revokedAt == null) return { userId: input.userId, duplicated: true };
+  if (existing[0]) {
+    await db.update(adminRoles).set({ revokedAt: null, grantedByUserId: input.actorUserId, grantedAt: new Date() }).where(eq(adminRoles.id, existing[0].id));
+  } else {
+    await db.insert(adminRoles).values({ userId: input.userId, role: "super_admin", grantedByUserId: input.actorUserId });
+  }
+  return { userId: input.userId, duplicated: false };
+}
+
+export async function revokeSuperAdminRole(input: { actorUserId: number; userId: number }) {
+  if (!(await hasActiveSuperAdminRole(input.actorUserId))) throw new Error("SUPER_ADMIN_REQUIRED");
+  if (input.actorUserId === input.userId) throw new Error("SUPER_ADMIN_SELF_REVOKE_FORBIDDEN");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db
+    .update(adminRoles)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(adminRoles.userId, input.userId), eq(adminRoles.role, "super_admin"), isNull(adminRoles.revokedAt)));
+  if (result[0].affectedRows !== 1) throw new Error("SUPER_ADMIN_ROLE_NOT_FOUND");
+  return { userId: input.userId, revoked: true };
+}
 
 // Service Categories
 
@@ -1651,6 +1909,7 @@ export type ServiceRequestDetailsInput = {
 
 export async function createServiceRequest(data: {
   userId: number;
+  organizationId?: number;
   categoryId: number;
   title: string;
   description?: string;
@@ -1665,6 +1924,9 @@ export async function createServiceRequest(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  if (data.organizationId != null) {
+    await assertOrganizationRequestAccess({ organizationId: data.organizationId, userId: data.userId });
+  }
   const { details, ...requestData } = data;
   return db.transaction(async (tx) => {
     const result = await tx.insert(serviceRequests).values(requestData);
@@ -1759,10 +2021,26 @@ export async function createServiceRequestMedia(data: {
 export async function getUserServiceRequests(userId: number) {
   const db = await getDb();
   if (!db) return [];
+  const organizationMemberships = await db
+    .select({ organizationId: organizationMembers.organizationId })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
+    .where(
+      and(
+        eq(organizationMembers.userId, userId),
+        isNotNull(organizationMembers.joinedAt),
+        eq(organizations.status, "active"),
+      ),
+    );
+  const organizationIds = organizationMemberships.map((membership) => membership.organizationId);
   const requestRows = await db
     .select()
     .from(serviceRequests)
-    .where(eq(serviceRequests.userId, userId))
+    .where(
+      organizationIds.length > 0
+        ? or(eq(serviceRequests.userId, userId), inArray(serviceRequests.organizationId, organizationIds))
+        : eq(serviceRequests.userId, userId),
+    )
     .orderBy(desc(serviceRequests.updatedAt), desc(serviceRequests.id));
 
   if (requestRows.length === 0) return [];
@@ -1960,6 +2238,104 @@ export async function validateMessageParticipant(
   await assertMessageParticipant(db, requestId, userId, otherUserId);
 }
 
+async function getMaskedCommunicationParticipants(requestId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db
+    .select({
+      customerUserId: serviceRequests.userId,
+      providerUserId: providers.userId,
+      status: serviceRequests.status,
+    })
+    .from(serviceRequests)
+    .leftJoin(providers, eq(serviceRequests.assignedProviderId, providers.id))
+    .where(eq(serviceRequests.id, requestId))
+    .limit(1);
+  const participant = rows[0];
+  if (!participant) throw new Error("MASKED_COMMUNICATION_REQUEST_NOT_FOUND");
+  if (participant.providerUserId == null) throw new Error("MASKED_COMMUNICATION_REQUEST_NOT_ASSIGNED");
+  if (participant.status === "cancelled" || participant.status === "completed") {
+    throw new Error("MASKED_COMMUNICATION_REQUEST_INACTIVE");
+  }
+  return { db, customerUserId: participant.customerUserId, providerUserId: participant.providerUserId };
+}
+
+export async function createMaskedCommunicationSession(input: {
+  requestId: number;
+  actorUserId: number;
+  channel: MaskedCommunicationChannel;
+}) {
+  const participant = await getMaskedCommunicationParticipants(input.requestId);
+  if (input.actorUserId !== participant.customerUserId && input.actorUserId !== participant.providerUserId) {
+    throw new Error("MASKED_COMMUNICATION_FORBIDDEN");
+  }
+  const existing = await participant.db
+    .select()
+    .from(maskedCommunicationSessions)
+    .where(and(eq(maskedCommunicationSessions.requestId, input.requestId), eq(maskedCommunicationSessions.channel, input.channel)))
+    .limit(1);
+  if (existing[0]) return existing[0];
+  const result = await participant.db.insert(maskedCommunicationSessions).values({
+    requestId: input.requestId,
+    customerUserId: participant.customerUserId,
+    providerUserId: participant.providerUserId,
+    channel: input.channel,
+    status: "not_configured",
+    createdByUserId: input.actorUserId,
+  });
+  const row = await participant.db
+    .select()
+    .from(maskedCommunicationSessions)
+    .where(eq(maskedCommunicationSessions.id, Number(result[0].insertId)))
+    .limit(1);
+  return row[0]!;
+}
+
+export async function getMaskedCommunicationSession(input: {
+  requestId: number;
+  actorUserId: number;
+  channel: MaskedCommunicationChannel;
+}) {
+  const participant = await getMaskedCommunicationParticipants(input.requestId);
+  if (input.actorUserId !== participant.customerUserId && input.actorUserId !== participant.providerUserId) {
+    throw new Error("MASKED_COMMUNICATION_FORBIDDEN");
+  }
+  const rows = await participant.db
+    .select({
+      id: maskedCommunicationSessions.id,
+      requestId: maskedCommunicationSessions.requestId,
+      channel: maskedCommunicationSessions.channel,
+      status: maskedCommunicationSessions.status,
+      expiresAt: maskedCommunicationSessions.expiresAt,
+      releasedAt: maskedCommunicationSessions.releasedAt,
+      createdAt: maskedCommunicationSessions.createdAt,
+    })
+    .from(maskedCommunicationSessions)
+    .where(and(eq(maskedCommunicationSessions.requestId, input.requestId), eq(maskedCommunicationSessions.channel, input.channel)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function releaseMaskedCommunicationSession(input: {
+  requestId: number;
+  actorUserId: number;
+  channel: MaskedCommunicationChannel;
+}) {
+  const participant = await getMaskedCommunicationParticipants(input.requestId);
+  if (input.actorUserId !== participant.customerUserId && input.actorUserId !== participant.providerUserId) {
+    throw new Error("MASKED_COMMUNICATION_FORBIDDEN");
+  }
+  const result = await participant.db
+    .update(maskedCommunicationSessions)
+    .set({ status: "released", releasedAt: new Date() })
+    .where(and(
+      eq(maskedCommunicationSessions.requestId, input.requestId),
+      eq(maskedCommunicationSessions.channel, input.channel),
+    ));
+  if (result[0].affectedRows !== 1) throw new Error("MASKED_COMMUNICATION_SESSION_NOT_FOUND");
+  return { released: true };
+}
+
 export async function sendMessage(data: {
   senderId: number;
   receiverId: number;
@@ -1969,7 +2345,10 @@ export async function sendMessage(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await assertMessageParticipant(db, data.requestId, data.senderId, data.receiverId);
-  const result = await db.insert(messages).values(data);
+  const result = await db.insert(messages).values({
+    ...data,
+    content: sanitizeMaskedMessageContent(data.content),
+  });
   return result[0].insertId;
 }
 

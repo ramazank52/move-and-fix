@@ -1,5 +1,7 @@
 export type Language = "tr" | "en" | "de" | "fr" | "ar" | "ru";
-export type SupportedCurrency = "TRY";
+import type { SupportedDisplayCurrency } from "@/shared/currency-policy";
+
+export type SupportedCurrency = SupportedDisplayCurrency;
 
 export const LANGUAGES: { code: Language; name: string; nativeName: string; locale: string; isRTL: boolean }[] = [
   { code: "tr", name: "Turkish", nativeName: "Türkçe", locale: "tr-TR", isRTL: false },
@@ -12,6 +14,8 @@ export const LANGUAGES: { code: Language; name: string; nativeName: string; loca
 
 export const SUPPORTED_CURRENCIES: { code: SupportedCurrency; label: string; locale: string }[] = [
   { code: "TRY", label: "Türk lirası (TRY)", locale: "tr-TR" },
+  { code: "USD", label: "US dollar (USD)", locale: "en-US" },
+  { code: "EUR", label: "Euro (EUR)", locale: "de-DE" },
 ];
 
 export type TranslationKey =
@@ -19,7 +23,9 @@ export type TranslationKey =
   | "serviceRequest" | "findProvider" | "login" | "register" | "logout" | "settings" | "premium" | "notifications"
   | "aiAssistant" | "active" | "pending" | "completed" | "cancelled" | "language" | "currency" | "wallet" | "restartRequired"
   | "settingsSecurity" | "darkMode" | "activeDevices" | "about" | "privacyPolicy" | "terms" | "logoutConfirmTitle"
-  | "logoutConfirmBody" | "cancel" | "currencyTry" | "version" | "languageSelectionHelp" | "back" | "security"
+  | "logoutConfirmBody" | "cancel" | "currencyTry" | "currencyUsd" | "currencyEur" | "currencyUnavailableTitle" | "currencyUnavailableBody" | "currencySettlementNotice" | "version" | "languageSelectionHelp" | "back" | "security"
+  | "consent.title" | "consent.requiredHint" | "consent.readText" | "consent.createAccount" | "consent.acceptAll"
+  | "privacy.title" | "privacy.updated" | "privacy.publicDescription" | "privacy.publicNotice" | "privacy.approvedText" | "privacy.pendingLegalReviewTitle" | "privacy.pendingLegalReviewBody" | "privacy.tabAccessibility" | "privacy.tabHint"
   | "home.greeting" | "home.defaultName" | "home.subtitle" | "home.searchPlaceholder" | "home.moveAITitle"
   | "home.moveAISubtitle" | "home.quickAccess" | "home.activeJob" | "home.nearbyProviders" | "home.popularServices"
   | "home.noNearbyProviders" | "home.quickAccess_emergency" | "home.quickAccess_vehicle" | "home.quickAccess_home"
@@ -73,7 +79,7 @@ export type TranslationValues = Record<string, string | number>;
 
 const translations: Record<Language, Dictionary> = {
   tr: {
-    home: "Ana Sayfa", explore: "Keşfet", myJobs: "İşlerim", messages: "Mesajlar", profile: "Profil", search: "Hizmet veya usta ara...", categories: "Hizmet Kategorileri", topRated: "En Yüksek Puanlı", viewAll: "Tümü", serviceRequest: "Hizmet Talebi", findProvider: "Usta Bul", login: "Giriş Yap", register: "Kayıt Ol", logout: "Çıkış Yap", settings: "Ayarlar", premium: "Premium Üyelik", notifications: "Bildirimler", aiAssistant: "MoveAI Asistan", active: "Aktif", pending: "Bekleyen", completed: "Tamamlanan", cancelled: "İptal", language: "Dil", currency: "Para Birimi", wallet: "MoveWallet", restartRequired: "Yön değişikliğinin uygulanması için uygulamayı yeniden açın.", settingsSecurity: "Ayarlar ve Güvenlik", darkMode: "Karanlık Mod", activeDevices: "Aktif Cihazlar", about: "Hakkında", privacyPolicy: "Gizlilik Politikası", terms: "Kullanım Koşulları", logoutConfirmTitle: "Çıkış Yap", logoutConfirmBody: "Hesabınızdan çıkış yapmak istediğinize emin misiniz?", cancel: "İptal", currencyTry: "₺ TRY", version: "Move&Fix v1.0.0", languageSelectionHelp: "Uygulama dilini seçin. Arapça yön değişikliğinin tamamlanması için uygulamayı yeniden açmanız gerekir.", back: "Geri dön", security: "Güvenlik", "home.greeting": "Merhaba {name} 👋", "home.defaultName": "Kullanıcı", "home.subtitle": "Bugün sana nasıl yardımcı olabilirim?", "home.searchPlaceholder": "Ne arıyorsun?", "home.moveAITitle": "MoveAI ile anlat", "home.moveAISubtitle": "Doğal dille söyle, biz halledelim", "home.quickAccess": "Hızlı Erişim", "home.activeJob": "Aktif İş", "home.nearbyProviders": "Yakındaki Ustalar", "home.popularServices": "Popüler Hizmetler", "home.noNearbyProviders": "Yakında profesyonel bulunamadı", "home.quickAccess_emergency": "Acil Yardım", "home.quickAccess_vehicle": "Araç", "home.quickAccess_home": "Ev", "home.quickAccess_moving": "Taşıma", "home.service.cleaning": "Temizlik", "home.service.plumbing": "Su Tesisatı", "home.service.electricity": "Elektrik", "home.service.airConditioning": "Klima", "home.serviceCount": "{count} hizmet", "common.seeAll": "Tümü", "explore.title": "Ne arıyorsun?", "explore.all": "Tümü", "explore.emergency": "Acil", "explore.vehicle": "Araç", "explore.loadingServices": "Hizmetler yükleniyor...", "explore.categoriesFailed": "Kategoriler yüklenemedi", "explore.retry": "Yeniden dene", "explore.noServices": "Aramana uygun hizmet bulunamadı.", "explore.recommendedProviders": "Önerilen Ustalar", "explore.loadingProvidersFailed": "Profesyoneller yüklenemedi. Yeniden dene.", "explore.noProviders": "Uygun profesyonel bulunamadı.", "explore.providerCount": "{count} profesyonel", "explore.moveScore": "MoveScore {score}"
+    home: "Ana Sayfa", explore: "Keşfet", myJobs: "İşlerim", messages: "Mesajlar", profile: "Profil", search: "Hizmet veya usta ara...", categories: "Hizmet Kategorileri", topRated: "En Yüksek Puanlı", viewAll: "Tümü", serviceRequest: "Hizmet Talebi", findProvider: "Usta Bul", login: "Giriş Yap", register: "Kayıt Ol", logout: "Çıkış Yap", settings: "Ayarlar", premium: "Premium Üyelik", notifications: "Bildirimler", aiAssistant: "MoveAI Asistan", active: "Aktif", pending: "Bekleyen", completed: "Tamamlanan", cancelled: "İptal", language: "Dil", currency: "Para Birimi", wallet: "MoveWallet", restartRequired: "Yön değişikliğinin uygulanması için uygulamayı yeniden açın.", settingsSecurity: "Ayarlar ve Güvenlik", darkMode: "Karanlık Mod", activeDevices: "Aktif Cihazlar", about: "Hakkında", privacyPolicy: "Gizlilik Politikası", terms: "Kullanım Koşulları", logoutConfirmTitle: "Çıkış Yap", logoutConfirmBody: "Hesabınızdan çıkış yapmak istediğinize emin misiniz?", cancel: "İptal", currencyTry: "₺ TRY", currencyUsd: "$ USD", currencyEur: "€ EUR", currencyUnavailableTitle: "Kur dönüşümü hazır değil", currencyUnavailableBody: "{currency} görüntüleme ve ödeme için onaylı bir kur sağlayıcısı yapılandırılmadı. Tüm tutarlar güvenle TRY olarak kalır.", currencySettlementNotice: "Ödemeler ve cüzdan bakiyesi yalnız TRY üzerinden uzlaştırılır.", version: "Move&Fix v1.0.0", languageSelectionHelp: "Uygulama dilini seçin. Arapça yön değişikliğinin tamamlanması için uygulamayı yeniden açmanız gerekir.", back: "Geri dön", security: "Güvenlik", "home.greeting": "Merhaba {name} 👋", "home.defaultName": "Kullanıcı", "home.subtitle": "Bugün sana nasıl yardımcı olabilirim?", "home.searchPlaceholder": "Ne arıyorsun?", "home.moveAITitle": "MoveAI ile anlat", "home.moveAISubtitle": "Doğal dille söyle, biz halledelim", "home.quickAccess": "Hızlı Erişim", "home.activeJob": "Aktif İş", "home.nearbyProviders": "Yakındaki Ustalar", "home.popularServices": "Popüler Hizmetler", "home.noNearbyProviders": "Yakında profesyonel bulunamadı", "home.quickAccess_emergency": "Acil Yardım", "home.quickAccess_vehicle": "Araç", "home.quickAccess_home": "Ev", "home.quickAccess_moving": "Taşıma", "home.service.cleaning": "Temizlik", "home.service.plumbing": "Su Tesisatı", "home.service.electricity": "Elektrik", "home.service.airConditioning": "Klima", "home.serviceCount": "{count} hizmet", "common.seeAll": "Tümü", "explore.title": "Ne arıyorsun?", "explore.all": "Tümü", "explore.emergency": "Acil", "explore.vehicle": "Araç", "explore.loadingServices": "Hizmetler yükleniyor...", "explore.categoriesFailed": "Kategoriler yüklenemedi", "explore.retry": "Yeniden dene", "explore.noServices": "Aramana uygun hizmet bulunamadı.", "explore.recommendedProviders": "Önerilen Ustalar", "explore.loadingProvidersFailed": "Profesyoneller yüklenemedi. Yeniden dene.", "explore.noProviders": "Uygun profesyonel bulunamadı.", "explore.providerCount": "{count} profesyonel", "explore.moveScore": "MoveScore {score}"
   },
   en: {
     home: "Home", explore: "Explore", myJobs: "My Jobs", messages: "Messages", profile: "Profile", search: "Search for services or providers...", categories: "Service Categories", topRated: "Top Rated", viewAll: "View All", serviceRequest: "Service Request", findProvider: "Find Provider", login: "Login", register: "Register", logout: "Log out", settings: "Settings", premium: "Premium Membership", notifications: "Notifications", aiAssistant: "MoveAI Assistant", active: "Active", pending: "Pending", completed: "Completed", cancelled: "Cancelled", language: "Language", currency: "Currency", wallet: "MoveWallet", restartRequired: "Reopen the app to apply the direction change.", settingsSecurity: "Settings & Security", darkMode: "Dark Mode", activeDevices: "Active Devices", about: "About", privacyPolicy: "Privacy Policy", terms: "Terms of Use", logoutConfirmTitle: "Log out", logoutConfirmBody: "Are you sure you want to sign out of your account?", cancel: "Cancel", currencyTry: "₺ TRY", version: "Move&Fix v1.0.0", languageSelectionHelp: "Choose the app language. Reopen the app to fully apply Arabic right-to-left direction.", back: "Go back", security: "Security", "home.greeting": "Hello {name} 👋", "home.defaultName": "Customer", "home.subtitle": "How can I help you today?", "home.searchPlaceholder": "What are you looking for?", "home.moveAITitle": "Tell MoveAI", "home.moveAISubtitle": "Say it naturally, we’ll handle it", "home.quickAccess": "Quick Access", "home.activeJob": "Active Job", "home.nearbyProviders": "Nearby Providers", "home.popularServices": "Popular Services", "home.noNearbyProviders": "No nearby providers found", "home.quickAccess_emergency": "Emergency", "home.quickAccess_vehicle": "Vehicle", "home.quickAccess_home": "Home", "home.quickAccess_moving": "Moving", "home.service.cleaning": "Cleaning", "home.service.plumbing": "Plumbing", "home.service.electricity": "Electrical", "home.service.airConditioning": "Air Conditioning", "home.serviceCount": "{count} services", "common.seeAll": "See All", "explore.title": "What are you looking for?", "explore.all": "All", "explore.emergency": "Emergency", "explore.vehicle": "Vehicle", "explore.loadingServices": "Loading services...", "explore.categoriesFailed": "Categories could not be loaded", "explore.retry": "Try again", "explore.noServices": "No services match your search.", "explore.recommendedProviders": "Recommended Providers", "explore.loadingProvidersFailed": "Providers could not be loaded. Try again.", "explore.noProviders": "No suitable providers found.", "explore.providerCount": "{count} providers", "explore.moveScore": "MoveScore {score}"
@@ -94,6 +100,25 @@ const translations: Record<Language, Dictionary> = {
 
 const extraTranslations: Partial<Record<Language, Dictionary>> = {
   tr: {
+    "consent.title": "Yasal Onaylar",
+    "consent.requiredHint": "Devam etmek için aşağıdaki tüm maddeleri onaylamanız gerekmektedir.",
+    "consent.readText": "Metni oku →",
+    "consent.createAccount": "Hesap Oluştur",
+    "consent.acceptAll": "Tüm maddeleri onaylayın",
+    "privacy.title": "Move&Fix Gizlilik Politikası",
+    "privacy.updated": "Son güncelleme",
+    "privacy.publicDescription": "Move&Fix gizlilik politikası ve kişisel veri işleme bilgileri.",
+    "privacy.publicNotice": "Bu sayfa giriş gerektirmeden herkese açıktır.",
+    "privacy.approvedText": "Onaylı metin",
+    "privacy.pendingLegalReviewTitle": "Hukuk incelemesi bekleniyor",
+    "privacy.pendingLegalReviewBody": "İngilizce çeviri erişilebilirlik için sunulmaktadır. Hukuk incelemesi tamamlanana kadar Türkçe politika onaylı ve esas metindir.",
+    "privacy.tabAccessibility": "{language} gizlilik politikası",
+    "privacy.tabHint": "Gizlilik politikası görüntüleme dilini değiştirir",
+    currencyUsd: "$ USD",
+    currencyEur: "€ EUR",
+    currencyUnavailableTitle: "Kur dönüşümü hazır değil",
+    currencyUnavailableBody: "{currency} görüntüleme ve ödeme için onaylı bir kur sağlayıcısı yapılandırılmadı. Tüm tutarlar güvenle TRY olarak kalır.",
+    currencySettlementNotice: "Ödemeler ve cüzdan bakiyesi yalnız TRY üzerinden uzlaştırılır.",
     "ai.welcome": "Merhaba! Ben MoveAI 🤖 Size nasıl yardımcı olabilirim? Acil bir sorun mu var, hizmet mi arıyorsunuz?",
     "ai.online": "Çevrimiçi", "ai.thinking": "MoveAI düşünüyor...", "ai.inputPlaceholder": "Sorunuzu yazın...",
     "ai.fallback": "Size yardımcı olmaya çalışıyorum. Lütfen biraz daha açıklayıcı olur musunuz?",
@@ -141,6 +166,25 @@ const extraTranslations: Partial<Record<Language, Dictionary>> = {
     "security.revokeFailed": "Oturum İptal Edilemedi", "security.sessionsRevokeFailed": "Oturumlar İptal Edilemedi", "security.sessionsRevoked": "Oturumlar Kapatıldı", "security.sessionsRevokedBody": "{count} diğer oturum güvenle iptal edildi.", "security.revokeCurrentTitle": "Bu Cihazdan Çıkış Yap", "security.revokeDeviceTitle": "Cihaz Oturumunu Kapat", "security.revokeCurrentBody": "Bu cihazdaki oturumunuz kapatılacak.", "security.revokeDeviceBody": "Bu cihaz artık hesabınıza erişemeyecek.", "security.cancel": "İptal", "security.revoke": "Oturumu Kapat", "security.revokeOthersTitle": "Diğer Tüm Oturumları Kapat", "security.revokeOthersBody": "Bu cihaz dışındaki tüm aktif oturumlar kapatılacak.", "security.revokeOthers": "Diğerlerini Kapat", "security.back": "Geri dön", "security.title": "Hesap Güvenliği", "security.noticeTitle": "Güvenli oturumlar", "security.noticeBody": "Tanımadığınız cihazları hemen kapatın. Para çekme işlemlerinde parola ile yeniden doğrulama istenir.", "security.activeDevices": "Aktif cihazlar", "security.loadFailed": "Oturumlar yüklenemedi", "security.retry": "Yeniden dene", "security.currentDevice": "Bu cihaz", "security.signedInDevice": "Giriş yapılmış cihaz", "security.active": "Aktif", "security.deviceMissing": "Cihaz bilgisi mevcut değil", "security.closed": "Oturum kapalı", "security.lastActivity": "Son etkinlik: {date}", "security.signOut": "Çıkış", "security.close": "Kapat", "security.noSessions": "Yerel oturum bulunamadı", "security.noSessionsBody": "OAuth oturumları kimlik sağlayıcısı tarafından yönetilir."
   },
   en: {
+    "consent.title": "Legal consents",
+    "consent.requiredHint": "You must approve all required items below to continue.",
+    "consent.readText": "Read text →",
+    "consent.createAccount": "Create account",
+    "consent.acceptAll": "Approve all required items",
+    "privacy.title": "Move&Fix Privacy Policy",
+    "privacy.updated": "Last updated",
+    "privacy.publicDescription": "Move&Fix privacy policy and personal data processing information.",
+    "privacy.publicNotice": "This page is publicly available without sign-in.",
+    "privacy.approvedText": "Approved text",
+    "privacy.pendingLegalReviewTitle": "Legal review pending",
+    "privacy.pendingLegalReviewBody": "This English translation is provided for accessibility. The Turkish policy remains the approved, authoritative version until legal review is completed.",
+    "privacy.tabAccessibility": "{language} privacy policy",
+    "privacy.tabHint": "Changes the display language of the privacy policy",
+    currencyUsd: "$ USD",
+    currencyEur: "€ EUR",
+    currencyUnavailableTitle: "Currency conversion is not ready",
+    currencyUnavailableBody: "An approved exchange-rate provider is not configured for {currency} display or payment. All amounts safely remain in TRY.",
+    currencySettlementNotice: "Payments and wallet balances settle in TRY only.",
     "ai.welcome": "Hello! I’m MoveAI 🤖 How can I help you? Is there an emergency, or are you looking for a service?",
     "ai.online": "Online", "ai.thinking": "MoveAI is thinking...", "ai.inputPlaceholder": "Type your question...",
     "ai.fallback": "I’m trying to help. Could you please give me a little more detail?",
@@ -188,6 +232,25 @@ const extraTranslations: Partial<Record<Language, Dictionary>> = {
     "security.revokeFailed": "Session Could Not Be Revoked", "security.sessionsRevokeFailed": "Sessions Could Not Be Revoked", "security.sessionsRevoked": "Sessions Closed", "security.sessionsRevokedBody": "{count} other sessions were safely revoked.", "security.revokeCurrentTitle": "Sign Out From This Device", "security.revokeDeviceTitle": "Close Device Session", "security.revokeCurrentBody": "Your session on this device will be closed.", "security.revokeDeviceBody": "This device will no longer be able to access your account.", "security.cancel": "Cancel", "security.revoke": "Close Session", "security.revokeOthersTitle": "Close All Other Sessions", "security.revokeOthersBody": "All active sessions except this device will be closed.", "security.revokeOthers": "Close Others", "security.back": "Go back", "security.title": "Account Security", "security.noticeTitle": "Secure sessions", "security.noticeBody": "Close unrecognized devices immediately. Withdrawals require password re-authentication.", "security.activeDevices": "Active devices", "security.loadFailed": "Sessions could not be loaded", "security.retry": "Try again", "security.currentDevice": "This device", "security.signedInDevice": "Signed-in device", "security.active": "Active", "security.deviceMissing": "Device information unavailable", "security.closed": "Session closed", "security.lastActivity": "Last activity: {date}", "security.signOut": "Sign out", "security.close": "Close", "security.noSessions": "No local sessions found", "security.noSessionsBody": "OAuth sessions are managed by the identity provider."
   },
   ru: {
+    "consent.title": "Юридические согласия",
+    "consent.requiredHint": "Чтобы продолжить, необходимо подтвердить все обязательные пункты ниже.",
+    "consent.readText": "Прочитать текст →",
+    "consent.createAccount": "Создать аккаунт",
+    "consent.acceptAll": "Подтвердите все обязательные пункты",
+    "privacy.title": "Политика конфиденциальности Move&Fix",
+    "privacy.updated": "Последнее обновление",
+    "privacy.publicDescription": "Политика конфиденциальности Move&Fix и сведения об обработке персональных данных.",
+    "privacy.publicNotice": "Эта страница доступна публично без входа в аккаунт.",
+    "privacy.approvedText": "Утверждённый текст",
+    "privacy.pendingLegalReviewTitle": "Ожидается юридическая проверка",
+    "privacy.pendingLegalReviewBody": "Английский перевод предоставлен для доступности. До завершения юридической проверки утверждённой и основной остаётся турецкая политика.",
+    "privacy.tabAccessibility": "Политика конфиденциальности: {language}",
+    "privacy.tabHint": "Изменяет язык отображения политики конфиденциальности",
+    currencyUsd: "$ USD",
+    currencyEur: "€ EUR",
+    currencyUnavailableTitle: "Конвертация валюты не настроена",
+    currencyUnavailableBody: "Для отображения или оплаты в {currency} не настроен одобренный поставщик курсов. Все суммы безопасно остаются в TRY.",
+    currencySettlementNotice: "Платежи и баланс кошелька рассчитываются только в TRY.",
     "ai.welcome": "Здравствуйте! Я MoveAI 🤖 Чем могу помочь? У вас срочная проблема или вы ищете услугу?",
     "ai.online": "В сети", "ai.thinking": "MoveAI думает...", "ai.inputPlaceholder": "Напишите ваш вопрос...",
     "ai.fallback": "Я стараюсь помочь. Пожалуйста, опишите ситуацию немного подробнее.",

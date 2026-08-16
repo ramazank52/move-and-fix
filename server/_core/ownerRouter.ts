@@ -32,6 +32,9 @@ import {
   listMoveOsCategories,
   listMoveOsServices,
   listMoveOsUsers,
+  listActiveSuperAdmins,
+  grantSuperAdminRole,
+  revokeSuperAdminRole,
   incrementAuthChallengeAttempts,
   markAuthChallengeUsed,
   reviewProviderCapabilityStatus,
@@ -49,7 +52,7 @@ import {
 } from "../compliance/CountryComplianceRepository";
 import { ENV } from "./env";
 import { STANDARD_COMMISSION_RATE_BPS } from "../payments/policy";
-import { adminMfaProcedure, adminProcedure, publicProcedure, router } from "./trpc";
+import { adminMfaProcedure, adminProcedure, publicProcedure, router, superAdminMfaProcedure } from "./trpc";
 import { NotificationChannel, notificationServiceV2 } from "../services/NotificationServiceV2";
 
 const listInput = z.object({
@@ -233,6 +236,42 @@ export const ownerRouter = router({
   logout: adminProcedure.mutation(async () => ({ success: true })),
 
   dashboard: adminMfaProcedure.query(async () => getMoveOsDashboardMetrics()),
+
+  superAdmins: superAdminMfaProcedure.query(async () => listActiveSuperAdmins()),
+
+  grantSuperAdmin: superAdminMfaProcedure
+    .input(z.object({ userId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await grantSuperAdminRole({ actorUserId: ctx.user!.id, userId: input.userId });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "SUPER_ADMIN_GRANT_FAILED";
+        if (message === "SUPER_ADMIN_TARGET_NOT_FOUND") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Yönetici kullanıcı bulunamadı" });
+        }
+        if (message === "SUPER_ADMIN_TARGET_MUST_BE_ADMIN") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Super Admin atanacak kullanıcı önce yönetici rolüne sahip olmalıdır" });
+        }
+        throw error;
+      }
+    }),
+
+  revokeSuperAdmin: superAdminMfaProcedure
+    .input(z.object({ userId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await revokeSuperAdminRole({ actorUserId: ctx.user!.id, userId: input.userId });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "SUPER_ADMIN_REVOKE_FAILED";
+        if (message === "SUPER_ADMIN_SELF_REVOKE_FORBIDDEN") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Kendi Super Admin erişiminizi bu oturumda kaldıramazsınız" });
+        }
+        if (message === "SUPER_ADMIN_ROLE_NOT_FOUND") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Aktif Super Admin ataması bulunamadı" });
+        }
+        throw error;
+      }
+    }),
 
   listProviderCapabilities: adminMfaProcedure
     .input(z.object({ providerId: z.number().int().positive() }))

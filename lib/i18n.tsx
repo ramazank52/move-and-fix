@@ -4,10 +4,12 @@ import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, 
 
 import { isRightToLeft, localeForLanguage, formatLocalDate, formatMoney, t } from "./i18n-core";
 import type { Language, SupportedCurrency, TranslationKey, TranslationValues } from "./i18n-core";
+import { requiresFxQuote } from "@/shared/currency-policy";
 
 export * from "./i18n-core";
 
 const LANGUAGE_STORAGE_KEY = "movefix.preference.language.v1";
+const CURRENCY_STORAGE_KEY = "movefix.preference.currency.v1";
 
 type LocalizationContextValue = {
   language: Language;
@@ -26,14 +28,20 @@ const LocalizationContext = createContext<LocalizationContextValue | null>(null)
 
 export function LocalizationProvider({ children }: PropsWithChildren) {
   const [language, setLanguageState] = useState<Language>("tr");
+  const [currency, setCurrencyState] = useState<SupportedCurrency>("TRY");
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
-    void AsyncStorage.getItem(LANGUAGE_STORAGE_KEY)
-      .then((saved) => {
-        if (!active || !["tr", "en", "de", "fr", "ar", "ru"].includes(saved ?? "")) return;
-        setLanguageState(saved as Language);
+    void Promise.all([AsyncStorage.getItem(LANGUAGE_STORAGE_KEY), AsyncStorage.getItem(CURRENCY_STORAGE_KEY)])
+      .then(([savedLanguage, savedCurrency]) => {
+        if (!active) return;
+        if (["tr", "en", "de", "fr", "ar", "ru"].includes(savedLanguage ?? "")) {
+          setLanguageState(savedLanguage as Language);
+        }
+        // A non-TRY value can only originate from a future server-verified FX
+        // rollout. Legacy/local values must not silently relabel TRY balances.
+        if (savedCurrency === "TRY") setCurrencyState("TRY");
       })
       .finally(() => { if (active) setReady(true); });
     return () => { active = false; };
@@ -41,7 +49,7 @@ export function LocalizationProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<LocalizationContextValue>(() => ({
     language,
-    currency: "TRY",
+    currency,
     locale: localeForLanguage(language),
     isRTL: isRightToLeft(language),
     ready,
@@ -53,11 +61,15 @@ export function LocalizationProvider({ children }: PropsWithChildren) {
         I18nManager.forceRTL(isRightToLeft(nextLanguage));
       }
     },
-    setCurrency: async (currency) => { if (currency !== "TRY") throw new Error("UNSUPPORTED_TRANSACTION_CURRENCY"); },
+    setCurrency: async (nextCurrency) => {
+      if (requiresFxQuote(nextCurrency)) throw new Error("CURRENCY_CONVERSION_NOT_CONFIGURED");
+      setCurrencyState(nextCurrency);
+      await AsyncStorage.setItem(CURRENCY_STORAGE_KEY, nextCurrency);
+    },
     translate: (key, values) => t(key, language, values),
     formatMoney: (amount) => formatMoney(amount, language),
     formatDate: (date) => formatLocalDate(date, language),
-  }), [language, ready]);
+  }), [currency, language, ready]);
 
   return <LocalizationContext.Provider value={value}>{children}</LocalizationContext.Provider>;
 }

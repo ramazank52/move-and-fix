@@ -274,6 +274,20 @@
       "when": 1786840189038,
       "tag": "0039_handy_timeslip",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1786842084016,
+      "tag": "0040_black_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1786842634665,
+      "tag": "0041_mushy_warhawk",
+      "breakpoints": true
     }
   ]
 }

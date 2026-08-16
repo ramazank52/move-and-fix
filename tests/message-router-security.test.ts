@@ -10,6 +10,9 @@ vi.mock("../server/db", async () => {
     getMessageParticipant: vi.fn(),
     markConversationRead: vi.fn(),
     sendMessage: vi.fn(),
+    getMaskedCommunicationSession: vi.fn(),
+    createMaskedCommunicationSession: vi.fn(),
+    releaseMaskedCommunicationSession: vi.fn(),
   };
 });
 
@@ -187,5 +190,65 @@ describe("message router security", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(messageDb.getConversation).not.toHaveBeenCalled();
     expect(messageDb.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("masked communication router security", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects anonymous proxy-session operations before database access", async () => {
+    const caller = appRouter.createCaller({ ...createContext(), user: null });
+
+    await expect(caller.maskedCommunications.status({ requestId: 42, channel: "phone" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.maskedCommunications.create({ requestId: 42, channel: "message" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.maskedCommunications.release({ requestId: 42, channel: "phone" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(messageDb.getMaskedCommunicationSession).not.toHaveBeenCalled();
+    expect(messageDb.createMaskedCommunicationSession).not.toHaveBeenCalled();
+    expect(messageDb.releaseMaskedCommunicationSession).not.toHaveBeenCalled();
+  });
+
+  it("derives proxy-session access from the authenticated participant and exposes no real number", async () => {
+    vi.mocked(messageDb.getMaskedCommunicationSession).mockResolvedValue({
+      id: 80,
+      requestId: 42,
+      channel: "phone",
+      status: "not_configured",
+      expiresAt: null,
+      releasedAt: null,
+      createdAt: new Date(),
+    } as never);
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.maskedCommunications.status({ requestId: 42, channel: "phone" })).resolves.toMatchObject({
+      readiness: { configured: false, code: "NOT_CONFIGURED" },
+      session: { id: 80, status: "not_configured" },
+    });
+    expect(messageDb.getMaskedCommunicationSession).toHaveBeenCalledWith({
+      requestId: 42,
+      channel: "phone",
+      actorUserId: 10,
+    });
+  });
+
+  it("maps third-party proxy-session access to FORBIDDEN", async () => {
+    vi.mocked(messageDb.createMaskedCommunicationSession).mockRejectedValue(
+      new Error("MASKED_COMMUNICATION_FORBIDDEN"),
+    );
+    const caller = appRouter.createCaller(createContext(30));
+
+    await expect(caller.maskedCommunications.create({ requestId: 42, channel: "message" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(messageDb.createMaskedCommunicationSession).toHaveBeenCalledWith({
+      requestId: 42,
+      channel: "message",
+      actorUserId: 30,
+    });
+  });
+
+  it("requires a valid positive request id and supported channel", async () => {
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.maskedCommunications.status({ requestId: 0, channel: "phone" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.maskedCommunications.status({ requestId: 42, channel: "video" as never })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(messageDb.getMaskedCommunicationSession).not.toHaveBeenCalled();
   });
 });

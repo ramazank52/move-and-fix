@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { PRIVACY_POLICY_TRANSLATIONS } from "@/lib/data/legal";
+import { t } from "@/lib/i18n-core";
 
 type PolicyLanguage = "tr" | "en";
 
@@ -24,8 +25,8 @@ export default function PrivacyPolicyScreen() {
   const isTurkish = language === "tr";
   const policy = PRIVACY_POLICY_TRANSLATIONS[language];
 
-  const pageTitle = isTurkish ? "Move&Fix Gizlilik Politikası" : "Move&Fix Privacy Policy";
-  const updatedLabel = isTurkish ? "Son güncelleme" : "Last updated";
+  const pageTitle = t("privacy.title", language);
+  const updatedLabel = t("privacy.updated", language);
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
@@ -34,9 +35,7 @@ export default function PrivacyPolicyScreen() {
         <meta
           name="description"
           content={
-            isTurkish
-              ? "Move&Fix gizlilik politikası ve kişisel veri işleme bilgileri."
-              : "Move&Fix privacy policy and personal data processing information."
+            t("privacy.publicDescription", language)
           }
         />
         <meta name="robots" content="index,follow" />
@@ -63,9 +62,7 @@ export default function PrivacyPolicyScreen() {
               {pageTitle}
             </Text>
             <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 21 }}>
-              {isTurkish
-                ? "Bu sayfa giriş gerektirmeden herkese açıktır."
-                : "This page is publicly available without sign-in."}
+              {t("privacy.publicNotice", language)}
             </Text>
           </View>
 
@@ -88,8 +85,8 @@ export default function PrivacyPolicyScreen() {
                   onPress={() => setLanguage(policyLanguage)}
                   accessibilityRole="tab"
                   accessibilityState={{ selected }}
-                  accessibilityLabel={`${POLICY_LANGUAGE_LABELS[policyLanguage]} gizlilik politikası`}
-                  accessibilityHint="Gizlilik politikası görüntüleme dilini değiştirir"
+                  accessibilityLabel={t("privacy.tabAccessibility", language, { language: POLICY_LANGUAGE_LABELS[policyLanguage] })}
+                  accessibilityHint={t("privacy.tabHint", language)}
                   style={({ pressed }) => ({
                     minHeight: 40,
                     justifyContent: "center",
@@ -121,12 +118,12 @@ export default function PrivacyPolicyScreen() {
           >
             <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "800" }}>
               {policy.authoritative
-                ? (isTurkish ? "Onaylı metin" : "Approved text")
-                : "Translation pending legal review"}
+                ? t("privacy.approvedText", language)
+                : t("privacy.pendingLegalReviewTitle", language)}
             </Text>
             {!policy.authoritative ? (
               <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 19 }}>
-                This English translation is provided for accessibility. The Turkish policy remains the approved, authoritative version until legal review is completed.
+                {t("privacy.pendingLegalReviewBody", language)}
               </Text>
             ) : null}
           </View>

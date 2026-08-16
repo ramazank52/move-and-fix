@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { REGISTRATION_CONSENTS } from "@/lib/data/legal";
+import { useTranslation } from "@/lib/i18n";
 
 interface RegistrationConsentProps {
   onAllAccepted: (acceptedConsentKeys: string[]) => void;
@@ -11,6 +12,7 @@ interface RegistrationConsentProps {
 export function RegistrationConsent({ onAllAccepted }: RegistrationConsentProps) {
   const colors = useColors();
   const router = useRouter();
+  const { t } = useTranslation();
   const [consents, setConsents] = useState<Record<string, boolean>>(
     Object.fromEntries(REGISTRATION_CONSENTS.map((c) => [c.id, false]))
   );
@@ -24,10 +26,10 @@ export function RegistrationConsent({ onAllAccepted }: RegistrationConsentProps)
   return (
     <View style={{ gap: 10 }}>
       <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>
-        Yasal Onaylar
+        {t("consent.title")}
       </Text>
       <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 8 }}>
-        Devam etmek için aşağıdaki tüm maddeleri onaylamanız gerekmektedir.
+        {t("consent.requiredHint")}
       </Text>
 
       {REGISTRATION_CONSENTS.map((consent) => (
@@ -75,7 +77,7 @@ export function RegistrationConsent({ onAllAccepted }: RegistrationConsentProps)
                 style={{ marginTop: 4 }}
               >
                 <Text style={{ fontSize: 12, color: colors.primary, textDecorationLine: "underline" }}>
-                  Metni oku →
+                  {t("consent.readText")}
                 </Text>
               </Pressable>
             )}
@@ -98,7 +100,7 @@ export function RegistrationConsent({ onAllAccepted }: RegistrationConsentProps)
         ]}
       >
         <Text style={{ color: "#FFF", fontSize: 15, fontWeight: "600" }}>
-          {allAccepted ? "Hesap Oluştur" : "Tüm maddeleri onaylayın"}
+          {allAccepted ? t("consent.createAccount") : t("consent.acceptAll")}
         </Text>
       </Pressable>
     </View>

@@ -3,7 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { AppError } from "./errors";
-import { hasValidAdminMfaGrant } from "../db";
+import { hasActiveSuperAdminRole, hasValidAdminMfaGrant } from "../db";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -94,6 +94,16 @@ export const adminMfaProcedure = adminProcedure.use(
     const granted = await hasValidAdminMfaGrant({ userId: ctx.user.id, sessionFingerprint: ctx.sessionFingerprint });
     if (!granted) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "MoveOS için ikinci faktör doğrulaması gerekli" });
+    }
+    return next({ ctx });
+  }),
+);
+
+/** Highest-privilege MoveOS operations require both an MFA grant and an active, database-backed scope. */
+export const superAdminMfaProcedure = adminMfaProcedure.use(
+  t.middleware(async ({ ctx, next }) => {
+    if (!ctx.user || !(await hasActiveSuperAdminRole(ctx.user.id))) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Bu MoveOS işlemi için Super Admin yetkisi gerekli" });
     }
     return next({ ctx });
   }),

@@ -10,6 +10,10 @@ const db = vi.hoisted(() => ({
   getMoveOsService: vi.fn(),
   getMoveOsUser: vi.fn(),
   hasValidAdminMfaGrant: vi.fn(),
+  hasActiveSuperAdminRole: vi.fn(),
+  listActiveSuperAdmins: vi.fn(),
+  grantSuperAdminRole: vi.fn(),
+  revokeSuperAdminRole: vi.fn(),
   createAuthChallenge: vi.fn(),
   getLatestActiveAuthChallenge: vi.fn(),
   incrementAuthChallengeAttempts: vi.fn(),
@@ -74,6 +78,7 @@ describe("MoveOS ortak API sözleşmesi", () => {
     vi.clearAllMocks();
     db.getMoveOsDashboardMetrics.mockResolvedValue(metrics);
     db.hasValidAdminMfaGrant.mockResolvedValue(true);
+    db.hasActiveSuperAdminRole.mockResolvedValue(false);
     db.createAuthChallenge.mockResolvedValue(71);
     notifications.sendVerificationCode.mockResolvedValue({ deliveryStatus: "delivered" });
     countryCompliance.listCountryComplianceOverviews.mockResolvedValue([]);
@@ -97,6 +102,27 @@ describe("MoveOS ortak API sözleşmesi", () => {
       }),
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(db.setFeatureFlag).not.toHaveBeenCalled();
+  });
+
+  it("MFA doğrulanmış sıradan yöneticinin Super Admin yönetim yüzeyine erişimini reddeder", async () => {
+    await expect(adminCaller().superAdmins()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.listActiveSuperAdmins).not.toHaveBeenCalled();
+  });
+
+  it("Super Admin yüzeyinde MFA grant’i yoksa aktif scope olsa dahi fail-closed reddeder", async () => {
+    db.hasValidAdminMfaGrant.mockResolvedValue(false);
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+
+    await expect(adminCaller().superAdmins()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(db.hasActiveSuperAdminRole).not.toHaveBeenCalled();
+  });
+
+  it("MFA doğrulanmış Super Admin atama çağrısında hedef kimliği yalnız doğrulanmış oturumdan türetir", async () => {
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+    db.grantSuperAdminRole.mockResolvedValue({ userId: 19, duplicated: false });
+
+    await expect(adminCaller().grantSuperAdmin({ userId: 19 })).resolves.toEqual({ userId: 19, duplicated: false });
+    expect(db.grantSuperAdminRole).toHaveBeenCalledWith({ actorUserId: 7, userId: 19 });
   });
 
   it("MFA doğrulanmış yönetici güncellemesini oturumdaki yönetici kimliğiyle veri katmanına bağlar", async () => {
