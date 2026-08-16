@@ -446,3 +446,10 @@
 - [x] iyzico/Stripe credential, webhook ve reconciliation yüzeylerini yapılandırılmadığında NOT_CONFIGURED/fail-closed bırak; gerçek teslimat üretmeden sağlık durumunu görünür kıl
 - [x] Türkiye country launch gate, sürümlü kategori/hizmet/capability/credential/fiyat-komisyon/vergi kaynak denetimini yönetsel kontrol ve immutable audit ile güçlendir
 - [x] P5 için birim, entegrasyon, yetki, hata ve edge-case ödeme/ledger/lansman regresyonlarını ekle; kalite kapılarını çalıştır
+
+## FINAL MASTER COMMAND P6
+- [x] Aktif iş katılımcılarıyla sınırlı, açık foreground izinli, minimum koordinatlı ve paylaşımı durdurulabilir canlı konum sözleşmesini uygula
+- [x] Sahiplikli destek talebi, immutable olay zaman çizelgesi ve yetkili karar akışlarını ekle
+- [x] Claim/sigorta vaka kaydı, kanıt erişimi, insan inceleme ve otomatik ödeme yaratmayan karar durumlarını ekle
+- [x] Türkiye KDV hesaplama ve sürümlü vergi kuralı doğrulamasını ödeme/iş dosyası bağlamında fail-closed uygula
+- [x] P6 konum, destek, claim, vergi ve upload güvenliği için birim, entegrasyon, yetki, hata ve edge-case regresyonlarını ekle; kalite kapılarını çalıştır

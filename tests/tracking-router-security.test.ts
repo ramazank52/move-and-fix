@@ -5,6 +5,7 @@ import type { TrpcContext } from "../server/_core/context";
 vi.mock("../server/db", () => ({
   getJobTracking: vi.fn(),
   publishJobLocation: vi.fn(),
+  setJobLocationSharing: vi.fn(),
   updateJobLifecycle: vi.fn(),
 }));
 
@@ -75,6 +76,33 @@ describe("tracking router security", () => {
     });
   });
 
+  it("records explicit location consent only with the authenticated provider identity", async () => {
+    vi.mocked(trackingDb.setJobLocationSharing).mockResolvedValue({
+      requestId: 42,
+      locationSharingStatus: "enabled",
+      changedAt: new Date("2026-08-16T00:00:00.000Z"),
+    } as Awaited<ReturnType<typeof trackingDb.setJobLocationSharing>>);
+    const caller = appRouter.createCaller(createContext(81));
+
+    await caller.tracking.setLocationSharing({ requestId: 42, enabled: true, consentGranted: true });
+
+    expect(trackingDb.setJobLocationSharing).toHaveBeenCalledWith({
+      requestId: 42,
+      userId: 81,
+      enabled: true,
+      consentGranted: true,
+    });
+  });
+
+  it("rejects enabling location sharing without explicit product consent before database access", async () => {
+    const caller = appRouter.createCaller(createContext(81));
+
+    await expect(caller.tracking.setLocationSharing({ requestId: 42, enabled: true })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    expect(trackingDb.setJobLocationSharing).not.toHaveBeenCalled();
+  });
+
   it("rejects unauthenticated tracking access before database operations", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
 
@@ -85,8 +113,12 @@ describe("tracking router security", () => {
     await expect(
       caller.tracking.updateLifecycle({ requestId: 42, status: "on_the_way" }),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(
+      caller.tracking.setLocationSharing({ requestId: 42, enabled: false }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(trackingDb.getJobTracking).not.toHaveBeenCalled();
     expect(trackingDb.publishJobLocation).not.toHaveBeenCalled();
+    expect(trackingDb.setJobLocationSharing).not.toHaveBeenCalled();
     expect(trackingDb.updateJobLifecycle).not.toHaveBeenCalled();
   });
 

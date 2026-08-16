@@ -46,6 +46,12 @@ import {
   releasePrivacyLegalHold,
   updateMoveOsCategory,
   updateMoveOsUser,
+  createTaxRule,
+  activateTurkeyTaxRule,
+  listInsuranceClaimsForReview,
+  reviewInsuranceClaim,
+  listSupportTicketsForReview,
+  reviewSupportTicket,
 } from "../db";
 import {
   createCountryCompliancePackage,
@@ -295,6 +301,62 @@ export const ownerRouter = router({
         throw new TRPCError({ code: message === "PRIVACY_LEGAL_HOLD_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
       }
     }),
+
+  supportTickets: adminMfaProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).default({ limit: 50 }))
+    .query(({ input }) => listSupportTicketsForReview(input.limit)),
+
+  reviewSupportTicket: adminMfaProcedure
+    .input(z.object({
+      ticketId: z.number().int().positive(),
+      status: z.enum(["in_review", "resolved", "closed"]),
+      resolutionNote: z.string().trim().min(3).max(2_000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await reviewSupportTicket({ ...input, reviewerUserId: ctx.user!.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "SUPPORT_TICKET_REVIEW_FAILED";
+        throw new TRPCError({ code: message === "SUPPORT_TICKET_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+      }
+    }),
+
+  insuranceClaims: superAdminMfaProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).default({ limit: 50 }))
+    .query(({ input }) => listInsuranceClaimsForReview(input.limit)),
+
+  reviewInsuranceClaim: superAdminMfaProcedure
+    .input(z.object({
+      claimId: z.number().int().positive(),
+      status: z.enum(["under_review", "more_information_required", "accepted", "rejected"]),
+      decisionNote: z.string().trim().min(3).max(2_000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await reviewInsuranceClaim({ ...input, reviewerUserId: ctx.user!.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "INSURANCE_CLAIM_REVIEW_FAILED";
+        throw new TRPCError({ code: message === "INSURANCE_CLAIM_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+      }
+    }),
+
+  createTurkeyVatRule: superAdminMfaProcedure
+    .input(z.object({
+      categoryId: z.number().int().positive().optional(),
+      version: z.string().trim().min(1).max(64),
+      rateBasisPoints: z.number().int().min(0).max(10_000),
+      effectiveFrom: z.coerce.date(),
+      effectiveUntil: z.coerce.date().optional(),
+    }).superRefine((value, context) => {
+      if (value.effectiveUntil && value.effectiveUntil <= value.effectiveFrom) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["effectiveUntil"], message: "Bitiş tarihi başlangıç tarihinden sonra olmalıdır" });
+      }
+    }))
+    .mutation(async ({ ctx, input }) => createTaxRule({ ...input, countryCode: "TR", createdByUserId: ctx.user!.id })),
+
+  activateTurkeyVatRule: superAdminMfaProcedure
+    .input(z.object({ taxRuleId: z.number().int().positive() }))
+    .mutation(({ ctx, input }) => activateTurkeyTaxRule({ ...input, actorUserId: ctx.user!.id })),
 
   superAdmins: superAdminMfaProcedure.query(async () => listActiveSuperAdmins()),
 

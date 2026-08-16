@@ -63,6 +63,9 @@ export default function HelpScreen() {
           İletişim
         </Text>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Destek talebi oluştur"
+          onPress={() => router.push("/settings/support-request")}
           style={({ pressed }) => [
             {
               flexDirection: "row",
@@ -78,7 +81,7 @@ export default function HelpScreen() {
           ]}
         >
           <IconSymbol name="message.fill" size={20} color={colors.primary} />
-          <Text style={{ marginLeft: 12, fontSize: 14, color: colors.foreground }}>Canlı Destek</Text>
+          <Text style={{ marginLeft: 12, fontSize: 14, color: colors.foreground }}>Destek Talebi Oluştur</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [
@@ -101,4 +104,3 @@ export default function HelpScreen() {
     </ScreenContainer>
   );
 }
-

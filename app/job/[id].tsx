@@ -199,6 +199,14 @@ export default function JobDetailScreen() {
             >
               <Text style={{ color: colors.primary, fontWeight: "800" }}>Job Capsule’ı Görüntüle</Text>
             </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Hasar veya claim bildir"
+              onPress={() => router.push(`/claims/new?requestId=${request.id}` as any)}
+              style={({ pressed }) => ({ marginTop: 10, minHeight: 42, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.warning, opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text style={{ color: colors.warning, fontWeight: "800" }}>Hasar / Claim Bildir</Text>
+            </Pressable>
           </View>
         ) : null}
 

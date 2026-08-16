@@ -873,6 +873,12 @@ import {
   organizationInvoices,
   privacyRightsRequests,
   privacyLegalHolds,
+  supportTickets,
+  supportTicketEvents,
+  insuranceClaims,
+  insuranceClaimMedia,
+  taxRules,
+  serviceRequestTaxSnapshots,
 } from "../drizzle/schema";
 import {
   type MaskedCommunicationChannel,
@@ -884,6 +890,7 @@ import {
   type PaymentProviderOperationalRecord,
   type PaymentProviderOperationalStatus,
 } from "./payments/ProviderOperationalPolicy";
+import { quoteTurkeyVat } from "./tax/TurkeyVatPolicy";
 import { EncryptionService } from "./_core/security";
 import { assertCapabilityTransition, assertServiceRequestCapabilityContext, evaluateCapabilityTransition } from "./compliance/CapabilityTransitionGuard";
 import {
@@ -2244,8 +2251,8 @@ export async function createServiceRequestMedia(data: {
   publicId: string;
   requestId: number;
   ownerUserId: number;
-  purpose: "request" | "before" | "after" | "completion" | "dispute" | "expense";
-  kind: "image" | "video" | "document";
+  purpose: "request" | "before" | "after" | "completion" | "dispute" | "expense" | "claim";
+  kind: "image" | "video" | "document" | "audio";
   storageKey: string;
   originalName: string;
   mimeType: string;
@@ -3548,17 +3555,74 @@ export async function getJobTracking(requestId: number, userId: number) {
         ? "cancelled"
         : "scheduled";
 
+  const locationIsVisible = tracking?.locationSharingStatus === "enabled" &&
+    (tracking.lifecycleStatus === "on_the_way" || tracking.lifecycleStatus === "arrived" || tracking.lifecycleStatus === "in_progress");
+
   return {
     ...context,
     viewerRole: isAssignedProvider ? ("provider" as const) : ("customer" as const),
     lifecycleStatus: tracking?.lifecycleStatus ?? fallbackLifecycle,
-    providerLatitude: tracking?.providerLatitude ?? null,
-    providerLongitude: tracking?.providerLongitude ?? null,
-    accuracyMeters: tracking?.accuracyMeters ?? null,
+    providerLatitude: locationIsVisible ? tracking?.providerLatitude ?? null : null,
+    providerLongitude: locationIsVisible ? tracking?.providerLongitude ?? null : null,
+    accuracyMeters: locationIsVisible ? tracking?.accuracyMeters ?? null : null,
     etaMinutes: tracking?.etaMinutes ?? null,
-    lastLocationAt: tracking?.lastLocationAt ?? null,
+    lastLocationAt: locationIsVisible ? tracking?.lastLocationAt ?? null : null,
+    locationSharingStatus: tracking?.locationSharingStatus ?? "disabled",
     trackingUpdatedAt: tracking?.updatedAt ?? null,
   };
+}
+
+const LIVE_LOCATION_STATUSES = new Set<JobLifecycleStatus>(["on_the_way", "arrived", "in_progress"]);
+
+function minimizeTrackingCoordinate(value: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error("LOCATION_COORDINATE_INVALID");
+  return parsed.toFixed(4);
+}
+
+export async function setJobLocationSharing(data: {
+  requestId: number;
+  userId: number;
+  enabled: boolean;
+  consentGranted?: boolean;
+}) {
+  const { db, context } = await getTrackingAccessContext(data.requestId);
+  if (context.providerUserId !== data.userId) throw new Error("LOCATION_SHARING_PROVIDER_ONLY");
+  if (context.requestStatus !== "active") throw new Error("LOCATION_SHARING_JOB_NOT_ACTIVE");
+
+  const rows = await db
+    .select({ lifecycleStatus: jobTracking.lifecycleStatus })
+    .from(jobTracking)
+    .where(eq(jobTracking.requestId, data.requestId))
+    .limit(1);
+  const lifecycleStatus = rows[0]?.lifecycleStatus ?? "scheduled";
+
+  if (data.enabled) {
+    if (data.consentGranted !== true) throw new Error("LOCATION_CONSENT_REQUIRED");
+    if (!LIVE_LOCATION_STATUSES.has(lifecycleStatus)) throw new Error("LOCATION_SHARING_LIFECYCLE_FORBIDDEN");
+  }
+
+  const now = new Date();
+  await db
+    .insert(jobTracking)
+    .values({
+      requestId: data.requestId,
+      lifecycleStatus,
+      locationSharingStatus: data.enabled ? "enabled" : "stopped",
+      locationConsentAt: data.enabled ? now : null,
+      locationSharingStoppedAt: data.enabled ? null : now,
+      updatedByUserId: data.userId,
+    })
+    .onDuplicateKeyUpdate({
+      set: {
+        locationSharingStatus: data.enabled ? "enabled" : "stopped",
+        locationConsentAt: data.enabled ? now : null,
+        locationSharingStoppedAt: data.enabled ? null : now,
+        updatedByUserId: data.userId,
+      },
+    });
+
+  return { requestId: data.requestId, locationSharingStatus: data.enabled ? ("enabled" as const) : ("stopped" as const), changedAt: now };
 }
 
 export async function publishJobLocation(data: {
@@ -3576,22 +3640,50 @@ export async function publishJobLocation(data: {
     throw new Error("Location can only be shared for an active job");
   }
 
+  const currentRows = await db
+    .select({
+      lifecycleStatus: jobTracking.lifecycleStatus,
+      locationSharingStatus: jobTracking.locationSharingStatus,
+      locationConsentAt: jobTracking.locationConsentAt,
+      lastLocationAt: jobTracking.lastLocationAt,
+    })
+    .from(jobTracking)
+    .where(eq(jobTracking.requestId, data.requestId))
+    .limit(1);
+  const current = currentRows[0];
+  if (!current?.locationConsentAt || current.locationSharingStatus !== "enabled") {
+    throw new Error("LOCATION_CONSENT_REQUIRED");
+  }
+  if (!LIVE_LOCATION_STATUSES.has(current.lifecycleStatus)) {
+    throw new Error("LOCATION_SHARING_LIFECYCLE_FORBIDDEN");
+  }
+  if (current.lastLocationAt && Date.now() - current.lastLocationAt.getTime() < 8_000) {
+    throw new Error("LOCATION_UPDATE_RATE_LIMITED");
+  }
+  const accuracyMeters = data.accuracyMeters == null ? null : Math.round(data.accuracyMeters);
+  if (accuracyMeters != null && (accuracyMeters < 0 || accuracyMeters > 5_000)) {
+    throw new Error("LOCATION_ACCURACY_INVALID");
+  }
+  const latitude = minimizeTrackingCoordinate(data.latitude);
+  const longitude = minimizeTrackingCoordinate(data.longitude);
+
   const now = new Date();
   await db
     .insert(jobTracking)
     .values({
       requestId: data.requestId,
-      providerLatitude: data.latitude,
-      providerLongitude: data.longitude,
-      accuracyMeters: data.accuracyMeters,
+      providerLatitude: latitude,
+      providerLongitude: longitude,
+      accuracyMeters,
       lastLocationAt: now,
+      locationSharingStatus: "enabled",
       updatedByUserId: data.userId,
     })
     .onDuplicateKeyUpdate({
       set: {
-        providerLatitude: data.latitude,
-        providerLongitude: data.longitude,
-        accuracyMeters: data.accuracyMeters,
+        providerLatitude: latitude,
+        providerLongitude: longitude,
+        accuracyMeters,
         lastLocationAt: now,
         updatedByUserId: data.userId,
       },
@@ -3692,6 +3784,10 @@ export async function updateJobLifecycle(data: {
       });
 
     if (data.status === "completed") {
+      await tx
+        .update(jobTracking)
+        .set({ locationSharingStatus: "stopped", locationConsentAt: null, locationSharingStoppedAt: new Date() })
+        .where(eq(jobTracking.requestId, data.requestId));
       await tx
         .update(serviceRequests)
         .set({ status: "completed" })
@@ -7101,6 +7197,14 @@ async function assertPhaseDRequestParticipant(requestId: number, userId: number)
   return request;
 }
 
+/**
+ * Requeste bağlı kanıt akışları için yalnız yetki kontrolü sunar; istek
+ * verisini router katmanına açmadan katılımcı sınırını veri katmanında tutar.
+ */
+export async function assertServiceRequestParticipant(requestId: number, userId: number): Promise<void> {
+  await assertPhaseDRequestParticipant(requestId, userId);
+}
+
 /** Writes one append-only Job Capsule event for an already-authoritative record. */
 export async function recordJobTimelineEvent(input: {
   requestId: number;
@@ -7816,4 +7920,214 @@ export async function listOrganizationInvoices(input: { organizationId: number; 
   const database = await getDb();
   if (!database) throw new Error("Database not available");
   return database.select().from(organizationInvoices).where(eq(organizationInvoices.organizationId, input.organizationId)).orderBy(desc(organizationInvoices.createdAt));
+}
+
+type SupportTicketCategory = "technical" | "payment" | "safety" | "service" | "account" | "other";
+type SupportTicketPriority = "normal" | "high" | "urgent";
+type InsuranceClaimCategory = "injury" | "property_damage" | "theft" | "liability" | "other";
+type InsuranceClaimStatus = "submitted" | "under_review" | "more_information_required" | "accepted" | "rejected" | "withdrawn";
+
+export async function createSupportTicket(input: {
+  createdByUserId: number;
+  requestId?: number;
+  category: SupportTicketCategory;
+  priority?: SupportTicketPriority;
+  subject: string;
+  description: string;
+}) {
+  const subject = input.subject.trim();
+  const description = input.description.trim();
+  if (!subject || subject.length > 180 || !description || description.length > 8_000) throw new Error("SUPPORT_TICKET_INPUT_INVALID");
+  if (input.requestId) await assertPhaseDRequestParticipant(input.requestId, input.createdByUserId);
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  return database.transaction(async (tx) => {
+    const inserted = await tx.insert(supportTickets).values({
+      requestId: input.requestId ?? null,
+      createdByUserId: input.createdByUserId,
+      category: input.category,
+      priority: input.priority ?? "normal",
+      subject,
+      description,
+    });
+    const id = Number(inserted[0].insertId);
+    await tx.insert(supportTicketEvents).values({
+      ticketId: id,
+      actorUserId: input.createdByUserId,
+      eventType: "opened",
+      metadataJson: JSON.stringify({ category: input.category, priority: input.priority ?? "normal" }),
+    });
+    return { id, status: "open" as const };
+  });
+}
+
+export async function listOwnSupportTickets(userId: number) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  return database.select().from(supportTickets).where(eq(supportTickets.createdByUserId, userId)).orderBy(desc(supportTickets.updatedAt));
+}
+
+export async function getOwnSupportTicket(input: { ticketId: number; userId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const ticket = (await database.select().from(supportTickets).where(and(eq(supportTickets.id, input.ticketId), eq(supportTickets.createdByUserId, input.userId))).limit(1))[0];
+  if (!ticket) throw new Error("SUPPORT_TICKET_FORBIDDEN");
+  const events = await database.select().from(supportTicketEvents).where(eq(supportTicketEvents.ticketId, ticket.id)).orderBy(supportTicketEvents.createdAt);
+  return { ticket, events };
+}
+
+export async function listSupportTicketsForReview(limit = 100) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  return database.select().from(supportTickets).orderBy(desc(supportTickets.updatedAt)).limit(Math.min(Math.max(limit, 1), 100));
+}
+
+export async function reviewSupportTicket(input: {
+  ticketId: number;
+  reviewerUserId: number;
+  status: "in_review" | "resolved" | "closed";
+  resolutionNote?: string;
+}) {
+  const note = input.resolutionNote?.trim() || null;
+  if (input.status === "resolved" && !note) throw new Error("SUPPORT_TICKET_RESOLUTION_NOTE_REQUIRED");
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const ticket = (await database.select().from(supportTickets).where(eq(supportTickets.id, input.ticketId)).limit(1))[0];
+  if (!ticket) throw new Error("SUPPORT_TICKET_NOT_FOUND");
+  if (ticket.status === "closed" || ticket.status === "resolved") throw new Error("SUPPORT_TICKET_FINALIZED");
+  await database.transaction(async (tx) => {
+    await tx.update(supportTickets).set({
+      status: input.status,
+      assignedAdminUserId: input.reviewerUserId,
+      resolutionNote: note,
+      resolvedAt: input.status === "resolved" ? new Date() : null,
+    }).where(eq(supportTickets.id, ticket.id));
+    await tx.insert(supportTicketEvents).values({
+      ticketId: ticket.id,
+      actorUserId: input.reviewerUserId,
+      eventType: input.status === "in_review" ? "assignment" : "resolution",
+      body: note,
+      metadataJson: JSON.stringify({ status: input.status }),
+    });
+  });
+  return { id: ticket.id, status: input.status };
+}
+
+export async function createInsuranceClaim(input: {
+  requestId: number;
+  openedByUserId: number;
+  claimantRole: "customer" | "provider";
+  category: InsuranceClaimCategory;
+  description: string;
+  incidentAt: Date;
+  mediaIds?: number[];
+}) {
+  const participant = await assertPhaseDRequestParticipant(input.requestId, input.openedByUserId);
+  const actualRole = participant.customerUserId === input.openedByUserId ? "customer" : "provider";
+  if (input.claimantRole !== actualRole) throw new Error("INSURANCE_CLAIM_ROLE_FORBIDDEN");
+  const description = input.description.trim();
+  if (!description || description.length > 8_000 || !(input.incidentAt instanceof Date) || Number.isNaN(input.incidentAt.getTime()) || input.incidentAt.getTime() > Date.now() + 5 * 60_000) {
+    throw new Error("INSURANCE_CLAIM_INPUT_INVALID");
+  }
+  const mediaIds = [...new Set(input.mediaIds ?? [])];
+  if (mediaIds.length > 8) throw new Error("INSURANCE_CLAIM_MEDIA_LIMIT");
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  if (mediaIds.length) {
+    const ownedClaimMedia = await database.select({ id: serviceRequestMedia.id }).from(serviceRequestMedia).where(and(
+      eq(serviceRequestMedia.requestId, input.requestId),
+      eq(serviceRequestMedia.ownerUserId, input.openedByUserId),
+      eq(serviceRequestMedia.purpose, "claim"),
+      inArray(serviceRequestMedia.id, mediaIds),
+    ));
+    if (ownedClaimMedia.length !== mediaIds.length) throw new Error("INSURANCE_CLAIM_MEDIA_FORBIDDEN");
+  }
+  return database.transaction(async (tx) => {
+    const inserted = await tx.insert(insuranceClaims).values({
+      requestId: input.requestId,
+      openedByUserId: input.openedByUserId,
+      claimantRole: actualRole,
+      category: input.category,
+      description,
+      incidentAt: input.incidentAt,
+    });
+    const id = Number(inserted[0].insertId);
+    if (mediaIds.length) await tx.insert(insuranceClaimMedia).values(mediaIds.map((mediaId) => ({ claimId: id, mediaId })));
+    await recordJobTimelineEvent({ requestId: input.requestId, eventType: "insurance_claim_opened", actorUserId: input.openedByUserId, referenceType: "insurance_claim", referenceId: id, metadata: { category: input.category, claimantRole: actualRole } });
+    return { id, status: "submitted" as const };
+  });
+}
+
+export async function listOwnInsuranceClaims(input: { requestId: number; userId: number }) {
+  await assertPhaseDRequestParticipant(input.requestId, input.userId);
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  return database.select().from(insuranceClaims).where(and(eq(insuranceClaims.requestId, input.requestId), eq(insuranceClaims.openedByUserId, input.userId))).orderBy(desc(insuranceClaims.createdAt));
+}
+
+export async function listInsuranceClaimsForReview(limit = 100) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  return database.select().from(insuranceClaims).orderBy(desc(insuranceClaims.updatedAt)).limit(Math.min(Math.max(limit, 1), 100));
+}
+
+export async function reviewInsuranceClaim(input: { claimId: number; reviewerUserId: number; status: Exclude<InsuranceClaimStatus, "submitted" | "withdrawn">; decisionNote?: string }) {
+  const note = input.decisionNote?.trim() || null;
+  if ((input.status === "accepted" || input.status === "rejected") && !note) throw new Error("INSURANCE_CLAIM_DECISION_NOTE_REQUIRED");
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const claim = (await database.select().from(insuranceClaims).where(eq(insuranceClaims.id, input.claimId)).limit(1))[0];
+  if (!claim) throw new Error("INSURANCE_CLAIM_NOT_FOUND");
+  if (claim.status === "accepted" || claim.status === "rejected" || claim.status === "withdrawn") throw new Error("INSURANCE_CLAIM_FINALIZED");
+  await database.update(insuranceClaims).set({ status: input.status, reviewedByUserId: input.reviewerUserId, decisionNote: note, decidedAt: input.status === "accepted" || input.status === "rejected" ? new Date() : null }).where(eq(insuranceClaims.id, input.claimId));
+  await recordJobTimelineEvent({ requestId: claim.requestId, eventType: "insurance_claim_reviewed", actorUserId: input.reviewerUserId, referenceType: "insurance_claim", referenceId: claim.id, metadata: { status: input.status, hasDecisionNote: Boolean(note) } });
+  return { id: claim.id, status: input.status };
+}
+
+export async function createTaxRule(input: {
+  countryCode: string;
+  categoryId?: number;
+  version: string;
+  rateBasisPoints: number;
+  effectiveFrom: Date;
+  effectiveUntil?: Date;
+  createdByUserId: number;
+}) {
+  const countryCode = input.countryCode.trim().toUpperCase();
+  const version = input.version.trim();
+  if (countryCode !== "TR" || !version || version.length > 64 || !Number.isSafeInteger(input.rateBasisPoints) || input.rateBasisPoints < 0 || input.rateBasisPoints > 10_000 || Number.isNaN(input.effectiveFrom.getTime()) || (input.effectiveUntil && input.effectiveUntil <= input.effectiveFrom)) {
+    throw new Error("TAX_RULE_INPUT_INVALID");
+  }
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const inserted = await database.insert(taxRules).values({ ...input, countryCode, version, status: "draft" });
+  return { id: Number(inserted[0].insertId), status: "draft" as const };
+}
+
+export async function activateTurkeyTaxRule(input: { taxRuleId: number; actorUserId: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const rule = (await database.select().from(taxRules).where(eq(taxRules.id, input.taxRuleId)).limit(1))[0];
+  if (!rule || rule.countryCode !== "TR") throw new Error("TAX_RULE_NOT_FOUND");
+  const categoryScope = rule.categoryId == null
+    ? isNull(taxRules.categoryId)
+    : eq(taxRules.categoryId, rule.categoryId);
+  await database.update(taxRules).set({ status: "retired" }).where(and(eq(taxRules.countryCode, "TR"), categoryScope, eq(taxRules.status, "active")));
+  await database.update(taxRules).set({ status: "active", createdByUserId: input.actorUserId }).where(eq(taxRules.id, rule.id));
+  return { id: rule.id, status: "active" as const };
+}
+
+export async function quoteAndSnapshotTurkeyVat(input: { requestId: number; actorUserId: number; subtotalAmount: number; categoryId?: number }) {
+  await assertPhaseDRequestParticipant(input.requestId, input.actorUserId);
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const existing = (await database.select().from(serviceRequestTaxSnapshots).where(eq(serviceRequestTaxSnapshots.requestId, input.requestId)).limit(1))[0];
+  if (existing) return existing;
+  const now = new Date();
+  const activeRules = await database.select().from(taxRules).where(and(eq(taxRules.countryCode, "TR"), eq(taxRules.status, "active"), lte(taxRules.effectiveFrom, now), or(isNull(taxRules.effectiveUntil), gt(taxRules.effectiveUntil, now)), input.categoryId ? or(eq(taxRules.categoryId, input.categoryId), isNull(taxRules.categoryId)) : isNull(taxRules.categoryId))).orderBy(desc(taxRules.categoryId), desc(taxRules.effectiveFrom)).limit(1);
+  const rule = activeRules[0];
+  if (!rule) throw new Error("TAX_RULE_NOT_CONFIGURED");
+  const quote = quoteTurkeyVat({ subtotalAmount: input.subtotalAmount, rateBasisPoints: rule.rateBasisPoints });
+  const inserted = await database.insert(serviceRequestTaxSnapshots).values({ requestId: input.requestId, taxRuleId: rule.id, taxRuleVersion: rule.version, currency: "TRY", subtotalAmount: quote.subtotalAmount, taxAmount: quote.taxAmount, totalAmount: quote.totalAmount });
+  return { id: Number(inserted[0].insertId), taxRuleId: rule.id, taxRuleVersion: rule.version, ...quote, currency: "TRY" as const };
 }

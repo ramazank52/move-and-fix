@@ -1003,7 +1003,7 @@ export const appRouter = router({
     uploadMedia: protectedProcedure
       .input(z.object({
         requestId: z.number().int().positive(),
-        purpose: z.enum(["request", "expense"]).default("request"),
+        purpose: z.enum(["request", "expense", "claim"]).default("request"),
         originalName: z
           .string()
           .trim()
@@ -1031,8 +1031,10 @@ export const appRouter = router({
           if (request.status !== "pending") {
             throw new TRPCError({ code: "CONFLICT", message: "Yalnız bekleyen taleplere medya eklenebilir" });
           }
-        } else {
+        } else if (input.purpose === "expense") {
           await runAgreementOperation(() => db.assertExpenseMediaUpload(input.requestId, ctx.user.id));
+        } else {
+          await db.assertServiceRequestParticipant(input.requestId, ctx.user.id);
         }
 
         const existingMedia = await db.getServiceRequestMedia(input.requestId);
@@ -1319,13 +1321,43 @@ export const appRouter = router({
       .query(({ ctx, input }) =>
         runTrackingOperation(() => db.getJobTracking(input.requestId, ctx.user.id)),
       ),
+    setLocationSharing: protectedProcedure
+      .input(
+        z
+          .object({
+            requestId: z.number().int().positive(),
+            enabled: z.boolean(),
+            // Device permission is not consent. Enabling requires this explicit
+            // product-level acknowledgement for the specific active job.
+            consentGranted: z.literal(true).optional(),
+          })
+          .superRefine((value, ctx) => {
+            if (value.enabled && value.consentGranted !== true) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["consentGranted"],
+                message: "Explicit product consent is required to enable job location sharing",
+              });
+            }
+          }),
+      )
+      .mutation(({ ctx, input }) =>
+        runTrackingOperation(() =>
+          db.setJobLocationSharing({
+            requestId: input.requestId,
+            userId: ctx.user.id,
+            enabled: input.enabled,
+            consentGranted: input.consentGranted,
+          }),
+        ),
+      ),
     publishLocation: protectedProcedure
       .input(
         z.object({
           requestId: z.number().int().positive(),
           latitude: z.number().finite().min(-90).max(90),
           longitude: z.number().finite().min(-180).max(180),
-          accuracyMeters: z.number().finite().min(0).max(10_000).optional(),
+          accuracyMeters: z.number().finite().min(0).max(5_000).optional(),
         }),
       )
       .mutation(({ ctx, input }) =>
@@ -1358,6 +1390,38 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         runTrackingOperation(() => db.updateJobLifecycle({ ...input, userId: ctx.user.id })),
       ),
+  }),
+
+  support: router({
+    create: protectedProcedure
+      .input(z.object({
+        requestId: z.number().int().positive().optional(),
+        category: z.enum(["technical", "payment", "safety", "service", "account", "other"]),
+        priority: z.enum(["normal", "high", "urgent"]).optional(),
+        subject: z.string().trim().min(1).max(180),
+        description: z.string().trim().min(1).max(8_000),
+      }))
+      .mutation(({ ctx, input }) => db.createSupportTicket({ ...input, createdByUserId: ctx.user.id })),
+    mine: protectedProcedure.query(({ ctx }) => db.listOwnSupportTickets(ctx.user.id)),
+    detail: protectedProcedure
+      .input(z.object({ ticketId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.getOwnSupportTicket({ ...input, userId: ctx.user.id })),
+  }),
+
+  insuranceClaims: router({
+    create: protectedProcedure
+      .input(z.object({
+        requestId: z.number().int().positive(),
+        claimantRole: z.enum(["customer", "provider"]),
+        category: z.enum(["injury", "property_damage", "theft", "liability", "other"]),
+        description: z.string().trim().min(1).max(8_000),
+        incidentAt: z.coerce.date(),
+        mediaIds: z.array(z.number().int().positive()).max(8).optional(),
+      }))
+      .mutation(({ ctx, input }) => db.createInsuranceClaim({ ...input, openedByUserId: ctx.user.id })),
+    mine: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(({ ctx, input }) => db.listOwnInsuranceClaims({ ...input, userId: ctx.user.id })),
   }),
 
   // Completion proof — only the assigned provider can submit proof. The customer

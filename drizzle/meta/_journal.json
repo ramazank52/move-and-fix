@@ -351,6 +351,27 @@
       "when": 1786865554099,
       "tag": "0050_slow_enchantress",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "5",
+      "when": 1786867069030,
+      "tag": "0051_curved_killmonger",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "5",
+      "when": 1786867367024,
+      "tag": "0052_same_ultimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "5",
+      "when": 1786867460709,
+      "tag": "0053_mixed_cyclops",
+      "breakpoints": true
     }
   ]
 }

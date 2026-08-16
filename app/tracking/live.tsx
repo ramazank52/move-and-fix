@@ -187,6 +187,9 @@ export default function LiveTrackingScreen() {
   const publishLocation = trpc.tracking.publishLocation.useMutation({
     onSuccess: () => utils.tracking.get.invalidate({ requestId }),
   });
+  const setLocationSharing = trpc.tracking.setLocationSharing.useMutation({
+    onSuccess: () => utils.tracking.get.invalidate({ requestId }),
+  });
   const updateLifecycle = trpc.tracking.updateLifecycle.useMutation({
     onSuccess: async () => {
       await utils.tracking.get.invalidate({ requestId });
@@ -246,15 +249,38 @@ export default function LiveTrackingScreen() {
     [customerCoordinate, providerCoordinate],
   );
 
-  const stopLocationSharing = () => {
+  const stopLocationSharing = (persistStop = true) => {
     locationSubscriptionRef.current?.remove();
     locationSubscriptionRef.current = null;
     setIsSharingLocation(false);
+    if (persistStop && tracking?.viewerRole === "provider" && hasValidRequestId) {
+      void setLocationSharing.mutateAsync({ requestId, enabled: false }).catch(() => undefined);
+    }
   };
 
   const startLocationSharing = async () => {
     if (tracking?.viewerRole !== "provider") return;
+    if (!(["on_the_way", "arrived", "in_progress"] as LifecycleStatus[]).includes(lifecycleStatus)) {
+      Alert.alert("Konum henüz paylaşılamaz", "Konum paylaşımını işe doğru yola çıktıktan sonra başlatabilirsiniz.");
+      return;
+    }
+    const consentGranted = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        "Canlı konum paylaşımı",
+        "Konumunuz yalnız bu aktif iş sırasında müşteriye gösterilir. Paylaşımı istediğiniz an durdurabilirsiniz. Kesin konum, gereksiz hassasiyet saklanmadan iş takibi için kullanılır.",
+        [
+          { text: "Vazgeç", style: "cancel", onPress: () => resolve(false) },
+          { text: "Paylaşmayı Başlat", onPress: () => resolve(true) },
+        ],
+      );
+    });
+    if (!consentGranted) return;
     try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert("Konum servisi kapalı", "Canlı takip için cihazınızın konum servisini açmanız gerekir.");
+        return;
+      }
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
@@ -264,7 +290,8 @@ export default function LiveTrackingScreen() {
         return;
       }
 
-      stopLocationSharing();
+      stopLocationSharing(false);
+      await setLocationSharing.mutateAsync({ requestId, enabled: true, consentGranted: true });
       setIsSharingLocation(true);
       locationSubscriptionRef.current = await Location.watchPositionAsync(
         {
@@ -510,7 +537,7 @@ export default function LiveTrackingScreen() {
           ) : null}
         </View>
 
-        <View style={[styles.mapCard, { borderColor: colors.border }]}>
+        <View style={[styles.mapCard, { borderColor: colors.border }]}> 
           <JobTrackingMap
             providerCoordinate={providerCoordinate}
             customerCoordinate={customerCoordinate}
@@ -532,7 +559,46 @@ export default function LiveTrackingScreen() {
           </View>
         </View>
 
-        <View style={[styles.providerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {tracking.viewerRole === "provider" ? (
+          <View style={[styles.locationConsentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+            <View style={[styles.locationConsentCopy, { flex: 1 }]}> 
+              <View style={styles.locationConsentTitleRow}>
+                <MaterialIcons name="my-location" size={19} color={colors.primary} />
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Canlı Konum</Text>
+              </View>
+              <Text style={[styles.locationConsentHint, { color: colors.muted }]}> 
+                {isSharingLocation || tracking.locationSharingStatus === "enabled"
+                  ? "Konumunuz yalnızca bu aktif iş için müşteriye gösteriliyor."
+                  : "Paylaşım kapalı. Başlatmak için açık onay ve cihaz izni gerekir."}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={isSharingLocation || tracking.locationSharingStatus === "enabled" ? "Canlı konum paylaşımını durdur" : "Canlı konum paylaşımını başlat"}
+              disabled={setLocationSharing.isPending}
+              onPress={() => {
+                if (isSharingLocation || tracking.locationSharingStatus === "enabled") stopLocationSharing();
+                else void startLocationSharing();
+              }}
+              style={({ pressed }) => [
+                styles.locationConsentButton,
+                { backgroundColor: isSharingLocation || tracking.locationSharingStatus === "enabled" ? `${colors.error}18` : `${colors.primary}18`, opacity: pressed || setLocationSharing.isPending ? 0.65 : 1 },
+              ]}
+            >
+              <MaterialIcons name={isSharingLocation || tracking.locationSharingStatus === "enabled" ? "location-disabled" : "location-searching"} size={18} color={isSharingLocation || tracking.locationSharingStatus === "enabled" ? colors.error : colors.primary} />
+              <Text style={[styles.locationConsentButtonText, { color: isSharingLocation || tracking.locationSharingStatus === "enabled" ? colors.error : colors.primary }]}>
+                {isSharingLocation || tracking.locationSharingStatus === "enabled" ? "Durdur" : "Başlat"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : tracking.locationSharingStatus !== "enabled" ? (
+          <View style={[styles.locationPassiveNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
+            <MaterialIcons name="location-disabled" size={18} color={colors.muted} />
+            <Text style={[styles.locationPassiveText, { color: colors.muted }]}>Profesyonel henüz canlı konum paylaşmıyor.</Text>
+          </View>
+        ) : null}
+
+        <View style={[styles.providerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}> 
           <View style={[styles.avatar, { backgroundColor: `${colors.primary}1F` }]}>
             <Text style={[styles.avatarText, { color: colors.primary }]}>{providerName.charAt(0).toLocaleUpperCase("tr-TR")}</Text>
           </View>
@@ -717,7 +783,10 @@ export default function LiveTrackingScreen() {
           <View style={styles.providerActions}>
             {lifecycleStatus !== "completed" && lifecycleStatus !== "cancelled" ? (
               <Pressable
-                onPress={isSharingLocation ? stopLocationSharing : startLocationSharing}
+                onPress={() => {
+                  if (isSharingLocation) stopLocationSharing();
+                  else void startLocationSharing();
+                }}
                 style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.75 : 1 }]}
               >
                 <MaterialIcons name={isSharingLocation ? "location-disabled" : "share-location"} size={19} color={colors.primary} />
@@ -782,6 +851,14 @@ const styles = StyleSheet.create({
   headerTextGroup: { alignItems: "center", flex: 1 },
   headerTitle: { fontSize: 17, fontWeight: "700" },
   loadingText: { fontSize: 13, marginTop: 12 },
+  locationConsentButton: { alignItems: "center", borderRadius: 12, flexDirection: "row", gap: 5, minHeight: 40, paddingHorizontal: 10 },
+  locationConsentButtonText: { fontSize: 12, fontWeight: "800" },
+  locationConsentCard: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, padding: 13 },
+  locationConsentCopy: { gap: 4 },
+  locationConsentHint: { fontSize: 11, lineHeight: 16 },
+  locationConsentTitleRow: { alignItems: "center", flexDirection: "row", gap: 6 },
+  locationPassiveNotice: { alignItems: "center", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 8, paddingHorizontal: 13, paddingVertical: 11 },
+  locationPassiveText: { flex: 1, fontSize: 12, lineHeight: 17 },
   mapCard: { borderRadius: 20, borderWidth: 1, height: 272, overflow: "hidden", position: "relative" },
   mapMeta: { alignItems: "center", borderRadius: 12, borderWidth: 1, bottom: 12, flexDirection: "row", gap: 6, left: 12, paddingHorizontal: 10, paddingVertical: 7, position: "absolute" },
   mapMetaText: { fontSize: 10, fontWeight: "600" },

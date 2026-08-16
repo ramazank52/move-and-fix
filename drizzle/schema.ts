@@ -980,7 +980,7 @@ export const serviceRequestMedia = mysqlTable(
     publicId: varchar("publicId", { length: 64 }).notNull(),
     requestId: int("requestId").notNull(),
     ownerUserId: int("ownerUserId").notNull(),
-    purpose: mysqlEnum("purpose", ["request", "before", "after", "completion", "expense", "dispute"])
+    purpose: mysqlEnum("purpose", ["request", "before", "after", "completion", "expense", "dispute", "claim"])
       .default("request")
       .notNull(),
     kind: mysqlEnum("kind", ["image", "video", "audio", "document"]).notNull(),
@@ -1031,6 +1031,13 @@ export const jobTracking = mysqlTable(
     accuracyMeters: int("accuracyMeters"),
     etaMinutes: int("etaMinutes"),
     lastLocationAt: timestamp("lastLocationAt"),
+    // Foreground location is opt-in per active job. Exact device coordinates are
+    // never accepted unless this server-side, provider-owned consent state is enabled.
+    locationSharingStatus: mysqlEnum("locationSharingStatus", ["disabled", "enabled", "stopped"])
+      .default("disabled")
+      .notNull(),
+    locationConsentAt: timestamp("locationConsentAt"),
+    locationSharingStoppedAt: timestamp("locationSharingStoppedAt"),
     updatedByUserId: int("updatedByUserId").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -1038,6 +1045,7 @@ export const jobTracking = mysqlTable(
   (table) => [
     index("job_tracking_status_idx").on(table.lifecycleStatus),
     index("job_tracking_updated_at_idx").on(table.updatedAt),
+    index("job_tracking_location_share_idx").on(table.locationSharingStatus, table.lastLocationAt),
   ],
 );
 
@@ -1844,6 +1852,131 @@ export const userNotificationPreferences = mysqlTable(
   },
   (table) => [
     uniqueIndex("user_notification_preferences_user_unique").on(table.userId),
+  ],
+);
+
+// Support cases remain separate from service messages. Their append-only event
+// timeline makes assignment and resolution auditable without changing the job.
+export const supportTickets = mysqlTable(
+  "support_tickets",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId"),
+    createdByUserId: int("createdByUserId").notNull(),
+    category: mysqlEnum("category", ["technical", "payment", "safety", "service", "account", "other"]).notNull(),
+    priority: mysqlEnum("priority", ["normal", "high", "urgent"]).default("normal").notNull(),
+    subject: varchar("subject", { length: 180 }).notNull(),
+    description: text("description").notNull(),
+    status: mysqlEnum("status", ["open", "in_review", "resolved", "closed"]).default("open").notNull(),
+    assignedAdminUserId: int("assignedAdminUserId"),
+    resolutionNote: text("resolutionNote"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("support_tickets_creator_status_idx").on(table.createdByUserId, table.status, table.createdAt),
+    index("support_tickets_request_idx").on(table.requestId, table.createdAt),
+    index("support_tickets_admin_status_idx").on(table.assignedAdminUserId, table.status, table.updatedAt),
+  ],
+);
+
+export const supportTicketEvents = mysqlTable(
+  "support_ticket_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ticketId: int("ticketId").notNull(),
+    actorUserId: int("actorUserId").notNull(),
+    eventType: mysqlEnum("eventType", ["opened", "message", "status_changed", "assignment", "resolution"]).notNull(),
+    body: text("body"),
+    metadataJson: text("metadataJson"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("support_ticket_events_ticket_created_idx").on(table.ticketId, table.createdAt)],
+);
+
+// Claim review is deliberately non-financial. Any coverage or reimbursement
+// decision requires a separate, verified payment/settlement workflow.
+export const insuranceClaims = mysqlTable(
+  "insurance_claims",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    openedByUserId: int("openedByUserId").notNull(),
+    claimantRole: mysqlEnum("claimantRole", ["customer", "provider"]).notNull(),
+    category: mysqlEnum("category", ["injury", "property_damage", "theft", "liability", "other"]).notNull(),
+    description: text("description").notNull(),
+    incidentAt: timestamp("incidentAt").notNull(),
+    status: mysqlEnum("status", ["submitted", "under_review", "more_information_required", "accepted", "rejected", "withdrawn"])
+      .default("submitted")
+      .notNull(),
+    reviewedByUserId: int("reviewedByUserId"),
+    decisionNote: text("decisionNote"),
+    decidedAt: timestamp("decidedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("insurance_claims_request_status_idx").on(table.requestId, table.status, table.createdAt),
+    index("insurance_claims_opener_status_idx").on(table.openedByUserId, table.status, table.createdAt),
+  ],
+);
+
+export const insuranceClaimMedia = mysqlTable(
+  "insurance_claim_media",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    claimId: int("claimId").notNull(),
+    mediaId: int("mediaId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("insurance_claim_media_media_unique").on(table.mediaId),
+    uniqueIndex("insurance_claim_media_claim_media_unique").on(table.claimId, table.mediaId),
+    index("insurance_claim_media_claim_idx").on(table.claimId),
+  ],
+);
+
+// Tax rules are versioned configuration, never an implicit hard-coded rate.
+// Unknown, inactive or expired rules must block tax quotation rather than guess.
+export const taxRules = mysqlTable(
+  "tax_rules",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryCode: varchar("countryCode", { length: 2 }).notNull(),
+    taxType: mysqlEnum("taxType", ["vat"]).default("vat").notNull(),
+    categoryId: int("categoryId"),
+    version: varchar("version", { length: 64 }).notNull(),
+    rateBasisPoints: int("rateBasisPoints").notNull(),
+    effectiveFrom: timestamp("effectiveFrom").notNull(),
+    effectiveUntil: timestamp("effectiveUntil"),
+    status: mysqlEnum("status", ["draft", "active", "retired"]).default("draft").notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("tax_rules_country_category_version_unique").on(table.countryCode, table.categoryId, table.version),
+    index("tax_rules_lookup_idx").on(table.countryCode, table.categoryId, table.status, table.effectiveFrom),
+  ],
+);
+
+export const serviceRequestTaxSnapshots = mysqlTable(
+  "service_request_tax_snapshots",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    taxRuleId: int("taxRuleId").notNull(),
+    taxRuleVersion: varchar("taxRuleVersion", { length: 64 }).notNull(),
+    currency: varchar("currency", { length: 3 }).default("TRY").notNull(),
+    subtotalAmount: int("subtotalAmount").notNull(),
+    taxAmount: int("taxAmount").notNull(),
+    totalAmount: int("totalAmount").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("service_request_tax_snapshots_request_unique").on(table.requestId),
+    index("service_request_tax_snapshots_rule_idx").on(table.taxRuleId, table.createdAt),
   ],
 );
 
