@@ -27,7 +27,7 @@ import {
   notificationServiceV2,
 } from "./services/NotificationServiceV2";
 import { eventService } from "./services/EventService";
-import { storagePut } from "./storage";
+import { storageGetSignedUrl, storagePut } from "./storage";
 import * as pushStore from "./notifications/push-store";
 import { analyzeCompletionEvidence } from "./services/CompletionEvidenceAnalysisService";
 import {
@@ -36,6 +36,8 @@ import {
 } from "./payments/GatewayCheckoutService";
 import { getMaskedCommunicationReadiness } from "./communications/MaskedCommunicationService";
 import { createPriceIntelligenceNarrative } from "./services/PriceIntelligenceNarrativeService";
+import { createPolicyBoundMoveAiResponse, resolveMoveAiCategory } from "./ai/MoveAiResponsePolicy";
+import { translateMessageOnDemand } from "./ai/OnDemandMessageTranslation";
 
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
 // Döngüsel import'u önlemek için servisler burada birbirine bağlanır.
@@ -206,6 +208,18 @@ function mapPhaseDError(error: unknown): never {
   throw error;
 }
 
+function mapCapabilityTransitionError(error: unknown): never {
+  const message = error instanceof Error ? error.message : "CAPABILITY_TRANSITION_FORBIDDEN";
+  if (
+    message === "COMPLIANCE_CONTEXT_NOT_CONFIGURED" ||
+    message === "PROVIDER_CAPABILITY_NOT_ELIGIBLE" ||
+    message === "PROVIDER_CAPABILITY_EXPIRED"
+  ) {
+    throw new TRPCError({ code: "FORBIDDEN", message });
+  }
+  throw error;
+}
+
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
   const digest = scryptSync(password, salt, 64).toString("hex");
@@ -307,7 +321,12 @@ async function runTrackingOperation<T>(operation: () => Promise<T>): Promise<T> 
     if (message.includes("not found")) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Aktif iş bulunamadı" });
     }
-    if (message.includes("Not authorized") || message.includes("Only the assigned provider")) {
+    if (
+      message.includes("Not authorized") ||
+      message.includes("Only the assigned provider") ||
+      message.includes("PROVIDER_CAPABILITY_") ||
+      message.includes("COMPLIANCE_CONTEXT_NOT_CONFIGURED")
+    ) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Bu canlı takip işlemine yetkiniz yok" });
     }
     if (message.includes("active job") || message.includes("transition")) {
@@ -1007,7 +1026,9 @@ export const appRouter = router({
         const sha256 = createHash("sha256").update(buffer).digest("hex");
         const relKey = `service-requests/${input.requestId}/${ctx.user.id}/${randomUUID()}.${policy.extension}`;
         const uploaded = await storagePut(relKey, buffer, input.mimeType);
+        const mediaRef = randomUUID();
         const mediaId = await db.createServiceRequestMedia({
+          publicId: mediaRef,
           requestId: input.requestId,
           ownerUserId: ctx.user.id,
           purpose: input.purpose,
@@ -1020,11 +1041,27 @@ export const appRouter = router({
         });
         return {
           id: mediaId,
+          mediaRef,
           kind: policy.kind,
           mimeType: input.mimeType,
           sizeBytes: buffer.length,
           sha256,
-          url: uploaded.url,
+        };
+      }),
+    mediaAccess: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive(), mediaRef: z.string().uuid() }))
+      .query(async ({ ctx, input }) => {
+        const media = await db.getAuthorizedServiceRequestMedia(input.requestId, input.mediaRef, ctx.user.id);
+        if (!media) {
+          // Do not disclose whether the media resource exists to a non-participant.
+          throw new TRPCError({ code: "NOT_FOUND", message: "Medya kaynağı bulunamadı" });
+        }
+        const signedUrl = await storageGetSignedUrl(media.storageKey);
+        return {
+          mediaRef: media.publicId,
+          mimeType: media.mimeType,
+          sizeBytes: media.sizeBytes,
+          signedUrl,
         };
       }),
   }),
@@ -1068,18 +1105,36 @@ export const appRouter = router({
         }
 
         try {
+          const [capabilityStatuses, providerCredentials] = await Promise.all([
+            db.listProviderCapabilityStatuses(provider.id),
+            db.listProviderCredentialStatuses(provider.id),
+          ]);
+          db.assertProviderCapabilityForRequest({ request, capabilityStatuses });
+          db.assertProviderCredentialForRequest({ request, providerCredentials });
           return await db.createOffer({ ...input, providerId: provider.id });
         } catch (error) {
           if (error instanceof Error && error.message.includes("daha önce")) {
             throw new TRPCError({ code: "CONFLICT", message: error.message });
           }
-          throw error;
+          return mapCapabilityTransitionError(error);
         }
       }),
     accept: protectedProcedure
       .input(z.object({ offerId: z.number().int().positive() }))
-      .mutation(({ ctx, input }) => {
-        return db.acceptOffer(input.offerId, ctx.user.id);
+      .mutation(async ({ ctx, input }) => {
+        const transitionContext = await db.getOfferCapabilityTransitionContext(input.offerId);
+        if (!transitionContext) throw new TRPCError({ code: "NOT_FOUND", message: "Teklif bulunamadı" });
+        try {
+          const [capabilityStatuses, providerCredentials] = await Promise.all([
+            db.listProviderCapabilityStatuses(transitionContext.providerId),
+            db.listProviderCredentialStatuses(transitionContext.providerId),
+          ]);
+          db.assertProviderCapabilityForRequest({ request: transitionContext, capabilityStatuses });
+          db.assertProviderCredentialForRequest({ request: transitionContext, providerCredentials });
+          return await db.acceptOffer(input.offerId, ctx.user.id);
+        } catch (error) {
+          return mapCapabilityTransitionError(error);
+        }
       }),
     reject: protectedProcedure
       .input(z.object({ offerId: z.number().int().positive() }))
@@ -1434,6 +1489,54 @@ export const appRouter = router({
           isOwn: message.senderId === ctx.user.id,
         }));
       }),
+    voiceAccess: protectedProcedure
+      .input(z.object({ messageId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const message = await runMessageOperation(() =>
+          db.getAuthorizedVoiceMessageStorage(input.messageId, ctx.user.id),
+        );
+        if (!message) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Sesli mesaj bulunamadı" });
+        }
+        const storageKey = message.storageKey;
+        if (!storageKey) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Sesli mesaj bulunamadı" });
+        }
+        const url = await storageGetSignedUrl(storageKey);
+        return {
+          messageId: message.id,
+          url,
+          mimeType: message.mimeType,
+          sizeBytes: message.sizeBytes,
+          durationMs: message.durationMs,
+        };
+      }),
+    translate: protectedProcedure
+      .input(z.object({
+        messageId: z.number().int().positive(),
+        targetLanguage: z.enum(["tr", "en", "de", "fr", "ar", "ru", "es", "it", "pt", "nl", "zh", "fa", "uk"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const message = await runMessageOperation(() =>
+          db.getAuthorizedTextMessageForTranslation(input.messageId, ctx.user.id),
+        );
+        // Do not reveal the existence of a message that the actor is not entitled to read.
+        if (!message) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Mesaj bulunamadı" });
+        }
+        const result = await translateMessageOnDemand({
+          sourceText: message.content,
+          targetLanguage: input.targetLanguage,
+        });
+        if (result.status !== "translated") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Çeviri şu anda kullanılamıyor" });
+        }
+        return {
+          messageId: message.id,
+          targetLanguage: result.targetLanguage,
+          translatedText: result.translatedText,
+        };
+      }),
     send: protectedProcedure
       .input(z.object({
         receiverId: z.number().int().positive(),
@@ -1493,6 +1596,11 @@ export const appRouter = router({
           db.markConversationRead(input.requestId, ctx.user.id, input.otherUserId),
         ),
       ),
+    delete: protectedProcedure
+      .input(z.object({ messageId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) =>
+        runMessageOperation(() => db.softDeleteMessage({ ...input, actorUserId: ctx.user.id })),
+      ),
   }),
 
   maskedCommunications: router({
@@ -1522,6 +1630,16 @@ export const appRouter = router({
           db.releaseMaskedCommunicationSession({ ...input, actorUserId: ctx.user.id }),
         ),
       ),
+  }),
+
+  privacyRights: router({
+    list: protectedProcedure.query(({ ctx }) => db.listOwnPrivacyRightsRequests(ctx.user.id)),
+    submit: protectedProcedure
+      .input(z.object({
+        requestType: z.enum(["export", "erasure"]),
+        requestReason: z.string().trim().min(3).max(500).optional(),
+      }))
+      .mutation(({ ctx, input }) => db.createPrivacyRightsRequest({ ...input, requesterUserId: ctx.user.id })),
   }),
   // Providers
   providers: router({
@@ -1673,13 +1791,15 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           // until its owner uses the separate explicit confirmation endpoint.
           let draftId: number | undefined;
           let draftStatus: "draft" | "blocked" | undefined;
-          if (parsed.shouldCreateRequest && parsed.category) {
+          const category = resolveMoveAiCategory(parsed.category);
+          let riskBlocked = false;
+          if (parsed.shouldCreateRequest && category !== "general") {
             const categoryMap: Record<string, number> = {
               plumbing: 1, electrical: 2, cleaning: 3, hvac: 4,
               towing: 13, courier: 14, roadside: 15, locksmith: 5,
               painting: 6, gardening: 7, moving: 8, appliance: 9,
             };
-            const categoryId = categoryMap[parsed.category] ?? 1;
+            const categoryId = categoryMap[category] ?? 1;
             const lowerMessage = input.message.toLocaleLowerCase("tr-TR");
             const riskLevel = /(silah|uyuşturucu|dolandır|kimlik sahte|şiddet)/.test(lowerMessage)
               ? "high" as const
@@ -1696,12 +1816,19 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
             });
             draftId = draft.id;
             draftStatus = draft.status === "draft" ? "draft" : "blocked";
+            riskBlocked = draftStatus === "blocked";
           }
 
+          const safeResponse = createPolicyBoundMoveAiResponse({
+            category,
+            draftCreated: draftStatus === "draft",
+            riskBlocked,
+          });
+
           return {
-            response: parsed.response ?? "Size yardımcı olmaya çalışıyorum. Hangi hizmete ihtiyacınız var?",
-            category: parsed.category,
-            suggestions: parsed.suggestions ?? ["Su tesisatçısı", "Elektrikçi", "Çekici", "Temizlik"],
+            response: safeResponse.response,
+            category: safeResponse.category,
+            suggestions: safeResponse.suggestions,
             requestId: undefined,
             draftId,
             draftStatus,
@@ -1710,24 +1837,24 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           // Fallback: keyword-based intent detection
           const lower = input.message.toLowerCase();
           let category = "general";
-          let response = "Sorununuzu anladım. Size yardımcı olmak istiyorum. Hangi hizmete ihtiyacınız var?";
-          const suggestions = ["Su tesisatçısı", "Elektrikçi", "Çekici", "Temizlik"];
+          let response = "Size uygun bir hizmet taslağı hazırlayabilmem için ihtiyacınızla ilgili biraz daha ayrıntı paylaşın.";
+          const suggestions = ["Hizmet türünü belirt", "Konumu ekle", "Zaman tercihini paylaş"];
 
           if (lower.includes("su") && (lower.includes("akı") || lower.includes("patla"))) {
             category = "plumbing";
-            response = "Su tesisatı acil durumu anlıyorum. Size en yakın su tesisatçısını buluyorum. Tahmini ücret: ₺200-₺500.";
+            response = "Su tesisatı ihtiyacınız için ayrıntıları kontrol ederek bir hizmet taslağı hazırlayabilirim.";
           } else if (lower.includes("araba") && (lower.includes("kal") || lower.includes("bozul"))) {
             category = "towing";
-            response = "Araç arızası için çekici veya yol yardımı gerekiyor. Çekici: ₺200 başlangıç + ₺25/km.";
+            response = "Araç arızası için çekici veya yol yardımı talep taslağı hazırlayabilirim.";
           } else if (lower.includes("klima") && (lower.includes("soğut") || lower.includes("çalış"))) {
             category = "hvac";
-            response = "Klima arızası için size en yakın klima servisini buluyorum. Tahmini ücret: ₺600-₺1.200.";
+            response = "Klima hizmeti için talep taslağınızı ayrıntılarla birlikte hazırlayabilirim.";
           } else if (lower.includes("çekici")) {
             category = "towing";
-            response = "Çekici hizmeti için konumunuzu paylaşır mısınız? ₺200 başlangıç + ₺25/km.";
+            response = "Çekici talebi için konum ve araç bilgilerini ekleyebilirsiniz.";
           } else if (lower.includes("kurye")) {
             category = "courier";
-            response = "Kurye hizmeti için paket bilgilerinizi paylaşır mısınız? ₺50 başlangıç + ₺12/km.";
+            response = "Kurye talebi için paket ve teslimat bilgilerini ekleyebilirsiniz.";
           }
 
           return { response, category, suggestions, requestId: undefined, draftId: undefined, draftStatus: undefined };
@@ -1921,21 +2048,13 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
         if (ctx.user.role !== "admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "İade işlemi yalnızca yetkili yönetici tarafından yapılabilir" });
         }
-        try {
-          return await db.transitionPaymentStatus({
-            paymentId: input.paymentId,
-            actorUserId: ctx.user.id,
-            nextStatus: "refunded",
-            requireAdmin: true,
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "PAYMENT_REFUND_FAILED";
-          if (message === "PAYMENT_NOT_FOUND") throw new TRPCError({ code: "NOT_FOUND", message: "Ödeme bulunamadı" });
-          if (message.includes("INVALID_TRANSITION")) {
-            throw new TRPCError({ code: "CONFLICT", message: "Ödeme mevcut durumda iade edilemez" });
-          }
-          throw error;
-        }
+        // An administrative decision never proves an external refund. The only
+        // settlement writer is the signed, amount-matched gateway webhook.
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "İade durumu yalnız doğrulanmış ödeme sağlayıcısı callback’i ile güncellenebilir",
+          cause: { paymentId: input.paymentId, reason: "PAYMENT_REFUND_GATEWAY_CALLBACK_REQUIRED" },
+        });
       }),
   }),
 

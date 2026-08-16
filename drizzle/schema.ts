@@ -104,6 +104,7 @@ export const maskedCommunicationSessions = mysqlTable(
       .notNull(),
     providerSessionReference: varchar("providerSessionReference", { length: 191 }),
     expiresAt: timestamp("expiresAt"),
+    expiredAt: timestamp("expiredAt"),
     releasedAt: timestamp("releasedAt"),
     createdByUserId: int("createdByUserId").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -115,6 +116,49 @@ export const maskedCommunicationSessions = mysqlTable(
     index("masked_communication_provider_idx").on(table.providerUserId, table.status),
     index("masked_communication_expiry_idx").on(table.status, table.expiresAt),
   ],
+);
+
+// Privacy-rights records preserve a data-subject request without changing the
+// immutable consent, financial or audit ledgers. An erasure request is blocked
+// only by a separately recorded active legal hold.
+export const privacyRightsRequests = mysqlTable(
+  "privacy_rights_requests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requesterUserId: int("requesterUserId").notNull(),
+    requestType: mysqlEnum("requestType", ["export", "erasure"]).notNull(),
+    status: mysqlEnum("status", ["open", "in_review", "blocked_legal_hold", "approved", "rejected", "completed"])
+      .default("open")
+      .notNull(),
+    requestReason: varchar("requestReason", { length: 500 }),
+    reviewNote: varchar("reviewNote", { length: 1000 }),
+    reviewedByUserId: int("reviewedByUserId"),
+    reviewedAt: timestamp("reviewedAt"),
+    completedAt: timestamp("completedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    index("privacy_rights_requester_status_idx").on(table.requesterUserId, table.status),
+    index("privacy_rights_status_created_idx").on(table.status, table.createdAt),
+  ],
+);
+
+// Legal holds are explicit, reversible and reviewer-owned. They prevent only
+// execution of an erasure request and never conceal that the request exists.
+export const privacyLegalHolds = mysqlTable(
+  "privacy_legal_holds",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    reason: varchar("reason", { length: 1000 }).notNull(),
+    status: mysqlEnum("status", ["active", "released"]).default("active").notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    releasedByUserId: int("releasedByUserId"),
+    releasedAt: timestamp("releasedAt"),
+  },
+  (table) => [index("privacy_legal_hold_user_status_idx").on(table.userId, table.status)],
 );
 
 // Immutable, denormalized references to already-authoritative job records.
@@ -871,9 +915,21 @@ export const serviceRequests = mysqlTable("service_requests", {
   distanceKm: int("distanceKm"),
   estimatedPrice: int("estimatedPrice"),
   assignedProviderId: int("assignedProviderId"),
+  // Server-derived compliance context. Once a requirement is present, offer,
+  // acceptance and job-start decisions use this immutable request context.
+  jurisdictionId: int("jurisdictionId"),
+  requiredCapabilityId: int("requiredCapabilityId"),
+  requiredCredentialType: varchar("requiredCredentialType", { length: 120 }),
+  requiredCredentialAssurance: mysqlEnum("requiredCredentialAssurance", ["A", "B", "C", "D", "E", "F"]),
+  requiresCredentialHumanReview: int("requiresCredentialHumanReview"),
+  compliancePackageVersion: varchar("compliancePackageVersion", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [index("service_requests_organization_status_idx").on(table.organizationId, table.status)]);
+}, (table) => [
+  index("service_requests_organization_status_idx").on(table.organizationId, table.status),
+  index("service_requests_capability_context_idx").on(table.jurisdictionId, table.requiredCapabilityId),
+  index("service_requests_credential_context_idx").on(table.jurisdictionId, table.requiredCredentialType),
+]);
 
 // Structured, service-specific information kept outside the legacy request row.
 export const serviceRequestDetails = mysqlTable(
@@ -921,6 +977,7 @@ export const serviceRequestMedia = mysqlTable(
   "service_request_media",
   {
     id: int("id").autoincrement().primaryKey(),
+    publicId: varchar("publicId", { length: 64 }).notNull(),
     requestId: int("requestId").notNull(),
     ownerUserId: int("ownerUserId").notNull(),
     purpose: mysqlEnum("purpose", ["request", "before", "after", "completion", "expense", "dispute"])
@@ -936,6 +993,7 @@ export const serviceRequestMedia = mysqlTable(
   },
   (table) => [
     uniqueIndex("service_request_media_storage_key_unique").on(table.storageKey),
+    uniqueIndex("service_request_media_public_id_unique").on(table.publicId),
     index("service_request_media_request_purpose_idx").on(table.requestId, table.purpose),
     index("service_request_media_owner_idx").on(table.ownerUserId),
   ],
@@ -1054,6 +1112,10 @@ export const completionDisputes = mysqlTable(
       .notNull(),
     reviewedByUserId: int("reviewedByUserId"),
     resolutionNote: text("resolutionNote"),
+    // Customer-favoring decisions remain under review until a verified payment
+    // gateway callback confirms that held escrow was actually refunded.
+    refundGatewayReference: varchar("refundGatewayReference", { length: 191 }),
+    refundVerifiedAt: timestamp("refundVerifiedAt"),
     resolvedAt: timestamp("resolvedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -1139,6 +1201,8 @@ export const messages = mysqlTable("messages", {
   mediaDurationMs: int("mediaDurationMs"),
   mediaSha256: varchar("mediaSha256", { length: 64 }),
   isRead: int("isRead").default(0),
+  deletedAt: timestamp("deletedAt"),
+  deletedByUserId: int("deletedByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

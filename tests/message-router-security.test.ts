@@ -7,16 +7,26 @@ vi.mock("../server/db", async () => {
   return {
     ...actual,
     getConversation: vi.fn(),
+    getAuthorizedVoiceMessageStorage: vi.fn(),
+    getAuthorizedTextMessageForTranslation: vi.fn(),
     getMessageParticipant: vi.fn(),
     markConversationRead: vi.fn(),
     sendMessage: vi.fn(),
+    softDeleteMessage: vi.fn(),
+    listOwnPrivacyRightsRequests: vi.fn(),
+    createPrivacyRightsRequest: vi.fn(),
     getMaskedCommunicationSession: vi.fn(),
     createMaskedCommunicationSession: vi.fn(),
     releaseMaskedCommunicationSession: vi.fn(),
   };
 });
 
+vi.mock("../server/ai/OnDemandMessageTranslation", () => ({
+  translateMessageOnDemand: vi.fn(),
+}));
+
 import * as messageDb from "../server/db";
+import { translateMessageOnDemand } from "../server/ai/OnDemandMessageTranslation";
 import { appRouter } from "../server/routers";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -105,9 +115,45 @@ describe("message router security", () => {
     await expect(
       caller.messages.markRead({ requestId: 42, otherUserId: 20 }),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.messages.delete({ messageId: 501 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.messages.translate({ messageId: 501, targetLanguage: "en" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.privacyRights.list()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(
+      caller.privacyRights.submit({ requestType: "erasure", requestReason: "Veri silme talebi" }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(messageDb.getConversation).not.toHaveBeenCalled();
     expect(messageDb.sendMessage).not.toHaveBeenCalled();
     expect(messageDb.markConversationRead).not.toHaveBeenCalled();
+    expect(messageDb.softDeleteMessage).not.toHaveBeenCalled();
+    expect(messageDb.getAuthorizedTextMessageForTranslation).not.toHaveBeenCalled();
+    expect(messageDb.listOwnPrivacyRightsRequests).not.toHaveBeenCalled();
+    expect(messageDb.createPrivacyRightsRequest).not.toHaveBeenCalled();
+  });
+
+  it("binds a message delete request to the authenticated sender only", async () => {
+    vi.mocked(messageDb.softDeleteMessage).mockResolvedValue({ deleted: true, idempotent: false });
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.delete({ messageId: 501 })).resolves.toEqual({ deleted: true, idempotent: false });
+    expect(messageDb.softDeleteMessage).toHaveBeenCalledWith({ messageId: 501, actorUserId: 10 });
+  });
+
+  it("validates and binds privacy requests to their owner", async () => {
+    vi.mocked(messageDb.createPrivacyRightsRequest).mockResolvedValue({ id: 83, status: "open" });
+    vi.mocked(messageDb.listOwnPrivacyRightsRequests).mockResolvedValue([]);
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.privacyRights.submit({ requestType: "export", requestReason: "KVKK veri kopyası" }))
+      .resolves.toEqual({ id: 83, status: "open" });
+    await expect(caller.privacyRights.list()).resolves.toEqual([]);
+    expect(messageDb.createPrivacyRightsRequest).toHaveBeenCalledWith({
+      requesterUserId: 10,
+      requestType: "export",
+      requestReason: "KVKK veri kopyası",
+    });
+    expect(messageDb.listOwnPrivacyRightsRequests).toHaveBeenCalledWith(10);
+    await expect(caller.privacyRights.submit({ requestType: "erasure", requestReason: "x" }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("rejects a third party trying to send into another service conversation", async () => {
@@ -135,12 +181,9 @@ describe("message router security", () => {
         requestId: 42,
         content: "Randevu uygun.",
         kind: "text",
-        mediaStorageKey: null,
-        mediaUrl: null,
         mediaMimeType: null,
         mediaSizeBytes: null,
         mediaDurationMs: null,
-        mediaSha256: null,
         isRead: 0,
         createdAt: new Date("2026-08-09T08:00:00.000Z"),
       },
@@ -165,6 +208,100 @@ describe("message router security", () => {
       senderId: 10,
     });
     expect(messageDb.getConversation).toHaveBeenCalledWith(42, 20, 10);
+  });
+
+  it("never exposes a permanent media address in a conversation DTO", async () => {
+    vi.mocked(messageDb.getConversation).mockResolvedValue([
+      {
+        id: 502,
+        senderId: 10,
+        receiverId: 20,
+        requestId: 42,
+        content: "Sesli mesaj",
+        kind: "audio",
+        mediaMimeType: "audio/mpeg",
+        mediaSizeBytes: 1_024,
+        mediaDurationMs: 2_000,
+        isRead: 0,
+        createdAt: new Date("2026-08-09T08:01:00.000Z"),
+      },
+    ]);
+    const caller = appRouter.createCaller(createContext(10));
+
+    const messages = await caller.messages.conversation({ requestId: 42, otherUserId: 20 });
+
+    expect(messages[0]).not.toHaveProperty("mediaUrl");
+    expect(messages[0]).not.toHaveProperty("mediaStorageKey");
+    expect(messages[0]).not.toHaveProperty("mediaSha256");
+  });
+
+  it("binds audio playback access to the authenticated conversation participant", async () => {
+    vi.mocked(messageDb.getAuthorizedVoiceMessageStorage).mockResolvedValue({
+      id: 502,
+      requestId: 42,
+      senderId: 10,
+      receiverId: 20,
+      storageKey: "messages/42/10/audio.mp3",
+      mimeType: "audio/mpeg",
+      sizeBytes: 1_024,
+      durationMs: 2_000,
+    });
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.voiceAccess({ messageId: 502 })).resolves.toMatchObject({
+      messageId: 502,
+      mimeType: "audio/mpeg",
+      sizeBytes: 1_024,
+      durationMs: 2_000,
+    });
+    expect(messageDb.getAuthorizedVoiceMessageStorage).toHaveBeenCalledWith(502, 10);
+  });
+
+  it("translates only an authorized visible text message and does not persist a translation", async () => {
+    vi.mocked(messageDb.getAuthorizedTextMessageForTranslation).mockResolvedValue({
+      id: 503,
+      requestId: 42,
+      senderId: 20,
+      receiverId: 10,
+      content: "Usta yolda.",
+    });
+    vi.mocked(translateMessageOnDemand).mockResolvedValue({
+      status: "translated",
+      targetLanguage: "en",
+      translatedText: "The professional is on the way.",
+    });
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.translate({ messageId: 503, targetLanguage: "en" })).resolves.toEqual({
+      messageId: 503,
+      targetLanguage: "en",
+      translatedText: "The professional is on the way.",
+    });
+    expect(messageDb.getAuthorizedTextMessageForTranslation).toHaveBeenCalledWith(503, 10);
+    expect(translateMessageOnDemand).toHaveBeenCalledWith({ sourceText: "Usta yolda.", targetLanguage: "en" });
+  });
+
+  it("does not disclose an inaccessible message or fabricate translation output", async () => {
+    vi.mocked(messageDb.getAuthorizedTextMessageForTranslation).mockResolvedValue(null);
+    const caller = appRouter.createCaller(createContext(30));
+
+    await expect(caller.messages.translate({ messageId: 503, targetLanguage: "en" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(translateMessageOnDemand).not.toHaveBeenCalled();
+  });
+
+  it("fails closed if the translation provider is unavailable and validates language before database access", async () => {
+    vi.mocked(messageDb.getAuthorizedTextMessageForTranslation).mockResolvedValue({
+      id: 503,
+      requestId: 42,
+      senderId: 20,
+      receiverId: 10,
+      content: "Usta yolda.",
+    });
+    vi.mocked(translateMessageOnDemand).mockResolvedValue({ status: "unavailable", code: "TRANSLATION_UNAVAILABLE" });
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.translate({ messageId: 503, targetLanguage: "en" })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(caller.messages.translate({ messageId: 503, targetLanguage: "xx" as never })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("maps unauthorized read receipts to FORBIDDEN and never trusts a client user id", async () => {

@@ -1,8 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { I18nManager, Platform } from "react-native";
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
+import { getLocales } from "expo-localization";
 
-import { isRightToLeft, localeForLanguage, formatLocalDate, formatMoney, t } from "./i18n-core";
+import { isRightToLeft, LANGUAGES, languageFromDeviceLocale, localeForLanguage, formatLocalDate, formatMoney, t } from "./i18n-core";
 import type { Language, SupportedCurrency, TranslationKey, TranslationValues } from "./i18n-core";
 import { requiresFxQuote } from "@/shared/currency-policy";
 
@@ -36,8 +37,13 @@ export function LocalizationProvider({ children }: PropsWithChildren) {
     void Promise.all([AsyncStorage.getItem(LANGUAGE_STORAGE_KEY), AsyncStorage.getItem(CURRENCY_STORAGE_KEY)])
       .then(([savedLanguage, savedCurrency]) => {
         if (!active) return;
-        if (["tr", "en", "de", "fr", "ar", "ru"].includes(savedLanguage ?? "")) {
-          setLanguageState(savedLanguage as Language);
+        const resolvedLanguage = LANGUAGES.some((item) => item.code === savedLanguage)
+          ? savedLanguage as Language
+          : languageFromDeviceLocale(getLocales()[0]?.languageTag);
+        setLanguageState(resolvedLanguage);
+        if (Platform.OS !== "web" && I18nManager.isRTL !== isRightToLeft(resolvedLanguage)) {
+          I18nManager.allowRTL(true);
+          I18nManager.forceRTL(isRightToLeft(resolvedLanguage));
         }
         // A non-TRY value can only originate from a future server-verified FX
         // rollout. Legacy/local values must not silently relabel TRY balances.

@@ -309,6 +309,41 @@
       "when": 1786845505953,
       "tag": "0044_blue_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "5",
+      "when": 1786859504932,
+      "tag": "0045_chubby_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "5",
+      "when": 1786860889611,
+      "tag": "0046_nosy_epoch",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1786861438178,
+      "tag": "0047_known_squadron_supreme",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "5",
+      "when": 1786861904372,
+      "tag": "0048_equal_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "5",
+      "when": 1786863200306,
+      "tag": "0049_silly_glorian",
+      "breakpoints": true
     }
   ]
 }

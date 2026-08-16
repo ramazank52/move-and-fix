@@ -5,6 +5,11 @@ import type { TrpcContext } from "../server/_core/context";
 vi.mock("../server/db", () => ({
   acceptOffer: vi.fn(),
   rejectOffer: vi.fn(),
+  getOfferCapabilityTransitionContext: vi.fn(),
+  listProviderCapabilityStatuses: vi.fn(),
+  listProviderCredentialStatuses: vi.fn(),
+  assertProviderCapabilityForRequest: vi.fn(),
+  assertProviderCredentialForRequest: vi.fn(),
 }));
 
 import * as offerDb from "../server/db";
@@ -36,7 +41,39 @@ function createContext(id = 55): TrpcContext {
 }
 
 describe("offer router security", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(offerDb.getOfferCapabilityTransitionContext).mockResolvedValue({
+      offerId: 91,
+      providerId: 44,
+      requestId: 12,
+      jurisdictionId: 7,
+      requiredCapabilityId: 3,
+      requiredCredentialType: null,
+      requiredCredentialAssurance: null,
+      requiresCredentialHumanReview: null,
+      compliancePackageVersion: "v1",
+    });
+    vi.mocked(offerDb.listProviderCapabilityStatuses).mockResolvedValue([
+      {
+        id: 1,
+        providerId: 44,
+        capabilityId: 3,
+        jurisdictionId: 7,
+        status: "VERIFIED",
+        assuranceLevel: "A",
+        ruleVersion: "v1",
+        scopeNote: null,
+        evaluatedAt: new Date(),
+        expiresAt: null,
+        nextCheckAt: null,
+        lastCredentialId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(offerDb.listProviderCredentialStatuses).mockResolvedValue([]);
+  });
 
   it("derives accept and reject ownership from the authenticated session", async () => {
     vi.mocked(offerDb.acceptOffer).mockResolvedValue({
@@ -60,6 +97,32 @@ describe("offer router security", () => {
 
     expect(offerDb.acceptOffer).toHaveBeenCalledWith(91, 73);
     expect(offerDb.rejectOffer).toHaveBeenCalledWith(92, 73);
+    expect(offerDb.assertProviderCapabilityForRequest).toHaveBeenCalledWith({
+      request: expect.objectContaining({ offerId: 91, providerId: 44, requiredCapabilityId: 3 }),
+      capabilityStatuses: expect.any(Array),
+    });
+  });
+
+  it("fails closed before acceptance when the provider capability is expired", async () => {
+    vi.mocked(offerDb.assertProviderCapabilityForRequest).mockImplementation(() => {
+      throw new Error("PROVIDER_CAPABILITY_EXPIRED");
+    });
+    const caller = appRouter.createCaller(createContext(73));
+
+    await expect(caller.offers.accept({ offerId: 91 })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "PROVIDER_CAPABILITY_EXPIRED",
+    });
+    expect(offerDb.acceptOffer).not.toHaveBeenCalled();
+  });
+
+  it("does not treat an absent offer compliance context as an allow decision", async () => {
+    vi.mocked(offerDb.getOfferCapabilityTransitionContext).mockResolvedValue(null);
+    const caller = appRouter.createCaller(createContext(73));
+
+    await expect(caller.offers.accept({ offerId: 91 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(offerDb.listProviderCapabilityStatuses).not.toHaveBeenCalled();
+    expect(offerDb.acceptOffer).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated offer mutations before database access", async () => {

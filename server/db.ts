@@ -1,4 +1,5 @@
 import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lte, or, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { drizzle } from "drizzle-orm/mysql2";
 import { getRequiredRegistrationConsentDocuments } from "../lib/data/legal";
 import {
@@ -678,6 +679,26 @@ export async function listProviderCapabilityStatuses(providerId: number) {
     .orderBy(desc(providerCapabilityStatuses.updatedAt), desc(providerCapabilityStatuses.id));
 }
 
+export async function listProviderCredentialStatuses(providerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  return db
+    .select({
+      jurisdictionId: providerCredentials.jurisdictionId,
+      credentialType: providerCredentials.credentialType,
+      assuranceLevel: providerCredentials.assuranceLevel,
+      status: providerCredentials.status,
+      expiresAt: providerCredentials.expiresAt,
+      verifiedAt: providerCredentials.verifiedAt,
+      reviewedByUserId: providerCredentials.reviewedByUserId,
+      revocationStatus: providerCredentials.revocationStatus,
+      ruleVersion: providerCredentials.ruleVersion,
+    })
+    .from(providerCredentials)
+    .where(eq(providerCredentials.providerId, providerId))
+    .orderBy(desc(providerCredentials.updatedAt), desc(providerCredentials.id));
+}
+
 export async function createProviderCapabilityAppeal(data: {
   providerId: number;
   providerCapabilityStatusId: number;
@@ -796,6 +817,10 @@ export async function refreshProviderVerificationStatus(providerId: number) {
 import {
   serviceCategories,
   serviceSubcategories,
+  serviceCapabilities,
+  jurisdictions,
+  jurisdictionCompliancePackages,
+  capabilityJurisdictionRules,
   serviceRequests,
   serviceRequestDetails,
   serviceRequestMedia,
@@ -845,6 +870,8 @@ import {
   organizationRequestBatches,
   organizationRequestBatchItems,
   organizationInvoices,
+  privacyRightsRequests,
+  privacyLegalHolds,
 } from "../drizzle/schema";
 import {
   type MaskedCommunicationChannel,
@@ -857,9 +884,188 @@ import {
   type PaymentProviderOperationalStatus,
 } from "./payments/ProviderOperationalPolicy";
 import { EncryptionService } from "./_core/security";
+import { assertCapabilityTransition, assertServiceRequestCapabilityContext, evaluateCapabilityTransition } from "./compliance/CapabilityTransitionGuard";
+import {
+  assertCredentialEligibility,
+  evaluateCredentialEligibility,
+  type CredentialAssurance,
+} from "./compliance/CredentialEligibilityGuard";
 
 export type OrganizationType = "corporate" | "fleet" | "facility";
 export type OrganizationMemberRole = "owner" | "admin" | "member";
+
+export type ServiceRequestComplianceContext = {
+  jurisdictionId: number | null;
+  requiredCapabilityId: number | null;
+  requiredCredentialType: string | null;
+  requiredCredentialAssurance: CredentialAssurance | null;
+  requiresCredentialHumanReview: number | null;
+  compliancePackageVersion: string | null;
+};
+
+/**
+ * Resolves the compliance context from server-owned catalog and enabled legal
+ * package data. Client input can select a country, but can never select or
+ * waive a capability requirement.
+ */
+export async function resolveServiceRequestComplianceContext(input: {
+  categoryId: number;
+  subcategoryId?: number;
+  countryCode?: string;
+  now?: Date;
+}): Promise<ServiceRequestComplianceContext> {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+
+  const countryCode = (input.countryCode ?? "TR").trim().toUpperCase();
+  const now = input.now ?? new Date();
+  const jurisdictionRows = await db
+    .select({ id: jurisdictions.id, regionCode: jurisdictions.regionCode })
+    .from(jurisdictions)
+    .where(and(eq(jurisdictions.countryCode, countryCode), eq(jurisdictions.status, "active")));
+  const jurisdiction = jurisdictionRows.find((row) => row.regionCode === null) ?? jurisdictionRows[0];
+  if (!jurisdiction) {
+    return {
+      jurisdictionId: null,
+      requiredCapabilityId: null,
+      requiredCredentialType: null,
+      requiredCredentialAssurance: null,
+      requiresCredentialHumanReview: null,
+      compliancePackageVersion: null,
+    };
+  }
+
+  const packages = await db
+    .select({ id: jurisdictionCompliancePackages.id, version: jurisdictionCompliancePackages.version, effectiveFrom: jurisdictionCompliancePackages.effectiveFrom, effectiveTo: jurisdictionCompliancePackages.effectiveTo })
+    .from(jurisdictionCompliancePackages)
+    .where(and(eq(jurisdictionCompliancePackages.jurisdictionId, jurisdiction.id), eq(jurisdictionCompliancePackages.status, "enabled")))
+    .orderBy(desc(jurisdictionCompliancePackages.updatedAt), desc(jurisdictionCompliancePackages.id));
+  const compliancePackage = packages.find((candidate) =>
+    (candidate.effectiveFrom === null || candidate.effectiveFrom <= now) &&
+    (candidate.effectiveTo === null || candidate.effectiveTo > now),
+  );
+  if (!compliancePackage) {
+    return {
+      jurisdictionId: jurisdiction.id,
+      requiredCapabilityId: null,
+      requiredCredentialType: null,
+      requiredCredentialAssurance: null,
+      requiresCredentialHumanReview: null,
+      compliancePackageVersion: null,
+    };
+  }
+
+  const categoryCapabilities = await db
+    .select({ id: serviceCapabilities.id, subcategoryId: serviceCapabilities.subcategoryId })
+    .from(serviceCapabilities)
+    .where(and(eq(serviceCapabilities.categoryId, input.categoryId), eq(serviceCapabilities.status, "active")));
+  const capability =
+    (input.subcategoryId == null
+      ? undefined
+      : categoryCapabilities.find((candidate) => candidate.subcategoryId === input.subcategoryId)) ??
+    categoryCapabilities.find((candidate) => candidate.subcategoryId === null);
+  if (!capability) {
+    return {
+      jurisdictionId: jurisdiction.id,
+      requiredCapabilityId: null,
+      requiredCredentialType: null,
+      requiredCredentialAssurance: null,
+      requiresCredentialHumanReview: null,
+      compliancePackageVersion: compliancePackage.version,
+    };
+  }
+
+  const ruleRows = await db
+    .select({
+      ruleStatus: capabilityJurisdictionRules.ruleStatus,
+      requiredCredentialType: capabilityJurisdictionRules.requiredCredentialType,
+      minimumAssurance: capabilityJurisdictionRules.minimumAssurance,
+      requiresHumanReview: capabilityJurisdictionRules.requiresHumanReview,
+    })
+    .from(capabilityJurisdictionRules)
+    .where(and(eq(capabilityJurisdictionRules.packageId, compliancePackage.id), eq(capabilityJurisdictionRules.capabilityId, capability.id)))
+    .limit(1);
+  const rule = ruleRows[0];
+  // Any absent/unknown/prohibited rule is retained as a requirement. It will
+  // subsequently block provider transitions instead of allowing a silent bypass.
+  const requiredCapabilityId = rule?.ruleStatus === "not_required" ? null : capability.id;
+  return {
+    jurisdictionId: jurisdiction.id,
+    requiredCapabilityId,
+    requiredCredentialType: rule?.ruleStatus === "required" ? rule.requiredCredentialType : null,
+    requiredCredentialAssurance:
+      rule?.ruleStatus === "required" && rule.requiredCredentialType !== null
+        ? rule.minimumAssurance
+        : null,
+    requiresCredentialHumanReview:
+      rule?.ruleStatus === "required" && rule.requiredCredentialType !== null
+        ? rule.requiresHumanReview
+        : null,
+    compliancePackageVersion: compliancePackage.version,
+  };
+}
+
+export function assertProviderCapabilityForRequest(input: {
+  request: Pick<ServiceRequestComplianceContext, "jurisdictionId" | "requiredCapabilityId">;
+  capabilityStatuses: Array<{
+    capabilityId: number;
+    jurisdictionId: number;
+    status: "VERIFIED" | "VERIFIED_LIMITED_SCOPE" | "MANUAL_REVIEW" | "REJECTED" | "EXPIRED_OR_SUSPENDED" | "LEGAL_REVIEW_REQUIRED";
+    expiresAt: Date | null;
+  }>;
+  now?: Date;
+}): void {
+  const capabilityStatus = input.request.requiredCapabilityId == null || input.request.jurisdictionId == null
+    ? null
+    : input.capabilityStatuses.find((candidate) =>
+        candidate.capabilityId === input.request.requiredCapabilityId &&
+        candidate.jurisdictionId === input.request.jurisdictionId,
+      ) ?? null;
+  assertCapabilityTransition({
+    enforcementEnabled: input.request.requiredCapabilityId !== null,
+    requiredCapabilityId: input.request.requiredCapabilityId,
+    jurisdictionId: input.request.jurisdictionId,
+    providerCapabilityDecision: capabilityStatus?.status ?? null,
+    providerCapabilityExpiresAt: capabilityStatus?.expiresAt ?? null,
+    now: input.now,
+  });
+}
+
+export function assertProviderCredentialForRequest(input: {
+  request: Pick<
+    ServiceRequestComplianceContext,
+    | "jurisdictionId"
+    | "requiredCredentialType"
+    | "requiredCredentialAssurance"
+    | "requiresCredentialHumanReview"
+    | "compliancePackageVersion"
+  >;
+  providerCredentials: Array<{
+    jurisdictionId: number;
+    credentialType: string;
+    assuranceLevel: CredentialAssurance;
+    status: "submitted" | "verified" | "rejected" | "expired" | "suspended" | "revoked";
+    expiresAt: Date | null;
+    verifiedAt: Date | null;
+    reviewedByUserId: number | null;
+    revocationStatus: "unknown" | "clear" | "revoked" | "check_failed";
+    ruleVersion: string | null;
+  }>;
+  now?: Date;
+}): void {
+  assertCredentialEligibility({
+    requiredCredentialType: input.request.requiredCredentialType,
+    minimumAssurance: input.request.requiredCredentialAssurance,
+    requiresHumanReview:
+      input.request.requiresCredentialHumanReview == null
+        ? null
+        : input.request.requiresCredentialHumanReview === 1,
+    compliancePackageVersion: input.request.compliancePackageVersion,
+    jurisdictionId: input.request.jurisdictionId,
+    providerCredentials: input.providerCredentials,
+    now: input.now,
+  });
+}
 
 async function getOrganizationAccess(input: { organizationId: number; userId: number }) {
   const db = await getDb();
@@ -1926,6 +2132,7 @@ export async function createServiceRequest(data: {
   userId: number;
   organizationId?: number;
   categoryId: number;
+  countryCode?: string;
   title: string;
   description?: string;
   address?: string;
@@ -1942,9 +2149,19 @@ export async function createServiceRequest(data: {
   if (data.organizationId != null) {
     await assertOrganizationRequestAccess({ organizationId: data.organizationId, userId: data.userId });
   }
-  const { details, ...requestData } = data;
+  const complianceContext = await resolveServiceRequestComplianceContext({
+    categoryId: data.categoryId,
+    subcategoryId: data.details?.subcategoryId,
+    countryCode: data.countryCode,
+  });
+  assertServiceRequestCapabilityContext({
+    enforcementEnabled: complianceContext.requiredCapabilityId !== null,
+    requiredCapabilityId: complianceContext.requiredCapabilityId,
+    jurisdictionId: complianceContext.jurisdictionId,
+  });
+  const { details, countryCode: _countryCode, ...requestData } = data;
   return db.transaction(async (tx) => {
-    const result = await tx.insert(serviceRequests).values(requestData);
+    const result = await tx.insert(serviceRequests).values({ ...requestData, ...complianceContext });
     const requestId = result[0].insertId;
     if (details) {
       await tx.insert(serviceRequestDetails).values({
@@ -2011,12 +2228,19 @@ export async function getServiceRequestMedia(requestId: number) {
     .where(eq(serviceRequestMedia.requestId, requestId))
     .orderBy(serviceRequestMedia.createdAt, serviceRequestMedia.id);
   return rows.map((row) => ({
-    ...row,
-    url: `/manus-storage/${row.storageKey}`,
+    id: row.id,
+    mediaRef: row.publicId,
+    purpose: row.purpose,
+    kind: row.kind,
+    originalName: row.originalName,
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+    createdAt: row.createdAt,
   }));
 }
 
 export async function createServiceRequestMedia(data: {
+  publicId: string;
   requestId: number;
   ownerUserId: number;
   purpose: "request" | "before" | "after" | "completion" | "dispute" | "expense";
@@ -2031,6 +2255,30 @@ export async function createServiceRequestMedia(data: {
   if (!db) throw new Error("Database not available");
   const result = await db.insert(serviceRequestMedia).values(data);
   return result[0].insertId;
+}
+
+/** Resolves a storage object only for a request participant; absent and forbidden are indistinguishable. */
+export async function getAuthorizedServiceRequestMedia(
+  requestId: number,
+  mediaRef: string,
+  actorUserId: number,
+) {
+  const db = await getDb();
+  if (!db) return null;
+  const [requestRows, mediaRows] = await Promise.all([
+    db.select().from(serviceRequests).where(eq(serviceRequests.id, requestId)).limit(1),
+    db
+      .select()
+      .from(serviceRequestMedia)
+      .where(and(eq(serviceRequestMedia.requestId, requestId), eq(serviceRequestMedia.publicId, mediaRef)))
+      .limit(1),
+  ]);
+  const request = requestRows[0];
+  const media = mediaRows[0];
+  if (!request || !media) return null;
+  if (request.userId === actorUserId || media.ownerUserId === actorUserId) return media;
+  const provider = await getProviderProfile(actorUserId);
+  return provider && request.assignedProviderId === provider.id ? media : null;
 }
 
 export async function getUserServiceRequests(userId: number) {
@@ -2157,6 +2405,27 @@ export async function createOffer(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const requestRows = await db
+    .select({
+      id: serviceRequests.id,
+      jurisdictionId: serviceRequests.jurisdictionId,
+      requiredCapabilityId: serviceRequests.requiredCapabilityId,
+      requiredCredentialType: serviceRequests.requiredCredentialType,
+      requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
+      requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
+      compliancePackageVersion: serviceRequests.compliancePackageVersion,
+    })
+    .from(serviceRequests)
+    .where(eq(serviceRequests.id, data.requestId))
+    .limit(1);
+  const request = requestRows[0];
+  if (!request) throw new Error("SERVICE_REQUEST_NOT_FOUND");
+  const [capabilityStatuses, providerCredentials] = await Promise.all([
+    listProviderCapabilityStatuses(data.providerId),
+    listProviderCredentialStatuses(data.providerId),
+  ]);
+  assertProviderCapabilityForRequest({ request, capabilityStatuses });
+  assertProviderCredentialForRequest({ request, providerCredentials });
   const existing = await db
     .select({ id: offers.id })
     .from(offers)
@@ -2165,6 +2434,28 @@ export async function createOffer(data: {
   if (existing[0]) throw new Error("Bu iş için daha önce teklif verdiniz");
   const result = await db.insert(offers).values(data);
   return result[0].insertId;
+}
+
+export async function getOfferCapabilityTransitionContext(offerId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      offerId: offers.id,
+      providerId: offers.providerId,
+      requestId: serviceRequests.id,
+      jurisdictionId: serviceRequests.jurisdictionId,
+      requiredCapabilityId: serviceRequests.requiredCapabilityId,
+      requiredCredentialType: serviceRequests.requiredCredentialType,
+      requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
+      requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
+      compliancePackageVersion: serviceRequests.compliancePackageVersion,
+    })
+    .from(offers)
+    .innerJoin(serviceRequests, eq(serviceRequests.id, offers.requestId))
+    .where(eq(offers.id, offerId))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export async function getOffersForRequest(requestId: number) {
@@ -2311,6 +2602,7 @@ export async function getMaskedCommunicationSession(input: {
   actorUserId: number;
   channel: MaskedCommunicationChannel;
 }) {
+  await expireMaskedCommunicationSessions({ requestId: input.requestId });
   const participant = await getMaskedCommunicationParticipants(input.requestId);
   if (input.actorUserId !== participant.customerUserId && input.actorUserId !== participant.providerUserId) {
     throw new Error("MASKED_COMMUNICATION_FORBIDDEN");
@@ -2342,13 +2634,47 @@ export async function releaseMaskedCommunicationSession(input: {
   }
   const result = await participant.db
     .update(maskedCommunicationSessions)
-    .set({ status: "released", releasedAt: new Date() })
+    .set({ status: "released", releasedAt: new Date(), providerSessionReference: null })
     .where(and(
       eq(maskedCommunicationSessions.requestId, input.requestId),
       eq(maskedCommunicationSessions.channel, input.channel),
     ));
   if (result[0].affectedRows !== 1) throw new Error("MASKED_COMMUNICATION_SESSION_NOT_FOUND");
   return { released: true };
+}
+
+/**
+ * Marks elapsed proxy sessions inactive while retaining only the minimum audit
+ * record. Clearing the opaque provider reference prevents stale reuse.
+ */
+export async function expireMaskedCommunicationSessions(input: { requestId?: number; now?: Date } = {}) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const now = input.now ?? new Date();
+  const expiredCondition = and(
+    inArray(maskedCommunicationSessions.status, ["pending", "active"]),
+    isNotNull(maskedCommunicationSessions.expiresAt),
+    lte(maskedCommunicationSessions.expiresAt, now),
+  );
+  const whereClause = input.requestId == null
+    ? expiredCondition
+    : and(eq(maskedCommunicationSessions.requestId, input.requestId), expiredCondition);
+  const expired = await database
+    .select({ id: maskedCommunicationSessions.id, requestId: maskedCommunicationSessions.requestId })
+    .from(maskedCommunicationSessions)
+    .where(whereClause);
+  if (expired.length === 0) return { expiredCount: 0 };
+
+  await database
+    .update(maskedCommunicationSessions)
+    .set({ status: "expired", expiredAt: now, providerSessionReference: null })
+    .where(inArray(maskedCommunicationSessions.id, expired.map((row) => row.id)));
+  await Promise.all(expired.map((session) => logOperationEvent({
+    eventType: "masked_communication_expired",
+    subjectId: session.requestId,
+    payload: { sessionId: session.id },
+  })));
+  return { expiredCount: expired.length };
 }
 
 export async function sendMessage(data: {
@@ -2419,9 +2745,63 @@ export async function getVoiceMessageMetadata(messageId: number) {
       createdAt: messages.createdAt,
     })
     .from(messages)
-    .where(and(eq(messages.id, messageId), eq(messages.kind, "audio")))
+    .where(and(eq(messages.id, messageId), eq(messages.kind, "audio"), isNull(messages.deletedAt)))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * Resolves only the storage metadata needed to mint a short-lived download URL.
+ * Callers must never return this internal record directly to a client.
+ */
+export async function getAuthorizedVoiceMessageStorage(
+  messageId: number,
+  actorUserId: number,
+) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      id: messages.id,
+      requestId: messages.requestId,
+      senderId: messages.senderId,
+      receiverId: messages.receiverId,
+      storageKey: messages.mediaStorageKey,
+      mimeType: messages.mediaMimeType,
+      sizeBytes: messages.mediaSizeBytes,
+      durationMs: messages.mediaDurationMs,
+    })
+    .from(messages)
+    .where(and(eq(messages.id, messageId), eq(messages.kind, "audio"), isNull(messages.deletedAt)))
+    .limit(1);
+  const message = rows[0];
+  if (!message || message.requestId == null || !message.storageKey) return null;
+  if (message.senderId !== actorUserId && message.receiverId !== actorUserId) return null;
+  await assertMessageParticipant(db, message.requestId, message.senderId, message.receiverId);
+  return message;
+}
+
+/** Returns source text only after proving that the requesting actor is a conversation participant. */
+export async function getAuthorizedTextMessageForTranslation(messageId: number, actorUserId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      id: messages.id,
+      requestId: messages.requestId,
+      senderId: messages.senderId,
+      receiverId: messages.receiverId,
+      content: messages.content,
+    })
+    .from(messages)
+    .where(and(eq(messages.id, messageId), eq(messages.kind, "text"), isNull(messages.deletedAt)))
+    .limit(1);
+  const message = rows[0];
+  if (!message || message.requestId == null || (message.senderId !== actorUserId && message.receiverId !== actorUserId)) {
+    return null;
+  }
+  await assertMessageParticipant(db, message.requestId, message.senderId, message.receiverId);
+  return message;
 }
 
 export async function getConversation(requestId: number, userId1: number, userId2: number) {
@@ -2430,11 +2810,24 @@ export async function getConversation(requestId: number, userId1: number, userId
   await assertMessageParticipant(db, requestId, userId1, userId2);
   const { or, and } = await import("drizzle-orm");
   return db
-    .select()
+    .select({
+      id: messages.id,
+      senderId: messages.senderId,
+      receiverId: messages.receiverId,
+      requestId: messages.requestId,
+      content: messages.content,
+      kind: messages.kind,
+      mediaMimeType: messages.mediaMimeType,
+      mediaSizeBytes: messages.mediaSizeBytes,
+      mediaDurationMs: messages.mediaDurationMs,
+      isRead: messages.isRead,
+      createdAt: messages.createdAt,
+    })
     .from(messages)
     .where(
       and(
         eq(messages.requestId, requestId),
+        isNull(messages.deletedAt),
         or(
           and(eq(messages.senderId, userId1), eq(messages.receiverId, userId2)),
           and(eq(messages.senderId, userId2), eq(messages.receiverId, userId1)),
@@ -2452,7 +2845,7 @@ export async function getMessageConversations(userId: number) {
   const rows = await db
     .select()
     .from(messages)
-    .where(or(eq(messages.senderId, userId), eq(messages.receiverId, userId))!)
+    .where(and(isNull(messages.deletedAt), or(eq(messages.senderId, userId), eq(messages.receiverId, userId))!))
     .orderBy(desc(messages.createdAt), desc(messages.id));
 
   const requestIds = [
@@ -2552,6 +2945,258 @@ export async function getMessageConversations(userId: number) {
       unreadCount: state.unreadCount,
     };
   });
+}
+
+/**
+ * Removes a sender-owned message from both participants' normal views. The row
+ * remains as minimal audit evidence, while content/media are not retrievable
+ * from conversation APIs after deletion.
+ */
+export async function softDeleteMessage(input: { messageId: number; actorUserId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db
+    .select({
+      id: messages.id,
+      senderId: messages.senderId,
+      receiverId: messages.receiverId,
+      requestId: messages.requestId,
+      deletedAt: messages.deletedAt,
+    })
+    .from(messages)
+    .where(eq(messages.id, input.messageId))
+    .limit(1);
+  const message = rows[0];
+  if (!message) throw new Error("MESSAGE_NOT_FOUND");
+  if (message.senderId !== input.actorUserId) throw new Error("MESSAGE_DELETE_FORBIDDEN");
+  if (message.requestId == null) throw new Error("MESSAGE_REQUEST_REQUIRED");
+  await assertMessageParticipant(db, message.requestId, message.senderId, message.receiverId);
+  if (message.deletedAt) return { deleted: true, idempotent: true } as const;
+
+  const result = await db
+    .update(messages)
+    .set({ deletedAt: new Date(), deletedByUserId: input.actorUserId, content: "" })
+    .where(and(eq(messages.id, input.messageId), isNull(messages.deletedAt), eq(messages.senderId, input.actorUserId)));
+  if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("MESSAGE_DELETE_CONFLICT");
+  await logOperationEvent({
+    eventType: "message_soft_deleted",
+    subjectId: message.requestId,
+    actorId: input.actorUserId,
+    payload: { messageId: input.messageId },
+  });
+  return { deleted: true, idempotent: false } as const;
+}
+
+export type PrivacyRightRequestType = "export" | "erasure";
+export type PrivacyRightReviewDecision = "start_review" | "approve" | "reject";
+
+/**
+ * Creates an owned privacy request. Completion is intentionally absent from
+ * this path: exports require a secure delivery destination and erasure requires
+ * retention-aware human review before any authoritative record is altered.
+ */
+export async function createPrivacyRightsRequest(input: {
+  requesterUserId: number;
+  requestType: PrivacyRightRequestType;
+  requestReason?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const requester = await db.select({ id: users.id }).from(users).where(eq(users.id, input.requesterUserId)).limit(1);
+  if (!requester[0]) throw new Error("PRIVACY_REQUESTER_NOT_FOUND");
+
+  const existing = await db
+    .select({ id: privacyRightsRequests.id })
+    .from(privacyRightsRequests)
+    .where(and(
+      eq(privacyRightsRequests.requesterUserId, input.requesterUserId),
+      eq(privacyRightsRequests.requestType, input.requestType),
+      inArray(privacyRightsRequests.status, ["open", "in_review", "blocked_legal_hold", "approved"]),
+    ))
+    .limit(1);
+  if (existing[0]) throw new Error("PRIVACY_REQUEST_ALREADY_OPEN");
+
+  const legalHold = input.requestType === "erasure"
+    ? await db
+        .select({ id: privacyLegalHolds.id })
+        .from(privacyLegalHolds)
+        .where(and(eq(privacyLegalHolds.userId, input.requesterUserId), eq(privacyLegalHolds.status, "active")))
+        .limit(1)
+    : [];
+  const status = legalHold[0] ? "blocked_legal_hold" as const : "open" as const;
+  const result = await db.insert(privacyRightsRequests).values({
+    requesterUserId: input.requesterUserId,
+    requestType: input.requestType,
+    status,
+    requestReason: input.requestReason?.trim() || null,
+  });
+  const id = Number(result[0].insertId);
+  await logOperationEvent({
+    eventType: "privacy_right_requested",
+    subjectId: id,
+    actorId: input.requesterUserId,
+    payload: { requestType: input.requestType, blockedByLegalHold: Boolean(legalHold[0]) },
+    severity: legalHold[0] ? "warning" : "info",
+  });
+  return { id, status };
+}
+
+export async function listOwnPrivacyRightsRequests(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: privacyRightsRequests.id,
+      requestType: privacyRightsRequests.requestType,
+      status: privacyRightsRequests.status,
+      requestReason: privacyRightsRequests.requestReason,
+      reviewNote: privacyRightsRequests.reviewNote,
+      reviewedAt: privacyRightsRequests.reviewedAt,
+      completedAt: privacyRightsRequests.completedAt,
+      createdAt: privacyRightsRequests.createdAt,
+      updatedAt: privacyRightsRequests.updatedAt,
+    })
+    .from(privacyRightsRequests)
+    .where(eq(privacyRightsRequests.requesterUserId, userId))
+    .orderBy(desc(privacyRightsRequests.createdAt), desc(privacyRightsRequests.id));
+}
+
+export async function listPrivacyRightsRequestsForReview(limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: privacyRightsRequests.id,
+      requesterUserId: privacyRightsRequests.requesterUserId,
+      requestType: privacyRightsRequests.requestType,
+      status: privacyRightsRequests.status,
+      requestReason: privacyRightsRequests.requestReason,
+      reviewNote: privacyRightsRequests.reviewNote,
+      reviewedByUserId: privacyRightsRequests.reviewedByUserId,
+      reviewedAt: privacyRightsRequests.reviewedAt,
+      completedAt: privacyRightsRequests.completedAt,
+      createdAt: privacyRightsRequests.createdAt,
+      updatedAt: privacyRightsRequests.updatedAt,
+    })
+    .from(privacyRightsRequests)
+    .orderBy(desc(privacyRightsRequests.createdAt), desc(privacyRightsRequests.id))
+    .limit(Math.min(Math.max(limit, 1), 200));
+}
+
+export async function listPrivacyLegalHolds(limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(privacyLegalHolds)
+    .orderBy(desc(privacyLegalHolds.createdAt), desc(privacyLegalHolds.id))
+    .limit(Math.min(Math.max(limit, 1), 200));
+}
+
+export async function createPrivacyLegalHold(input: {
+  userId: number;
+  createdByUserId: number;
+  reason: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const user = await db.select({ id: users.id }).from(users).where(eq(users.id, input.userId)).limit(1);
+  if (!user[0]) throw new Error("PRIVACY_HOLD_USER_NOT_FOUND");
+  const existing = await db
+    .select({ id: privacyLegalHolds.id })
+    .from(privacyLegalHolds)
+    .where(and(eq(privacyLegalHolds.userId, input.userId), eq(privacyLegalHolds.status, "active")))
+    .limit(1);
+  if (existing[0]) throw new Error("PRIVACY_LEGAL_HOLD_ALREADY_ACTIVE");
+  const result = await db.insert(privacyLegalHolds).values({
+    userId: input.userId,
+    createdByUserId: input.createdByUserId,
+    reason: input.reason.trim(),
+  });
+  const holdId = Number(result[0].insertId);
+  await db
+    .update(privacyRightsRequests)
+    .set({ status: "blocked_legal_hold" })
+    .where(and(
+      eq(privacyRightsRequests.requesterUserId, input.userId),
+      eq(privacyRightsRequests.requestType, "erasure"),
+      inArray(privacyRightsRequests.status, ["open", "in_review", "approved"]),
+    ));
+  await logOperationEvent({
+    eventType: "privacy_legal_hold_created",
+    subjectId: holdId,
+    actorId: input.createdByUserId,
+    payload: { userId: input.userId },
+    severity: "warning",
+  });
+  return { id: holdId, status: "active" as const };
+}
+
+export async function releasePrivacyLegalHold(input: { holdId: number; releasedByUserId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select().from(privacyLegalHolds).where(eq(privacyLegalHolds.id, input.holdId)).limit(1);
+  const hold = rows[0];
+  if (!hold) throw new Error("PRIVACY_LEGAL_HOLD_NOT_FOUND");
+  if (hold.status === "released") return { id: hold.id, status: "released" as const, idempotent: true };
+  await db
+    .update(privacyLegalHolds)
+    .set({ status: "released", releasedByUserId: input.releasedByUserId, releasedAt: new Date() })
+    .where(and(eq(privacyLegalHolds.id, input.holdId), eq(privacyLegalHolds.status, "active")));
+  await logOperationEvent({
+    eventType: "privacy_legal_hold_released",
+    subjectId: input.holdId,
+    actorId: input.releasedByUserId,
+    payload: { userId: hold.userId },
+    severity: "info",
+  });
+  return { id: hold.id, status: "released" as const, idempotent: false };
+}
+
+export async function reviewPrivacyRightsRequest(input: {
+  requestId: number;
+  reviewerUserId: number;
+  decision: PrivacyRightReviewDecision;
+  reviewNote?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select().from(privacyRightsRequests).where(eq(privacyRightsRequests.id, input.requestId)).limit(1);
+  const request = rows[0];
+  if (!request) throw new Error("PRIVACY_REQUEST_NOT_FOUND");
+  if (["rejected", "completed"].includes(request.status)) throw new Error("PRIVACY_REQUEST_TERMINAL");
+
+  const activeHold = request.requestType === "erasure"
+    ? await db
+        .select({ id: privacyLegalHolds.id })
+        .from(privacyLegalHolds)
+        .where(and(eq(privacyLegalHolds.userId, request.requesterUserId), eq(privacyLegalHolds.status, "active")))
+        .limit(1)
+    : [];
+  const status = activeHold[0]
+    ? "blocked_legal_hold" as const
+    : input.decision === "start_review"
+      ? "in_review" as const
+      : input.decision === "approve"
+        ? "approved" as const
+        : "rejected" as const;
+  await db
+    .update(privacyRightsRequests)
+    .set({
+      status,
+      reviewNote: input.reviewNote?.trim() || null,
+      reviewedByUserId: input.reviewerUserId,
+      reviewedAt: new Date(),
+    })
+    .where(eq(privacyRightsRequests.id, input.requestId));
+  await logOperationEvent({
+    eventType: "privacy_right_reviewed",
+    subjectId: input.requestId,
+    actorId: input.reviewerUserId,
+    payload: { decision: input.decision, resultingStatus: status, blockedByLegalHold: Boolean(activeHold[0]) },
+    severity: activeHold[0] ? "warning" : "info",
+  });
+  return { id: input.requestId, status };
 }
 
 export async function getMessageParticipant(
@@ -2829,6 +3474,12 @@ async function getTrackingAccessContext(requestId: number) {
       customerLatitude: serviceRequests.latitude,
       customerLongitude: serviceRequests.longitude,
       assignedProviderId: serviceRequests.assignedProviderId,
+      jurisdictionId: serviceRequests.jurisdictionId,
+      requiredCapabilityId: serviceRequests.requiredCapabilityId,
+      requiredCredentialType: serviceRequests.requiredCredentialType,
+      requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
+      requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
+      compliancePackageVersion: serviceRequests.compliancePackageVersion,
       categoryName: serviceCategories.name,
       providerUserId: providers.userId,
       providerName: providers.displayName,
@@ -2955,6 +3606,50 @@ export async function updateJobLifecycle(data: {
     }
     if (!TRACKING_TRANSITIONS[current].includes(data.status)) {
       throw new Error(`Invalid job lifecycle transition: ${current} -> ${data.status}`);
+    }
+
+    // Capability eligibility is rechecked at the moment an assigned provider
+    // starts or progresses an active job. This prevents an expired, revoked, or
+    // otherwise ineligible capability from being bypassed after offer acceptance.
+    if (
+      data.status === "on_the_way" ||
+      data.status === "arrived" ||
+      data.status === "in_progress"
+    ) {
+      if (context.assignedProviderId == null) {
+        throw new Error("COMPLIANCE_CONTEXT_NOT_CONFIGURED");
+      }
+      const capabilityStatuses = await tx
+        .select({
+          capabilityId: providerCapabilityStatuses.capabilityId,
+          jurisdictionId: providerCapabilityStatuses.jurisdictionId,
+          status: providerCapabilityStatuses.status,
+          expiresAt: providerCapabilityStatuses.expiresAt,
+        })
+        .from(providerCapabilityStatuses)
+        .where(eq(providerCapabilityStatuses.providerId, context.assignedProviderId));
+      assertProviderCapabilityForRequest({
+        request: context,
+        capabilityStatuses,
+      });
+      const providerCredentialStatuses = await tx
+        .select({
+          jurisdictionId: providerCredentials.jurisdictionId,
+          credentialType: providerCredentials.credentialType,
+          assuranceLevel: providerCredentials.assuranceLevel,
+          status: providerCredentials.status,
+          expiresAt: providerCredentials.expiresAt,
+          verifiedAt: providerCredentials.verifiedAt,
+          reviewedByUserId: providerCredentials.reviewedByUserId,
+          revocationStatus: providerCredentials.revocationStatus,
+          ruleVersion: providerCredentials.ruleVersion,
+        })
+        .from(providerCredentials)
+        .where(eq(providerCredentials.providerId, context.assignedProviderId));
+      assertProviderCredentialForRequest({
+        request: context,
+        providerCredentials: providerCredentialStatuses,
+      });
     }
 
     await tx
@@ -3236,6 +3931,7 @@ export async function submitCompletionProof(data: {
     const proofId = proofResult[0].insertId;
     for (const item of data.media) {
       const mediaResult = await tx.insert(serviceRequestMedia).values({
+        publicId: randomUUID(),
         requestId: data.requestId,
         ownerUserId: data.userId,
         purpose: "completion",
@@ -3411,6 +4107,7 @@ export async function resolveCompletionDispute(data: {
     }
     if (!payment || payment.status !== "held") throw new Error("ESCROW_NOT_HELD");
     const now = new Date();
+    let settlementPending = false;
     if (data.resolution === "provider") {
       await releaseHeldEscrowInTransaction(tx, {
         requestId: data.requestId,
@@ -3425,35 +4122,59 @@ export async function resolveCompletionDispute(data: {
         .update(jobCompletionProofs)
         .set({ status: "resolved", releasedAt: now, releaseReason: "admin_resolution" })
         .where(eq(jobCompletionProofs.id, proof.id));
-    } else {
-      const refundResult = await tx
-        .update(payments)
-        .set({ status: "refunded" })
-        .where(and(eq(payments.id, payment.id), eq(payments.status, "held")));
-      if ((refundResult[0]?.affectedRows ?? 0) !== 1) throw new Error("ESCROW_REFUND_CONFLICT");
+
       await tx
-        .update(jobCompletionProofs)
-        .set({ status: "resolved" })
-        .where(eq(jobCompletionProofs.id, proof.id));
+        .update(completionDisputes)
+        .set({
+          status: "resolved_provider",
+          reviewedByUserId: data.adminUserId,
+          resolutionNote: data.resolutionNote.trim(),
+          resolvedAt: now,
+        })
+        .where(eq(completionDisputes.id, dispute.id));
+    } else {
+      // An administrative customer-favoring decision is not a payment event.
+      // Keep escrow held until the signed provider callback confirms the refund.
+      settlementPending = true;
+      const reviewResult = await tx
+        .update(completionDisputes)
+        .set({
+          status: "under_review",
+          reviewedByUserId: data.adminUserId,
+          resolutionNote: data.resolutionNote.trim(),
+          resolvedAt: null,
+          refundGatewayReference: null,
+          refundVerifiedAt: null,
+        })
+        .where(
+          and(
+            eq(completionDisputes.id, dispute.id),
+            inArray(completionDisputes.status, ["open", "under_review"]),
+          ),
+        );
+      if ((reviewResult[0]?.affectedRows ?? 0) !== 1) {
+        throw new Error("COMPLETION_DISPUTE_REVIEW_CONFLICT");
+      }
     }
-    await tx
-      .update(completionDisputes)
-      .set({
-        status: data.resolution === "provider" ? "resolved_provider" : "resolved_customer",
-        reviewedByUserId: data.adminUserId,
-        resolutionNote: data.resolutionNote.trim(),
-        resolvedAt: now,
-      })
-      .where(eq(completionDisputes.id, dispute.id));
-    return { requestId: data.requestId, resolution: data.resolution, resolvedAt: now };
+    return { requestId: data.requestId, resolution: data.resolution, settlementPending, resolvedAt: settlementPending ? null : now };
   });
-  await logOperationEvent({
-    eventType: "completion_dispute.resolved",
-    subjectId: data.requestId,
-    actorId: data.adminUserId,
-    severity: data.resolution === "customer" ? "warning" : "info",
-    payload: { resolution: data.resolution },
-  });
+  await logOperationEvent(
+    outcome.settlementPending
+      ? {
+          eventType: "completion_dispute.refund_pending",
+          subjectId: data.requestId,
+          actorId: data.adminUserId,
+          severity: "warning",
+          payload: { resolution: data.resolution, paymentStatus: "held" },
+        }
+      : {
+          eventType: "completion_dispute.resolved",
+          subjectId: data.requestId,
+          actorId: data.adminUserId,
+          severity: "info",
+          payload: { resolution: data.resolution },
+        },
+  );
   if (data.resolution === "provider") {
     await logOperationEvent({
       eventType: "escrow.released",
@@ -3463,6 +4184,70 @@ export async function resolveCompletionDispute(data: {
     });
   }
   return outcome;
+}
+
+/**
+ * Finalizes a customer-favoring completion-dispute decision only after a
+ * verified full-refund gateway callback changed the payment from held to
+ * refunded in the same database transaction.
+ */
+async function resolveCompletionDisputeRefundInTransaction(
+  tx: DatabaseTransaction,
+  payment: typeof payments.$inferSelect,
+  gatewayReference: string,
+) {
+  const disputeRows = await tx
+    .select()
+    .from(completionDisputes)
+    .where(eq(completionDisputes.requestId, payment.requestId))
+    .limit(1);
+  const dispute = disputeRows[0];
+  if (!dispute || dispute.status !== "under_review" || !dispute.reviewedByUserId) return false;
+
+  const proofRows = await tx
+    .select()
+    .from(jobCompletionProofs)
+    .where(eq(jobCompletionProofs.id, dispute.completionProofId))
+    .limit(1);
+  const proof = proofRows[0];
+  if (!proof || proof.requestId !== payment.requestId || proof.status !== "disputed") {
+    throw new Error("COMPLETION_DISPUTE_REFUND_STATE_MISMATCH");
+  }
+
+  const now = new Date();
+  const disputeUpdate = await tx
+    .update(completionDisputes)
+    .set({
+      status: "resolved_customer",
+      refundGatewayReference: gatewayReference,
+      refundVerifiedAt: now,
+      resolvedAt: now,
+    })
+    .where(and(eq(completionDisputes.id, dispute.id), eq(completionDisputes.status, "under_review")));
+  if ((disputeUpdate[0]?.affectedRows ?? 0) !== 1) {
+    throw new Error("COMPLETION_DISPUTE_REFUND_RESOLUTION_CONFLICT");
+  }
+  const proofUpdate = await tx
+    .update(jobCompletionProofs)
+    .set({ status: "resolved" })
+    .where(and(eq(jobCompletionProofs.id, proof.id), eq(jobCompletionProofs.status, "disputed")));
+  if ((proofUpdate[0]?.affectedRows ?? 0) !== 1) {
+    throw new Error("COMPLETION_PROOF_REFUND_RESOLUTION_CONFLICT");
+  }
+  await tx.insert(jobTimelineEvents).values({
+    requestId: payment.requestId,
+    eventType: "completion_dispute.refund_verified",
+    actorUserId: dispute.reviewedByUserId,
+    referenceType: "completion_dispute_refund",
+    referenceId: dispute.id,
+    metadataJson: {
+      disputeId: dispute.id,
+      paymentId: payment.id,
+      gatewayReference,
+      resolution: "customer",
+    },
+  });
+  return true;
 }
 
 export async function autoReleaseDueCompletionProofs(now = new Date(), limit = 100) {
@@ -3563,6 +4348,32 @@ export async function acceptOffer(offerId: number, userId: number) {
       .limit(1);
     const provider = providerRows[0];
     if (!provider) throw new Error("OFFER_ACCEPT_PROVIDER_NOT_FOUND");
+
+    const capabilityStatuses = await tx
+      .select({
+        capabilityId: providerCapabilityStatuses.capabilityId,
+        jurisdictionId: providerCapabilityStatuses.jurisdictionId,
+        status: providerCapabilityStatuses.status,
+        expiresAt: providerCapabilityStatuses.expiresAt,
+      })
+      .from(providerCapabilityStatuses)
+      .where(eq(providerCapabilityStatuses.providerId, provider.id));
+    assertProviderCapabilityForRequest({ request, capabilityStatuses });
+    const providerCredentialStatuses = await tx
+      .select({
+        jurisdictionId: providerCredentials.jurisdictionId,
+        credentialType: providerCredentials.credentialType,
+        assuranceLevel: providerCredentials.assuranceLevel,
+        status: providerCredentials.status,
+        expiresAt: providerCredentials.expiresAt,
+        verifiedAt: providerCredentials.verifiedAt,
+        reviewedByUserId: providerCredentials.reviewedByUserId,
+        revocationStatus: providerCredentials.revocationStatus,
+        ruleVersion: providerCredentials.ruleVersion,
+      })
+      .from(providerCredentials)
+      .where(eq(providerCredentials.providerId, provider.id));
+    assertProviderCredentialForRequest({ request, providerCredentials: providerCredentialStatuses });
 
     const detailRows = await tx
       .select()
@@ -4351,28 +5162,14 @@ export async function rejectOffer(offerId: number, userId: number) {
 
 // Update job status (for provider lifecycle: active → in_progress → completed)
 export async function updateJobStatus(requestId: number, status: "pending" | "active" | "completed" | "cancelled", userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Verify ownership or assignment
-  const rows = await db.select().from(serviceRequests).where(eq(serviceRequests.id, requestId)).limit(1);
-  if (rows.length === 0) throw new Error("Service request not found");
-  const request = rows[0];
-
-  // Only the job owner or assigned provider can update status
-  if (request.userId !== userId && request.assignedProviderId !== userId) {
-    throw new Error("Not authorized to update this job status");
-  }
-
-  await db.transaction(async (tx) => {
-    await tx.update(serviceRequests).set({ status }).where(eq(serviceRequests.id, requestId));
-    if (status === "completed" && request.status !== "completed") {
-      await tx.insert(jobTimelineEvents).values(
-        buildJobCompletionTimelineEvent({ requestId, actorUserId: userId, source: "job_status_update" }),
-      ).onDuplicateKeyUpdate({ set: { eventType: "job_completed" } });
-    }
-  });
-  return { success: true, requestId, status };
+  void requestId;
+  void status;
+  void userId;
+  // This legacy generic mutation could bypass accepted-offer, capability,
+  // completion-proof, cancellation-review and escrow settlement controls.
+  // Canonical flows are offers.accept, tracking.updateLifecycle, completion,
+  // and cancellation; therefore this compatibility entry point must not write.
+  throw new Error("LEGACY_JOB_STATUS_MUTATION_DISABLED");
 }
 
 // Complete a job and create payment record
@@ -4579,6 +5376,17 @@ export async function getNewJobsForProvider(providerId: number) {
   const categoryId = provider.categoryId;
   if (!categoryId || provider.isAvailable !== 1) return [];
 
+  const capabilityStatuses = await db
+    .select({
+      capabilityId: providerCapabilityStatuses.capabilityId,
+      jurisdictionId: providerCapabilityStatuses.jurisdictionId,
+      status: providerCapabilityStatuses.status,
+      expiresAt: providerCapabilityStatuses.expiresAt,
+    })
+    .from(providerCapabilityStatuses)
+    .where(eq(providerCapabilityStatuses.providerId, provider.id));
+  const providerCredentialStatuses = await listProviderCredentialStatuses(provider.id);
+
   // Only unassigned pending requests in the provider's category are genuine
   // opportunities. Fetch a bounded candidate set, then apply deterministic
   // proximity filtering when both sides have valid coordinates. Legacy rows
@@ -4596,8 +5404,38 @@ export async function getNewJobsForProvider(providerId: number) {
     .orderBy(desc(serviceRequests.createdAt))
     .limit(100);
 
+  const eligibleCandidates = candidates.filter((candidate) => {
+    const capabilityStatus =
+      candidate.requiredCapabilityId == null || candidate.jurisdictionId == null
+        ? null
+        : capabilityStatuses.find(
+            (status) =>
+              status.capabilityId === candidate.requiredCapabilityId &&
+              status.jurisdictionId === candidate.jurisdictionId,
+          ) ?? null;
+    const capabilityAllowed = evaluateCapabilityTransition({
+      enforcementEnabled: candidate.requiredCapabilityId !== null,
+      requiredCapabilityId: candidate.requiredCapabilityId,
+      jurisdictionId: candidate.jurisdictionId,
+      providerCapabilityDecision: capabilityStatus?.status ?? null,
+      providerCapabilityExpiresAt: capabilityStatus?.expiresAt ?? null,
+    }).allowed;
+    if (!capabilityAllowed) return false;
+    return evaluateCredentialEligibility({
+      requiredCredentialType: candidate.requiredCredentialType,
+      minimumAssurance: candidate.requiredCredentialAssurance,
+      requiresHumanReview:
+        candidate.requiresCredentialHumanReview == null
+          ? null
+          : candidate.requiresCredentialHumanReview === 1,
+      compliancePackageVersion: candidate.compliancePackageVersion,
+      jurisdictionId: candidate.jurisdictionId,
+      providerCredentials: providerCredentialStatuses,
+    }).allowed;
+  });
+
   return rankServiceOpportunitiesByLocation(
-    candidates,
+    eligibleCandidates,
     provider.latitude,
     provider.longitude,
   ).slice(0, 20);
@@ -5070,6 +5908,9 @@ export async function transitionPaymentStatus(data: {
   nextStatus: EscrowPaymentStatus;
   requireAdmin?: boolean;
 }) {
+  if (data.nextStatus === "refunded") {
+    throw new Error("PAYMENT_REFUND_GATEWAY_CALLBACK_REQUIRED");
+  }
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -5193,6 +6034,7 @@ export async function resolvePaymentForGatewayWebhook(data: {
 export async function transitionPaymentFromVerifiedWebhook(data: {
   paymentId: number;
   nextStatus: "held" | "refunded";
+  gatewayReference?: string;
   partialRefund?: { refundAmount: number; gatewayReference: string };
 }) {
   const db = await getDb();
@@ -5249,8 +6091,10 @@ export async function transitionPaymentFromVerifiedWebhook(data: {
     if (data.nextStatus === "held") {
       await postFinancialLedgerEntry(tx, buildPaymentHeldLedgerEntry(updatedRows[0]));
     } else if (data.nextStatus === "refunded" && payment.status === "held") {
+      if (!data.gatewayReference?.trim()) throw new Error("PAYMENT_REFUND_GATEWAY_REFERENCE_REQUIRED");
       await postFinancialLedgerEntry(tx, buildRefundLedgerEntry(updatedRows[0]));
       await resolveRefundCancellationInTransaction(tx, updatedRows[0]);
+      await resolveCompletionDisputeRefundInTransaction(tx, updatedRows[0], data.gatewayReference.trim());
     }
 
     return { payment: updatedRows[0], duplicated: false };

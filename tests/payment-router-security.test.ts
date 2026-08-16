@@ -126,21 +126,14 @@ describe("payments router security", () => {
     expect(paymentDb.transitionPaymentStatus).not.toHaveBeenCalled();
   });
 
-  it("allows an admin to request only the server-defined refunded transition", async () => {
-    vi.mocked(paymentDb.transitionPaymentStatus).mockResolvedValue({
-      payment: { id: 71, status: "refunded" } as never,
-      duplicated: false,
-    });
+  it("blocks an admin refund request until a verified gateway callback settles the payment", async () => {
     const caller = appRouter.createCaller(createContext("admin", 1));
 
-    await caller.payments.refund({ paymentId: 71 });
-
-    expect(paymentDb.transitionPaymentStatus).toHaveBeenCalledWith({
-      paymentId: 71,
-      actorUserId: 1,
-      nextStatus: "refunded",
-      requireAdmin: true,
+    await expect(caller.payments.refund({ paymentId: 71 })).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: expect.stringContaining("doğrulanmış ödeme sağlayıcısı callback"),
     });
+    expect(paymentDb.transitionPaymentStatus).not.toHaveBeenCalled();
   });
 
   it("rejects payment creation without authentication", async () => {

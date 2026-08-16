@@ -124,4 +124,15 @@ describe("tracking router security", () => {
       caller.tracking.updateLifecycle({ requestId: 42, status: "completed" }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
+
+  it("fails closed when the provider capability is not eligible to start the job", async () => {
+    vi.mocked(trackingDb.updateJobLifecycle).mockRejectedValue(
+      new Error("PROVIDER_CAPABILITY_NOT_ELIGIBLE"),
+    );
+    const caller = appRouter.createCaller(createContext(81));
+
+    await expect(
+      caller.tracking.updateLifecycle({ requestId: 42, status: "on_the_way" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
 });

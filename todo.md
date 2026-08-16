@@ -382,6 +382,9 @@
 - [x] Master Phase D — MoveTrust Passport ve Job Capsule için açıklanabilir, sahiplikli veri ve API katmanını uygula
 - [x] Master Phase D — No Surprise Price ve fail-safe AI Price Intelligence katmanını anlaşma/fiyat yaşam döngüsüne bağla
 - [x] Master Phase D — Safety Center ve Provider Business Cockpit yüzeylerini yetki, audit ve hata sınırlarıyla uygula
+- [x] FINAL MASTER P0 — Server-determined capability/jurisdiction bağlamını talep, teklif ve kabul geçişlerinde fail-closed uygula; migration, transaction-içi ikinci savunma katmanı ve regression testlerini doğrula
+- [x] FINAL MASTER P1 — Completion proof, iptal, uyuşmazlık ve settlement kararlarını immutable iş dosyası, doğrulanmış gateway callback’i, idempotent çift taraflı ledger ve insan incelemesi sınırlarıyla sertleştir; müşteri lehine kararı signed callback bekleyen duruma bağla ve admin direct-refund bypass’ını fail-closed kapat
+- [x] FINAL MASTER P2 — Mesaj görünümden silme, privacy export/erasure talepleri, legal hold, immutable audit ve maskeli iletişim oturumu sona erdirme/temizleme akışlarını fail-closed uygula; privacy review ve legal hold işlemlerini yalnız Super Admin + MFA sınırına bağla
 - [x] Master Phase D — Corporate Fleet/Facility için çoklu lokasyon, toplu talep ve kurumsal fatura altyapısını ekle
 - [x] Master Phase D — Yetki, idempotency, hata ve edge-case regresyonları ile kalite kapılarını çalıştırıp checkpoint al
 - [x] İstemci dışa aktarımları ve izlenen Git geçmişinde sağlayıcı sırrı/private key bulunmadığını değer göstermeden doğrula
@@ -418,3 +421,19 @@
 - [x] Master Phase C — Merkezi i18n kapsamını tamamla ve TRY-only modelini çoklu para birimi biçimleme/validasyon temeliyle genişlet
 - [x] Master Phase C — Maskeli iletişim sağlayıcı adaptörünü NOT_CONFIGURED fail-closed durumda hazırla
 - [x] Master Phase C — Uygulama branding source-of-truth, bundle/payment kimliği ve template kalıntılarını güvenli biçimde temizle
+
+## FINAL MASTER COMMAND P0
+- [x] Opaque media ID ve kaynak-tabanlı erişim kontrolünü public URL dönüşleri olmadan uygula
+- [x] Capability/jurisdiction fail-closed kararını teklif, kabul, iş başlangıcı ve profesyonel fırsat görünümüne transaction-içi savunma katmanıyla bağla
+- [x] Dynamic credential requirement, PII-minimized DTO, MoveAI policy guard ve production debug gate eksiklerini kapat
+- [x] P0 kapanışı — Capability kararını fırsat görünümü ve iş başlangıcında uygula; kategori/ülke/policy sürümüne bağlı credential denetimi, PII-minimized DTO, MoveAI iddia politikası ve production debug allowlist gate için regresyon ekle
+
+## FINAL MASTER COMMAND P3
+- [x] 13 dil desteği, cihaz locale fallback ve RTL destek altyapısını uygula
+- [x] AI mesaj çevirisini izinli, kaynaktan bağımsız, saklamayan ve hata durumunda kaynak metni koruyan yapıyla ekle
+- [x] P3 kapanışı — Locale, RTL ve çeviri fail-closed davranışını birim, yetki ve hata regresyonlarıyla doğrula
+
+## FINAL MASTER COMMAND P4
+- [ ] MoveAI çoklu ortam taslağını kullanıcı onayı, redaksiyon, minimum veri, saklamama ve fail-closed model sınırlarıyla uygula
+- [ ] Profesyonel AI yardımcılarını karar verici olmayan, açıklanabilir, policy-korumalı ve insan onaylı iş akışlarıyla sınırla
+- [ ] P4 kapanışı — Yetki, hata, redaksiyon ve güvenli model yokluğu regresyonlarını doğrula

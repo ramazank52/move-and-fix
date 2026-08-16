@@ -190,6 +190,7 @@ describe("payment webhook processor", () => {
     expect(dbMocks.transitionPaymentFromVerifiedWebhook).toHaveBeenCalledWith({
       paymentId: 42,
       nextStatus: "refunded",
+      gatewayReference: "stripe:evt_123",
     });
   });
 
@@ -222,6 +223,7 @@ describe("payment webhook processor", () => {
     expect(dbMocks.transitionPaymentFromVerifiedWebhook).toHaveBeenCalledWith({
       paymentId: 42,
       nextStatus: "refunded",
+      gatewayReference: "stripe:evt_refund_1",
       partialRefund: { refundAmount: 50, gatewayReference: "stripe:evt_refund_1" },
     });
   });

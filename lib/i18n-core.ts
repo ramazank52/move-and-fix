@@ -1,4 +1,4 @@
-export type Language = "tr" | "en" | "de" | "fr" | "ar" | "ru";
+export type Language = "tr" | "en" | "de" | "fr" | "ar" | "ru" | "es" | "it" | "pt" | "nl" | "zh" | "fa" | "uk";
 import type { SupportedDisplayCurrency } from "@/shared/currency-policy";
 
 export type SupportedCurrency = SupportedDisplayCurrency;
@@ -10,6 +10,13 @@ export const LANGUAGES: { code: Language; name: string; nativeName: string; loca
   { code: "fr", name: "French", nativeName: "Français", locale: "fr-FR", isRTL: false },
   { code: "ar", name: "Arabic", nativeName: "العربية", locale: "ar", isRTL: true },
   { code: "ru", name: "Russian", nativeName: "Русский", locale: "ru-RU", isRTL: false },
+  { code: "es", name: "Spanish", nativeName: "Español", locale: "es-ES", isRTL: false },
+  { code: "it", name: "Italian", nativeName: "Italiano", locale: "it-IT", isRTL: false },
+  { code: "pt", name: "Portuguese", nativeName: "Português", locale: "pt-PT", isRTL: false },
+  { code: "nl", name: "Dutch", nativeName: "Nederlands", locale: "nl-NL", isRTL: false },
+  { code: "zh", name: "Chinese", nativeName: "中文", locale: "zh-CN", isRTL: false },
+  { code: "fa", name: "Persian", nativeName: "فارسی", locale: "fa-IR", isRTL: true },
+  { code: "uk", name: "Ukrainian", nativeName: "Українська", locale: "uk-UA", isRTL: false },
 ];
 
 export const SUPPORTED_CURRENCIES: { code: SupportedCurrency; label: string; locale: string }[] = [
@@ -77,7 +84,7 @@ export type TranslationKey =
 type Dictionary = Partial<Record<TranslationKey, string>>;
 export type TranslationValues = Record<string, string | number>;
 
-const translations: Record<Language, Dictionary> = {
+const translations: Partial<Record<Language, Dictionary>> = {
   tr: {
     home: "Ana Sayfa", explore: "Keşfet", myJobs: "İşlerim", messages: "Mesajlar", profile: "Profil", search: "Hizmet veya usta ara...", categories: "Hizmet Kategorileri", topRated: "En Yüksek Puanlı", viewAll: "Tümü", serviceRequest: "Hizmet Talebi", findProvider: "Usta Bul", login: "Giriş Yap", register: "Kayıt Ol", logout: "Çıkış Yap", settings: "Ayarlar", premium: "Premium Üyelik", notifications: "Bildirimler", aiAssistant: "MoveAI Asistan", active: "Aktif", pending: "Bekleyen", completed: "Tamamlanan", cancelled: "İptal", language: "Dil", currency: "Para Birimi", wallet: "MoveWallet", restartRequired: "Yön değişikliğinin uygulanması için uygulamayı yeniden açın.", settingsSecurity: "Ayarlar ve Güvenlik", darkMode: "Karanlık Mod", activeDevices: "Aktif Cihazlar", about: "Hakkında", privacyPolicy: "Gizlilik Politikası", terms: "Kullanım Koşulları", logoutConfirmTitle: "Çıkış Yap", logoutConfirmBody: "Hesabınızdan çıkış yapmak istediğinize emin misiniz?", cancel: "İptal", currencyTry: "₺ TRY", currencyUsd: "$ USD", currencyEur: "€ EUR", currencyUnavailableTitle: "Kur dönüşümü hazır değil", currencyUnavailableBody: "{currency} görüntüleme ve ödeme için onaylı bir kur sağlayıcısı yapılandırılmadı. Tüm tutarlar güvenle TRY olarak kalır.", currencySettlementNotice: "Ödemeler ve cüzdan bakiyesi yalnız TRY üzerinden uzlaştırılır.", version: "Move&Fix v1.0.0", languageSelectionHelp: "Uygulama dilini seçin. Arapça yön değişikliğinin tamamlanması için uygulamayı yeniden açmanız gerekir.", back: "Geri dön", security: "Güvenlik", "home.greeting": "Merhaba {name} 👋", "home.defaultName": "Kullanıcı", "home.subtitle": "Bugün sana nasıl yardımcı olabilirim?", "home.searchPlaceholder": "Ne arıyorsun?", "home.moveAITitle": "MoveAI ile anlat", "home.moveAISubtitle": "Doğal dille söyle, biz halledelim", "home.quickAccess": "Hızlı Erişim", "home.activeJob": "Aktif İş", "home.nearbyProviders": "Yakındaki Ustalar", "home.popularServices": "Popüler Hizmetler", "home.noNearbyProviders": "Yakında profesyonel bulunamadı", "home.quickAccess_emergency": "Acil Yardım", "home.quickAccess_vehicle": "Araç", "home.quickAccess_home": "Ev", "home.quickAccess_moving": "Taşıma", "home.service.cleaning": "Temizlik", "home.service.plumbing": "Su Tesisatı", "home.service.electricity": "Elektrik", "home.service.airConditioning": "Klima", "home.serviceCount": "{count} hizmet", "common.seeAll": "Tümü", "explore.title": "Ne arıyorsun?", "explore.all": "Tümü", "explore.emergency": "Acil", "explore.vehicle": "Araç", "explore.loadingServices": "Hizmetler yükleniyor...", "explore.categoriesFailed": "Kategoriler yüklenemedi", "explore.retry": "Yeniden dene", "explore.noServices": "Aramana uygun hizmet bulunamadı.", "explore.recommendedProviders": "Önerilen Ustalar", "explore.loadingProvidersFailed": "Profesyoneller yüklenemedi. Yeniden dene.", "explore.noProviders": "Uygun profesyonel bulunamadı.", "explore.providerCount": "{count} profesyonel", "explore.moveScore": "MoveScore {score}"
   },
@@ -308,10 +315,18 @@ export function t(key: TranslationKey, values?: TranslationValues): string;
 export function t(key: TranslationKey, languageOrValues: Language | TranslationValues = currentLanguage, maybeValues?: TranslationValues): string {
   const language = typeof languageOrValues === "string" ? languageOrValues : currentLanguage;
   const values = typeof languageOrValues === "string" ? (maybeValues ?? {}) : languageOrValues;
-  const template = extraTranslations[language]?.[key] ?? translations[language]?.[key] ?? extraTranslations.tr?.[key] ?? translations.tr[key] ?? key;
+  const template = extraTranslations[language]?.[key] ?? translations[language]?.[key] ?? extraTranslations.tr?.[key] ?? translations.tr?.[key] ?? key;
   return template.replace(/\{([A-Za-z0-9_]+)\}/g, (_, name: string) => String(values[name] ?? `{${name}}`));
 }
 export function localeForLanguage(language: Language) { return LANGUAGES.find((item) => item.code === language)?.locale ?? "tr-TR"; }
 export function isRightToLeft(language: Language) { return LANGUAGES.find((item) => item.code === language)?.isRTL ?? false; }
+export function languageFromDeviceLocale(localeTag: string | null | undefined): Language {
+  const normalized = localeTag?.trim().replace("_", "-").toLowerCase();
+  if (!normalized) return "tr";
+  const exact = LANGUAGES.find((item) => item.locale.toLowerCase() === normalized);
+  if (exact) return exact.code;
+  const languageCode = normalized.split("-")[0] as Language;
+  return LANGUAGES.some((item) => item.code === languageCode) ? languageCode : "tr";
+}
 export function formatMoney(amount: number, language: Language = currentLanguage) { return new Intl.NumberFormat(localeForLanguage(language), { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(amount); }
 export function formatLocalDate(value: Date | string | number, language: Language = currentLanguage) { return new Intl.DateTimeFormat(localeForLanguage(language), { dateStyle: "medium" }).format(new Date(value)); }

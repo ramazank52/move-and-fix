@@ -230,6 +230,7 @@ export async function processVerifiedPaymentWebhook(
     const transition = await db.transitionPaymentFromVerifiedWebhook({
       paymentId: payment.id,
       nextStatus: event.nextStatus,
+      ...(event.nextStatus === "refunded" ? { gatewayReference: `${provider}:${event.eventId}` } : {}),
       ...(partialRefund != null
         ? { partialRefund: { refundAmount: partialRefund / 100, gatewayReference: `${provider}:${event.eventId}` } }
         : {}),

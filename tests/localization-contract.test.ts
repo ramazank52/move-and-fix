@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { LANGUAGES, formatLocalDate, formatMoney, isRightToLeft, localeForLanguage, t } from "../lib/i18n-core";
+import { LANGUAGES, formatLocalDate, formatMoney, isRightToLeft, languageFromDeviceLocale, localeForLanguage, t } from "../lib/i18n-core";
 
 describe("yerelleştirme sözleşmesi", () => {
   it("desteklenen her dil için eksiksiz navigasyon çevirisi döndürür", () => {
@@ -44,12 +44,24 @@ describe("yerelleştirme sözleşmesi", () => {
     expect(t("provider.totalEarnings", "ru", { amount: "₺1 250,00" })).toContain("₺1 250,00");
   });
 
-  it("yalnız Arapça için RTL yönünü etkinleştirir", () => {
+  it("13 dili destekler, cihaz yerelini güvenle çözer ve iki RTL dilini yön bilgisiyle işaretler", () => {
+    expect(LANGUAGES).toHaveLength(13);
+    expect(languageFromDeviceLocale("ar-SA")).toBe("ar");
+    expect(languageFromDeviceLocale("fa-IR")).toBe("fa");
+    expect(languageFromDeviceLocale("uk-UA")).toBe("uk");
+    expect(languageFromDeviceLocale("unsupported-XX")).toBe("tr");
     expect(isRightToLeft("ar")).toBe(true);
+    expect(isRightToLeft("fa")).toBe(true);
     expect(isRightToLeft("tr")).toBe(false);
     expect(isRightToLeft("en")).toBe(false);
     expect(localeForLanguage("tr")).toBe("tr-TR");
     expect(localeForLanguage("ar")).toBe("ar");
+    expect(localeForLanguage("fa")).toBe("fa-IR");
+  });
+
+  it("genişletilmiş dil sözlüklerinde yerel navigasyon metinlerini çözer", () => {
+    expect(t("home", "de")).toBe("Startseite");
+    expect(t("language", "zh")).toBeTruthy();
   });
 
   it("TRY tutarlarını seçilen locale ile biçimlendirir ancak para birimini değiştirmez", () => {

@@ -111,4 +111,27 @@ describe("completion proof and escrow security", () => {
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(completionDb.resolveCompletionDispute).not.toHaveBeenCalled();
   });
+
+  it("keeps a customer-favoring dispute decision pending until a verified gateway refund callback", async () => {
+    vi.mocked(completionDb.resolveCompletionDispute).mockResolvedValue({
+      requestId: 91,
+      resolution: "customer",
+      settlementPending: true,
+      resolvedAt: null,
+    });
+    const caller = appRouter.createCaller(createContext(126, "admin"));
+
+    await expect(caller.admin.resolveCompletionDispute({
+      requestId: 91,
+      resolution: "customer",
+      resolutionNote: "Gateway doğrulaması bekleyen müşteri lehine inceleme kararı",
+    })).resolves.toMatchObject({ settlementPending: true, resolvedAt: null });
+
+    expect(completionDb.resolveCompletionDispute).toHaveBeenCalledWith({
+      requestId: 91,
+      resolution: "customer",
+      resolutionNote: "Gateway doğrulaması bekleyen müşteri lehine inceleme kararı",
+      adminUserId: 126,
+    });
+  });
 });

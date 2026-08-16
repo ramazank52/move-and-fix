@@ -31,6 +31,11 @@ const db = vi.hoisted(() => ({
   reviewJobCancellationForAdmin: vi.fn(),
   listFeatureFlags: vi.fn(),
   setFeatureFlag: vi.fn(),
+  listPrivacyRightsRequestsForReview: vi.fn(),
+  reviewPrivacyRightsRequest: vi.fn(),
+  listPrivacyLegalHolds: vi.fn(),
+  createPrivacyLegalHold: vi.fn(),
+  releasePrivacyLegalHold: vi.fn(),
 }));
 
 vi.mock("../server/db", () => db);
@@ -113,6 +118,65 @@ describe("MoveOS ortak API sözleşmesi", () => {
   it("Operations Control özetini MFA doğrulanmış Super Admin scope olmadan fail-closed reddeder", async () => {
     await expect(adminCaller().operationsControl()).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(db.getOperationsControlSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("privacy rights inceleme yüzeyini Super Admin + MFA olmadan fail-closed reddeder", async () => {
+    await expect(adminCaller().privacyRights()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      adminCaller().reviewPrivacyRight({ requestId: 9, decision: "approve", reviewNote: "Yasal inceleme tamamlandı" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.listPrivacyRightsRequestsForReview).not.toHaveBeenCalled();
+    expect(db.reviewPrivacyRightsRequest).not.toHaveBeenCalled();
+  });
+
+  it("privacy rights incelemesini yalnız MFA doğrulanmış Super Admin adına kaydeder", async () => {
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+    db.listPrivacyRightsRequestsForReview.mockResolvedValue([]);
+    db.reviewPrivacyRightsRequest.mockResolvedValue({ id: 9, status: "approved" });
+
+    await expect(adminCaller().privacyRights({ limit: 25 })).resolves.toEqual([]);
+    await expect(
+      adminCaller().reviewPrivacyRight({ requestId: 9, decision: "approve", reviewNote: "Yasal inceleme tamamlandı" }),
+    ).resolves.toEqual({ id: 9, status: "approved" });
+    expect(db.listPrivacyRightsRequestsForReview).toHaveBeenCalledWith(25);
+    expect(db.reviewPrivacyRightsRequest).toHaveBeenCalledWith({
+      requestId: 9,
+      decision: "approve",
+      reviewNote: "Yasal inceleme tamamlandı",
+      reviewerUserId: 7,
+    });
+  });
+
+  it("legal hold yüzeyini Super Admin + MFA olmadan fail-closed reddeder", async () => {
+    await expect(adminCaller().privacyLegalHolds()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      adminCaller().createPrivacyLegalHold({ userId: 19, reason: "Açık yasal uyuşmazlık nedeniyle koruma" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(adminCaller().releasePrivacyLegalHold({ holdId: 4 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.listPrivacyLegalHolds).not.toHaveBeenCalled();
+    expect(db.createPrivacyLegalHold).not.toHaveBeenCalled();
+    expect(db.releasePrivacyLegalHold).not.toHaveBeenCalled();
+  });
+
+  it("legal hold oluşturma ve serbest bırakmayı yalnız oturumdaki Super Admin’e bağlar", async () => {
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+    db.listPrivacyLegalHolds.mockResolvedValue([]);
+    db.createPrivacyLegalHold.mockResolvedValue({ id: 4, status: "active" });
+    db.releasePrivacyLegalHold.mockResolvedValue({ id: 4, status: "released", idempotent: false });
+
+    await expect(adminCaller().privacyLegalHolds({ limit: 15 })).resolves.toEqual([]);
+    await expect(
+      adminCaller().createPrivacyLegalHold({ userId: 19, reason: "Açık yasal uyuşmazlık nedeniyle koruma" }),
+    ).resolves.toEqual({ id: 4, status: "active" });
+    await expect(adminCaller().releasePrivacyLegalHold({ holdId: 4 }))
+      .resolves.toEqual({ id: 4, status: "released", idempotent: false });
+    expect(db.listPrivacyLegalHolds).toHaveBeenCalledWith(15);
+    expect(db.createPrivacyLegalHold).toHaveBeenCalledWith({
+      userId: 19,
+      reason: "Açık yasal uyuşmazlık nedeniyle koruma",
+      createdByUserId: 7,
+    });
+    expect(db.releasePrivacyLegalHold).toHaveBeenCalledWith({ holdId: 4, releasedByUserId: 7 });
   });
 
   it("Operations Control özetini yalnız MFA doğrulanmış Super Admin için sınırlandırılmış parametrelerle üretir", async () => {

@@ -255,21 +255,22 @@ describe("phase 31 service request contracts", () => {
     vi.mocked(requestDb.createServiceRequestMedia).mockResolvedValue(901);
     const caller = appRouter.createCaller(createContext(73));
 
-    await expect(
-      caller.requests.uploadMedia({
-        requestId: 501,
-        originalName: "kanit.png",
-        mimeType: "image/png",
-        base64: validPng.toString("base64"),
-      }),
-    ).resolves.toEqual({
+    const uploaded = await caller.requests.uploadMedia({
+      requestId: 501,
+      originalName: "kanit.png",
+      mimeType: "image/png",
+      base64: validPng.toString("base64"),
+    });
+
+    expect(uploaded).toMatchObject({
       id: 901,
       kind: "image",
       mimeType: "image/png",
       sizeBytes: validPng.length,
       sha256: createHash("sha256").update(validPng).digest("hex"),
-      url: "https://storage.example/service-requests/501/73/generated.png",
     });
+    expect(uploaded.mediaRef).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(uploaded).not.toHaveProperty("url");
 
     expect(storagePut).toHaveBeenCalledWith(
       expect.stringMatching(/^service-requests\/501\/73\/[0-9a-f-]+\.png$/),
@@ -277,6 +278,7 @@ describe("phase 31 service request contracts", () => {
       "image/png",
     );
     expect(requestDb.createServiceRequestMedia).toHaveBeenCalledWith({
+      publicId: expect.any(String),
       requestId: 501,
       ownerUserId: 73,
       purpose: "request",

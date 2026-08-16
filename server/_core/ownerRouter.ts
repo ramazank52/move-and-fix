@@ -33,12 +33,17 @@ import {
   listMoveOsCategories,
   listMoveOsServices,
   listMoveOsUsers,
+  listPrivacyLegalHolds,
+  listPrivacyRightsRequestsForReview,
   listActiveSuperAdmins,
   grantSuperAdminRole,
   revokeSuperAdminRole,
   incrementAuthChallengeAttempts,
   markAuthChallengeUsed,
   reviewProviderCapabilityStatus,
+  reviewPrivacyRightsRequest,
+  createPrivacyLegalHold,
+  releasePrivacyLegalHold,
   updateMoveOsCategory,
   updateMoveOsUser,
 } from "../db";
@@ -241,6 +246,54 @@ export const ownerRouter = router({
   operationsControl: superAdminMfaProcedure
     .input(z.object({ eventLimit: z.number().int().min(1).max(100).default(25), caseLimit: z.number().int().min(1).max(100).default(25) }).default({ eventLimit: 25, caseLimit: 25 }))
     .query(async ({ input }) => getOperationsControlSnapshot(input)),
+
+  privacyRights: superAdminMfaProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }).default({ limit: 100 }))
+    .query(({ input }) => listPrivacyRightsRequestsForReview(input.limit)),
+
+  reviewPrivacyRight: superAdminMfaProcedure
+    .input(z.object({
+      requestId: z.number().int().positive(),
+      decision: z.enum(["start_review", "approve", "reject"]),
+      reviewNote: z.string().trim().min(3).max(1000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Oturum gerekli" });
+        return await reviewPrivacyRightsRequest({ ...input, reviewerUserId: ctx.user.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "PRIVACY_REQUEST_REVIEW_FAILED";
+        throw new TRPCError({ code: message === "PRIVACY_REQUEST_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+      }
+    }),
+
+  privacyLegalHolds: superAdminMfaProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }).default({ limit: 100 }))
+    .query(({ input }) => listPrivacyLegalHolds(input.limit)),
+
+  createPrivacyLegalHold: superAdminMfaProcedure
+    .input(z.object({ userId: z.number().int().positive(), reason: z.string().trim().min(5).max(1000) }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Oturum gerekli" });
+      try {
+        return await createPrivacyLegalHold({ ...input, createdByUserId: ctx.user.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "PRIVACY_LEGAL_HOLD_CREATE_FAILED";
+        throw new TRPCError({ code: message === "PRIVACY_HOLD_USER_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+      }
+    }),
+
+  releasePrivacyLegalHold: superAdminMfaProcedure
+    .input(z.object({ holdId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Oturum gerekli" });
+      try {
+        return await releasePrivacyLegalHold({ ...input, releasedByUserId: ctx.user.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "PRIVACY_LEGAL_HOLD_RELEASE_FAILED";
+        throw new TRPCError({ code: message === "PRIVACY_LEGAL_HOLD_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+      }
+    }),
 
   superAdmins: superAdminMfaProcedure.query(async () => listActiveSuperAdmins()),
 
