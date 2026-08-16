@@ -983,7 +983,7 @@ export const serviceRequestMedia = mysqlTable(
     purpose: mysqlEnum("purpose", ["request", "before", "after", "completion", "expense", "dispute"])
       .default("request")
       .notNull(),
-    kind: mysqlEnum("kind", ["image", "video", "document"]).notNull(),
+    kind: mysqlEnum("kind", ["image", "video", "audio", "document"]).notNull(),
     storageKey: varchar("storageKey", { length: 500 }).notNull(),
     originalName: varchar("originalName", { length: 255 }).notNull(),
     mimeType: varchar("mimeType", { length: 100 }).notNull(),
@@ -1323,6 +1323,11 @@ export const moveAiDrafts = mysqlTable(
     assistantSummary: text("assistantSummary").notNull(),
     categoryId: int("categoryId"),
     draftJson: text("draftJson").notNull(),
+    // Drafts hold only opaque IDs and consent metadata; raw media and model
+    // input are intentionally kept outside this persisted proposal payload.
+    attachedMediaOpaqueIds: json("attachedMediaOpaqueIds").$type<string[] | null>(),
+    mediaConsentGrantedAt: timestamp("mediaConsentGrantedAt"),
+    hasAudioInput: int("hasAudioInput").default(0).notNull(),
     riskLevel: mysqlEnum("riskLevel", ["low", "medium", "high"])
       .default("low")
       .notNull(),
@@ -1339,6 +1344,36 @@ export const moveAiDrafts = mysqlTable(
   (table) => [
     index("move_ai_drafts_user_status_idx").on(table.userId, table.status, table.createdAt),
     index("move_ai_drafts_expiry_idx").on(table.status, table.expiresAt),
+  ],
+);
+
+// Short-lived, owner-scoped metadata for MoveAI images and audio. Storage keys
+// are copied to a request only during explicit draft confirmation; no public
+// media URL or raw media content is persisted in the MoveAI draft.
+export const moveAiDraftMedia = mysqlTable(
+  "move_ai_draft_media",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    draftId: int("draftId"),
+    ownerUserId: int("ownerUserId").notNull(),
+    opaqueId: varchar("opaqueId", { length: 64 }).notNull(),
+    kind: mysqlEnum("kind", ["image", "audio"]).notNull(),
+    storageKey: varchar("storageKey", { length: 500 }).notNull(),
+    originalName: varchar("originalName", { length: 255 }).notNull(),
+    mimeType: varchar("mimeType", { length: 100 }).notNull(),
+    sizeBytes: int("sizeBytes").notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["staged", "attached", "transferred", "purged"])
+      .default("staged")
+      .notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    attachedAt: timestamp("attachedAt"),
+    transferredAt: timestamp("transferredAt"),
+  },
+  (table) => [
+    uniqueIndex("move_ai_draft_media_opaque_unique").on(table.opaqueId),
+    index("move_ai_draft_media_owner_status_idx").on(table.ownerUserId, table.status, table.createdAt),
+    index("move_ai_draft_media_draft_idx").on(table.draftId, table.status),
   ],
 );
 

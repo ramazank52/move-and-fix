@@ -344,6 +344,13 @@
       "when": 1786863200306,
       "tag": "0049_silly_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "5",
+      "when": 1786865554099,
+      "tag": "0050_slow_enchantress",
+      "breakpoints": true
     }
   ]
 }

@@ -434,6 +434,9 @@
 - [x] P3 kapanışı — Locale, RTL ve çeviri fail-closed davranışını birim, yetki ve hata regresyonlarıyla doğrula
 
 ## FINAL MASTER COMMAND P4
-- [ ] MoveAI çoklu ortam taslağını kullanıcı onayı, redaksiyon, minimum veri, saklamama ve fail-closed model sınırlarıyla uygula
-- [ ] Profesyonel AI yardımcılarını karar verici olmayan, açıklanabilir, policy-korumalı ve insan onaylı iş akışlarıyla sınırla
-- [ ] P4 kapanışı — Yetki, hata, redaksiyon ve güvenli model yokluğu regresyonlarını doğrula
+- [x] MoveAI çoklu ortam taslağını kullanıcı onayı, redaksiyon, minimum veri, saklamama ve fail-closed model sınırlarıyla uygula
+- [x] Profesyonel AI yardımcılarını karar verici olmayan, açıklanabilir, policy-korumalı ve insan onaylı iş akışlarıyla sınırla
+- [x] P4 kapanışı — Yetki, hata, redaksiyon ve güvenli model yokluğu regresyonlarını doğrula
+- [x] P4 — Taslak-medya staging, kullanıcı sahipliği, açık rıza ve onayda güvenli request-media aktarımını additive şema ve tRPC yüzeyleriyle uygula
+- [x] P4 — MoveAI ekranına izinli görsel seçimi, ses kaydı, rıza bilgisi ve gönderim durumlarını gerçek API akışıyla ekle
+- [x] P4 — Çoklu ortam, rıza, yetki, redaksiyon, hata ve profesyonel AI sınırı regresyonlarını ekle; kalite kapılarını çalıştır

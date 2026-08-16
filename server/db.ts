@@ -850,6 +850,7 @@ import {
   providerCapabilityReviews,
   providerCapabilityStatuses,
   moveAiDrafts,
+  moveAiDraftMedia,
   trustProfiles,
   riskFlags,
   paymentProviderWatch,
@@ -2498,6 +2499,28 @@ export async function getProviderOfferForRequest(requestId: number, providerId: 
     .where(and(eq(offers.requestId, requestId), eq(offers.providerId, providerId)))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/** Minimal, redacted ownership context for a provider-facing AI policy preflight. */
+export async function getProfessionalAiJobContext(requestId: number, providerUserId: number) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const rows = await database
+    .select({
+      requestId: serviceRequests.id,
+      status: serviceRequests.status,
+      assignedProviderUserId: providers.userId,
+    })
+    .from(serviceRequests)
+    .leftJoin(providers, eq(serviceRequests.assignedProviderId, providers.id))
+    .where(eq(serviceRequests.id, requestId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    status: row.status,
+    isAssignedProvider: row.assignedProviderUserId === providerUserId,
+  };
 }
 
 // Messages
@@ -6581,9 +6604,16 @@ export async function createMoveAiDraft(input: {
   categoryId: number;
   suggestions: string[];
   riskLevel: "low" | "medium" | "high";
+  attachedMediaOpaqueIds?: string[];
+  mediaConsentGrantedAt?: Date;
 }) {
   const database = await getDb();
   if (!database) throw new Error("Database not available");
+  const attachedMediaOpaqueIds = [...new Set(input.attachedMediaOpaqueIds ?? [])];
+  if (attachedMediaOpaqueIds.length > 4) throw new Error("MOVE_AI_MEDIA_LIMIT_EXCEEDED");
+  if (attachedMediaOpaqueIds.length > 0 && !input.mediaConsentGrantedAt) {
+    throw new Error("MOVE_AI_MEDIA_CONSENT_REQUIRED");
+  }
   const trust = await getOrCreateTrustProfile(database, input.userId);
   const blocked = trust.status !== "active" || input.riskLevel === "high";
   const status = blocked ? "blocked" : "draft";
@@ -6595,6 +6625,19 @@ export async function createMoveAiDraft(input: {
     suggestions: input.suggestions.slice(0, 6),
   };
   return database.transaction(async (tx) => {
+    const stagedMedia = attachedMediaOpaqueIds.length === 0
+      ? []
+      : await tx
+          .select()
+          .from(moveAiDraftMedia)
+          .where(and(
+            eq(moveAiDraftMedia.ownerUserId, input.userId),
+            eq(moveAiDraftMedia.status, "staged"),
+            inArray(moveAiDraftMedia.opaqueId, attachedMediaOpaqueIds),
+          ));
+    if (stagedMedia.length !== attachedMediaOpaqueIds.length) {
+      throw new Error("MOVE_AI_MEDIA_NOT_OWNED_OR_UNAVAILABLE");
+    }
     const result = await tx.insert(moveAiDrafts).values({
       userId: input.userId,
       sourceMessage: input.sourceMessage,
@@ -6604,8 +6647,24 @@ export async function createMoveAiDraft(input: {
       riskLevel: input.riskLevel,
       status,
       expiresAt,
+      attachedMediaOpaqueIds: attachedMediaOpaqueIds.length > 0 ? attachedMediaOpaqueIds : null,
+      mediaConsentGrantedAt: attachedMediaOpaqueIds.length > 0 ? input.mediaConsentGrantedAt : null,
+      hasAudioInput: stagedMedia.some((media) => media.kind === "audio") ? 1 : 0,
     });
     const id = Number(result[0].insertId);
+    if (stagedMedia.length > 0) {
+      const attached = await tx
+        .update(moveAiDraftMedia)
+        .set({ draftId: id, status: "attached", attachedAt: new Date() })
+        .where(and(
+          eq(moveAiDraftMedia.ownerUserId, input.userId),
+          eq(moveAiDraftMedia.status, "staged"),
+          inArray(moveAiDraftMedia.opaqueId, attachedMediaOpaqueIds),
+        ));
+      if (Number(attached[0].affectedRows) !== stagedMedia.length) {
+        throw new Error("MOVE_AI_MEDIA_NOT_OWNED_OR_UNAVAILABLE");
+      }
+    }
     if (input.riskLevel === "high") {
       await tx.insert(riskFlags).values({
         subjectUserId: input.userId,
@@ -6617,6 +6676,31 @@ export async function createMoveAiDraft(input: {
     }
     return { id, status, expiresAt, riskLevel: input.riskLevel, payload };
   });
+}
+
+/** Stores only owner-scoped opaque metadata for a pending MoveAI draft. */
+export async function stageMoveAiDraftMedia(input: {
+  ownerUserId: number;
+  opaqueId: string;
+  kind: "image" | "audio";
+  storageKey: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256: string;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const activeRows = await database
+    .select({ id: moveAiDraftMedia.id })
+    .from(moveAiDraftMedia)
+    .where(and(
+      eq(moveAiDraftMedia.ownerUserId, input.ownerUserId),
+      inArray(moveAiDraftMedia.status, ["staged", "attached"]),
+    ));
+  if (activeRows.length >= 4) throw new Error("MOVE_AI_MEDIA_LIMIT_EXCEEDED");
+  await database.insert(moveAiDraftMedia).values({ ...input, status: "staged" });
+  return { opaqueId: input.opaqueId, kind: input.kind, sizeBytes: input.sizeBytes };
 }
 
 export async function getMoveAiDraftForUser(draftId: number, userId: number) {
@@ -6665,6 +6749,50 @@ export async function confirmMoveAiDraft(input: { draftId: number; userId: numbe
       description: payload.description,
     });
     const requestId = Number(requestResult[0].insertId);
+    const attachedMediaOpaqueIds = Array.isArray(draft.attachedMediaOpaqueIds)
+      ? draft.attachedMediaOpaqueIds
+      : [];
+    if (attachedMediaOpaqueIds.length > 0 && !draft.mediaConsentGrantedAt) {
+      throw new Error("MOVE_AI_MEDIA_CONSENT_REQUIRED");
+    }
+    if (attachedMediaOpaqueIds.length > 0) {
+      const attachedMedia = await tx
+        .select()
+        .from(moveAiDraftMedia)
+        .where(and(
+          eq(moveAiDraftMedia.draftId, draft.id),
+          eq(moveAiDraftMedia.ownerUserId, input.userId),
+          eq(moveAiDraftMedia.status, "attached"),
+          inArray(moveAiDraftMedia.opaqueId, attachedMediaOpaqueIds),
+        ));
+      if (attachedMedia.length !== attachedMediaOpaqueIds.length) {
+        throw new Error("MOVE_AI_MEDIA_NOT_OWNED_OR_UNAVAILABLE");
+      }
+      await tx.insert(serviceRequestMedia).values(attachedMedia.map((media) => ({
+        publicId: media.opaqueId,
+        requestId,
+        ownerUserId: input.userId,
+        purpose: "request" as const,
+        kind: media.kind,
+        storageKey: media.storageKey,
+        originalName: media.originalName,
+        mimeType: media.mimeType,
+        sizeBytes: media.sizeBytes,
+        sha256: media.sha256,
+      })));
+      const transferred = await tx
+        .update(moveAiDraftMedia)
+        .set({ status: "transferred", transferredAt: new Date() })
+        .where(and(
+          eq(moveAiDraftMedia.draftId, draft.id),
+          eq(moveAiDraftMedia.ownerUserId, input.userId),
+          eq(moveAiDraftMedia.status, "attached"),
+          inArray(moveAiDraftMedia.opaqueId, attachedMediaOpaqueIds),
+        ));
+      if (Number(transferred[0].affectedRows) !== attachedMedia.length) {
+        throw new Error("MOVE_AI_MEDIA_TRANSFER_FAILED");
+      }
+    }
     await tx.update(moveAiDrafts).set({ confirmedRequestId: requestId }).where(eq(moveAiDrafts.id, draft.id));
     return { requestId, draftId: draft.id };
   });

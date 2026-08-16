@@ -1,4 +1,13 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
 import {
   View,
   Text,
@@ -30,6 +39,12 @@ interface Message {
   draftStatus?: "draft" | "blocked";
 }
 
+type MoveAiAttachment = {
+  opaqueId: string;
+  kind: "image" | "audio";
+  originalName: string;
+};
+
 export default function AIAssistantScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -50,6 +65,11 @@ export default function AIAssistantScreen() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mediaConsentGranted, setMediaConsentGranted] = useState(false);
+  const [attachments, setAttachments] = useState<MoveAiAttachment[]>([]);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -73,6 +93,7 @@ export default function AIAssistantScreen() {
         draftStatus: data.draftStatus || undefined,
       };
       setMessages((prev) => [...prev, response]);
+      setAttachments([]);
 
     },
     onError: (_error, variables) => {
@@ -105,6 +126,86 @@ export default function AIAssistantScreen() {
     },
     onError: (error) => Alert.alert("Taslak onaylanamadı", error.message || "Lütfen taslağı yeniden oluşturun."),
   });
+
+  const stageMediaMutation = trpc.ai.stageMedia.useMutation();
+
+  const requireMediaConsent = useCallback(() => {
+    if (mediaConsentGranted) return true;
+    Alert.alert(
+      "Açık rıza gerekli",
+      "Eklediğiniz görsel veya ses dosyası yalnızca onayladığınız hizmet talebine aktarılabilir. Devam etmek için açık rızanızı onaylayın.",
+    );
+    return false;
+  }, [mediaConsentGranted]);
+
+  const stageLocalMedia = useCallback(async (inputMedia: { uri: string; mimeType: string; originalName: string }) => {
+    if (!requireMediaConsent()) return;
+    if (attachments.length >= 4) {
+      Alert.alert("Medya sınırı", "En fazla dört görsel veya ses girdisi ekleyebilirsiniz.");
+      return;
+    }
+    setMediaBusy(true);
+    try {
+      const base64 = await FileSystem.readAsStringAsync(inputMedia.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const staged = await stageMediaMutation.mutateAsync({
+        mediaConsentGranted: true,
+        originalName: inputMedia.originalName,
+        mimeType: inputMedia.mimeType as any,
+        base64,
+      });
+      setAttachments((current) => [...current, {
+        opaqueId: staged.opaqueId,
+        kind: staged.kind,
+        originalName: inputMedia.originalName,
+      }]);
+    } catch (error) {
+      Alert.alert("Medya eklenemedi", error instanceof Error ? error.message : "Dosya güvenli biçimde eklenemedi.");
+    } finally {
+      setMediaBusy(false);
+    }
+  }, [attachments.length, requireMediaConsent, stageMediaMutation]);
+
+  const pickImage = useCallback(async () => {
+    if (!requireMediaConsent()) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Fotoğraf izni gerekli", "Görsel eklemek için fotoğraf kitaplığı izni vermelisiniz.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType && ["image/jpeg", "image/png", "image/webp"].includes(asset.mimeType)
+      ? asset.mimeType
+      : "image/jpeg";
+    await stageLocalMedia({
+      uri: asset.uri,
+      mimeType,
+      originalName: asset.fileName || `moveai-image-${Date.now()}.jpg`,
+    });
+  }, [requireMediaConsent, stageLocalMedia]);
+
+  const toggleAudioRecording = useCallback(async () => {
+    if (recorderState.isRecording) {
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+      if (uri) await stageLocalMedia({ uri, mimeType: "audio/m4a", originalName: `moveai-audio-${Date.now()}.m4a` });
+      return;
+    }
+    if (!requireMediaConsent()) return;
+    const permission = await requestRecordingPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Mikrofon izni gerekli", "Sesli açıklama kaydetmek için mikrofon izni vermelisiniz.");
+      return;
+    }
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+    await audioRecorder.prepareToRecordAsync();
+    audioRecorder.record();
+  }, [audioRecorder, recorderState.isRecording, requireMediaConsent, stageLocalMedia]);
 
   const getLocalResponse = (text: string): { text: string; suggestions?: string[]; category?: string } => {
     const lower = text.toLowerCase();
@@ -168,8 +269,12 @@ export default function AIAssistantScreen() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
-    aiCommandMutation.mutate({ message: messageText });
-  }, [input, loading, aiCommandMutation]);
+    aiCommandMutation.mutate({
+      message: messageText,
+      attachedMediaOpaqueIds: attachments.map((attachment) => attachment.opaqueId),
+      mediaConsentGranted: attachments.length > 0 ? mediaConsentGranted : false,
+    });
+  }, [input, loading, aiCommandMutation, attachments, mediaConsentGranted]);
 
   const handleSuggestion = (suggestion: string) => {
     sendMessage(suggestion);
@@ -432,11 +537,27 @@ export default function AIAssistantScreen() {
           )}
         </ScrollView>
 
+        {attachments.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, paddingTop: 8, backgroundColor: colors.background }}>
+            {attachments.map((attachment) => (
+              <Pressable
+                key={attachment.opaqueId}
+                accessibilityRole="button"
+                accessibilityLabel={`${attachment.kind === "image" ? "Görsel" : "Ses"} ekini kaldır`}
+                onPress={() => setAttachments((current) => current.filter((item) => item.opaqueId !== attachment.opaqueId))}
+                style={{ flexDirection: "row", alignItems: "center", borderRadius: 14, backgroundColor: colors.accentPurple + "16", paddingHorizontal: 10, paddingVertical: 6, marginRight: 6, marginBottom: 4 }}
+              >
+                <IconSymbol name={attachment.kind === "image" ? "photo.fill" : "mic.fill"} size={15} color={colors.accentPurple} />
+                <Text numberOfLines={1} style={{ maxWidth: 140, marginLeft: 5, fontSize: 12, color: colors.foreground }}>{attachment.originalName}</Text>
+                <IconSymbol name="xmark" size={14} color={colors.muted} style={{ marginLeft: 5 }} />
+              </Pressable>
+            ))}
+          </View>
+        )}
         {/* Input — Referans yapısı */}
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "center",
+            flexDirection: "column",
             paddingHorizontal: 16,
             paddingVertical: 12,
             borderTopWidth: 0.5,
@@ -444,36 +565,36 @@ export default function AIAssistantScreen() {
             backgroundColor: colors.background,
           }}
         >
-          <TextInput
-            value={input}
-            accessibilityLabel={t("ai.inputPlaceholder")}
-            accessibilityHint={t("aiAssistant")}
-            onChangeText={setInput}
-            placeholder={t("ai.inputPlaceholder")}
-            placeholderTextColor={colors.muted}
-            style={{
-              flex: 1,
-              borderRadius: 24,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              marginRight: 10,
-              backgroundColor: colors.surface,
-              color: colors.foreground,
-              fontSize: 14,
-              borderWidth: 0.5,
-              borderColor: colors.border,
-            }}
-            returnKeyType="send"
-            onSubmitEditing={() => sendMessage()}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="MoveAI mesajını gönder"
-            accessibilityHint={t("ai.inputPlaceholder")}
-            onPress={() => sendMessage()}
-            disabled={!input.trim() || loading}
-            style={({ pressed }) => [
-              {
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <TextInput
+              value={input}
+              accessibilityLabel={t("ai.inputPlaceholder")}
+              accessibilityHint={t("aiAssistant")}
+              onChangeText={setInput}
+              placeholder={t("ai.inputPlaceholder")}
+              placeholderTextColor={colors.muted}
+              style={{
+                flex: 1,
+                borderRadius: 24,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                marginRight: 10,
+                backgroundColor: colors.surface,
+                color: colors.foreground,
+                fontSize: 14,
+                borderWidth: 0.5,
+                borderColor: colors.border,
+              }}
+              returnKeyType="send"
+              onSubmitEditing={() => sendMessage()}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="MoveAI mesajını gönder"
+              accessibilityHint={t("ai.inputPlaceholder")}
+              onPress={() => sendMessage()}
+              disabled={!input.trim() || loading}
+              style={({ pressed }) => ({
                 width: 44,
                 height: 44,
                 borderRadius: 22,
@@ -481,15 +602,31 @@ export default function AIAssistantScreen() {
                 justifyContent: "center",
                 backgroundColor: input.trim() ? colors.accentPurple : colors.surface,
                 opacity: pressed ? 0.85 : 1,
-              },
-            ]}
-          >
-            <IconSymbol
-              name="paperplane.fill"
-              size={20}
-              color={input.trim() ? "#FFFFFF" : colors.muted}
-            />
-          </Pressable>
+              })}
+            >
+              <IconSymbol name="paperplane.fill" size={20} color={input.trim() ? "#FFFFFF" : colors.muted} />
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: mediaConsentGranted }}
+              accessibilityLabel="MoveAI medya açık rızası"
+              onPress={() => setMediaConsentGranted((current) => !current)}
+              style={{ flexDirection: "row", alignItems: "center", flex: 1, paddingVertical: 4 }}
+            >
+              <IconSymbol name={mediaConsentGranted ? "checkmark.circle.fill" : "circle"} size={18} color={mediaConsentGranted ? colors.accentPurple : colors.muted} />
+              <Text style={{ flex: 1, marginLeft: 7, fontSize: 11, lineHeight: 15, color: colors.muted }}>
+                Görsel veya ses eklersem, yalnızca onayladığım hizmet talebine aktarılmasına izin veriyorum.
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Görsel ekle" disabled={mediaBusy || attachments.length >= 4} onPress={pickImage} style={{ padding: 8, opacity: mediaBusy ? 0.5 : 1 }}>
+              <IconSymbol name="photo.fill" size={22} color={colors.accentPurple} />
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={recorderState.isRecording ? "Ses kaydını durdur" : "Ses kaydı başlat"} disabled={mediaBusy || attachments.length >= 4} onPress={toggleAudioRecording} style={{ padding: 8, marginLeft: 4, opacity: mediaBusy ? 0.5 : 1 }}>
+              {mediaBusy ? <ActivityIndicator size="small" color={colors.accentPurple} /> : <IconSymbol name="mic.fill" size={22} color={recorderState.isRecording ? colors.error : colors.accentPurple} />}
+            </Pressable>
+          </View>
         </View>
         </KeyboardAvoidingView>
       </View>

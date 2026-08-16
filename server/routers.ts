@@ -38,6 +38,8 @@ import { getMaskedCommunicationReadiness } from "./communications/MaskedCommunic
 import { createPriceIntelligenceNarrative } from "./services/PriceIntelligenceNarrativeService";
 import { createPolicyBoundMoveAiResponse, resolveMoveAiCategory } from "./ai/MoveAiResponsePolicy";
 import { translateMessageOnDemand } from "./ai/OnDemandMessageTranslation";
+import { evaluateProfessionalAiBoundary } from "./ai/ProfessionalAiBoundary";
+import { evaluateMoveAiMediaConsent } from "./ai/MoveAiMediaPolicy";
 
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
 // Döngüsel import'u önlemek için servisler burada birbirine bağlanır.
@@ -103,7 +105,20 @@ const allowedRequestMedia = {
   "video/quicktime": { kind: "video", extension: "mov", maxBytes: 25 * 1024 * 1024 },
 } as const;
 
+const allowedMoveAiMedia = {
+  "image/jpeg": { kind: "image", extension: "jpg", maxBytes: 8 * 1024 * 1024 },
+  "image/png": { kind: "image", extension: "png", maxBytes: 8 * 1024 * 1024 },
+  "image/webp": { kind: "image", extension: "webp", maxBytes: 8 * 1024 * 1024 },
+  "audio/mp4": { kind: "audio", extension: "m4a", maxBytes: 12 * 1024 * 1024 },
+  "audio/m4a": { kind: "audio", extension: "m4a", maxBytes: 12 * 1024 * 1024 },
+  "audio/mpeg": { kind: "audio", extension: "mp3", maxBytes: 12 * 1024 * 1024 },
+  "audio/ogg": { kind: "audio", extension: "ogg", maxBytes: 12 * 1024 * 1024 },
+  "audio/webm": { kind: "audio", extension: "webm", maxBytes: 12 * 1024 * 1024 },
+  "audio/wav": { kind: "audio", extension: "wav", maxBytes: 12 * 1024 * 1024 },
+} as const;
+
 type AllowedRequestMime = keyof typeof allowedRequestMedia;
+type AllowedMoveAiMime = keyof typeof allowedMoveAiMedia;
 
 function hasExpectedMediaSignature(buffer: Buffer, mimeType: AllowedRequestMime): boolean {
   if (buffer.length < 12) return false;
@@ -119,6 +134,20 @@ function hasExpectedMediaSignature(buffer: Buffer, mimeType: AllowedRequestMime)
     return /^ftyp(?:heic|heix|hevc|hevx|heim|heis|mif1|msf1)/.test(isoBrand);
   }
   return isoBrand.startsWith("ftyp");
+}
+
+function hasExpectedMoveAiMediaSignature(buffer: Buffer, mimeType: AllowedMoveAiMime): boolean {
+  if (mimeType.startsWith("image/")) return hasExpectedMediaSignature(buffer, mimeType as AllowedRequestMime);
+  if (buffer.length < 12) return false;
+  if (mimeType === "audio/mpeg") {
+    return buffer.subarray(0, 3).toString("ascii") === "ID3" || (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0);
+  }
+  if (mimeType === "audio/ogg") return buffer.subarray(0, 4).toString("ascii") === "OggS";
+  if (mimeType === "audio/wav") {
+    return buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WAVE";
+  }
+  if (mimeType === "audio/webm") return buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3;
+  return buffer.subarray(4, 8).toString("ascii") === "ftyp";
 }
 
 function decodeStrictBase64(value: string): Buffer {
@@ -1745,9 +1774,86 @@ export const appRouter = router({
 
   // MoveAI — Customer-facing AI assistant
   ai: router({
+    professionalPreflight: protectedProcedure
+      .input(z.object({
+        requestId: z.number().int().positive(),
+        capability: z.enum([
+          "job_summary",
+          "schedule_checklist",
+          "safety_checklist",
+          "communication_draft",
+          "price_quote",
+          "payment_instruction",
+          "provider_ranking",
+          "eligibility_decision",
+          "contract_change",
+          "customer_contact_disclosure",
+          "automated_action",
+        ]),
+        containsCustomerContactData: z.boolean().default(false),
+        attemptsExternalAction: z.boolean().default(false),
+      }))
+      .query(async ({ ctx, input }) => {
+        const job = await db.getProfessionalAiJobContext(input.requestId, ctx.user.id);
+        return evaluateProfessionalAiBoundary({
+          actorRole: "provider",
+          isAssignedProvider: job?.isAssignedProvider ?? false,
+          jobStatus: job?.status ?? null,
+          requestedCapability: input.capability,
+          containsCustomerContactData: input.containsCustomerContactData,
+          attemptsExternalAction: input.attemptsExternalAction,
+        });
+      }),
+    stageMedia: protectedProcedure
+      .input(z.object({
+        mediaConsentGranted: z.literal(true),
+        originalName: z.string().trim().min(1).max(255).regex(/^[^\\/\u0000-\u001f]+$/, "Geçersiz dosya adı"),
+        mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "audio/mp4", "audio/m4a", "audio/mpeg", "audio/ogg", "audio/webm", "audio/wav"]),
+        base64: z.string().min(4).max(17_000_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const policy = allowedMoveAiMedia[input.mimeType];
+        const buffer = decodeStrictBase64(input.base64);
+        if (buffer.length > policy.maxBytes) {
+          throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "MoveAI medyası izin verilen boyutu aşıyor" });
+        }
+        if (!hasExpectedMoveAiMediaSignature(buffer, input.mimeType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Dosya içeriği bildirilen medya türüyle uyuşmuyor" });
+        }
+        const opaqueId = randomUUID();
+        const sha256 = createHash("sha256").update(buffer).digest("hex");
+        const uploaded = await storagePut(`move-ai/${ctx.user.id}/${opaqueId}.${policy.extension}`, buffer, input.mimeType);
+        try {
+          return await db.stageMoveAiDraftMedia({
+            ownerUserId: ctx.user.id,
+            opaqueId,
+            kind: policy.kind,
+            storageKey: uploaded.key,
+            originalName: input.originalName,
+            mimeType: input.mimeType,
+            sizeBytes: buffer.length,
+            sha256,
+          });
+        } catch (error) {
+          if (error instanceof Error && error.message === "MOVE_AI_MEDIA_LIMIT_EXCEEDED") {
+            throw new TRPCError({ code: "CONFLICT", message: "En fazla dört MoveAI medya girdisi ekleyebilirsiniz" });
+          }
+          throw error;
+        }
+      }),
     command: protectedProcedure
       .input(z.object({
         message: z.string().min(1).max(500),
+        attachedMediaOpaqueIds: z.array(z.string().uuid()).max(4).optional(),
+        mediaConsentGranted: z.boolean().optional().default(false),
+      }).superRefine((value, validation) => {
+        const decision = evaluateMoveAiMediaConsent({
+          opaqueIds: value.attachedMediaOpaqueIds,
+          mediaConsentGranted: value.mediaConsentGranted,
+        });
+        if (!decision.allowed) {
+          validation.addIssue({ code: z.ZodIssueCode.custom, message: "Medya eklemek için açık rıza ve benzersiz geçerli ekler gerekir", path: ["mediaConsentGranted"] });
+        }
       }))
       .mutation(async ({ ctx, input }) => {
         // Use built-in LLM to understand intent and generate response
@@ -1813,6 +1919,8 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
               categoryId,
               suggestions: parsed.suggestions ?? [],
               riskLevel,
+              attachedMediaOpaqueIds: input.attachedMediaOpaqueIds,
+              mediaConsentGrantedAt: input.mediaConsentGranted ? new Date() : undefined,
             });
             draftId = draft.id;
             draftStatus = draft.status === "draft" ? "draft" : "blocked";
@@ -1834,6 +1942,15 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
             draftStatus,
           };
         } catch (error: unknown) {
+          // A staged media reference must never be silently downgraded to a text-only
+          // response: that would obscure an ownership/consent/storage failure from its owner.
+          if ((input.attachedMediaOpaqueIds?.length ?? 0) > 0) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "MoveAI medya taslağı güvenli biçimde oluşturulamadı; ekler işlenmeden hiçbir talep oluşturulmadı",
+              cause: error,
+            });
+          }
           // Fallback: keyword-based intent detection
           const lower = input.message.toLowerCase();
           let category = "general";
