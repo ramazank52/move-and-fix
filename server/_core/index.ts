@@ -29,6 +29,7 @@ import { COOKIE_NAME } from "../../shared/const";
 import { createCompletionAutoReleaseResponse } from "./completion-auto-release-response";
 import * as db from "../db";
 import { runFinancialReconciliation } from "../payments/FinancialReconciliationService";
+import { errorMiddleware, logger, requestLoggingMiddleware } from "./errorHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -55,6 +56,7 @@ async function startServer() {
 
   // Request ID middleware — every request gets a unique ID for tracing
   app.use(requestIdMiddleware);
+  app.use(requestLoggingMiddleware(logger));
 
   // Response compression
   app.use(compression());
@@ -382,6 +384,7 @@ async function startServer() {
       createContext,
     }),
   );
+  app.use(errorMiddleware(logger));
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);

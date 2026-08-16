@@ -264,6 +264,19 @@
 - [x] Phase 6 yaşam döngüsü API’lerini fail-closed rol, durum geçişi ve işlem idempotency kurallarıyla uygula
 - [x] Phase 6 iş kanıtı, müşteri onayı ve itiraz mobil arayüzlerini gerçek API akışlarına bağla
 - [x] Phase 6 AI kanıt analizinin yardımcı niteliğini canlı takipte şeffaf biçimde göster
+
+## Master Phase E: Operasyonel Sertleştirme
+- [x] MoveOS Operations Control REST köprüsünü Super Admin MFA korumasıyla tamamla
+- [x] MoveOS Operations Control kartlarını ve vaka tablosunu gerçek API verisine bağla
+- [x] Operations Control yetkilendirme, hata ve sınır durum regresyonlarını ekle
+- [x] PII redaksiyonlu structured logging ve fail-closed APM adaptörünü doğrula
+- [x] Sentetik health check yüzeylerini gerçek veri tabanı ve disk ölçümleriyle değiştir
+- [x] Ölü/mock/placeholder yüzeylerini denetle ve güvenli biçimde temizle
+- [x] SBOM, lisans politikası ve CI güvenlik kalite kapılarını yeniden doğrula ve eksikse geri yükle
+- [x] Audit bulgularındaki doğrudan yüksek önem seviyeli çalışma zamanı bağımlılıklarını güvenli sürümlere yükselt
+- [x] Final kalite kapıları, Expo export ve istemci sır taramasını doğrula
+- [ ] Expo SDK 54 araç zincirinin yamalanamayan image-size ve dar PostCSS zinciri audit bulgularını Expo SDK güncellemesiyle kapat
+- [x] Phase E checkpoint ve gerçek durum raporunu hazırla
 - [x] Phase 6 yetki, geçersiz durum, kanıt medya ve escrow süre testlerini ekle
 - [x] Phase 6 TypeScript, lint, build, test ve iOS/Android export kalite kapılarını doğrula
 - [x] Escrow, yüzde 10 komisyon, profesyonel cüzdanı, para çekme, ödeme güvenliği, webhook doğrulama, idempotency ve double-payment korumasını production standardında doğrula
@@ -381,8 +394,14 @@
 - [x] Master Phase B — Kısmi iade ve payout yaşam döngüsünü gerçek gateway callback’ine idempotent, uzlaştırılabilir ve fail-closed bağla
 - [x] Master Phase C — Organization/corporate account, RBAC/Super Admin, uluslararasılaştırma, çoklu para birimi ve branding source-of-truth işlerini tamamla
 - [x] Master Phase D — MoveTrust Passport, Job Capsule, No Surprise Price, AI Price Intelligence, Safety Center ve Provider Business Cockpit güven katmanını uygula
-- [ ] Master Phase D — Corporate Fleet/Facility ve MoveOS Operations Control yüzeylerini ortak API/DB/MFA güvenlik modeliyle tamamla
+- [x] Master Phase D — Corporate Fleet/Facility ve MoveOS Operations Control yüzeylerini ortak API/DB/MFA güvenlik modeliyle tamamla
 - [ ] Master Phase E — SBOM/SCA, gözlemlenebilirlik, dead/legacy code temizliği, OpenAPI, tam regresyon, Android/iOS/web doğrulaması ve mock/fake final taramasını tamamla
+- [x] Master Phase E — MoveOS Operations Control, sistem sağlığı ve inceleme kuyruğunu MFA/RBAC ve immutable audit sınırlarıyla uygula
+- [x] Master Phase E — Structured/redacted log, correlation ID ve fail-closed APM adapter sözleşmesini uygula
+- [x] Master Phase E — SBOM, lisans envanteri, bağımlılık/secret taraması ve CI kalite kapılarını ekle
+- [x] Master Phase E — Authorization, rate-limit, webhook, ödeme ve uyum testlerini davranış temelli sertleştir
+- [ ] Master Phase E — Ölü/legacy/mock kaynakları ve görünür sabit metinleri güvenli biçimde temizle; OpenAPI sözleşmesini güncelle
+- [x] Master Phase E — Tam regresyon, build, mobil export ve final mock/fake/secret taramasından sonra checkpoint al
 - [ ] Master final — Her faz için gerçek PASS/PARTIAL/BLOCKED raporu, checkpoint ve production-readiness kararını yalnız doğrulanmış bulgularla sun
 - [x] Master Phase A P0 — CORS allowlist’i fail-closed uygula; cookie tabanlı tRPC ve MoveOS mutasyonlarında CSRF’yi gerçek oturum bağlamıyla zorunlu kıl
 - [x] Master Phase A P0 — ENCRYPTION_KEY üretimde zorunlu, legacy REST logout oturum iptalli, token rotasyonu ve Stripe/Wallet kaynakları denetlenmiş hale getir

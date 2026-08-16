@@ -5,8 +5,11 @@
  */
 
 import type { RequestHandler } from 'express';
+import { statfs } from 'node:fs/promises';
+import { sql } from 'drizzle-orm';
 
 import { getErrorMessage } from './errors';
+import { getDb } from '../db';
 
 export interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -19,7 +22,7 @@ export interface HealthStatus {
       message?: string;
     };
     redis: {
-      status: 'ok' | 'error';
+      status: 'not_configured' | 'ok' | 'error';
       responseTime: number;
       message?: string;
     };
@@ -51,7 +54,9 @@ export class HealthChecker {
     const start = Date.now();
 
     try {
-      // Database connection test: await db.query('SELECT 1');
+      const database = await getDb();
+      if (!database) throw new Error('Database is not configured');
+      await database.execute(sql`SELECT 1`);
       return {
         status: 'ok',
         responseTime: Date.now() - start,
@@ -66,16 +71,17 @@ export class HealthChecker {
   }
 
   async checkRedis(): Promise<{
-    status: 'ok' | 'error';
+    status: 'not_configured' | 'ok' | 'error';
     responseTime: number;
     message?: string;
   }> {
     const start = Date.now();
 
     try {
-      // Redis connection test: await redis.ping();
       return {
-        status: 'ok',
+        // Redis is intentionally not inferred as healthy: no Redis client is
+        // configured by this deployment, so callers receive an explicit state.
+        status: 'not_configured',
         responseTime: Date.now() - start,
       };
     } catch (error: unknown) {
@@ -105,15 +111,21 @@ export class HealthChecker {
     return { status, usage, limit, percentage };
   }
 
-  checkDisk(): {
+  async checkDisk(): Promise<{
     status: 'ok' | 'warning' | 'error';
     usage: number;
     limit: number;
     percentage: number;
-  } {
-    // Production'da gerçek disk kullanım sağlayıcısı ile değiştirilecektir.
-    const usage = 50 * 1024 * 1024 * 1024;
-    const limit = 100 * 1024 * 1024 * 1024;
+  }> {
+    const filesystem = await statfs(process.cwd());
+    const blockSize = Number(filesystem.bsize);
+    const totalBlocks = Number(filesystem.blocks);
+    const availableBlocks = Number(filesystem.bavail);
+    const limit = blockSize * totalBlocks;
+    const usage = limit - blockSize * availableBlocks;
+    if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(usage) || usage < 0) {
+      throw new Error('Disk capacity metrics are unavailable');
+    }
     const percentage = (usage / limit) * 100;
 
     let status: 'ok' | 'warning' | 'error' = 'ok';
@@ -129,7 +141,7 @@ export class HealthChecker {
       this.checkRedis(),
     ]);
     const memory = this.checkMemory();
-    const disk = this.checkDisk();
+    const disk = await this.checkDisk();
 
     let status: HealthStatus['status'] = 'healthy';
     if (database.status === 'error' || redis.status === 'error') {

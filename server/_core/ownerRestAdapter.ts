@@ -18,6 +18,7 @@ type OwnerProcedure =
   | "requestMfa"
   | "verifyMfa"
   | "dashboard"
+  | "operationsControl"
   | "users"
   | "getUser"
   | "updateUser"
@@ -153,6 +154,21 @@ export function registerOwnerRestRoutes(app: Express) {
       res.json(await callOwnerProcedure(req, res, user, "dashboard"));
     } catch (error) {
       sendOwnerError(res, error, "Dashboard verileri alınamadı");
+    }
+  });
+
+  app.get("/api/owner/operations-control", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "operationsControl", {
+          eventLimit: req.query.eventLimit ? Number(req.query.eventLimit) : 25,
+          caseLimit: req.query.caseLimit ? Number(req.query.caseLimit) : 25,
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Operations Control verileri alınamadı");
     }
   });
 

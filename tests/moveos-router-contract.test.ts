@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 
 const db = vi.hoisted(() => ({
   getMoveOsDashboardMetrics: vi.fn(),
+  getOperationsControlSnapshot: vi.fn(),
   listMoveOsCategories: vi.fn(),
   createMoveOsCategory: vi.fn(),
   archiveMoveOsCategory: vi.fn(),
@@ -107,6 +108,34 @@ describe("MoveOS ortak API sözleşmesi", () => {
   it("MFA doğrulanmış sıradan yöneticinin Super Admin yönetim yüzeyine erişimini reddeder", async () => {
     await expect(adminCaller().superAdmins()).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(db.listActiveSuperAdmins).not.toHaveBeenCalled();
+  });
+
+  it("Operations Control özetini MFA doğrulanmış Super Admin scope olmadan fail-closed reddeder", async () => {
+    await expect(adminCaller().operationsControl()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.getOperationsControlSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("Operations Control özetini yalnız MFA doğrulanmış Super Admin için sınırlandırılmış parametrelerle üretir", async () => {
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+    const snapshot = {
+      generatedAt: new Date("2026-08-16T00:00:00.000Z"),
+      health: { status: "attention" },
+      queues: {},
+      events: [],
+    };
+    db.getOperationsControlSnapshot.mockResolvedValue(snapshot);
+
+    await expect(adminCaller().operationsControl({ eventLimit: 12, caseLimit: 8 })).resolves.toEqual(snapshot);
+    expect(db.getOperationsControlSnapshot).toHaveBeenCalledWith({ eventLimit: 12, caseLimit: 8 });
+  });
+
+  it("Operations Control için sıfır, kesirli veya üst sınırı aşan vaka limitlerini veri katmanına erişmeden reddeder", async () => {
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+
+    await expect(adminCaller().operationsControl({ eventLimit: 0, caseLimit: 8 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(adminCaller().operationsControl({ eventLimit: 12.5, caseLimit: 8 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(adminCaller().operationsControl({ eventLimit: 12, caseLimit: 101 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(db.getOperationsControlSnapshot).not.toHaveBeenCalled();
   });
 
   it("Super Admin yüzeyinde MFA grant’i yoksa aktif scope olsa dahi fail-closed reddeder", async () => {

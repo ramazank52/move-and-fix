@@ -18,6 +18,7 @@ import {
   operationalEvents,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { getApmConfigurationStatus } from "./_core/observability";
 import {
   assertPaymentStatusTransition,
   calculateCancellationSettlementPlan,
@@ -791,7 +792,6 @@ export async function refreshProviderVerificationStatus(providerId: number) {
   return status;
 }
 
-// TODO: add feature queries here as your schema grows.
 
 import {
   serviceCategories,
@@ -6453,6 +6453,62 @@ export async function createSafetyIncident(input: {
   }
   await logOperationEvent({ eventType: "safety_incident_created", actorId: input.reporterUserId, subjectId: input.requestId, severity: input.severity === "critical" ? "error" : "warning" });
   return { id: result[0].insertId, status: "open" as const, externalDeliveryStatus: "not_configured" as const };
+}
+
+/**
+ * Read-only Operations Control projection. It deliberately derives its values
+ * from authoritative records instead of maintaining a second operational state.
+ */
+export async function getOperationsControlSnapshot(input?: { eventLimit?: number; caseLimit?: number }) {
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  const eventLimit = Math.max(1, Math.min(input?.eventLimit ?? 25, 100));
+  const caseLimit = Math.max(1, Math.min(input?.caseLimit ?? 25, 100));
+
+  const [requests, paymentsRows, riskRows, cancellationRows, safetyRows, featureFlags, recentEvents] = await Promise.all([
+    database.select().from(serviceRequests),
+    database.select().from(payments),
+    database.select().from(riskFlags),
+    database.select().from(jobCancellationCases).orderBy(desc(jobCancellationCases.createdAt)).limit(caseLimit),
+    database.select().from(safetyIncidents).orderBy(desc(safetyIncidents.createdAt)).limit(caseLimit),
+    database.select().from(operationalFeatureFlags),
+    database.select().from(operationalEvents).orderBy(desc(operationalEvents.occurredAt)).limit(eventLimit),
+  ]);
+
+  const requestStatusCounts = requests.reduce<Record<string, number>>((summary, request) => {
+    const status = String(request.status ?? "unknown");
+    summary[status] = (summary[status] ?? 0) + 1;
+    return summary;
+  }, {});
+  const paymentStatusCounts = paymentsRows.reduce<Record<string, number>>((summary, payment) => {
+    const status = String(payment.status ?? "unknown");
+    summary[status] = (summary[status] ?? 0) + 1;
+    return summary;
+  }, {});
+  const openRiskCount = riskRows.filter((risk) => ["open", "under_review"].includes(String(risk.status))).length;
+  const disabledFeatureFlagCount = featureFlags.filter((flag) => Number(flag.enabled) !== 1).length;
+
+  return {
+    generatedAt: new Date(),
+    health: {
+      database: "available" as const,
+       externalApm: getApmConfigurationStatus(),
+      activeFeatureFlags: featureFlags.length - disabledFeatureFlagCount,
+      disabledFeatureFlags: disabledFeatureFlagCount,
+    },
+    workload: {
+      requestStatusCounts,
+      paymentStatusCounts,
+      openRiskCount,
+      cancellationCases: cancellationRows.length,
+      safetyIncidents: safetyRows.length,
+    },
+    queues: {
+      cancellations: cancellationRows,
+      safetyIncidents: safetyRows,
+      operationalEvents: recentEvents,
+    },
+  };
 }
 
 export async function listMySafetyIncidents(userId: number) {

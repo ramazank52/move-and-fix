@@ -56,6 +56,51 @@ function renderDashboard(metrics) {
   $("#pending-payments").textContent = money.format(metrics.pendingPayments ?? 0);
 }
 
+function formatStatusCounts(counts) {
+  const entries = Object.entries(counts || {});
+  return entries.length ? entries.map(([name, count]) => `${name}: ${count}`).join(" · ") : "Kayıt yok";
+}
+
+function renderOperationsControl(operations) {
+  const accessMessage = "Operations Control yalnız aktif MFA grant'ine sahip Super Admin kullanıcıları için kullanılabilir.";
+  if (!operations || operations.unavailableReason) {
+    ["#operations-db-health", "#operations-apm-health", "#operations-open-risks", "#operations-cancellation-cases", "#operations-safety-incidents", "#operations-feature-flags"].forEach((selector) => {
+      $(selector).textContent = "Erişim yok";
+    });
+    $("#operations-workload").textContent = operations?.unavailableReason || accessMessage;
+    $("#operations-generated-at").textContent = "";
+    $("#operations-cases-list").innerHTML = `<tr><td colspan="6">${escapeHtml(operations?.unavailableReason || accessMessage)}</td></tr>`;
+    return;
+  }
+
+  const health = operations.health || {};
+  const workload = operations.workload || {};
+  const queues = operations.queues || {};
+  $("#operations-db-health").textContent = health.database || "Bilinmiyor";
+  $("#operations-apm-health").textContent = health.externalApm || "Bilinmiyor";
+  $("#operations-open-risks").textContent = String(workload.openRiskCount ?? 0);
+  $("#operations-cancellation-cases").textContent = String(workload.cancellationCases ?? 0);
+  $("#operations-safety-incidents").textContent = String(workload.safetyIncidents ?? 0);
+  $("#operations-feature-flags").textContent = `${health.activeFeatureFlags ?? 0} / ${health.disabledFeatureFlags ?? 0}`;
+  $("#operations-workload").textContent = `İş durumları: ${formatStatusCounts(workload.requestStatusCounts)}. Ödeme durumları: ${formatStatusCounts(workload.paymentStatusCounts)}.`;
+  $("#operations-generated-at").textContent = operations.generatedAt ? `Son türetim: ${formatDateTime(operations.generatedAt)}` : "";
+
+  const cancellationCases = Array.isArray(queues.cancellations) ? queues.cancellations : [];
+  const safetyIncidents = Array.isArray(queues.safetyIncidents) ? queues.safetyIncidents : [];
+  const cases = [
+    ...cancellationCases.map((item) => ({
+      kind: "İptal / settlement", requestId: item.requestId, signal: item.reasonCode || "other", status: item.status || "requested", createdAt: item.createdAt,
+      disposition: item.settlementOutcome ? `Sonuç: ${item.settlementOutcome}` : "Gateway sonucu bekleniyor",
+    })),
+    ...safetyIncidents.map((item) => ({
+      kind: "Safety Center", requestId: item.requestId, signal: `${item.category || "other"} / ${item.severity || "unknown"}`, status: item.status || "open", createdAt: item.createdAt,
+      disposition: item.externalDeliveryStatus || "not_configured",
+    })),
+  ].sort((left, right) => new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime());
+
+  $("#operations-cases-list").innerHTML = cases.map((item) => `<tr><td>${escapeHtml(item.kind)}</td><td>${item.requestId ? `#${escapeHtml(item.requestId)}` : "—"}</td><td>${escapeHtml(item.signal)}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(formatDateTime(item.createdAt))}</td><td>${escapeHtml(item.disposition)}</td></tr>`).join("") || "<tr><td colspan=\"6\">Açık vaka kaydı yok.</td></tr>";
+}
+
 function renderCategories(categories) {
   $("#categories-list").innerHTML = categories.map((category) => `
     <tr><td>${escapeHtml(category.name)}</td><td>${escapeHtml(category.pricingType || "fixed")}</td><td>${status(Boolean(category.isActive))}</td>
@@ -94,6 +139,12 @@ function formatDate(value) {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("tr-TR");
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
 }
 
 function renderSettlementPolicies(result) {
@@ -244,8 +295,14 @@ function renderFeatureFlags(result) {
 
 async function loadData() {
   notice("Veriler yenileniyor…");
-  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, changeOrders, riskFlags, featureFlags] = await Promise.all([api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/change-orders?limit=20"), api("/api/owner/risk-flags?limit=50"), api("/api/owner/feature-flags?limit=100")]);
-  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderChangeOrders(changeOrders); renderRiskFlags(riskFlags); renderFeatureFlags(featureFlags);
+  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, changeOrders, riskFlags, featureFlags, operationsControl] = await Promise.all([
+    api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/change-orders?limit=20"), api("/api/owner/risk-flags?limit=50"), api("/api/owner/feature-flags?limit=100"),
+    api("/api/owner/operations-control?eventLimit=25&caseLimit=25").catch((error) => {
+      if (error instanceof ApiError && error.status === 403) return { unavailableReason: "Operations Control görünümü yalnız Super Admin rolüne açıktır." };
+      throw error;
+    }),
+  ]);
+  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderChangeOrders(changeOrders); renderRiskFlags(riskFlags); renderFeatureFlags(featureFlags); renderOperationsControl(operationsControl);
   setMfaVisible(false);
   $("#dashboard").hidden = false;
   notice("Gerçek ortak API verileri güncellendi.");

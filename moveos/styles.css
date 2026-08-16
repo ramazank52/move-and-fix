@@ -24,6 +24,8 @@ h2 { font-size: 1.1rem; }
 .metric { min-height: 112px; padding: 18px; }
 .metric span, .subtle { color: #b8b0c9; font-size: .83rem; }
 .metric strong { display: block; font-size: 1.45rem; margin-top: 12px; }
+.operations-control-panel { margin-bottom: 20px; }
+.operations-metrics { margin: 18px 0 14px; }
 .grid { display: grid; gap: 20px; grid-template-columns: 1.25fr .75fr; }
 .panel { padding: 20px; }
 .panel:last-child { grid-column: 1 / -1; }

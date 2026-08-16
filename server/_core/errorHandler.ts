@@ -11,6 +11,7 @@ import {
   ErrorSeverity,
   normalizeError,
 } from './errors';
+import { createObservabilityEvent, emitObservabilityEvent, redactObservabilityData } from './observability';
 
 export {
   AppError,
@@ -83,15 +84,16 @@ export class StructuredLogger {
       timestamp: new Date(),
       category: appError.category,
       severity: appError.severity,
-      message: appError.message,
+      message: String(redactObservabilityData(appError.message)),
       code: appError.code,
       statusCode: appError.statusCode,
       userId,
       requestId,
       endpoint,
       method,
-      stack: appError.stack,
-      context: appError.context,
+      // Raw stack/context can include request payload data and must not be retained.
+      stack: undefined,
+      context: redactObservabilityData(appError.context) as ErrorContext | undefined,
       retryable: appError.retryable,
       retryCount: 0,
       userMessage: this.getUserMessage(appError),
@@ -107,20 +109,16 @@ export class StructuredLogger {
   }
 
   logInfo(message: string, data?: ErrorContext, requestId?: string): void {
-    console.log(JSON.stringify({ timestamp: new Date(), level: 'INFO', message, requestId, data }));
+    emitObservabilityEvent(createObservabilityEvent({ level: 'info', message, requestId, context: data }));
   }
 
   logWarning(message: string, data?: ErrorContext, requestId?: string): void {
-    console.warn(
-      JSON.stringify({ timestamp: new Date(), level: 'WARNING', message, requestId, data }),
-    );
+    emitObservabilityEvent(createObservabilityEvent({ level: 'warn', message, requestId, context: data }));
   }
 
   logDebug(message: string, data?: ErrorContext, requestId?: string): void {
     if (process.env.NODE_ENV === 'development') {
-      console.debug(
-        JSON.stringify({ timestamp: new Date(), level: 'DEBUG', message, requestId, data }),
-      );
+      emitObservabilityEvent(createObservabilityEvent({ level: 'debug', message, requestId, context: data }));
     }
   }
 
@@ -132,18 +130,12 @@ export class StructuredLogger {
     requestId?: string,
     userId?: string,
   ): void {
-    console.log(
-      JSON.stringify({
-        timestamp: new Date(),
-        level: 'REQUEST',
-        method,
-        endpoint,
-        statusCode,
-        responseTime,
-        requestId,
-        userId,
-      }),
-    );
+    emitObservabilityEvent(createObservabilityEvent({
+      level: 'info',
+      message: 'http.request.completed',
+      requestId,
+      context: { method, endpoint, statusCode, responseTime, userId },
+    }));
   }
 
   private getUserMessage(error: AppError): string {
@@ -164,22 +156,22 @@ export class StructuredLogger {
   }
 
   private printLog(errorLog: ErrorLog): void {
-    console.error(
-      JSON.stringify({
-        timestamp: errorLog.timestamp.toISOString(),
-        level: 'ERROR',
+    emitObservabilityEvent(createObservabilityEvent({
+      level: 'error',
+      message: errorLog.message,
+      requestId: errorLog.requestId,
+      context: {
         severity: errorLog.severity,
         category: errorLog.category,
         code: errorLog.code,
-        message: errorLog.message,
         statusCode: errorLog.statusCode,
-        requestId: errorLog.requestId,
         userId: errorLog.userId,
         endpoint: errorLog.endpoint,
         method: errorLog.method,
         retryable: errorLog.retryable,
-      }),
-    );
+        context: errorLog.context,
+      },
+    }));
   }
 
   getErrorHistory(filters?: {

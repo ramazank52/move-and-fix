@@ -205,23 +205,3 @@ export function webhookVerificationMiddleware(
     next();
   };
 }
-
-/**
- * @deprecated Replay protection must use the durable payment_webhook_events table.
- * Retained only to avoid breaking older imports while they are migrated.
- */
-export class WebhookReplayProtection {
-  isProcessed(_webhookId: string): boolean {
-    return false;
-  }
-
-  markProcessed(_webhookId: string): void {
-    // Intentionally empty: in-memory replay state is unsafe in multi-instance deployments.
-  }
-
-  cleanup(): void {
-    // Durable records are managed by the database retention policy.
-  }
-}
-
-export const webhookReplayProtection = new WebhookReplayProtection();

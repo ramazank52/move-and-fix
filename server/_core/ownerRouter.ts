@@ -15,6 +15,7 @@ import {
   createAuthChallenge,
   createMoveOsCategory,
   getLatestActiveAuthChallenge,
+  getOperationsControlSnapshot,
   getMoveOsDashboardMetrics,
   getMoveOsService,
   getMoveOsUser,
@@ -236,6 +237,10 @@ export const ownerRouter = router({
   logout: adminProcedure.mutation(async () => ({ success: true })),
 
   dashboard: adminMfaProcedure.query(async () => getMoveOsDashboardMetrics()),
+
+  operationsControl: superAdminMfaProcedure
+    .input(z.object({ eventLimit: z.number().int().min(1).max(100).default(25), caseLimit: z.number().int().min(1).max(100).default(25) }).default({ eventLimit: 25, caseLimit: 25 }))
+    .query(async ({ input }) => getOperationsControlSnapshot(input)),
 
   superAdmins: superAdminMfaProcedure.query(async () => listActiveSuperAdmins()),
 

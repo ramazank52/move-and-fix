@@ -73,6 +73,7 @@ describe("E2E HTTP: Ortak oturumlu MoveOS", () => {
   describe("Yönetim yetki sınırı", () => {
     const protectedCases: Array<{ method: string; path: string; body?: unknown }> = [
       { method: "GET", path: "/api/owner/dashboard" },
+      { method: "GET", path: "/api/owner/operations-control?eventLimit=25&caseLimit=25" },
       { method: "GET", path: "/api/owner/users" },
       { method: "GET", path: "/api/owner/categories" },
       { method: "POST", path: "/api/owner/categories", body: { name: "Bahçe Bakımı", pricingType: "fixed" } },

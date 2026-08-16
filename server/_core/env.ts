@@ -41,6 +41,8 @@ export const ENV = {
   twilioFromNumber: process.env.TWILIO_FROM_NUMBER ?? "",
   proxyTelephonyBaseUrl: process.env.PROXY_TELEPHONY_BASE_URL ?? "",
   proxyTelephonyApiKey: process.env.PROXY_TELEPHONY_API_KEY ?? "",
+  apmEndpoint: process.env.APM_ENDPOINT ?? "",
+  apmApiKey: process.env.APM_API_KEY ?? "",
   completionAutoReleaseSecret:
     process.env.ESCROW_RELEASE_CRON_SECRET ?? process.env.COMPLETION_AUTO_RELEASE_SECRET ?? "",
   financialReconciliationSecret: process.env.FINANCIAL_RECONCILIATION_CRON_SECRET ?? "",
