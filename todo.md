@@ -459,3 +459,10 @@
 - [x] Controlled publish/rollback, feature flag değişikliği, vergi/uyum kuralı ve yönetici kararları için immutable audit ve iki aşamalı doğrulama sınırlarını sertleştir
 - [x] MoveOS operasyon görünümüne yalnız sahiplikli özetler, fail-closed aksiyonlar, durum/hata geri bildirimi ve denetim bağlantıları ekle
 - [x] P7 için yönetici yetkisi, MFA, IDOR, hata, audit ve edge-case regresyonlarını ekle; kalite kapılarını çalıştır
+
+## FINAL MASTER COMMAND P8
+- [x] SBOM, lisans politikası, bağımlılık/audit eşiği ve kaynak secret/mock tarama kanıtlarını güncelle
+- [x] Felaket kurtarma, restore doğrulaması, retention/scheduler çalışma kitabı ve sorumlu-operasyon kanıtlarını koddan ayrık, uygulanabilir dokümantasyonla tamamla
+- [x] APM/health/operasyonel gözlemleme yüzeylerini secret yokluğunda fail-closed ve veri-minimize davranışla tekrar doğrula
+- [x] iOS/Android mağaza çıkış metadata, izin gerekçeleri, privacy manifest ve release kontrol listesini eksik harici kaynakları açık blocker olarak kaydederek tamamla
+- [x] P8 tedarik zinciri, DR, gözlemleme ve mağaza kontrollerini test/build/export/tarama kanıtlarıyla doğrula
