@@ -126,7 +126,7 @@ export const privacyRightsRequests = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     requesterUserId: int("requesterUserId").notNull(),
-    requestType: mysqlEnum("requestType", ["export", "erasure"]).notNull(),
+    requestType: mysqlEnum("requestType", ["export", "erasure", "rectification"]).notNull(),
     status: mysqlEnum("status", ["open", "in_review", "blocked_legal_hold", "approved", "rejected", "completed"])
       .default("open")
       .notNull(),
@@ -626,6 +626,12 @@ export const providerDocuments = mysqlTable(
     sizeBytes: int("sizeBytes").notNull(),
     sha256: varchar("sha256", { length: 64 }).notNull(),
     status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "clean", "blocked", "expired"])
+      .default("pending_scan")
+      .notNull(),
+    quarantineReason: varchar("quarantineReason", { length: 500 }),
+    scannedAt: timestamp("scannedAt"),
+    releasedAt: timestamp("releasedAt"),
     rejectionReason: varchar("rejectionReason", { length: 500 }),
     reviewedByUserId: int("reviewedByUserId"),
     reviewedAt: timestamp("reviewedAt"),
@@ -748,8 +754,12 @@ export const capabilityJurisdictionRules = mysqlTable(
     requiredCredentialType: varchar("requiredCredentialType", { length: 120 }),
     minimumAssurance: mysqlEnum("minimumAssurance", ["A", "B", "C", "D", "E", "F"]).default("F").notNull(),
     requiresHumanReview: int("requiresHumanReview").default(1).notNull(),
-    ruleStatus: mysqlEnum("ruleStatus", ["unknown", "required", "not_required", "prohibited"])
+    ruleStatus: mysqlEnum("ruleStatus", ["unknown", "required", "not_required", "prohibited", "conditional"])
       .default("unknown")
+      .notNull(),
+    scopeConstraintsJson: json("scopeConstraintsJson"),
+    conditionalStatus: mysqlEnum("conditionalStatus", ["not_applicable", "conditional", "satisfied", "blocked"])
+      .default("not_applicable")
       .notNull(),
     rationale: text("rationale"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -823,6 +833,7 @@ export const providerCapabilityStatuses = mysqlTable(
     assuranceLevel: mysqlEnum("assuranceLevel", ["A", "B", "C", "D", "E", "F"]).default("F").notNull(),
     ruleVersion: varchar("ruleVersion", { length: 64 }),
     scopeNote: varchar("scopeNote", { length: 500 }),
+    scopeConstraintsJson: json("scopeConstraintsJson"),
     evaluatedAt: timestamp("evaluatedAt").defaultNow().notNull(),
     expiresAt: timestamp("expiresAt"),
     nextCheckAt: timestamp("nextCheckAt"),
@@ -989,6 +1000,12 @@ export const serviceRequestMedia = mysqlTable(
     mimeType: varchar("mimeType", { length: 100 }).notNull(),
     sizeBytes: int("sizeBytes").notNull(),
     sha256: varchar("sha256", { length: 64 }).notNull(),
+    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "clean", "blocked", "expired"])
+      .default("pending_scan")
+      .notNull(),
+    quarantineReason: varchar("quarantineReason", { length: 500 }),
+    scannedAt: timestamp("scannedAt"),
+    releasedAt: timestamp("releasedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => [
@@ -1213,6 +1230,42 @@ export const messages = mysqlTable("messages", {
   deletedByUserId: int("deletedByUserId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+// Cached translations preserve the original message as source of truth. The
+// source hash avoids stale translation reuse without storing participant PII.
+export const messageTranslationCache = mysqlTable(
+  "message_translation_cache",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    messageId: int("messageId").notNull(),
+    sourceLanguage: varchar("sourceLanguage", { length: 16 }).notNull(),
+    targetLanguage: varchar("targetLanguage", { length: 16 }).notNull(),
+    translatedText: text("translatedText").notNull(),
+    sourceContentHash: varchar("sourceContentHash", { length: 64 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("message_translation_cache_message_language_unique").on(table.messageId, table.targetLanguage),
+    index("message_translation_cache_source_idx").on(table.sourceLanguage, table.targetLanguage),
+  ],
+);
+
+// Per-viewer hiding never deletes the original message or affects another
+// participant's conversation/dispute view.
+export const messageVisibilityOverrides = mysqlTable(
+  "message_visibility_overrides",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    messageId: int("messageId").notNull(),
+    viewerUserId: int("viewerUserId").notNull(),
+    hiddenAt: timestamp("hiddenAt").defaultNow().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("message_visibility_overrides_message_viewer_unique").on(table.messageId, table.viewerUserId),
+    index("message_visibility_overrides_viewer_idx").on(table.viewerUserId, table.hiddenAt),
+  ],
+);
 
 // Payments (escrow) — amounts are whole TRY major units. Gateway adapters convert at their boundary.
 export const payments = mysqlTable("payments", {
@@ -1980,6 +2033,85 @@ export const serviceRequestTaxSnapshots = mysqlTable(
   ],
 );
 
+// Insurance records retain only a policy reference hash and a pointer to
+// quarantined, provider-owned evidence. Review status is authoritative.
+export const providerInsurancePolicies = mysqlTable(
+  "provider_insurance_policies",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    providerId: int("providerId").notNull(),
+    insurer: varchar("insurer", { length: 200 }).notNull(),
+    policyType: varchar("policyType", { length: 120 }).notNull(),
+    policyReferenceHash: varchar("policyReferenceHash", { length: 128 }).notNull(),
+    coverageScopeJson: json("coverageScopeJson").$type<Record<string, unknown>>().notNull(),
+    insuredEntityType: mysqlEnum("insuredEntityType", ["person", "vehicle", "company", "other"]).notNull(),
+    insuredVehicleReference: varchar("insuredVehicleReference", { length: 128 }),
+    jurisdictionCode: varchar("jurisdictionCode", { length: 16 }).notNull(),
+    issueDate: timestamp("issueDate"),
+    expiryDate: timestamp("expiryDate").notNull(),
+    verificationStatus: mysqlEnum("verificationStatus", ["unverified", "pending", "verified", "rejected", "expired", "manual_approved"])
+      .default("unverified")
+      .notNull(),
+    verificationSource: varchar("verificationSource", { length: 200 }),
+    lastCheckedAt: timestamp("lastCheckedAt"),
+    documentMediaId: int("documentMediaId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_insurance_policies_provider_ref_unique").on(table.providerId, table.policyReferenceHash),
+    index("provider_insurance_policies_provider_status_idx").on(table.providerId, table.verificationStatus, table.expiryDate),
+    index("provider_insurance_policies_jurisdiction_idx").on(table.jurisdictionCode, table.verificationStatus),
+  ],
+);
+
+export const providerOperatingModels = mysqlTable(
+  "provider_operating_models",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    providerId: int("providerId").notNull(),
+    jurisdictionCode: varchar("jurisdictionCode", { length: 16 }).notNull(),
+    operatingModel: mysqlEnum("operatingModel", ["employee", "self_employed", "sole_trader", "company_owner", "company_worker", "unresolved"])
+      .default("unresolved")
+      .notNull(),
+    classificationMetadataJson: json("classificationMetadataJson").$type<Record<string, unknown> | null>(),
+    reviewStatus: mysqlEnum("reviewStatus", ["pending", "verified", "needs_legal_review", "rejected"])
+      .default("pending")
+      .notNull(),
+    reviewedByUserId: int("reviewedByUserId"),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_operating_models_provider_jurisdiction_unique").on(table.providerId, table.jurisdictionCode),
+    index("provider_operating_models_review_idx").on(table.jurisdictionCode, table.reviewStatus),
+  ],
+);
+
+export const jobSafetyRules = mysqlTable(
+  "job_safety_rules",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    jurisdictionCode: varchar("jurisdictionCode", { length: 16 }).notNull(),
+    categoryId: int("categoryId"),
+    serviceKey: varchar("serviceKey", { length: 120 }),
+    activityStatus: mysqlEnum("activityStatus", ["allowed", "restricted", "high_risk", "prohibited", "emergency_only"])
+      .notNull(),
+    riskAttributesJson: json("riskAttributesJson").$type<Record<string, unknown>>().notNull(),
+    prerequisitesJson: json("prerequisitesJson").$type<Record<string, unknown>>().notNull(),
+    version: varchar("version", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["draft", "active", "retired"]).default("draft").notNull(),
+    createdByUserId: int("createdByUserId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("job_safety_rules_scope_version_unique").on(table.jurisdictionCode, table.categoryId, table.serviceKey, table.version),
+    index("job_safety_rules_active_lookup_idx").on(table.jurisdictionCode, table.categoryId, table.status),
+  ],
+);
+
 // Export types
 export type ServiceCategory = typeof serviceCategories.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
@@ -1989,6 +2121,9 @@ export type FinancialLedgerEntry = typeof financialLedgerEntries.$inferSelect;
 export type FinancialLedgerLine = typeof financialLedgerLines.$inferSelect;
 export type AuthChallenge = typeof authChallenges.$inferSelect;
 export type ProviderDocument = typeof providerDocuments.$inferSelect;
+export type ProviderInsurancePolicy = typeof providerInsurancePolicies.$inferSelect;
+export type ProviderOperatingModel = typeof providerOperatingModels.$inferSelect;
+export type JobSafetyRule = typeof jobSafetyRules.$inferSelect;
 export type ProviderFavorite = typeof providerFavorites.$inferSelect;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;
 export type Offer = typeof offers.$inferSelect;

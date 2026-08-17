@@ -37,6 +37,9 @@ const db = vi.hoisted(() => ({
   createPrivacyLegalHold: vi.fn(),
   releasePrivacyLegalHold: vi.fn(),
   listMoveOsReviewQueue: vi.fn(),
+  reviewProviderInsurancePolicy: vi.fn(),
+  reviewProviderOperatingModel: vi.fn(),
+  upsertJobSafetyRule: vi.fn(),
 }));
 
 vi.mock("../server/db", () => db);
@@ -178,6 +181,54 @@ describe("MoveOS ortak API sözleşmesi", () => {
       createdByUserId: 7,
     });
     expect(db.releasePrivacyLegalHold).toHaveBeenCalledWith({ holdId: 4, releasedByUserId: 7 });
+  });
+
+  it("P11 policy inceleme ve iş güvenliği yönetimini Super Admin + MFA olmadan fail-closed reddeder", async () => {
+    await expect(adminCaller().reviewProviderInsurancePolicy({ policyId: 17, decision: "verified", verificationSource: "manual-review" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(adminCaller().reviewProviderOperatingModel({ providerId: 18, jurisdictionCode: "TR", decision: "verified" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(adminCaller().upsertJobSafetyRule({
+      jurisdictionCode: "TR",
+      activityStatus: "allowed",
+      riskAttributesJson: {},
+      prerequisitesJson: {},
+      version: "2026.08",
+      status: "active",
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.reviewProviderInsurancePolicy).not.toHaveBeenCalled();
+    expect(db.reviewProviderOperatingModel).not.toHaveBeenCalled();
+    expect(db.upsertJobSafetyRule).not.toHaveBeenCalled();
+  });
+
+  it("P11 policy incelemelerini yalnız MFA doğrulanmış Super Admin’in oturum kimliğiyle kaydeder", async () => {
+    db.hasActiveSuperAdminRole.mockResolvedValue(true);
+    db.reviewProviderInsurancePolicy.mockResolvedValue(undefined);
+    db.reviewProviderOperatingModel.mockResolvedValue(undefined);
+    db.upsertJobSafetyRule.mockResolvedValue({ id: 27, status: "active" });
+
+    await expect(adminCaller().reviewProviderInsurancePolicy({ policyId: 17, decision: "manual_approved", verificationSource: "human-review" }))
+      .resolves.toEqual({ success: true });
+    await expect(adminCaller().reviewProviderOperatingModel({ providerId: 18, jurisdictionCode: "tr", decision: "needs_legal_review" }))
+      .resolves.toEqual({ success: true });
+    await expect(adminCaller().upsertJobSafetyRule({
+      jurisdictionCode: "tr",
+      categoryId: 4,
+      serviceKey: "electrical",
+      activityStatus: "high_risk",
+      riskAttributesJson: { voltage: "high" },
+      prerequisitesJson: { requiresVerifiedInsurance: true, requiresVerifiedOperatingModel: true },
+      version: "2026.08",
+      status: "active",
+    })).resolves.toEqual({ id: 27, status: "active" });
+    expect(db.reviewProviderInsurancePolicy).toHaveBeenCalledWith({ policyId: 17, decision: "manual_approved", verificationSource: "human-review", reviewerUserId: 7 });
+    expect(db.reviewProviderOperatingModel).toHaveBeenCalledWith({ providerId: 18, jurisdictionCode: "TR", decision: "needs_legal_review", reviewerUserId: 7 });
+    expect(db.upsertJobSafetyRule).toHaveBeenCalledWith(expect.objectContaining({
+      adminUserId: 7,
+      jurisdictionCode: "TR",
+      activityStatus: "high_risk",
+      status: "active",
+    }));
   });
 
   it("Operations Control özetini yalnız MFA doğrulanmış Super Admin için sınırlandırılmış parametrelerle üretir", async () => {

@@ -38,6 +38,8 @@ export default function ChatRoomScreen() {
   const router = useRouter();
   const utils = trpc.useUtils();
   const [input, setInput] = useState("");
+  const [messageTranslations, setMessageTranslations] = useState<Record<number, { text: string; showingTranslation: boolean }>>({});
+  const [locallyHiddenMessageIds, setLocallyHiddenMessageIds] = useState<Set<number>>(() => new Set());
   const flatListRef = useRef<FlatList>(null);
   const markedReadForRef = useRef("");
   const voiceStartedAtRef = useRef<number | null>(null);
@@ -76,6 +78,20 @@ export default function ChatRoomScreen() {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
     },
   });
+  const translateMessageMutation = trpc.messages.translate.useMutation({
+    onSuccess: (result) => {
+      setMessageTranslations((current) => ({
+        ...current,
+        [result.messageId]: { text: result.translatedText, showingTranslation: true },
+      }));
+    },
+  });
+  const hideForMeMutation = trpc.messages.hideForMe.useMutation({
+    onSuccess: (result) => {
+      setLocallyHiddenMessageIds((current) => new Set([...current, result.messageId]));
+      void messagesQuery.refetch();
+    },
+  });
 
   useEffect(() => {
     if (
@@ -98,6 +114,24 @@ export default function ChatRoomScreen() {
       requestId,
     });
   }, [hasValidConversationContext, input, otherUid, requestId, sendMessageMutation]);
+
+  const translateOrToggleMessage = useCallback((messageId: number) => {
+    const current = messageTranslations[messageId];
+    if (current) {
+      setMessageTranslations((translations) => ({
+        ...translations,
+        [messageId]: { ...current, showingTranslation: !current.showingTranslation },
+      }));
+      return;
+    }
+    if (translateMessageMutation.isPending) return;
+    translateMessageMutation.mutate({ messageId, targetLanguage: language });
+  }, [language, messageTranslations, translateMessageMutation]);
+
+  const hideMessageForMe = useCallback((messageId: number) => {
+    if (hideForMeMutation.isPending) return;
+    hideForMeMutation.mutate({ messageId });
+  }, [hideForMeMutation]);
 
   const toggleVoiceRecording = useCallback(async () => {
     if (!hasValidConversationContext || sendVoiceMutation.isPending) return;
@@ -187,7 +221,7 @@ export default function ChatRoomScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
         <FlatList
           ref={flatListRef}
-          data={messagesQuery.data ?? []}
+          data={(messagesQuery.data ?? []).filter((item) => !locallyHiddenMessageIds.has(item.id))}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={{ flexGrow: 1, padding: 16, gap: 10, paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
@@ -230,7 +264,11 @@ export default function ChatRoomScreen() {
               </View>
             )
           }
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+            const translation = messageTranslations[item.id];
+            const canTranslate = item.kind !== "audio" && Boolean(item.content?.trim());
+            const visibleText = translation?.showingTranslation ? translation.text : item.content;
+            return (
             <View style={{ flexDirection: "row", justifyContent: item.isOwn ? "flex-end" : "flex-start" }}>
               {!item.isOwn ? (
                 <View
@@ -265,9 +303,39 @@ export default function ChatRoomScreen() {
                   <VoiceAudioBubble uri={item.mediaUrl} durationMs={item.mediaDurationMs} isOwn={item.isOwn} />
                 ) : (
                   <Text style={{ fontSize: 14, color: item.isOwn ? "#FFFFFF" : colors.foreground, lineHeight: 20 }}>
-                    {item.content}
+                    {visibleText}
                   </Text>
                 )}
+                {canTranslate ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 7 }}>
+                    <Pressable
+                      onPress={() => translateOrToggleMessage(item.id)}
+                      disabled={translateMessageMutation.isPending}
+                      accessibilityRole="button"
+                      accessibilityLabel={translation ? (translation.showingTranslation ? t("chat.showOriginal") : t("chat.showTranslation")) : t("chat.translate")}
+                      style={({ pressed }) => ({ opacity: pressed || translateMessageMutation.isPending ? 0.64 : 1 })}
+                    >
+                      {translateMessageMutation.isPending ? (
+                        <ActivityIndicator size="small" color={item.isOwn ? "#FFFFFFCC" : colors.primary} />
+                      ) : (
+                        <Text style={{ color: item.isOwn ? "#FFFFFFCC" : colors.primary, fontSize: 11, fontWeight: "700" }}>
+                          {translation ? (translation.showingTranslation ? t("chat.showOriginal") : t("chat.showTranslation")) : t("chat.translate")}
+                        </Text>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      onPress={() => hideMessageForMe(item.id)}
+                      disabled={hideForMeMutation.isPending}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("chat.hideForMe")}
+                      style={({ pressed }) => ({ opacity: pressed || hideForMeMutation.isPending ? 0.64 : 1 })}
+                    >
+                      <Text style={{ color: item.isOwn ? "#FFFFFFCC" : colors.muted, fontSize: 11, fontWeight: "700" }}>
+                        {t("chat.hideForMe")}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
                 <View style={{ marginTop: 4, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                   <Text style={{ fontSize: 10, color: item.isOwn ? "#FFFFFFB3" : colors.muted }}>
                     {item.createdAt
@@ -282,12 +350,13 @@ export default function ChatRoomScreen() {
                 </View>
               </View>
             </View>
-          )}
+            );
+          }}
         />
 
-        {sendMessageMutation.isError || sendVoiceMutation.isError ? (
+        {sendMessageMutation.isError || sendVoiceMutation.isError || translateMessageMutation.isError || hideForMeMutation.isError ? (
           <Text style={{ paddingHorizontal: 16, paddingBottom: 6, color: colors.error, fontSize: 12 }}>
-            {sendVoiceMutation.isError ? t("chat.voiceSendError") : t("chat.sendError")}
+            {translateMessageMutation.isError ? t("chat.translationUnavailable") : sendVoiceMutation.isError ? t("chat.voiceSendError") : t("chat.sendError")}
           </Text>
         ) : null}
         <View

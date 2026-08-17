@@ -11,8 +11,8 @@
 import { Platform } from "react-native";
 import type { Metrics } from "react-native-safe-area-context";
 
-// Debug logging with timestamps
-const DEBUG = true;
+// Debug logging is development-only and must never emit production runtime detail.
+const DEBUG = typeof __DEV__ !== "undefined" && __DEV__;
 const log = (msg: string) => {
   if (!DEBUG) return;
   const ts = new Date().toISOString();
@@ -46,15 +46,29 @@ function isWeb(): boolean {
   return Platform.OS === "web";
 }
 
+function getParentOrigin(): string | null {
+  if (!isWeb() || !isInIframe()) return null;
+  try {
+    const candidate = document.referrer ? new URL(document.referrer) : null;
+    if (!candidate || (candidate.protocol !== "https:" && candidate.protocol !== "http:")) {
+      return null;
+    }
+    return candidate.origin;
+  } catch {
+    return null;
+  }
+}
+
 function sendToParent(type: MessageType, payload: Record<string, unknown> = {}): void {
-  // NOTE: Validate parent origin if we need to transfer sensitive data
   if (!isWeb() || !isInIframe()) return;
+  const parentOrigin = getParentOrigin();
+  if (!parentOrigin) return;
 
   const message: SpacePreviewerMessage = {
     type: "SpacePreviewerChannel",
     payload: { type, from: "content", to: "container", payload },
   };
-  window.parent.postMessage(message, "*");
+  window.parent.postMessage(message, parentOrigin);
   log(`Sent to parent: ${type}`);
 }
 
@@ -71,7 +85,8 @@ function isValidInsets(payload: Record<string, unknown>): payload is SafeAreaIns
 }
 
 function handleMessage(event: MessageEvent<unknown>): void {
-  // NOTE: Validate event.origin if we need to transfer sensitive data
+  const parentOrigin = getParentOrigin();
+  if (!parentOrigin || event.origin !== parentOrigin || event.source !== window.parent) return;
   const data = event.data as SpacePreviewerMessage | undefined;
   if (!data || data.type !== "SpacePreviewerChannel") return;
 

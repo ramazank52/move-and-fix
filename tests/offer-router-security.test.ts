@@ -64,6 +64,7 @@ describe("offer router security", () => {
         assuranceLevel: "A",
         ruleVersion: "v1",
         scopeNote: null,
+        scopeConstraintsJson: null,
         evaluatedAt: new Date(),
         expiresAt: null,
         nextCheckAt: null,

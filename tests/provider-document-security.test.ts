@@ -6,7 +6,11 @@ vi.mock("../server/db", async () => {
   return {
     ...actual,
     getProviderProfile: vi.fn(),
+    getProviderDocumentRequirements: vi.fn(),
     getProviderDocuments: vi.fn(),
+    getProviderInsurancePolicies: vi.fn(),
+    getProviderOperatingModel: vi.fn(),
+    getJobSafetyRules: vi.fn(),
     listProviderCapabilityStatuses: vi.fn(),
     createProviderCapabilityAppeal: vi.fn(),
     assertMessageParticipant: vi.fn(),
@@ -49,7 +53,10 @@ describe("provider document and voice media security", () => {
   it("rejects anonymous document reads, document uploads and voice uploads", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
     await expect(caller.providers.getDocuments()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.providers.getDocumentRequirements()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.compliance.myCapabilities()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.providers.getInsurancePolicies()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.providers.getOperatingModel({ jurisdictionCode: "TR" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.providers.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.messages.sendVoice({ requestId: 9, receiverId: 10, mimeType: "audio/webm", durationMs: 500, base64: "AAAA" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(storagePut).not.toHaveBeenCalled();
@@ -62,6 +69,35 @@ describe("provider document and voice media security", () => {
 
     await expect(caller.providers.getDocuments()).resolves.toEqual([]);
     expect(providerDb.getProviderDocuments).toHaveBeenCalledWith(901);
+  });
+
+  it("derives dynamic document requirements solely from the authenticated provider session", async () => {
+    vi.mocked(providerDb.getProviderDocumentRequirements).mockResolvedValue({
+      providerId: 905,
+      policyVersion: "tr-provider-documents-2026-08",
+      category: { slug: "courier", name: "Kurye" },
+      required: [{ type: "identity", title: "Kimlik belgesi", description: "T.C. kimlik kartı veya pasaport" }],
+    } as Awaited<ReturnType<typeof providerDb.getProviderDocumentRequirements>>);
+    const caller = appRouter.createCaller(createContext(94));
+
+    await expect(caller.providers.getDocumentRequirements()).resolves.toMatchObject({
+      providerId: 905,
+      category: { slug: "courier" },
+      required: [expect.objectContaining({ type: "identity" })],
+    });
+    expect(providerDb.getProviderDocumentRequirements).toHaveBeenCalledWith(94);
+  });
+
+  it("derives private insurance and operating-model scope solely from the provider session", async () => {
+    vi.mocked(providerDb.getProviderProfile).mockResolvedValue({ id: 904 } as Awaited<ReturnType<typeof providerDb.getProviderProfile>>);
+    vi.mocked(providerDb.getProviderInsurancePolicies).mockResolvedValue([]);
+    vi.mocked(providerDb.getProviderOperatingModel).mockResolvedValue(null as never);
+    const caller = appRouter.createCaller(createContext(91));
+
+    await expect(caller.providers.getInsurancePolicies()).resolves.toEqual([]);
+    await expect(caller.providers.getOperatingModel({ jurisdictionCode: "tr" })).resolves.toBeNull();
+    expect(providerDb.getProviderInsurancePolicies).toHaveBeenCalledWith(904);
+    expect(providerDb.getProviderOperatingModel).toHaveBeenCalledWith(904, "TR");
   });
 
   it("rejects a non-provider before document bytes reach storage", async () => {
@@ -113,5 +149,33 @@ describe("provider document and voice media security", () => {
     const caller = appRouter.createCaller(createContext(84, "user"));
     await expect(caller.admin.reviewProviderDocument({ documentId: 901, status: "approved" }))
       .rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects non-providers from P11 private policy endpoints and exposes only active safety rule DTO fields publicly", async () => {
+    vi.mocked(providerDb.getProviderProfile).mockResolvedValue(null);
+    vi.mocked(providerDb.getProviderDocumentRequirements).mockResolvedValue(null);
+    const nonProvider = appRouter.createCaller(createContext(92));
+    await expect(nonProvider.providers.getInsurancePolicies()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(nonProvider.providers.getOperatingModel({ jurisdictionCode: "TR" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(nonProvider.providers.getDocumentRequirements()).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    vi.mocked(providerDb.getJobSafetyRules).mockResolvedValue([{
+      id: 301,
+      jurisdictionCode: "TR",
+      categoryId: 8,
+      serviceKey: "electrical",
+      activityStatus: "allowed",
+      riskAttributesJson: { voltage: "low" },
+      prerequisitesJson: { requiresVerifiedInsurance: true },
+      version: "2026.08",
+      status: "active",
+      createdByUserId: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }] as Awaited<ReturnType<typeof providerDb.getJobSafetyRules>>);
+    const anonymous = appRouter.createCaller({ ...createContext(), user: null });
+    await expect(anonymous.compliance.getJobSafetyRules({ jurisdictionCode: "tr", categoryId: 8, serviceKey: "electrical" }))
+      .resolves.toEqual([expect.objectContaining({ id: 301, jurisdictionCode: "TR", activityStatus: "allowed" })]);
+    expect(providerDb.getJobSafetyRules).toHaveBeenCalledWith({ jurisdictionCode: "TR", categoryId: 8, serviceKey: "electrical" });
   });
 });

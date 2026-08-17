@@ -55,10 +55,9 @@ export function evaluateCountryLaunch(input: {
   if (!input.hasVerifiedOfficialSource) {
     missing.unshift("verified_official_source" as CountryLaunchRequirement);
   }
-  if (
-    input.countryCode?.trim().toUpperCase() === "TR" &&
-    input.hasOperationalPaymentProvider !== true
-  ) {
+  // No country can open a paid marketplace solely because it is not Türkiye.
+  // A country-specific payment readiness proof is always mandatory.
+  if (input.hasOperationalPaymentProvider !== true) {
     missing.unshift("operational_payment_provider");
   }
   return {

@@ -27,7 +27,23 @@ describe("country professional marketplace launch gate", () => {
 
     expect(evaluateCountryLaunch({ checklist: complete, compliancePackageStatus: "legal_review", hasVerifiedOfficialSource: true }).ready).toBe(false);
     expect(evaluateCountryLaunch({ checklist: complete, compliancePackageStatus: "approved", hasVerifiedOfficialSource: false }).ready).toBe(false);
-    expect(evaluateCountryLaunch({ checklist: complete, compliancePackageStatus: "approved", hasVerifiedOfficialSource: true })).toEqual({
+    expect(evaluateCountryLaunch({
+      checklist: complete,
+      compliancePackageStatus: "approved",
+      hasVerifiedOfficialSource: true,
+      countryCode: "DE",
+    })).toMatchObject({
+      ready: false,
+      status: "blocked",
+      missing: ["operational_payment_provider"],
+    });
+    expect(evaluateCountryLaunch({
+      checklist: complete,
+      compliancePackageStatus: "approved",
+      hasVerifiedOfficialSource: true,
+      countryCode: "TR",
+      hasOperationalPaymentProvider: true,
+    })).toEqual({
       ready: true,
       missing: [],
       status: "ready",

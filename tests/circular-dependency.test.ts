@@ -53,17 +53,15 @@ describe('circular dependency resolution (Critical 3)', () => {
     const { eventService } = await import('../server/services/EventService');
     const { notificationService } = await import('../server/services/NotificationService');
     const { notificationServiceV2 } = await import('../server/services/NotificationServiceV2');
-    const { walletService } = await import('../server/services/WalletService');
 
     // Composition root wiring
     eventService.setNotificationSender(notificationService);
-    eventService.setWalletService(walletService);
     notificationServiceV2.setEventPublisher(eventService);
 
     // Tüm servisler tanımlı olmalı
     expect(eventService).toBeDefined();
     expect(notificationService).toBeDefined();
     expect(notificationServiceV2).toBeDefined();
-    expect(walletService).toBeDefined();
+    expect('setWalletService' in eventService).toBe(false);
   });
 });

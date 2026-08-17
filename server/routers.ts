@@ -44,7 +44,6 @@ import { evaluateMoveAiMediaConsent } from "./ai/MoveAiMediaPolicy";
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
 // Döngüsel import'u önlemek için servisler burada birbirine bağlanır.
 eventService.setNotificationSender(notificationService);
-eventService.setWalletService(walletService);
 notificationServiceV2.setEventPublisher(eventService);
 
 const serviceRequestTypeSchema = z.enum([
@@ -1077,6 +1076,7 @@ export const appRouter = router({
           mimeType: input.mimeType,
           sizeBytes: buffer.length,
           sha256,
+          quarantineStatus: "pending_scan" as const,
         };
       }),
     mediaAccess: protectedProcedure
@@ -1613,9 +1613,25 @@ export const appRouter = router({
         const message = await runMessageOperation(() =>
           db.getAuthorizedTextMessageForTranslation(input.messageId, ctx.user.id),
         );
-        // Do not reveal the existence of a message that the actor is not entitled to read.
+        // Do not reveal either source content or a cached translation when the
+        // actor is not a participant in the conversation.
         if (!message) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Mesaj bulunamadı" });
+        }
+        const cached = await runMessageOperation(() =>
+          db.getCachedMessageTranslation({
+            messageId: input.messageId,
+            actorUserId: ctx.user.id,
+            targetLanguage: input.targetLanguage,
+          }),
+        );
+        if (cached) {
+          return {
+            messageId: input.messageId,
+            targetLanguage: input.targetLanguage,
+            translatedText: cached.translatedText,
+            source: "cache" as const,
+          };
         }
         const result = await translateMessageOnDemand({
           sourceText: message.content,
@@ -1624,11 +1640,34 @@ export const appRouter = router({
         if (result.status !== "translated") {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Çeviri şu anda kullanılamıyor" });
         }
+        const saved = await runMessageOperation(() =>
+          db.cacheAuthorizedMessageTranslation({
+            messageId: message.id,
+            actorUserId: ctx.user.id,
+            targetLanguage: result.targetLanguage,
+            translatedText: result.translatedText,
+          }),
+        );
+        if (!saved) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Çeviri güvenli biçimde kaydedilemedi" });
+        }
         return {
           messageId: message.id,
           targetLanguage: result.targetLanguage,
           translatedText: result.translatedText,
+          source: "generated" as const,
         };
+      }),
+    hideForMe: protectedProcedure
+      .input(z.object({ messageId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const hidden = await runMessageOperation(() =>
+          db.hideMessageForViewer(input.messageId, ctx.user.id),
+        );
+        if (!hidden) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Mesaj bulunamadı" });
+        }
+        return { messageId: input.messageId, hidden: true as const };
       }),
     send: protectedProcedure
       .input(z.object({
@@ -1729,10 +1768,37 @@ export const appRouter = router({
     list: protectedProcedure.query(({ ctx }) => db.listOwnPrivacyRightsRequests(ctx.user.id)),
     submit: protectedProcedure
       .input(z.object({
-        requestType: z.enum(["export", "erasure"]),
+        requestType: z.enum(["export", "erasure", "rectification"]),
         requestReason: z.string().trim().min(3).max(500).optional(),
+        password: z.string().min(1).max(128),
+        verificationCode: verificationCodeSchema,
       }))
-      .mutation(({ ctx, input }) => db.createPrivacyRightsRequest({ ...input, requesterUserId: ctx.user.id })),
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user.email) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Hassas işlem doğrulaması başarısız" });
+        }
+        const local = await db.getUserByEmailNormalized(ctx.user.email);
+        if (!local?.credential || local.user.id !== ctx.user.id || !verifyPassword(input.password, local.credential.passwordHash)) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Hassas işlem doğrulaması başarısız" });
+        }
+        const codeHash = hashVerificationCode(ctx.user.id, "sensitive_transaction", input.verificationCode);
+        const challenge = await db.getActiveAuthChallenge({
+          userId: ctx.user.id,
+          purpose: "sensitive_transaction",
+          codeHash,
+        });
+        if (!challenge) {
+          const latest = await db.getLatestActiveAuthChallenge({ userId: ctx.user.id, purpose: "sensitive_transaction" });
+          if (latest) await db.incrementAuthChallengeAttempts(latest.id);
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Hassas işlem kodu geçersiz, kullanılmış veya süresi dolmuş" });
+        }
+        await db.markAuthChallengeUsed(challenge.id);
+        return db.createPrivacyRightsRequest({
+          requesterUserId: ctx.user.id,
+          requestType: input.requestType,
+          requestReason: input.requestReason,
+        });
+      }),
   }),
   // Providers
   providers: router({
@@ -1815,6 +1881,72 @@ export const appRouter = router({
       if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
       return db.getProviderDocuments(provider.id);
     }),
+    getDocumentRequirements: protectedProcedure.query(async ({ ctx }) => {
+      const requirements = await db.getProviderDocumentRequirements(ctx.user.id);
+      if (!requirements) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+      }
+      return requirements;
+    }),
+    getInsurancePolicies: protectedProcedure.query(async ({ ctx }) => {
+      const provider = await db.getProviderProfile(ctx.user.id);
+      if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+      return db.getProviderInsurancePolicies(provider.id);
+    }),
+    submitInsurancePolicy: protectedProcedure
+      .input(z.object({
+        insurer: z.string().trim().min(2).max(200),
+        policyType: z.string().trim().min(2).max(120),
+        policyReference: z.string().trim().min(4).max(256),
+        coverageScope: z.record(z.string(), z.unknown()).default({}),
+        insuredEntityType: z.enum(["person", "vehicle", "company", "other"]),
+        insuredVehicleReference: z.string().trim().min(2).max(128).optional(),
+        jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})?$/).max(16),
+        issueDate: z.coerce.date().optional(),
+        expiryDate: z.coerce.date(),
+        documentMediaId: z.number().int().positive().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const provider = await db.getProviderProfile(ctx.user.id);
+        if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+        if (input.expiryDate.getTime() <= Date.now()) throw new TRPCError({ code: "BAD_REQUEST", message: "Sigorta bitiş tarihi gelecekte olmalıdır" });
+        return db.upsertProviderInsurancePolicy({
+          providerId: provider.id,
+          insurer: input.insurer,
+          policyType: input.policyType,
+          policyReferenceHash: createHash("sha256").update(input.policyReference).digest("hex"),
+          coverageScopeJson: input.coverageScope,
+          insuredEntityType: input.insuredEntityType,
+          insuredVehicleReference: input.insuredVehicleReference ?? null,
+          jurisdictionCode: input.jurisdictionCode.toUpperCase(),
+          issueDate: input.issueDate ?? null,
+          expiryDate: input.expiryDate,
+          documentMediaId: input.documentMediaId ?? null,
+        });
+      }),
+    getOperatingModel: protectedProcedure
+      .input(z.object({ jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})?$/).max(16).default("TR") }))
+      .query(async ({ ctx, input }) => {
+        const provider = await db.getProviderProfile(ctx.user.id);
+        if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+        return db.getProviderOperatingModel(provider.id, input.jurisdictionCode.toUpperCase());
+      }),
+    submitOperatingModel: protectedProcedure
+      .input(z.object({
+        jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})?$/).max(16),
+        operatingModel: z.enum(["employee", "self_employed", "sole_trader", "company_owner", "company_worker", "unresolved"]),
+        classificationMetadata: z.record(z.string(), z.unknown()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const provider = await db.getProviderProfile(ctx.user.id);
+        if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+        return db.upsertProviderOperatingModel({
+          providerId: provider.id,
+          jurisdictionCode: input.jurisdictionCode.toUpperCase(),
+          operatingModel: input.operatingModel,
+          classificationMetadataJson: input.classificationMetadata ?? null,
+        });
+      }),
     myJobs: protectedProcedure.query(({ ctx }) => {
       return db.getProviderJobs(ctx.user.id);
     }),
@@ -2131,7 +2263,7 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       }))
       .mutation(async ({ ctx, input }) => {
         try {
-          await db.assertPaymentProviderOperational({
+          await db.resolvePaymentProviderForCheckout({
             provider: input.provider,
             countryCode: "TR",
             currency: "TRY",
@@ -2179,7 +2311,7 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           if (message.includes("INVALID_STATUS") || message.includes("CONFLICT")) {
             throw new TRPCError({ code: "CONFLICT", message: "Ödeme sağlayıcısı mevcut ödeme durumunda başlatılamaz" });
           }
-          if (message.startsWith("PAYMENT_PROVIDER_")) {
+          if (message.startsWith("PAYMENT_PROVIDER_") || message.startsWith("GLOBAL_PAYMENT_")) {
             throw new TRPCError({
               code: "PRECONDITION_FAILED",
               message: "Ödeme sağlayıcısı bu ülke ve para birimi için kullanıma hazır değil",

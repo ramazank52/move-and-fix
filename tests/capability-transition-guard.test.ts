@@ -19,4 +19,32 @@ describe("capability transition guard", () => {
     expect(() => assertCapabilityTransition({ enforcementEnabled: true, requiredCapabilityId: 1, jurisdictionId: 34, providerCapabilityDecision: "VERIFIED_LIMITED_SCOPE", providerCapabilityExpiresAt: new Date("2020-01-01") }))
       .toThrow("PROVIDER_CAPABILITY_EXPIRED");
   });
+
+  it("fails closed for a limited-scope capability without a machine-readable matching constraint", () => {
+    expect(() => assertCapabilityTransition({
+      enforcementEnabled: true,
+      requiredCapabilityId: 1,
+      jurisdictionId: 34,
+      providerCapabilityDecision: "VERIFIED_LIMITED_SCOPE",
+      scopeContext: { jurisdictionCode: "TR", categoryId: 5, serviceKey: "heating" },
+    })).toThrow("PROVIDER_CAPABILITY_SCOPE_NOT_ELIGIBLE");
+
+    expect(evaluateCapabilityTransition({
+      enforcementEnabled: true,
+      requiredCapabilityId: 1,
+      jurisdictionId: 34,
+      providerCapabilityDecision: "VERIFIED_LIMITED_SCOPE",
+      providerScopeConstraintsJson: { jurisdictionCodes: ["TR"], categoryIds: [5], serviceKeys: ["heating"] },
+      scopeContext: { jurisdictionCode: "TR", categoryId: 5, serviceKey: "heating" },
+    })).toEqual({ allowed: true, reason: "VERIFIED_LIMITED_SCOPE" });
+
+    expect(() => assertCapabilityTransition({
+      enforcementEnabled: true,
+      requiredCapabilityId: 1,
+      jurisdictionId: 34,
+      providerCapabilityDecision: "VERIFIED_LIMITED_SCOPE",
+      providerScopeConstraintsJson: { jurisdictionCodes: ["TR"], categoryIds: [5], serviceKeys: ["heating"] },
+      scopeContext: { jurisdictionCode: "TR", categoryId: 8, serviceKey: "heating" },
+    })).toThrow("PROVIDER_CAPABILITY_SCOPE_NOT_ELIGIBLE");
+  });
 });

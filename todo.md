@@ -375,6 +375,9 @@
 - [x] Bildirim tercihlerini, geçmişini ve okunma durumunu sahiplik denetimli kalıcı veri modeli ve gerçek tRPC prosedürleriyle tamamla
 - [x] NetGSM, SendGrid ve Expo/FCM kod yollarını credential yokken fail-closed; credential sağlandığında gerçek sağlayıcı çağrısına hazır hale getir ve sözleşme testleriyle doğrula
 - [x] iyzico sandbox checkout başlangıcını gerçek credential ile tahsilatsız doğrula; eksik/geçersiz credential yollarının fail-closed kaldığını doğrula
+- [x] P11 — Profesyonel belge ekranını kategoriye göre sunucunun belirlediği gereksinimlerle ve fail-closed erişim kontrolüyle bağla
+- [x] P11 — Release hijyeni: düzeltilebilir yüksek/kritik audit yollarını güncelle, TODO/FIXME taramasını değerlendir ve kalan Expo SDK araç zinciri bulgularını kaydet
+- [x] P11 — Tam kalite kapıları: 81 test dosyası / 521 test, TypeScript, lint, backend build, iOS/Android/web export ve tracked-source secret taramasını doğrula
 - [x] Master Phase C — Kurumsal/organizasyon hesabı, üyelik yetkileri ve kurumsal hizmet talebi sahipliğini additive şema, API ve testlerle uygula
 - [x] Master Phase C — Super Admin rol ayrımı ve MoveOS kritik yetki sınırlarını IDOR regresyonlarıyla güçlendir
 - [x] Master Phase C — Merkezi TR/EN/RU i18n kapsamını, çoklu para birimi fail-closed sözleşmesini ve maskeli iletişim adapterini tamamla
@@ -477,3 +480,13 @@
 - [x] Tüm fazların çalışma ağacını, migration uygulama durumunu, kalite kapılarını ve external blocker kayıtlarını nihai kanıt setiyle doğrula
 - [x] Son checkpoint’i kaydet; sürdürülebilir operasyon, hukuk ve credential blocker’larını gerçek durumuyla raporla
 - [x] İstenen formatta tek nihai production durum raporunu teslim et
+
+## P11 FINAL CORRECTION & RELEASE CLOSURE
+- [ ] P11 corrective migration’ları: scope/conditional rules, media quarantine, message translation/visibility, privacy rectification ve insurance/classification/safety modellerini additive olarak uygula
+- [ ] Provider insurance policy ve operating model kayıtlarını ownership, document quarantine, retention ve denetim kurallarıyla gerçek DB/tRPC katmanına bağla
+- [ ] Job safety rule kayıtlarını yalnız aktif kural DTO’suyla public okuma; MoveOS Super Admin + MFA ile inceleme/yönetim olarak uygula
+- [ ] Sigorta, worker classification ve job safety kararlarını teklif, kabul ve aktif iş yaşam döngüsünde server-authoritative fail-closed zorunlu kıl
+- [ ] Global payment resolver ve completion-dispute resolution politikasını gerçek checkout/refund/settlement sınırlarına bağla
+- [ ] P11 yetki, MFA, PII minimizasyonu, idempotency, hata ve edge-case regresyonlarını ekle
+- [ ] P11 bağımlılık denetimi, dead-code/TODO taraması, TypeScript, lint, build, test, iOS/Android/web export ve secret scan kalite kapılarını gerçek kanıtla tamamla
+- [ ] P11 checkpoint ve A/B/C nihai durum raporunu external blocker’ları ayrı listeleyerek teslim et

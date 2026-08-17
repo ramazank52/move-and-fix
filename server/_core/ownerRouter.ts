@@ -53,6 +53,9 @@ import {
   listSupportTicketsForReview,
   reviewSupportTicket,
   listMoveOsReviewQueue,
+  reviewProviderInsurancePolicy,
+  reviewProviderOperatingModel,
+  upsertJobSafetyRule,
 } from "../db";
 import {
   createCountryCompliancePackage,
@@ -414,9 +417,65 @@ export const ownerRouter = router({
         decision: z.enum(["verified", "limited_scope", "manual_review", "rejected", "suspended"]),
         rationale: z.string().trim().min(10).max(2_000),
         scopeNote: z.string().trim().max(500).optional(),
+        scopeConstraintsJson: z.object({
+          jurisdictionCodes: z.array(z.string().trim().min(2).max(8)).min(1).max(32).optional(),
+          categoryIds: z.array(z.number().int().positive()).min(1).max(64).optional(),
+          serviceKeys: z.array(z.string().trim().min(1).max(120)).min(1).max(64).optional(),
+          activityTypes: z.array(z.string().trim().min(1).max(80)).min(1).max(32).optional(),
+          validUntil: z.string().datetime().optional(),
+        }).strict().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => reviewProviderCapabilityStatus({ ...input, reviewerUserId: ctx.user!.id })),
+
+  reviewProviderInsurancePolicy: superAdminMfaProcedure
+    .input(z.object({
+      policyId: z.number().int().positive(),
+      decision: z.enum(["verified", "rejected", "manual_approved"]),
+      verificationSource: z.string().trim().min(3).max(200),
+    }).strict())
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await reviewProviderInsurancePolicy({ ...input, reviewerUserId: ctx.user!.id });
+        return { success: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "INSURANCE_POLICY_REVIEW_FAILED";
+        throw new TRPCError({ code: message === "INSURANCE_POLICY_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+      }
+    }),
+
+  reviewProviderOperatingModel: superAdminMfaProcedure
+    .input(z.object({
+      providerId: z.number().int().positive(),
+      jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})?$/).max(16),
+      decision: z.enum(["verified", "needs_legal_review", "rejected"]),
+    }).strict())
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await reviewProviderOperatingModel({ ...input, jurisdictionCode: input.jurisdictionCode.toUpperCase(), reviewerUserId: ctx.user!.id });
+        return { success: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "OPERATING_MODEL_REVIEW_FAILED";
+        throw new TRPCError({ code: message === "OPERATING_MODEL_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+      }
+    }),
+
+  upsertJobSafetyRule: superAdminMfaProcedure
+    .input(z.object({
+      jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})?$/).max(16),
+      categoryId: z.number().int().positive().nullable().optional(),
+      serviceKey: z.string().trim().min(1).max(120).nullable().optional(),
+      activityStatus: z.enum(["allowed", "restricted", "high_risk", "prohibited", "emergency_only"]),
+      riskAttributesJson: z.record(z.string(), z.unknown()).default({}),
+      prerequisitesJson: z.record(z.string(), z.unknown()).default({}),
+      version: z.string().trim().min(1).max(64),
+      status: z.enum(["draft", "active", "retired"]),
+    }).strict())
+    .mutation(({ ctx, input }) => upsertJobSafetyRule({
+      ...input,
+      jurisdictionCode: input.jurisdictionCode.toUpperCase(),
+      adminUserId: ctx.user!.id,
+    })),
 
   countryCompliance: adminMfaProcedure.query(async () => listCountryComplianceOverviews()),
 

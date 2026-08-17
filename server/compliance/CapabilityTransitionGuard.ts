@@ -1,4 +1,5 @@
 import type { CapabilityDecision } from "./CapabilityPolicyService";
+import { matchCapabilityScopeConstraints, type CapabilityScopeContext } from "./CapabilityScopeConstraintMatcher";
 
 export type CapabilityTransition = "offer" | "accept" | "job_start";
 
@@ -8,12 +9,14 @@ export type TransitionCapabilityContext = {
   jurisdictionId: number | null;
   providerCapabilityDecision: CapabilityDecision | null;
   providerCapabilityExpiresAt?: Date | null;
+  providerScopeConstraintsJson?: unknown | null;
+  scopeContext?: CapabilityScopeContext | null;
   now?: Date;
 };
 
 export type TransitionCapabilityResult =
   | { allowed: true; reason: "LEGACY_ROLLOUT_DISABLED" | "NOT_REQUIRED" | "VERIFIED" | "VERIFIED_LIMITED_SCOPE" }
-  | { allowed: false; code: "COMPLIANCE_CONTEXT_NOT_CONFIGURED" | "PROVIDER_CAPABILITY_NOT_ELIGIBLE" | "PROVIDER_CAPABILITY_EXPIRED" };
+  | { allowed: false; code: "COMPLIANCE_CONTEXT_NOT_CONFIGURED" | "PROVIDER_CAPABILITY_NOT_ELIGIBLE" | "PROVIDER_CAPABILITY_EXPIRED" | "PROVIDER_CAPABILITY_SCOPE_NOT_ELIGIBLE" };
 
 export type ServiceRequestCapabilityContext = Pick<
   TransitionCapabilityContext,
@@ -57,8 +60,13 @@ export function evaluateCapabilityTransition(input: TransitionCapabilityContext)
   if (input.providerCapabilityExpiresAt && input.providerCapabilityExpiresAt <= (input.now ?? new Date())) {
     return { allowed: false, code: "PROVIDER_CAPABILITY_EXPIRED" };
   }
-  if (input.providerCapabilityDecision === "VERIFIED" || input.providerCapabilityDecision === "VERIFIED_LIMITED_SCOPE") {
-    return { allowed: true, reason: input.providerCapabilityDecision };
+  if (input.providerCapabilityDecision === "VERIFIED") {
+    return { allowed: true, reason: "VERIFIED" };
+  }
+  if (input.providerCapabilityDecision === "VERIFIED_LIMITED_SCOPE") {
+    const scopeResult = matchCapabilityScopeConstraints(input.providerScopeConstraintsJson, input.scopeContext);
+    if (!scopeResult.matched) return { allowed: false, code: "PROVIDER_CAPABILITY_SCOPE_NOT_ELIGIBLE" };
+    return { allowed: true, reason: "VERIFIED_LIMITED_SCOPE" };
   }
   return { allowed: false, code: "PROVIDER_CAPABILITY_NOT_ELIGIBLE" };
 }

@@ -41,7 +41,11 @@ async function getCountryPaymentLaunchReadiness(
 ) {
   return countryCode.trim().toUpperCase() === "TR"
     ? getTurkeyPaymentLaunchReadiness(db)
-    : { ready: true, eligibleProviders: [], blockers: [] };
+    : {
+        ready: false,
+        eligibleProviders: [],
+        blockers: ["COUNTRY_PAYMENT_PROVIDER_NOT_CONFIGURED"],
+      };
 }
 
 export async function listCountryComplianceOverviews() {
@@ -52,7 +56,7 @@ export async function listCountryComplianceOverviews() {
     db.select().from(jurisdictionCompliancePackages).orderBy(desc(jurisdictionCompliancePackages.updatedAt)),
     db.select().from(officialComplianceSources).orderBy(desc(officialComplianceSources.updatedAt)),
     db.select().from(jurisdictionLaunchGates).orderBy(desc(jurisdictionLaunchGates.updatedAt)),
-    db.select().from(paymentProviderWatch).where(and(eq(paymentProviderWatch.countryCode, "TR"), eq(paymentProviderWatch.currency, "TRY"))),
+    db.select().from(paymentProviderWatch),
   ]);
 
   return jurisdictionRows.map((jurisdiction) => {
@@ -63,16 +67,17 @@ export async function listCountryComplianceOverviews() {
     const verifiedSourceCount = sourceRows.filter((item) => item.jurisdictionId === jurisdiction.id && item.status === "verified").length;
     const gate = gateRows.find((item) => item.jurisdictionId === jurisdiction.id) ?? null;
     const checklist = parseCountryLaunchChecklist(gate?.checklistJson);
+    const countryPaymentRows = providerRows.filter((record) => record.countryCode === jurisdiction.countryCode);
     const paymentReadiness = jurisdiction.countryCode === "TR"
       ? evaluateTurkeyPaymentLaunchReadiness({
           countryCode: "TR",
           currency: "TRY",
-          candidates: providerRows.map((record) => ({
+          candidates: countryPaymentRows.map((record) => ({
             ...record,
             configured: gatewayCheckoutService.isConfigured(record.provider),
           })),
         })
-      : { ready: true, eligibleProviders: [], blockers: [] };
+      : { ready: false, eligibleProviders: [], blockers: ["COUNTRY_PAYMENT_PROVIDER_NOT_CONFIGURED"] };
     const evaluation = evaluateCountryLaunch({
       checklist,
       compliancePackageStatus: currentPackage?.status ?? null,

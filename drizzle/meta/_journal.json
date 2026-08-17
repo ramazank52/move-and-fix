@@ -372,6 +372,48 @@
       "when": 1786867460709,
       "tag": "0053_mixed_cyclops",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "5",
+      "when": 1786870700000,
+      "tag": "0054_p11_scope_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "5",
+      "when": 1786870800000,
+      "tag": "0055_p11_conditional_rule_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "5",
+      "when": 1786870900000,
+      "tag": "0056_p11_media_quarantine",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "5",
+      "when": 1786871000000,
+      "tag": "0057_p11_message_translation_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "5",
+      "when": 1786871100000,
+      "tag": "0058_p11_privacy_rectification",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "5",
+      "when": 1786871200000,
+      "tag": "0059_p11_insurance_classification_safety",
+      "breakpoints": true
     }
   ]
 }

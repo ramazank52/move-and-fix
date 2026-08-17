@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createHmac, scryptSync } from "node:crypto";
 import type { TrpcContext } from "../server/_core/context";
 
 vi.mock("../server/db", async () => {
@@ -9,24 +10,40 @@ vi.mock("../server/db", async () => {
     getConversation: vi.fn(),
     getAuthorizedVoiceMessageStorage: vi.fn(),
     getAuthorizedTextMessageForTranslation: vi.fn(),
+    getCachedMessageTranslation: vi.fn(),
+    cacheAuthorizedMessageTranslation: vi.fn(),
+    hideMessageForViewer: vi.fn(),
     getMessageParticipant: vi.fn(),
     markConversationRead: vi.fn(),
     sendMessage: vi.fn(),
     softDeleteMessage: vi.fn(),
     listOwnPrivacyRightsRequests: vi.fn(),
     createPrivacyRightsRequest: vi.fn(),
+    getUserByEmailNormalized: vi.fn(),
+    getActiveAuthChallenge: vi.fn(),
+    getLatestActiveAuthChallenge: vi.fn(),
+    incrementAuthChallengeAttempts: vi.fn(),
+    markAuthChallengeUsed: vi.fn(),
     getMaskedCommunicationSession: vi.fn(),
     createMaskedCommunicationSession: vi.fn(),
     releaseMaskedCommunicationSession: vi.fn(),
   };
 });
 
+vi.mock("../server/_core/env", () => ({ ENV: { cookieSecret: "message-router-test-secret" } }));
+
 vi.mock("../server/ai/OnDemandMessageTranslation", () => ({
   translateMessageOnDemand: vi.fn(),
 }));
 
+vi.mock("../server/storage", () => ({
+  storageGetSignedUrl: vi.fn(),
+  storagePut: vi.fn(),
+}));
+
 import * as messageDb from "../server/db";
 import { translateMessageOnDemand } from "../server/ai/OnDemandMessageTranslation";
+import { storageGetSignedUrl } from "../server/storage";
 import { appRouter } from "../server/routers";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -101,7 +118,11 @@ describe("message participant database policy", () => {
 });
 
 describe("message router security", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(messageDb.getCachedMessageTranslation).mockResolvedValue(null);
+    vi.mocked(storageGetSignedUrl).mockResolvedValue("https://storage.example.test/signed-audio-url");
+  });
 
   it("rejects anonymous reads, sends and read receipts before database access", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
@@ -117,15 +138,23 @@ describe("message router security", () => {
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.messages.delete({ messageId: 501 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.messages.translate({ messageId: 501, targetLanguage: "en" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.messages.hideForMe({ messageId: 501 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.privacyRights.list()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(
-      caller.privacyRights.submit({ requestType: "erasure", requestReason: "Veri silme talebi" }),
+      caller.privacyRights.submit({
+        requestType: "erasure",
+        requestReason: "Veri silme talebi",
+        password: "invalid-password",
+        verificationCode: "000000",
+      }),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(messageDb.getConversation).not.toHaveBeenCalled();
     expect(messageDb.sendMessage).not.toHaveBeenCalled();
     expect(messageDb.markConversationRead).not.toHaveBeenCalled();
     expect(messageDb.softDeleteMessage).not.toHaveBeenCalled();
     expect(messageDb.getAuthorizedTextMessageForTranslation).not.toHaveBeenCalled();
+    expect(messageDb.getCachedMessageTranslation).not.toHaveBeenCalled();
+    expect(messageDb.hideMessageForViewer).not.toHaveBeenCalled();
     expect(messageDb.listOwnPrivacyRightsRequests).not.toHaveBeenCalled();
     expect(messageDb.createPrivacyRightsRequest).not.toHaveBeenCalled();
   });
@@ -138,12 +167,31 @@ describe("message router security", () => {
     expect(messageDb.softDeleteMessage).toHaveBeenCalledWith({ messageId: 501, actorUserId: 10 });
   });
 
-  it("validates and binds privacy requests to their owner", async () => {
+  it("requires session-owned password and one-time sensitive-operation OTP before binding privacy requests", async () => {
+    const password = "P11-privacy-password";
+    const passwordHash = `scrypt-v1$message-router-test-salt$${scryptSync(password, "message-router-test-salt", 64).toString("hex")}`;
+    const verificationCode = "735193";
+    const expectedCodeHash = createHmac("sha256", "message-router-test-secret")
+      .update(`10:sensitive_transaction:${verificationCode}`)
+      .digest("hex");
     vi.mocked(messageDb.createPrivacyRightsRequest).mockResolvedValue({ id: 83, status: "open" });
     vi.mocked(messageDb.listOwnPrivacyRightsRequests).mockResolvedValue([]);
+    vi.mocked(messageDb.getUserByEmailNormalized).mockResolvedValue({
+      user: { id: 10 },
+      credential: { passwordHash },
+    } as never);
+    vi.mocked(messageDb.getActiveAuthChallenge).mockImplementation(async (input) => (
+      input.codeHash === expectedCodeHash ? { id: 702 } as never : null
+    ));
+    vi.mocked(messageDb.markAuthChallengeUsed).mockResolvedValue(undefined);
     const caller = appRouter.createCaller(createContext(10));
 
-    await expect(caller.privacyRights.submit({ requestType: "export", requestReason: "KVKK veri kopyası" }))
+    await expect(caller.privacyRights.submit({
+      requestType: "export",
+      requestReason: "KVKK veri kopyası",
+      password,
+      verificationCode,
+    }))
       .resolves.toEqual({ id: 83, status: "open" });
     await expect(caller.privacyRights.list()).resolves.toEqual([]);
     expect(messageDb.createPrivacyRightsRequest).toHaveBeenCalledWith({
@@ -152,8 +200,25 @@ describe("message router security", () => {
       requestReason: "KVKK veri kopyası",
     });
     expect(messageDb.listOwnPrivacyRightsRequests).toHaveBeenCalledWith(10);
-    await expect(caller.privacyRights.submit({ requestType: "erasure", requestReason: "x" }))
+    expect(messageDb.markAuthChallengeUsed).toHaveBeenCalledWith(702);
+    await expect(caller.privacyRights.submit({
+      requestType: "erasure",
+      requestReason: "x",
+      password,
+      verificationCode,
+    }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    vi.mocked(messageDb.getUserByEmailNormalized).mockResolvedValue({
+      user: { id: 999 },
+      credential: { passwordHash },
+    } as never);
+    await expect(caller.privacyRights.submit({
+      requestType: "rectification",
+      requestReason: "Yanlış kişisel verinin düzeltilmesi",
+      password,
+      verificationCode,
+    })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("rejects a third party trying to send into another service conversation", async () => {
@@ -257,7 +322,8 @@ describe("message router security", () => {
     expect(messageDb.getAuthorizedVoiceMessageStorage).toHaveBeenCalledWith(502, 10);
   });
 
-  it("translates only an authorized visible text message and does not persist a translation", async () => {
+  it("translates only an authorized visible text message and persists a participant-bound cache entry", async () => {
+    vi.mocked(messageDb.getCachedMessageTranslation).mockResolvedValue(null);
     vi.mocked(messageDb.getAuthorizedTextMessageForTranslation).mockResolvedValue({
       id: 503,
       requestId: 42,
@@ -270,18 +336,65 @@ describe("message router security", () => {
       targetLanguage: "en",
       translatedText: "The professional is on the way.",
     });
+    vi.mocked(messageDb.cacheAuthorizedMessageTranslation).mockResolvedValue(true);
     const caller = appRouter.createCaller(createContext(10));
 
     await expect(caller.messages.translate({ messageId: 503, targetLanguage: "en" })).resolves.toEqual({
       messageId: 503,
       targetLanguage: "en",
       translatedText: "The professional is on the way.",
+      source: "generated",
+    });
+    expect(messageDb.getCachedMessageTranslation).toHaveBeenCalledWith({
+      messageId: 503,
+      actorUserId: 10,
+      targetLanguage: "en",
     });
     expect(messageDb.getAuthorizedTextMessageForTranslation).toHaveBeenCalledWith(503, 10);
     expect(translateMessageOnDemand).toHaveBeenCalledWith({ sourceText: "Usta yolda.", targetLanguage: "en" });
+    expect(messageDb.cacheAuthorizedMessageTranslation).toHaveBeenCalledWith({
+      messageId: 503,
+      actorUserId: 10,
+      targetLanguage: "en",
+      translatedText: "The professional is on the way.",
+    });
+  });
+
+  it("returns a cache hit without calling the translation provider", async () => {
+    vi.mocked(messageDb.getCachedMessageTranslation).mockResolvedValue({
+      translatedText: "The professional is on the way.",
+      sourceContentHash: "a".repeat(64),
+    });
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.translate({ messageId: 503, targetLanguage: "en" })).resolves.toEqual({
+      messageId: 503,
+      targetLanguage: "en",
+      translatedText: "The professional is on the way.",
+      source: "cache",
+    });
+    expect(translateMessageOnDemand).not.toHaveBeenCalled();
+    expect(messageDb.getAuthorizedTextMessageForTranslation).toHaveBeenCalledWith(503, 10);
+  });
+
+  it("binds message hiding to the authenticated viewer without deleting the shared source", async () => {
+    vi.mocked(messageDb.hideMessageForViewer).mockResolvedValue(true);
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.hideForMe({ messageId: 503 })).resolves.toEqual({ messageId: 503, hidden: true });
+    expect(messageDb.hideMessageForViewer).toHaveBeenCalledWith(503, 10);
+  });
+
+  it("does not disclose inaccessible messages through the viewer-only hiding endpoint", async () => {
+    vi.mocked(messageDb.hideMessageForViewer).mockResolvedValue(false);
+    const caller = appRouter.createCaller(createContext(30));
+
+    await expect(caller.messages.hideForMe({ messageId: 503 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(messageDb.hideMessageForViewer).toHaveBeenCalledWith(503, 30);
   });
 
   it("does not disclose an inaccessible message or fabricate translation output", async () => {
+    vi.mocked(messageDb.getCachedMessageTranslation).mockResolvedValue(null);
     vi.mocked(messageDb.getAuthorizedTextMessageForTranslation).mockResolvedValue(null);
     const caller = appRouter.createCaller(createContext(30));
 
@@ -290,6 +403,7 @@ describe("message router security", () => {
   });
 
   it("fails closed if the translation provider is unavailable and validates language before database access", async () => {
+    vi.mocked(messageDb.getCachedMessageTranslation).mockResolvedValue(null);
     vi.mocked(messageDb.getAuthorizedTextMessageForTranslation).mockResolvedValue({
       id: 503,
       requestId: 42,

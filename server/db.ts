@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lte, or, sql } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { drizzle } from "drizzle-orm/mysql2";
 import { getRequiredRegistrationConsentDocuments } from "../lib/data/legal";
 import {
@@ -19,6 +19,7 @@ import {
   operationalEvents,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { resolveProviderDocumentRequirements } from "./compliance/ProviderDocumentRequirementsPolicy";
 import { getApmConfigurationStatus } from "./_core/observability";
 import {
   assertPaymentStatusTransition,
@@ -749,6 +750,7 @@ export async function reviewProviderCapabilityStatus(data: {
   decision: "verified" | "limited_scope" | "manual_review" | "rejected" | "suspended";
   rationale: string;
   scopeNote?: string;
+  scopeConstraintsJson?: unknown;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -759,12 +761,20 @@ export async function reviewProviderCapabilityStatus(data: {
     rejected: "REJECTED",
     suspended: "EXPIRED_OR_SUSPENDED",
   } as const;
+  const { parseCapabilityScopeConstraints } = await import("./compliance/CapabilityScopeConstraintMatcher");
+  const normalizedConstraints = data.scopeConstraintsJson === undefined
+    ? undefined
+    : parseCapabilityScopeConstraints(data.scopeConstraintsJson);
+  if (data.decision === "limited_scope" && !normalizedConstraints) throw new Error("LIMITED_SCOPE_CONSTRAINTS_REQUIRED");
+  if (data.decision !== "limited_scope" && data.scopeConstraintsJson !== undefined) throw new Error("SCOPE_CONSTRAINTS_NOT_ALLOWED");
   return db.transaction(async (tx) => {
     const updated = await tx
       .update(providerCapabilityStatuses)
       .set({
         status: nextStatus[data.decision],
         ...(data.scopeNote !== undefined ? { scopeNote: data.scopeNote.trim().slice(0, 500) || null } : {}),
+        ...(normalizedConstraints !== undefined ? { scopeConstraintsJson: normalizedConstraints } : {}),
+        ...(data.decision !== "limited_scope" ? { scopeConstraintsJson: null } : {}),
         ...(data.credentialId !== undefined ? { lastCredentialId: data.credentialId } : {}),
         evaluatedAt: new Date(),
       })
@@ -877,6 +887,11 @@ import {
   supportTicketEvents,
   insuranceClaims,
   insuranceClaimMedia,
+  providerInsurancePolicies,
+  providerOperatingModels,
+  jobSafetyRules,
+  messageTranslationCache,
+  messageVisibilityOverrides,
   taxRules,
   serviceRequestTaxSnapshots,
 } from "../drizzle/schema";
@@ -890,6 +905,8 @@ import {
   type PaymentProviderOperationalRecord,
   type PaymentProviderOperationalStatus,
 } from "./payments/ProviderOperationalPolicy";
+import { assertGlobalPaymentResolution } from "./payments/GlobalPaymentResolver";
+import { evaluateCompletionDisputeResolution } from "./payments/CompletionDisputeResolutionPolicy";
 import { quoteTurkeyVat } from "./tax/TurkeyVatPolicy";
 import { EncryptionService } from "./_core/security";
 import { assertCapabilityTransition, assertServiceRequestCapabilityContext, evaluateCapabilityTransition } from "./compliance/CapabilityTransitionGuard";
@@ -898,9 +915,276 @@ import {
   evaluateCredentialEligibility,
   type CredentialAssurance,
 } from "./compliance/CredentialEligibilityGuard";
+import { evaluateInsuranceCapability } from "./compliance/InsuranceCapabilityPolicy";
+import { evaluateWorkerClassification } from "./compliance/WorkerClassificationPolicy";
+import { evaluateJobSafety } from "./compliance/JobSafetyEngine";
 
 export type OrganizationType = "corporate" | "fleet" | "facility";
 export type OrganizationMemberRole = "owner" | "admin" | "member";
+
+export async function getProviderInsurancePolicies(providerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  return db
+    .select()
+    .from(providerInsurancePolicies)
+    .where(eq(providerInsurancePolicies.providerId, providerId))
+    .orderBy(desc(providerInsurancePolicies.updatedAt), desc(providerInsurancePolicies.id));
+}
+
+export async function upsertProviderInsurancePolicy(input: {
+  providerId: number;
+  insurer: string;
+  policyType: string;
+  policyReferenceHash: string;
+  coverageScopeJson: Record<string, unknown>;
+  insuredEntityType: "person" | "vehicle" | "company" | "other";
+  insuredVehicleReference?: string | null;
+  jurisdictionCode: string;
+  issueDate?: Date | null;
+  expiryDate: Date;
+  documentMediaId?: number | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  if (input.expiryDate.getTime() <= Date.now()) throw new Error("INSURANCE_POLICY_EXPIRED");
+  await db.insert(providerInsurancePolicies).values({
+    ...input,
+    verificationStatus: "pending",
+    verificationSource: null,
+    lastCheckedAt: null,
+  }).onDuplicateKeyUpdate({
+    set: {
+      insurer: input.insurer,
+      policyType: input.policyType,
+      coverageScopeJson: input.coverageScopeJson,
+      insuredEntityType: input.insuredEntityType,
+      insuredVehicleReference: input.insuredVehicleReference ?? null,
+      jurisdictionCode: input.jurisdictionCode,
+      issueDate: input.issueDate ?? null,
+      expiryDate: input.expiryDate,
+      documentMediaId: input.documentMediaId ?? null,
+      verificationStatus: "pending",
+      verificationSource: null,
+      lastCheckedAt: null,
+    },
+  });
+  const rows = await db.select().from(providerInsurancePolicies).where(and(
+    eq(providerInsurancePolicies.providerId, input.providerId),
+    eq(providerInsurancePolicies.policyReferenceHash, input.policyReferenceHash),
+  )).limit(1);
+  if (!rows[0]) throw new Error("INSURANCE_POLICY_UPSERT_FAILED");
+  return rows[0];
+}
+
+export async function reviewProviderInsurancePolicy(input: {
+  policyId: number;
+  reviewerUserId: number;
+  decision: "verified" | "rejected" | "manual_approved";
+  verificationSource: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  const status = input.decision;
+  const updated = await db.update(providerInsurancePolicies).set({
+    verificationStatus: status,
+    verificationSource: input.verificationSource,
+    lastCheckedAt: new Date(),
+  }).where(eq(providerInsurancePolicies.id, input.policyId));
+  if ((updated[0]?.affectedRows ?? 0) !== 1) throw new Error("INSURANCE_POLICY_NOT_FOUND");
+  await logOperationEvent({
+    eventType: "provider.insurance_policy.reviewed",
+    severity: "info",
+    actorId: input.reviewerUserId,
+    subjectId: input.policyId,
+    payload: { decision: input.decision },
+  });
+}
+
+export async function getProviderOperatingModel(providerId: number, jurisdictionCode: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  const rows = await db.select().from(providerOperatingModels).where(and(
+    eq(providerOperatingModels.providerId, providerId),
+    eq(providerOperatingModels.jurisdictionCode, jurisdictionCode),
+  )).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertProviderOperatingModel(input: {
+  providerId: number;
+  jurisdictionCode: string;
+  operatingModel: "employee" | "self_employed" | "sole_trader" | "company_owner" | "company_worker" | "unresolved";
+  classificationMetadataJson?: Record<string, unknown> | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  await db.insert(providerOperatingModels).values({
+    ...input,
+    reviewStatus: "pending",
+    reviewedByUserId: null,
+    reviewedAt: null,
+  }).onDuplicateKeyUpdate({
+    set: {
+      operatingModel: input.operatingModel,
+      classificationMetadataJson: input.classificationMetadataJson ?? null,
+      reviewStatus: "pending",
+      reviewedByUserId: null,
+      reviewedAt: null,
+    },
+  });
+  const model = await getProviderOperatingModel(input.providerId, input.jurisdictionCode);
+  if (!model) throw new Error("OPERATING_MODEL_UPSERT_FAILED");
+  return model;
+}
+
+export async function reviewProviderOperatingModel(input: {
+  providerId: number;
+  jurisdictionCode: string;
+  reviewerUserId: number;
+  decision: "verified" | "needs_legal_review" | "rejected";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  const updated = await db.update(providerOperatingModels).set({
+    reviewStatus: input.decision,
+    reviewedByUserId: input.reviewerUserId,
+    reviewedAt: new Date(),
+  }).where(and(
+    eq(providerOperatingModels.providerId, input.providerId),
+    eq(providerOperatingModels.jurisdictionCode, input.jurisdictionCode),
+  ));
+  if ((updated[0]?.affectedRows ?? 0) !== 1) throw new Error("OPERATING_MODEL_NOT_FOUND");
+  await logOperationEvent({
+    eventType: "provider.operating_model.reviewed",
+    severity: "info",
+    actorId: input.reviewerUserId,
+    subjectId: input.providerId,
+    payload: { jurisdictionCode: input.jurisdictionCode, decision: input.decision },
+  });
+}
+
+export async function getJobSafetyRules(input: { jurisdictionCode: string; categoryId?: number; serviceKey?: string; includeInactive?: boolean }) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  const predicates = [eq(jobSafetyRules.jurisdictionCode, input.jurisdictionCode)];
+  if (!input.includeInactive) predicates.push(eq(jobSafetyRules.status, "active"));
+  if (input.categoryId !== undefined) predicates.push(or(eq(jobSafetyRules.categoryId, input.categoryId), isNull(jobSafetyRules.categoryId))!);
+  if (input.serviceKey) predicates.push(or(eq(jobSafetyRules.serviceKey, input.serviceKey), isNull(jobSafetyRules.serviceKey))!);
+  return db.select().from(jobSafetyRules).where(and(...predicates)).orderBy(desc(jobSafetyRules.updatedAt), desc(jobSafetyRules.id));
+}
+
+/**
+ * P11 policy enforcement is derived only from the assigned request and reviewed
+ * provider records. Client payloads cannot waive insurance, worker
+ * classification, activity status, or emergency-only safety requirements.
+ */
+export async function assertProviderP11PolicyEligibility(input: {
+  providerId: number;
+  requestId: number;
+  isEmergency?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+
+  const requestRows = await db
+    .select({
+      jurisdictionId: serviceRequests.jurisdictionId,
+      categoryId: serviceRequests.categoryId,
+      serviceKey: serviceRequestDetails.serviceType,
+      jurisdictionCode: jurisdictions.countryCode,
+    })
+    .from(serviceRequests)
+    .leftJoin(serviceRequestDetails, eq(serviceRequestDetails.requestId, serviceRequests.id))
+    .leftJoin(jurisdictions, eq(jurisdictions.id, serviceRequests.jurisdictionId))
+    .where(eq(serviceRequests.id, input.requestId))
+    .limit(1);
+  const request = requestRows[0];
+  if (!request) throw new Error("SERVICE_REQUEST_NOT_FOUND");
+
+  // P11 policies are a jurisdiction-scoped extension. Where the canonical
+  // request lacks a jurisdiction there is no policy scope to enforce.
+  if (!request.jurisdictionId || !request.jurisdictionCode) return;
+
+  const jurisdictionCode = request.jurisdictionCode.toUpperCase();
+  const rules = await getJobSafetyRules({
+    jurisdictionCode,
+    categoryId: request.categoryId,
+    serviceKey: request.serviceKey ?? undefined,
+  });
+  if (rules.length === 0) return;
+
+  // Prefer service-specific rules, then category-specific rules, then the
+  // jurisdiction fallback. The decision engine receives one deterministic,
+  // server-owned active rule instead of client-controlled rule selection.
+  const specificity = (rule: typeof rules[number]) =>
+    (rule.serviceKey === request.serviceKey ? 4 : 0) +
+    (rule.categoryId === request.categoryId ? 2 : 0) +
+    (rule.serviceKey === null ? 1 : 0) +
+    (rule.categoryId === null ? 1 : 0);
+  rules.sort((left, right) => specificity(right) - specificity(left) || right.id - left.id);
+
+  const [policies, operatingModel] = await Promise.all([
+    getProviderInsurancePolicies(input.providerId),
+    getProviderOperatingModel(input.providerId, jurisdictionCode),
+  ]);
+  const insurance = evaluateInsuranceCapability({ jurisdictionCode, policies });
+  const classification = evaluateWorkerClassification({ jurisdictionCode, model: operatingModel });
+  const safety = evaluateJobSafety({
+    rules: rules.map((rule) => ({
+      id: rule.id,
+      activityStatus: rule.activityStatus,
+      prerequisitesJson: rule.prerequisitesJson,
+    })),
+    // Emergency access must be represented by a server-controlled future
+    // request flag. Unknown/omitted context is deliberately not treated as
+    // emergency and therefore cannot bypass an emergency-only rule.
+    isEmergency: input.isEmergency === true,
+    insuranceEligible: insurance.allowed,
+    classificationEligible: classification.allowed,
+  });
+  if (!safety.allowed) throw new Error(safety.reason);
+}
+
+export async function upsertJobSafetyRule(input: {
+  adminUserId: number;
+  jurisdictionCode: string;
+  categoryId?: number | null;
+  serviceKey?: string | null;
+  activityStatus: "allowed" | "restricted" | "high_risk" | "prohibited" | "emergency_only";
+  riskAttributesJson: Record<string, unknown>;
+  prerequisitesJson: Record<string, unknown>;
+  version: string;
+  status: "draft" | "active" | "retired";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  const value = { ...input, createdByUserId: input.adminUserId };
+  await db.insert(jobSafetyRules).values(value).onDuplicateKeyUpdate({
+    set: {
+      activityStatus: input.activityStatus,
+      riskAttributesJson: input.riskAttributesJson,
+      prerequisitesJson: input.prerequisitesJson,
+      status: input.status,
+      createdByUserId: input.adminUserId,
+    },
+  });
+  const rows = await db.select().from(jobSafetyRules).where(and(
+    eq(jobSafetyRules.jurisdictionCode, input.jurisdictionCode),
+    input.categoryId == null ? isNull(jobSafetyRules.categoryId) : eq(jobSafetyRules.categoryId, input.categoryId),
+    input.serviceKey == null ? isNull(jobSafetyRules.serviceKey) : eq(jobSafetyRules.serviceKey, input.serviceKey),
+    eq(jobSafetyRules.version, input.version),
+  )).limit(1);
+  if (!rows[0]) throw new Error("JOB_SAFETY_RULE_UPSERT_FAILED");
+  await logOperationEvent({
+    eventType: "job_safety_rule.upserted",
+    severity: "info",
+    actorId: input.adminUserId,
+    subjectId: rows[0].id,
+    payload: { jurisdictionCode: input.jurisdictionCode, status: input.status },
+  });
+  return rows[0];
+}
 
 export type ServiceRequestComplianceContext = {
   jurisdictionId: number | null;
@@ -1360,6 +1644,20 @@ export async function assertPaymentProviderOperational(input: {
     throw error;
   }
   return decision;
+}
+
+export async function resolvePaymentProviderForCheckout(input: {
+  provider: PaymentProviderId;
+  countryCode: string;
+  currency: string;
+}) {
+  const operationalDecision = await getPaymentProviderOperationalDecision(input);
+  return assertGlobalPaymentResolution({
+    requestedProvider: input.provider,
+    countryCode: input.countryCode,
+    currency: input.currency,
+    operationalDecision,
+  });
 }
 
 export async function upsertPaymentProviderWatch(input: {
@@ -2284,6 +2582,7 @@ export async function getAuthorizedServiceRequestMedia(
   const request = requestRows[0];
   const media = mediaRows[0];
   if (!request || !media) return null;
+  if (media.quarantineStatus !== "clean") return null;
   if (request.userId === actorUserId || media.ownerUserId === actorUserId) return media;
   const provider = await getProviderProfile(actorUserId);
   return provider && request.assignedProviderId === provider.id ? media : null;
@@ -2434,6 +2733,10 @@ export async function createOffer(data: {
   ]);
   assertProviderCapabilityForRequest({ request, capabilityStatuses });
   assertProviderCredentialForRequest({ request, providerCredentials });
+  await assertProviderP11PolicyEligibility({
+    providerId: data.providerId,
+    requestId: data.requestId,
+  });
   const existing = await db
     .select({ id: offers.id })
     .from(offers)
@@ -2834,6 +3137,85 @@ export async function getAuthorizedTextMessageForTranslation(messageId: number, 
   return message;
 }
 
+const messageContentHash = (content: string) =>
+  createHash("sha256").update(content, "utf8").digest("hex");
+
+/** Reads a cached translation only after proving participant access and source integrity. */
+export async function getCachedMessageTranslation(input: {
+  messageId: number;
+  actorUserId: number;
+  targetLanguage: string;
+}) {
+  const message = await getAuthorizedTextMessageForTranslation(input.messageId, input.actorUserId);
+  if (!message) return null;
+  const db = await getDb();
+  if (!db) return null;
+  const sourceContentHash = messageContentHash(message.content);
+  const rows = await db
+    .select({ translatedText: messageTranslationCache.translatedText })
+    .from(messageTranslationCache)
+    .where(and(
+      eq(messageTranslationCache.messageId, message.id),
+      eq(messageTranslationCache.targetLanguage, input.targetLanguage),
+      eq(messageTranslationCache.sourceContentHash, sourceContentHash),
+    ))
+    .limit(1);
+  const cached = rows[0];
+  return cached ? { ...cached, sourceContentHash } : null;
+}
+
+/** Stores a participant-authorized rendering; the source remains only in the original message. */
+export async function cacheAuthorizedMessageTranslation(input: {
+  messageId: number;
+  actorUserId: number;
+  targetLanguage: string;
+  translatedText: string;
+}) {
+  const message = await getAuthorizedTextMessageForTranslation(input.messageId, input.actorUserId);
+  if (!message) return false;
+  const db = await getDb();
+  if (!db) return false;
+  const sourceContentHash = messageContentHash(message.content);
+  await db
+    .insert(messageTranslationCache)
+    .values({
+      messageId: message.id,
+      sourceLanguage: "und",
+      targetLanguage: input.targetLanguage,
+      translatedText: input.translatedText,
+      sourceContentHash,
+    })
+    .onDuplicateKeyUpdate({
+      set: {
+        translatedText: input.translatedText,
+        sourceContentHash,
+        sourceLanguage: "und",
+      },
+    });
+  return true;
+}
+
+/** Hides a message only from the current participant's own view. */
+export async function hideMessageForViewer(messageId: number, viewerUserId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db
+    .select({ id: messages.id, requestId: messages.requestId, senderId: messages.senderId, receiverId: messages.receiverId })
+    .from(messages)
+    .where(and(eq(messages.id, messageId), isNull(messages.deletedAt)))
+    .limit(1);
+  const message = rows[0];
+  if (!message || message.requestId == null || (message.senderId !== viewerUserId && message.receiverId !== viewerUserId)) {
+    return false;
+  }
+  await assertMessageParticipant(db, message.requestId, message.senderId, message.receiverId);
+  await db
+    .insert(messageVisibilityOverrides)
+    .values({ messageId: message.id, viewerUserId })
+    .onDuplicateKeyUpdate({ set: { hiddenAt: new Date() } });
+  return true;
+}
+
 export async function getConversation(requestId: number, userId1: number, userId2: number) {
   const db = await getDb();
   if (!db) return [];
@@ -2854,10 +3236,18 @@ export async function getConversation(requestId: number, userId1: number, userId
       createdAt: messages.createdAt,
     })
     .from(messages)
+    .leftJoin(
+      messageVisibilityOverrides,
+      and(
+        eq(messageVisibilityOverrides.messageId, messages.id),
+        eq(messageVisibilityOverrides.viewerUserId, userId1),
+      ),
+    )
     .where(
       and(
         eq(messages.requestId, requestId),
         isNull(messages.deletedAt),
+        isNull(messageVisibilityOverrides.id),
         or(
           and(eq(messages.senderId, userId1), eq(messages.receiverId, userId2)),
           and(eq(messages.senderId, userId2), eq(messages.receiverId, userId1)),
@@ -3017,7 +3407,7 @@ export async function softDeleteMessage(input: { messageId: number; actorUserId:
   return { deleted: true, idempotent: false } as const;
 }
 
-export type PrivacyRightRequestType = "export" | "erasure";
+export type PrivacyRightRequestType = "export" | "erasure" | "rectification";
 export type PrivacyRightReviewDecision = "start_review" | "approve" | "reject";
 
 /**
@@ -3319,6 +3709,31 @@ export async function getProviderProfile(userId: number) {
     .from(providers)
     .where(eq(providers.userId, userId));
   return rows[0] ?? null;
+}
+
+export async function getProviderDocumentRequirements(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const rows = await db
+    .select({
+      providerId: providers.id,
+      categorySlug: serviceCategories.slug,
+      categoryName: serviceCategories.name,
+    })
+    .from(providers)
+    .leftJoin(serviceCategories, eq(serviceCategories.id, providers.categoryId))
+    .where(eq(providers.userId, userId));
+  const provider = rows[0];
+  if (!provider) return null;
+
+  return {
+    providerId: provider.providerId,
+    ...resolveProviderDocumentRequirements({
+      categorySlug: provider.categorySlug ?? null,
+      categoryName: provider.categoryName ?? null,
+    }),
+  };
 }
 
 export async function updateProviderAvailability(userId: number, isAvailable: boolean) {
@@ -3764,6 +4179,10 @@ export async function updateJobLifecycle(data: {
       assertProviderCredentialForRequest({
         request: context,
         providerCredentials: providerCredentialStatuses,
+      });
+      await assertProviderP11PolicyEligibility({
+        providerId: context.assignedProviderId,
+        requestId: data.requestId,
       });
     }
 
@@ -4227,6 +4646,16 @@ export async function resolveCompletionDispute(data: {
     if (!payment || payment.status !== "held") throw new Error("ESCROW_NOT_HELD");
     const now = new Date();
     let settlementPending = false;
+    const decision = evaluateCompletionDisputeResolution({
+      resolution: data.resolution,
+      disputeStatus: dispute.status,
+      proofStatus: proof.status,
+      paymentStatus: payment.status,
+      reviewerUserId: data.adminUserId,
+      resolutionNote: data.resolutionNote,
+      providerPayout: payment.providerPayout,
+    });
+    if (!decision.allowed) throw new Error(decision.reason);
     if (data.resolution === "provider") {
       await releaseHeldEscrowInTransaction(tx, {
         requestId: data.requestId,
@@ -4331,6 +4760,18 @@ async function resolveCompletionDisputeRefundInTransaction(
   const proof = proofRows[0];
   if (!proof || proof.requestId !== payment.requestId || proof.status !== "disputed") {
     throw new Error("COMPLETION_DISPUTE_REFUND_STATE_MISMATCH");
+  }
+  const decision = evaluateCompletionDisputeResolution({
+    resolution: "customer",
+    disputeStatus: dispute.status,
+    proofStatus: proof.status,
+    paymentStatus: payment.status,
+    reviewerUserId: dispute.reviewedByUserId,
+    resolutionNote: dispute.resolutionNote ?? "",
+    providerPayout: payment.providerPayout,
+  });
+  if (!decision.allowed || decision.action !== "finalize_customer_refund") {
+    throw new Error(decision.reason || "COMPLETION_DISPUTE_REFUND_POLICY_REJECTED");
   }
 
   const now = new Date();
@@ -4493,6 +4934,10 @@ export async function acceptOffer(offerId: number, userId: number) {
       .from(providerCredentials)
       .where(eq(providerCredentials.providerId, provider.id));
     assertProviderCredentialForRequest({ request, providerCredentials: providerCredentialStatuses });
+    await assertProviderP11PolicyEligibility({
+      providerId: provider.id,
+      requestId: request.id,
+    });
 
     const detailRows = await tx
       .select()

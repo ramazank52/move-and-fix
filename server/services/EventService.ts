@@ -26,7 +26,7 @@ import {
   ErrorSeverity,
   normalizeError,
 } from '../_core/errors';
-import type { INotificationSender, IWalletService } from './interfaces';
+import type { INotificationSender } from './interfaces';
 
 export enum EventType {
   // Payment Events
@@ -107,7 +107,6 @@ export class EventService {
   private eventQueue: Event[] = [];
   private eventLogs: EventLog[] = [];
   private notificationSender: INotificationSender | null = null;
-  private walletService: IWalletService | null = null;
 
   constructor() {
     this.registerDefaultListeners();
@@ -119,13 +118,6 @@ export class EventService {
    */
   setNotificationSender(sender: INotificationSender): void {
     this.notificationSender = sender;
-  }
-
-  /**
-   * Wallet service bağımlılığını enjekte et
-   */
-  setWalletService(wallet: IWalletService): void {
-    this.walletService = wallet;
   }
 
   /**
@@ -280,16 +272,9 @@ export class EventService {
 
     console.log(`💰 Ödeme tamamlandı: ${orderId} - ${amount}₺`);
 
-    // 1. Escrow'dan ödeme yap (enjekte edilen wallet adapter üzerinden)
-    if (this.walletService) {
-      try {
-        await this.walletService.releaseEscrowPayment(orderId as string);
-      } catch (error: unknown) {
-        console.error('Escrow serbest bırakma hatası:', error);
-      }
-    }
-
-    // 2. Bildirim gönder (enjekte edilen sender adapter üzerinden)
+    // Finansal mutasyonlar event grafiğinden yürütülmez. Escrow serbest
+    // bırakma yalnız kanonik completion/dispute veri işlemlerinden yapılır.
+    // Bu listener yalnız teslimat sonrası bildirim üretir.
     if (this.notificationSender) {
       try {
         await this.notificationSender.sendNotification(
@@ -311,16 +296,8 @@ export class EventService {
 
     console.log(`❌ Ödeme başarısız: ${orderId} - ${reason}`);
 
-    // 1. Escrow'dan geri ödeme yap
-    if (this.walletService) {
-      try {
-        await this.walletService.refundEscrow(orderId as string, reason as string);
-      } catch (error: unknown) {
-        console.error('Escrow geri ödeme hatası:', error);
-      }
-    }
-
-    // 2. Müşteriye bildirim gönder
+    // İade yalnız yetkili, idempotent uyuşmazlık/refund akışında işlenir.
+    // Bu listener finansal durum değişikliği üretmeden müşteriyi bilgilendirir.
     if (this.notificationSender) {
       try {
         await this.notificationSender.sendNotification(
