@@ -591,7 +591,7 @@ export async function markAuthChallengeUsed(id: number) {
 export async function createProviderDocument(data: {
   providerId: number;
   ownerUserId: number;
-  type: "identity" | "driver_license" | "src_certificate" | "psychotechnic";
+  type: string;
   storageKey: string;
   fileUrl: string;
   fileName: string;
@@ -601,35 +601,51 @@ export async function createProviderDocument(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db
-    .insert(providerDocuments)
-    .values({ ...data, status: "pending", rejectionReason: null, reviewedByUserId: null, reviewedAt: null })
-    .onDuplicateKeyUpdate({
-      set: {
-        ownerUserId: data.ownerUserId,
-        storageKey: data.storageKey,
-        fileUrl: data.fileUrl,
-        fileName: data.fileName,
-        mimeType: data.mimeType,
-        sizeBytes: data.sizeBytes,
-        sha256: data.sha256,
-        status: "pending",
-        rejectionReason: null,
-        reviewedByUserId: null,
-        reviewedAt: null,
-      },
+  return db.transaction(async (tx) => {
+    const result = await tx
+      .insert(providerDocuments)
+      .values({ ...data, status: "pending", rejectionReason: null, reviewedByUserId: null, reviewedAt: null })
+      .onDuplicateKeyUpdate({
+        set: {
+          ownerUserId: data.ownerUserId,
+          storageKey: data.storageKey,
+          fileUrl: data.fileUrl,
+          fileName: data.fileName,
+          mimeType: data.mimeType,
+          sizeBytes: data.sizeBytes,
+          sha256: data.sha256,
+          status: "pending",
+          quarantineStatus: "pending_scan",
+          quarantineReason: null,
+          scannedAt: null,
+          releasedAt: null,
+          rejectionReason: null,
+          reviewedByUserId: null,
+          reviewedAt: null,
+        },
+      });
+    const rows = await tx
+      .select({ id: providerDocuments.id })
+      .from(providerDocuments)
+      .where(
+        and(
+          eq(providerDocuments.providerId, data.providerId),
+          eq(providerDocuments.type, data.type),
+        ),
+      )
+      .limit(1);
+    const id = rows[0]?.id ?? Number(result[0].insertId);
+    if (!Number.isInteger(id) || id <= 0) throw new Error("PROVIDER_DOCUMENT_CREATE_FAILED");
+    await tx.insert(mediaScannerJobs).values(buildMediaScannerJob({
+      mediaClass: "provider_document",
+      mediaId: String(id),
+      sha256: data.sha256,
+      storageKey: data.storageKey,
+    })).onDuplicateKeyUpdate({
+      set: resetMediaScannerJobForRetry(data),
     });
-  const rows = await db
-    .select({ id: providerDocuments.id })
-    .from(providerDocuments)
-    .where(
-      and(
-        eq(providerDocuments.providerId, data.providerId),
-        eq(providerDocuments.type, data.type),
-      ),
-    )
-    .limit(1);
-  return rows[0]?.id ?? result[0].insertId;
+    return id;
+  });
 }
 
 export async function getProviderDocuments(providerId: number) {
@@ -854,14 +870,32 @@ export async function refreshProviderVerificationStatus(providerId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const documents = await getProviderDocuments(providerId);
-  const identity = documents.find((document) => document.type === "identity");
-  const hasRejected = documents.some((document) => document.status === "rejected");
-  const hasPending = documents.some((document) => document.status === "pending");
+  const providerRows = await db
+    .select({ categorySlug: serviceCategories.slug, categoryName: serviceCategories.name })
+    .from(providers)
+    .leftJoin(serviceCategories, eq(providers.categoryId, serviceCategories.id))
+    .where(eq(providers.id, providerId))
+    .limit(1);
+  const provider = providerRows[0];
+  if (!provider) throw new Error("PROVIDER_NOT_FOUND");
+  const requirements = resolveProviderDocumentRequirements({
+    categorySlug: provider.categorySlug ?? null,
+    categoryName: provider.categoryName ?? null,
+  });
+  const requiredTypes = new Set(requirements.required.map((requirement) => requirement.type));
+  const requiredDocuments = documents.filter((document) => requiredTypes.has(document.type));
+  const hasRejected = requiredDocuments.some((document) => document.status === "rejected");
+  const hasPending = requirements.required.some((requirement) =>
+    requiredDocuments.some((document) => document.type === requirement.type && document.status === "pending"),
+  );
+  const hasAllRequiredApproved = requirements.required.every((requirement) =>
+    requiredDocuments.some((document) => document.type === requirement.type && document.status === "approved"),
+  );
   const status = hasRejected
     ? "rejected"
-    : identity?.status === "approved" && !hasPending
+    : hasAllRequiredApproved && !hasPending
       ? "approved"
-      : documents.length > 0
+      : requiredDocuments.length > 0
         ? "pending"
         : "unsubmitted";
   await db
@@ -883,6 +917,7 @@ import {
   serviceCapabilities,
   jurisdictions,
   jurisdictionCompliancePackages,
+  officialComplianceSources,
   capabilityJurisdictionRules,
   serviceRequests,
   serviceRequestDetails,
@@ -947,6 +982,7 @@ import {
   messageVisibilityOverrides,
   taxRules,
   serviceRequestTaxSnapshots,
+  mediaScannerJobs,
 } from "../drizzle/schema";
 import {
   type MaskedCommunicationChannel,
@@ -977,6 +1013,33 @@ import {
   type MediaScannerMediaClass,
   type MediaScannerOutcome,
 } from "./security/MediaQuarantinePolicy";
+import {
+  buildMediaScannerJob,
+  decideMediaScannerJobCompletion,
+  type MediaScannerJobStatus,
+} from "./security/MediaScannerJobQueue";
+import { decideMediaScannerDispatchFailure } from "./security/MediaScannerDispatchPolicy";
+
+function resetMediaScannerJobForRetry(input: { sha256: string; storageKey: string }) {
+  const job = buildMediaScannerJob({
+    mediaClass: "provider_document",
+    mediaId: "existing",
+    sha256: input.sha256,
+    storageKey: input.storageKey,
+  });
+  return {
+    sha256: job.sha256,
+    storageKey: job.storageKey,
+    status: job.status,
+    deliveryAttempts: job.deliveryAttempts,
+    lastDispatchAt: job.lastDispatchAt,
+    nextAttemptAt: job.nextAttemptAt,
+    scannerReference: job.scannerReference,
+    outcome: job.outcome,
+    outcomeReason: job.outcomeReason,
+    completedAt: job.completedAt,
+  } as const;
+}
 
 export type OrganizationType = "corporate" | "fleet" | "facility";
 export type OrganizationMemberRole = "owner" | "admin" | "member";
@@ -1247,7 +1310,15 @@ export async function upsertJobSafetyRule(input: {
 
 export type ServiceRequestComplianceContext = {
   jurisdictionId: number | null;
+  serviceCountryCode: string | null;
   requiredCapabilityId: number | null;
+  complianceRequirementState: "not_required" | "required" | "blocked" | "legal_review_required";
+  requirementState: import("./compliance/CapabilityTransitionGuard").ComplianceRequirementState;
+  compliancePackageId: number | null;
+  complianceRuleId: number | null;
+  officialSourceId: number | null;
+  sourceStatus: "verified" | "draft" | "superseded" | "revoked" | "missing";
+  currencyContext: string | null;
   requiredCredentialType: string | null;
   requiredCredentialAssurance: CredentialAssurance | null;
   requiresCredentialHumanReview: number | null;
@@ -1268,23 +1339,36 @@ export async function resolveServiceRequestComplianceContext(input: {
   const db = await getDb();
   if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
 
-  const countryCode = (input.countryCode ?? "TR").trim().toUpperCase();
+  const countryCode = input.countryCode?.trim().toUpperCase() ?? "";
+  const blockedContext = (
+    requirementState: ServiceRequestComplianceContext["requirementState"],
+    jurisdictionId: number | null = null,
+    compliancePackageVersion: string | null = null,
+    compliancePackageId: number | null = null,
+  ): ServiceRequestComplianceContext => ({
+    jurisdictionId,
+    serviceCountryCode: countryCode || null,
+    requiredCapabilityId: null,
+    complianceRequirementState: requirementState === "LEGAL_REVIEW_REQUIRED" ? "legal_review_required" : "blocked",
+    requirementState,
+    compliancePackageId,
+    complianceRuleId: null,
+    officialSourceId: null,
+    sourceStatus: "missing",
+    currencyContext: null,
+    requiredCredentialType: null,
+    requiredCredentialAssurance: null,
+    requiresCredentialHumanReview: null,
+    compliancePackageVersion,
+  });
+  if (!/^[A-Z]{2}$/.test(countryCode)) return blockedContext("JURISDICTION_UNRESOLVED");
   const now = input.now ?? new Date();
   const jurisdictionRows = await db
     .select({ id: jurisdictions.id, regionCode: jurisdictions.regionCode })
     .from(jurisdictions)
     .where(and(eq(jurisdictions.countryCode, countryCode), eq(jurisdictions.status, "active")));
   const jurisdiction = jurisdictionRows.find((row) => row.regionCode === null) ?? jurisdictionRows[0];
-  if (!jurisdiction) {
-    return {
-      jurisdictionId: null,
-      requiredCapabilityId: null,
-      requiredCredentialType: null,
-      requiredCredentialAssurance: null,
-      requiresCredentialHumanReview: null,
-      compliancePackageVersion: null,
-    };
-  }
+  if (!jurisdiction) return blockedContext("JURISDICTION_UNRESOLVED");
 
   const packages = await db
     .select({ id: jurisdictionCompliancePackages.id, version: jurisdictionCompliancePackages.version, effectiveFrom: jurisdictionCompliancePackages.effectiveFrom, effectiveTo: jurisdictionCompliancePackages.effectiveTo })
@@ -1295,16 +1379,7 @@ export async function resolveServiceRequestComplianceContext(input: {
     (candidate.effectiveFrom === null || candidate.effectiveFrom <= now) &&
     (candidate.effectiveTo === null || candidate.effectiveTo > now),
   );
-  if (!compliancePackage) {
-    return {
-      jurisdictionId: jurisdiction.id,
-      requiredCapabilityId: null,
-      requiredCredentialType: null,
-      requiredCredentialAssurance: null,
-      requiresCredentialHumanReview: null,
-      compliancePackageVersion: null,
-    };
-  }
+  if (!compliancePackage) return blockedContext("LEGAL_REVIEW_REQUIRED", jurisdiction.id);
 
   const categoryCapabilities = await db
     .select({ id: serviceCapabilities.id, subcategoryId: serviceCapabilities.subcategoryId })
@@ -1315,20 +1390,13 @@ export async function resolveServiceRequestComplianceContext(input: {
       ? undefined
       : categoryCapabilities.find((candidate) => candidate.subcategoryId === input.subcategoryId)) ??
     categoryCapabilities.find((candidate) => candidate.subcategoryId === null);
-  if (!capability) {
-    return {
-      jurisdictionId: jurisdiction.id,
-      requiredCapabilityId: null,
-      requiredCredentialType: null,
-      requiredCredentialAssurance: null,
-      requiresCredentialHumanReview: null,
-      compliancePackageVersion: compliancePackage.version,
-    };
-  }
+  if (!capability) return blockedContext("CAPABILITY_UNMAPPED", jurisdiction.id, compliancePackage.version, compliancePackage.id);
 
   const ruleRows = await db
     .select({
       ruleStatus: capabilityJurisdictionRules.ruleStatus,
+      id: capabilityJurisdictionRules.id,
+      officialSourceId: capabilityJurisdictionRules.sourceId,
       requiredCredentialType: capabilityJurisdictionRules.requiredCredentialType,
       minimumAssurance: capabilityJurisdictionRules.minimumAssurance,
       requiresHumanReview: capabilityJurisdictionRules.requiresHumanReview,
@@ -1337,12 +1405,47 @@ export async function resolveServiceRequestComplianceContext(input: {
     .where(and(eq(capabilityJurisdictionRules.packageId, compliancePackage.id), eq(capabilityJurisdictionRules.capabilityId, capability.id)))
     .limit(1);
   const rule = ruleRows[0];
-  // Any absent/unknown/prohibited rule is retained as a requirement. It will
-  // subsequently block provider transitions instead of allowing a silent bypass.
-  const requiredCapabilityId = rule?.ruleStatus === "not_required" ? null : capability.id;
+  const sourceRows = rule?.officialSourceId == null
+    ? []
+    : await db.select({ id: officialComplianceSources.id, status: officialComplianceSources.status })
+      .from(officialComplianceSources)
+      .where(eq(officialComplianceSources.id, rule.officialSourceId))
+      .limit(1);
+  const source = sourceRows[0] ?? null;
+  if (!rule || !source || source.status !== "verified") {
+    return blockedContext("LEGAL_REVIEW_REQUIRED", jurisdiction.id, compliancePackage.version, compliancePackage.id);
+  }
+  const complianceRequirementState =
+    rule?.ruleStatus === "not_required"
+      ? "not_required"
+      : rule?.ruleStatus === "required"
+        ? "required"
+        : rule?.ruleStatus === "prohibited"
+          ? "blocked"
+          : rule.ruleStatus === "conditional"
+            ? "legal_review_required"
+            : "legal_review_required";
+  const requiredCapabilityId = complianceRequirementState === "required" ? capability.id : null;
+  const requirementState = rule.ruleStatus === "not_required"
+    ? "NOT_REQUIRED"
+    : rule.ruleStatus === "required"
+      ? "REQUIRED"
+      : rule.ruleStatus === "conditional"
+        ? "CONDITIONAL"
+        : rule.ruleStatus === "prohibited"
+          ? "PROHIBITED"
+          : "UNKNOWN";
   return {
     jurisdictionId: jurisdiction.id,
+    serviceCountryCode: countryCode,
     requiredCapabilityId,
+    complianceRequirementState,
+    requirementState,
+    compliancePackageId: compliancePackage.id,
+    complianceRuleId: rule.id,
+    officialSourceId: source.id,
+    sourceStatus: source.status,
+    currencyContext: countryCode === "TR" ? "TRY" : null,
     requiredCredentialType: rule?.ruleStatus === "required" ? rule.requiredCredentialType : null,
     requiredCredentialAssurance:
       rule?.ruleStatus === "required" && rule.requiredCredentialType !== null
@@ -1357,7 +1460,7 @@ export async function resolveServiceRequestComplianceContext(input: {
 }
 
 export function assertProviderCapabilityForRequest(input: {
-  request: Pick<ServiceRequestComplianceContext, "jurisdictionId" | "requiredCapabilityId">;
+  request: Pick<ServiceRequestComplianceContext, "jurisdictionId" | "requiredCapabilityId" | "complianceRequirementState">;
   capabilityStatuses: Array<{
     capabilityId: number;
     jurisdictionId: number;
@@ -1373,7 +1476,8 @@ export function assertProviderCapabilityForRequest(input: {
         candidate.jurisdictionId === input.request.jurisdictionId,
       ) ?? null;
   assertCapabilityTransition({
-    enforcementEnabled: input.request.requiredCapabilityId !== null,
+    enforcementEnabled: true,
+    complianceRequirementState: input.request.complianceRequirementState,
     requiredCapabilityId: input.request.requiredCapabilityId,
     jurisdictionId: input.request.jurisdictionId,
     providerCapabilityDecision: capabilityStatus?.status ?? null,
@@ -2520,7 +2624,9 @@ export async function createServiceRequest(data: {
     countryCode: data.countryCode,
   });
   assertServiceRequestCapabilityContext({
-    enforcementEnabled: complianceContext.requiredCapabilityId !== null,
+    enforcementEnabled: complianceContext.requirementState === "REQUIRED",
+    requirementState: complianceContext.requirementState,
+    complianceRequirementState: complianceContext.complianceRequirementState,
     requiredCapabilityId: complianceContext.requiredCapabilityId,
     jurisdictionId: complianceContext.jurisdictionId,
   });
@@ -2618,8 +2724,16 @@ export async function createServiceRequestMedia(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(serviceRequestMedia).values(data);
-  return result[0].insertId;
+  return db.transaction(async (tx) => {
+    const result = await tx.insert(serviceRequestMedia).values(data);
+    await tx.insert(mediaScannerJobs).values(buildMediaScannerJob({
+      mediaClass: "service_request_media",
+      mediaId: data.publicId,
+      sha256: data.sha256,
+      storageKey: data.storageKey,
+    }));
+    return result[0].insertId;
+  });
 }
 
 /** Resolves a storage object only for a request participant; absent and forbidden are indistinguishable. */
@@ -2776,6 +2890,7 @@ export async function createOffer(data: {
       id: serviceRequests.id,
       jurisdictionId: serviceRequests.jurisdictionId,
       requiredCapabilityId: serviceRequests.requiredCapabilityId,
+      complianceRequirementState: serviceRequests.complianceRequirementState,
       requiredCredentialType: serviceRequests.requiredCredentialType,
       requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
       requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
@@ -2816,6 +2931,7 @@ export async function getOfferCapabilityTransitionContext(offerId: number) {
       requestId: serviceRequests.id,
       jurisdictionId: serviceRequests.jurisdictionId,
       requiredCapabilityId: serviceRequests.requiredCapabilityId,
+      complianceRequirementState: serviceRequests.complianceRequirementState,
       requiredCredentialType: serviceRequests.requiredCredentialType,
       requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
       requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
@@ -3102,20 +3218,30 @@ export async function createVoiceMessageMetadata(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await assertMessageParticipant(db, data.requestId, data.senderId, data.receiverId);
-  const result = await db.insert(messages).values({
-    senderId: data.senderId,
-    receiverId: data.receiverId,
-    requestId: data.requestId,
-    content: "Sesli mesaj",
-    kind: "audio",
-    mediaStorageKey: data.storageKey,
-    mediaUrl: data.mediaUrl,
-    mediaMimeType: data.mimeType,
-    mediaSizeBytes: data.sizeBytes,
-    mediaDurationMs: data.durationMs,
-    mediaSha256: data.sha256,
+  return db.transaction(async (tx) => {
+    const result = await tx.insert(messages).values({
+      senderId: data.senderId,
+      receiverId: data.receiverId,
+      requestId: data.requestId,
+      content: "Sesli mesaj",
+      kind: "audio",
+      mediaStorageKey: data.storageKey,
+      mediaUrl: data.mediaUrl,
+      mediaMimeType: data.mimeType,
+      mediaSizeBytes: data.sizeBytes,
+      mediaDurationMs: data.durationMs,
+      mediaSha256: data.sha256,
+    });
+    const id = Number(result[0].insertId);
+    if (!Number.isInteger(id) || id <= 0) throw new Error("VOICE_MESSAGE_CREATE_FAILED");
+    await tx.insert(mediaScannerJobs).values(buildMediaScannerJob({
+      mediaClass: "voice_message",
+      mediaId: String(id),
+      sha256: data.sha256,
+      storageKey: data.storageKey,
+    }));
+    return id;
   });
-  return result[0].insertId;
 }
 
 export async function getVoiceMessageMetadata(messageId: number) {
@@ -3195,65 +3321,189 @@ export async function applyMediaScannerOutcome(input: {
   const reason = input.reason?.trim() || null;
   const parsedNumericId = Number(input.mediaId);
   const numericId = Number.isInteger(parsedNumericId) && parsedNumericId > 0 ? parsedNumericId : null;
+  const outcome = await database.transaction(async (tx) => {
+    const record = await (async () => {
+      if (input.mediaClass === "provider_document") {
+        if (numericId == null) return null;
+        return (await tx.select({ sha256: providerDocuments.sha256, quarantineStatus: providerDocuments.quarantineStatus })
+          .from(providerDocuments).where(eq(providerDocuments.id, numericId)).limit(1))[0] ?? null;
+      }
+      if (input.mediaClass === "service_request_media") {
+        return (await tx.select({ sha256: serviceRequestMedia.sha256, quarantineStatus: serviceRequestMedia.quarantineStatus })
+          .from(serviceRequestMedia).where(eq(serviceRequestMedia.publicId, input.mediaId)).limit(1))[0] ?? null;
+      }
+      if (input.mediaClass === "voice_message") {
+        if (numericId == null) return null;
+        return (await tx.select({ sha256: messages.mediaSha256, quarantineStatus: messages.quarantineStatus })
+          .from(messages).where(and(eq(messages.id, numericId), eq(messages.kind, "audio"))).limit(1))[0] ?? null;
+      }
+      return (await tx.select({ sha256: moveAiDraftMedia.sha256, quarantineStatus: moveAiDraftMedia.quarantineStatus })
+        .from(moveAiDraftMedia).where(eq(moveAiDraftMedia.opaqueId, input.mediaId)).limit(1))[0] ?? null;
+    })();
 
-  const record = await (async () => {
-    if (input.mediaClass === "provider_document") {
-      if (numericId == null) return null;
-      return (await database.select({ sha256: providerDocuments.sha256, quarantineStatus: providerDocuments.quarantineStatus })
-        .from(providerDocuments).where(eq(providerDocuments.id, numericId)).limit(1))[0] ?? null;
+    if (!record) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_MEDIA_NOT_FOUND" };
+    if (!record.sha256 || record.sha256.toLowerCase() !== hash) {
+      return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_DIGEST_MISMATCH" };
     }
-    if (input.mediaClass === "service_request_media") {
-      return (await database.select({ sha256: serviceRequestMedia.sha256, quarantineStatus: serviceRequestMedia.quarantineStatus })
-        .from(serviceRequestMedia).where(eq(serviceRequestMedia.publicId, input.mediaId)).limit(1))[0] ?? null;
-    }
-    if (input.mediaClass === "voice_message") {
-      if (numericId == null) return null;
-      return (await database.select({ sha256: messages.mediaSha256, quarantineStatus: messages.quarantineStatus })
-        .from(messages).where(and(eq(messages.id, numericId), eq(messages.kind, "audio"))).limit(1))[0] ?? null;
-    }
-    return (await database.select({ sha256: moveAiDraftMedia.sha256, quarantineStatus: moveAiDraftMedia.quarantineStatus })
-      .from(moveAiDraftMedia).where(eq(moveAiDraftMedia.opaqueId, input.mediaId)).limit(1))[0] ?? null;
-  })();
+    const job = (await tx
+      .select({ sha256: mediaScannerJobs.sha256, status: mediaScannerJobs.status })
+      .from(mediaScannerJobs)
+      .where(and(eq(mediaScannerJobs.mediaClass, input.mediaClass), eq(mediaScannerJobs.mediaId, input.mediaId)))
+      .limit(1))[0] ?? null;
+    if (!job) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_JOB_NOT_FOUND" };
+    if (job.sha256.toLowerCase() !== hash) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_JOB_DIGEST_MISMATCH" };
 
-  if (!record) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_MEDIA_NOT_FOUND" };
-  if (!record.sha256 || record.sha256.toLowerCase() !== hash) {
-    return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_DIGEST_MISMATCH" };
-  }
-  const transition = decideMediaScannerTransition(record.quarantineStatus, input.outcome);
-  if (!transition.allowed) return { accepted: false, idempotent: false, reason: transition.reason };
-  if (transition.idempotent) return { accepted: true, idempotent: true, reason: transition.reason };
+    const transition = decideMediaScannerTransition(record.quarantineStatus, input.outcome);
+    const jobTransition = decideMediaScannerJobCompletion(job.status, input.outcome);
+    if (!transition.allowed || !jobTransition.allowed) {
+      return { accepted: false, idempotent: false, reason: !transition.allowed ? transition.reason : jobTransition.reason };
+    }
+    if (transition.idempotent || jobTransition.idempotent) {
+      if (!transition.idempotent || !jobTransition.idempotent) {
+        return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_QUEUE_STATE_CONFLICT" };
+      }
+      return { accepted: true, idempotent: true, reason: "MEDIA_SCAN_CALLBACK_IDEMPOTENT" };
+    }
 
-  const update = {
-    quarantineStatus: input.outcome,
-    quarantineReason: reason,
-    scannedAt: now,
-    releasedAt: input.outcome === "clean" ? now : null,
-  } as const;
-  let affectedRows = 0;
-  if (input.mediaClass === "provider_document" && numericId != null) {
-    const result = await database.update(providerDocuments).set(update)
-      .where(and(eq(providerDocuments.id, numericId), eq(providerDocuments.sha256, hash), eq(providerDocuments.quarantineStatus, "pending_scan")));
-    affectedRows = Number(result[0].affectedRows);
-  } else if (input.mediaClass === "service_request_media") {
-    const result = await database.update(serviceRequestMedia).set(update)
-      .where(and(eq(serviceRequestMedia.publicId, input.mediaId), eq(serviceRequestMedia.sha256, hash), eq(serviceRequestMedia.quarantineStatus, "pending_scan")));
-    affectedRows = Number(result[0].affectedRows);
-  } else if (input.mediaClass === "voice_message" && numericId != null) {
-    const result = await database.update(messages).set(update)
-      .where(and(eq(messages.id, numericId), eq(messages.kind, "audio"), eq(messages.mediaSha256, hash), eq(messages.quarantineStatus, "pending_scan")));
-    affectedRows = Number(result[0].affectedRows);
-  } else if (input.mediaClass === "move_ai_draft_media") {
-    const result = await database.update(moveAiDraftMedia).set(update)
-      .where(and(eq(moveAiDraftMedia.opaqueId, input.mediaId), eq(moveAiDraftMedia.sha256, hash), eq(moveAiDraftMedia.quarantineStatus, "pending_scan")));
-    affectedRows = Number(result[0].affectedRows);
-  }
-  if (affectedRows !== 1) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_STATE_CONFLICT" };
-  await logOperationEvent({
-    eventType: "media_scanner_outcome_recorded",
-    payload: { mediaClass: input.mediaClass, mediaReference: input.mediaId, outcome: input.outcome },
-    severity: input.outcome === "clean" ? "info" : "warning",
+    const update = {
+      quarantineStatus: input.outcome,
+      quarantineReason: reason,
+      scannedAt: now,
+      releasedAt: input.outcome === "clean" ? now : null,
+    } as const;
+    let affectedRows = 0;
+    if (input.mediaClass === "provider_document" && numericId != null) {
+      const result = await tx.update(providerDocuments).set(update)
+        .where(and(eq(providerDocuments.id, numericId), eq(providerDocuments.sha256, hash), eq(providerDocuments.quarantineStatus, "pending_scan")));
+      affectedRows = Number(result[0].affectedRows);
+    } else if (input.mediaClass === "service_request_media") {
+      const result = await tx.update(serviceRequestMedia).set(update)
+        .where(and(eq(serviceRequestMedia.publicId, input.mediaId), eq(serviceRequestMedia.sha256, hash), eq(serviceRequestMedia.quarantineStatus, "pending_scan")));
+      affectedRows = Number(result[0].affectedRows);
+    } else if (input.mediaClass === "voice_message" && numericId != null) {
+      const result = await tx.update(messages).set(update)
+        .where(and(eq(messages.id, numericId), eq(messages.kind, "audio"), eq(messages.mediaSha256, hash), eq(messages.quarantineStatus, "pending_scan")));
+      affectedRows = Number(result[0].affectedRows);
+    } else if (input.mediaClass === "move_ai_draft_media") {
+      const result = await tx.update(moveAiDraftMedia).set(update)
+        .where(and(eq(moveAiDraftMedia.opaqueId, input.mediaId), eq(moveAiDraftMedia.sha256, hash), eq(moveAiDraftMedia.quarantineStatus, "pending_scan")));
+      affectedRows = Number(result[0].affectedRows);
+    }
+    if (affectedRows !== 1) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_STATE_CONFLICT" };
+    const jobUpdated = await tx.update(mediaScannerJobs).set({
+      status: jobTransition.nextStatus,
+      outcome: input.outcome,
+      outcomeReason: reason,
+      completedAt: now,
+    }).where(and(
+      eq(mediaScannerJobs.mediaClass, input.mediaClass),
+      eq(mediaScannerJobs.mediaId, input.mediaId),
+      eq(mediaScannerJobs.sha256, hash),
+      eq(mediaScannerJobs.status, job.status),
+    ));
+    if (Number(jobUpdated[0].affectedRows) !== 1) throw new Error("MEDIA_SCAN_JOB_UPDATE_CONFLICT");
+    return { accepted: true, idempotent: false, reason: transition.reason };
   });
-  return { accepted: true, idempotent: false, reason: transition.reason };
+  if (outcome.accepted && !outcome.idempotent) {
+    await logOperationEvent({
+      eventType: "media_scanner_outcome_recorded",
+      payload: { mediaClass: input.mediaClass, mediaReference: input.mediaId, outcome: input.outcome },
+      severity: input.outcome === "clean" ? "info" : "warning",
+    });
+  }
+  return outcome;
+}
+
+export type ClaimedMediaScannerJob = {
+  jobId: number;
+  mediaClass: MediaScannerMediaClass;
+  mediaId: string;
+  sha256: string;
+  storageKey: string;
+  deliveryAttempts: number;
+};
+
+/** Atomically claims one due outbox job. A lost race produces no dispatch. */
+export async function claimNextMediaScannerJob(now = new Date()): Promise<ClaimedMediaScannerJob | null> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  return database.transaction(async (tx) => {
+    const candidate = (await tx
+      .select()
+      .from(mediaScannerJobs)
+      .where(and(
+        inArray(mediaScannerJobs.status, ["queued", "retry_scheduled"]),
+        lte(mediaScannerJobs.nextAttemptAt, now),
+      ))
+      .orderBy(mediaScannerJobs.nextAttemptAt, mediaScannerJobs.id)
+      .limit(1))[0] ?? null;
+    if (!candidate) return null;
+    const updated = await tx.update(mediaScannerJobs).set({
+      status: "dispatched",
+      deliveryAttempts: candidate.deliveryAttempts + 1,
+      lastDispatchAt: now,
+      nextAttemptAt: new Date(now.getTime() + 15 * 60 * 1_000),
+      outcomeReason: null,
+    }).where(and(
+      eq(mediaScannerJobs.id, candidate.id),
+      eq(mediaScannerJobs.status, candidate.status),
+      lte(mediaScannerJobs.nextAttemptAt, now),
+    ));
+    if (Number(updated[0].affectedRows) !== 1) return null;
+    return {
+      jobId: candidate.id,
+      mediaClass: candidate.mediaClass,
+      mediaId: candidate.mediaId,
+      sha256: candidate.sha256,
+      storageKey: candidate.storageKey,
+      deliveryAttempts: candidate.deliveryAttempts + 1,
+    };
+  });
+}
+
+export async function recordMediaScannerDispatchResult(input: {
+  jobId: number;
+  accepted: boolean;
+  scannerReference?: string;
+  reason?: string;
+  now?: Date;
+}): Promise<{ status: Extract<MediaScannerJobStatus, "dispatched" | "retry_scheduled" | "failed"> }> {
+  if (!Number.isInteger(input.jobId) || input.jobId <= 0) throw new Error("MEDIA_SCANNER_JOB_ID_INVALID");
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const now = input.now ?? new Date();
+  const result = await database.transaction(async (tx) => {
+    const job = (await tx.select().from(mediaScannerJobs).where(eq(mediaScannerJobs.id, input.jobId)).limit(1))[0] ?? null;
+    if (!job || job.status !== "dispatched") throw new Error("MEDIA_SCANNER_JOB_NOT_DISPATCHED");
+    if (input.accepted) {
+      const scannerReference = input.scannerReference?.trim().slice(0, 191) || null;
+      const updated = await tx.update(mediaScannerJobs).set({ scannerReference }).where(and(
+        eq(mediaScannerJobs.id, job.id),
+        eq(mediaScannerJobs.status, "dispatched"),
+      ));
+      if (Number(updated[0].affectedRows) !== 1) throw new Error("MEDIA_SCANNER_JOB_UPDATE_CONFLICT");
+      return { status: "dispatched" as const, mediaClass: job.mediaClass, mediaId: job.mediaId };
+    }
+    const failure = decideMediaScannerDispatchFailure(job.deliveryAttempts, now);
+    const updated = await tx.update(mediaScannerJobs).set({
+      status: failure.nextStatus,
+      nextAttemptAt: failure.nextAttemptAt ?? now,
+      outcomeReason: input.reason?.trim().slice(0, 500) || failure.reason,
+    }).where(and(
+      eq(mediaScannerJobs.id, job.id),
+      eq(mediaScannerJobs.status, "dispatched"),
+    ));
+    if (Number(updated[0].affectedRows) !== 1) throw new Error("MEDIA_SCANNER_JOB_UPDATE_CONFLICT");
+    return { status: failure.nextStatus, mediaClass: job.mediaClass, mediaId: job.mediaId };
+  });
+  if (result.status === "failed") {
+    await logOperationEvent({
+      eventType: "media_scanner_job_dead_letter",
+      severity: "warning",
+      payload: { mediaClass: result.mediaClass, mediaReference: result.mediaId },
+    });
+  }
+  return { status: result.status };
 }
 
 /** Returns source text only after proving that the requesting actor is a conversation participant. */
@@ -3467,7 +3717,7 @@ export async function getMessageConversations(userId: number) {
 
   const [participantRows, providerRows] = await Promise.all([
     db
-      .select({ id: users.id, name: users.name, email: users.email })
+      .select({ id: users.id, name: users.name })
       .from(users)
       .where(inArray(users.id, otherUserIds)),
     db
@@ -3496,7 +3746,6 @@ export async function getMessageConversations(userId: number) {
       otherUserId,
       displayName:
         provider?.displayName ?? participant?.name ?? `Kullanıcı #${otherUserId}`,
-      email: participant?.email ?? null,
       isProvider: provider != null,
       isVerified: provider?.isVerified === 1,
       rating: provider?.rating ?? null,
@@ -3771,7 +4020,7 @@ export async function getMessageParticipant(
   await assertMessageParticipant(db, requestId, userId, otherUserId);
 
   const participantRows = await db
-    .select({ id: users.id, name: users.name, email: users.email })
+    .select({ id: users.id, name: users.name })
     .from(users)
     .where(eq(users.id, otherUserId))
     .limit(1);
@@ -3792,7 +4041,6 @@ export async function getMessageParticipant(
   return {
     id: participant.id,
     displayName: provider?.displayName ?? participant.name ?? `Kullanıcı #${participant.id}`,
-    email: participant.email,
     isProvider: provider != null,
     isVerified: provider?.isVerified === 1,
     rating: provider?.rating ?? null,
@@ -4063,6 +4311,7 @@ async function getTrackingAccessContext(requestId: number) {
       assignedProviderId: serviceRequests.assignedProviderId,
       jurisdictionId: serviceRequests.jurisdictionId,
       requiredCapabilityId: serviceRequests.requiredCapabilityId,
+      complianceRequirementState: serviceRequests.complianceRequirementState,
       requiredCredentialType: serviceRequests.requiredCredentialType,
       requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
       requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
@@ -6080,7 +6329,20 @@ export async function getNewJobsForProvider(providerId: number) {
 
   const provider = providerRows[0];
   const categoryId = provider.categoryId;
-  if (!categoryId || provider.isAvailable !== 1) return [];
+  if (!categoryId || provider.isAvailable !== 1 || provider.isVerified !== 1 || provider.verificationStatus !== "approved") return [];
+
+  const categoryRows = await db
+    .select({ slug: serviceCategories.slug, name: serviceCategories.name })
+    .from(serviceCategories)
+    .where(eq(serviceCategories.id, categoryId))
+    .limit(1);
+  const onboardingRequirements = resolveProviderDocumentRequirements({
+    categorySlug: categoryRows[0]?.slug ?? null,
+    categoryName: categoryRows[0]?.name ?? null,
+  });
+  // A category with no approved-source mapping may not receive work. This keeps
+  // UNKNOWN = BLOCK while still permitting the provider to access their documents.
+  if (!onboardingRequirements.sourceMatched) return [];
 
   const capabilityStatuses = await db
     .select({
@@ -6120,7 +6382,8 @@ export async function getNewJobsForProvider(providerId: number) {
               status.jurisdictionId === candidate.jurisdictionId,
           ) ?? null;
     const capabilityAllowed = evaluateCapabilityTransition({
-      enforcementEnabled: candidate.requiredCapabilityId !== null,
+      enforcementEnabled: true,
+      complianceRequirementState: candidate.complianceRequirementState,
       requiredCapabilityId: candidate.requiredCapabilityId,
       jurisdictionId: candidate.jurisdictionId,
       providerCapabilityDecision: capabilityStatus?.status ?? null,
@@ -7377,16 +7640,24 @@ export async function stageMoveAiDraftMedia(input: {
 }) {
   const database = await getDb();
   if (!database) throw new Error("Database not available");
-  const activeRows = await database
-    .select({ id: moveAiDraftMedia.id })
-    .from(moveAiDraftMedia)
-    .where(and(
-      eq(moveAiDraftMedia.ownerUserId, input.ownerUserId),
-      inArray(moveAiDraftMedia.status, ["staged", "attached"]),
-    ));
-  if (activeRows.length >= 4) throw new Error("MOVE_AI_MEDIA_LIMIT_EXCEEDED");
-  await database.insert(moveAiDraftMedia).values({ ...input, status: "staged" });
-  return { opaqueId: input.opaqueId, kind: input.kind, sizeBytes: input.sizeBytes };
+  return database.transaction(async (tx) => {
+    const activeRows = await tx
+      .select({ id: moveAiDraftMedia.id })
+      .from(moveAiDraftMedia)
+      .where(and(
+        eq(moveAiDraftMedia.ownerUserId, input.ownerUserId),
+        inArray(moveAiDraftMedia.status, ["staged", "attached"]),
+      ));
+    if (activeRows.length >= 4) throw new Error("MOVE_AI_MEDIA_LIMIT_EXCEEDED");
+    await tx.insert(moveAiDraftMedia).values({ ...input, status: "staged" });
+    await tx.insert(mediaScannerJobs).values(buildMediaScannerJob({
+      mediaClass: "move_ai_draft_media",
+      mediaId: input.opaqueId,
+      sha256: input.sha256,
+      storageKey: input.storageKey,
+    }));
+    return { opaqueId: input.opaqueId, kind: input.kind, sizeBytes: input.sizeBytes };
+  });
 }
 
 export async function getMoveAiDraftForUser(draftId: number, userId: number) {

@@ -618,7 +618,9 @@ export const providerDocuments = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     providerId: int("providerId").notNull(),
     ownerUserId: int("ownerUserId").notNull(),
-    type: mysqlEnum("type", ["identity", "driver_license", "src_certificate", "psychotechnic"]).notNull(),
+    // Source-derived credential identifiers are versioned by the approved
+    // compliance pack. Router-side allow-listing prevents arbitrary values.
+    type: varchar("type", { length: 160 }).notNull(),
     storageKey: varchar("storageKey", { length: 512 }).notNull(),
     fileUrl: text("fileUrl").notNull(),
     fileName: varchar("fileName", { length: 255 }).notNull(),
@@ -929,7 +931,29 @@ export const serviceRequests = mysqlTable("service_requests", {
   // Server-derived compliance context. Once a requirement is present, offer,
   // acceptance and job-start decisions use this immutable request context.
   jurisdictionId: int("jurisdictionId"),
+  serviceCountryCode: varchar("serviceCountryCode", { length: 2 }),
   requiredCapabilityId: int("requiredCapabilityId"),
+  complianceRequirementState: mysqlEnum("complianceRequirementState", [
+    "not_required",
+    "required",
+    "blocked",
+    "legal_review_required",
+  ]).default("blocked").notNull(),
+  requirementState: mysqlEnum("requirementState", [
+    "REQUIRED",
+    "NOT_REQUIRED",
+    "CONDITIONAL",
+    "PROHIBITED",
+    "UNKNOWN",
+    "LEGAL_REVIEW_REQUIRED",
+    "JURISDICTION_UNRESOLVED",
+    "CAPABILITY_UNMAPPED",
+  ]).default("UNKNOWN").notNull(),
+  compliancePackageId: int("compliancePackageId"),
+  complianceRuleId: int("complianceRuleId"),
+  officialSourceId: int("officialSourceId"),
+  sourceStatus: mysqlEnum("sourceStatus", ["verified", "draft", "superseded", "revoked", "missing"]).default("missing").notNull(),
+  currencyContext: varchar("currencyContext", { length: 3 }),
   requiredCredentialType: varchar("requiredCredentialType", { length: 120 }),
   requiredCredentialAssurance: mysqlEnum("requiredCredentialAssurance", ["A", "B", "C", "D", "E", "F"]),
   requiresCredentialHumanReview: int("requiresCredentialHumanReview"),
@@ -939,6 +963,8 @@ export const serviceRequests = mysqlTable("service_requests", {
 }, (table) => [
   index("service_requests_organization_status_idx").on(table.organizationId, table.status),
   index("service_requests_capability_context_idx").on(table.jurisdictionId, table.requiredCapabilityId),
+  index("service_requests_requirement_state_idx").on(table.jurisdictionId, table.complianceRequirementState),
+  index("service_requests_jurisdiction_snapshot_idx").on(table.serviceCountryCode, table.jurisdictionId, table.requirementState),
   index("service_requests_credential_context_idx").on(table.jurisdictionId, table.requiredCredentialType),
 ]);
 
@@ -1013,6 +1039,42 @@ export const serviceRequestMedia = mysqlTable(
     uniqueIndex("service_request_media_public_id_unique").on(table.publicId),
     index("service_request_media_request_purpose_idx").on(table.requestId, table.purpose),
     index("service_request_media_owner_idx").on(table.ownerUserId),
+  ],
+);
+
+// Durable scanner outbox. Every quarantined media record has exactly one
+// mutable delivery job keyed by its class-scoped media reference. The job
+// contains no end-user PII and remains available for retry/reconciliation when
+// an external malware scanner is not configured or cannot be reached.
+export const mediaScannerJobs = mysqlTable(
+  "media_scanner_jobs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    mediaClass: mysqlEnum("mediaClass", [
+      "provider_document",
+      "service_request_media",
+      "voice_message",
+      "move_ai_draft_media",
+    ]).notNull(),
+    mediaId: varchar("mediaId", { length: 64 }).notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    storageKey: varchar("storageKey", { length: 512 }).notNull(),
+    status: mysqlEnum("status", ["queued", "dispatched", "retry_scheduled", "completed", "blocked", "failed"])
+      .default("queued")
+      .notNull(),
+    deliveryAttempts: int("deliveryAttempts").default(0).notNull(),
+    lastDispatchAt: timestamp("lastDispatchAt"),
+    nextAttemptAt: timestamp("nextAttemptAt").defaultNow().notNull(),
+    scannerReference: varchar("scannerReference", { length: 191 }),
+    outcome: mysqlEnum("outcome", ["clean", "blocked"]),
+    outcomeReason: varchar("outcomeReason", { length: 500 }),
+    completedAt: timestamp("completedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("media_scanner_jobs_media_unique").on(table.mediaClass, table.mediaId),
+    index("media_scanner_jobs_claim_idx").on(table.status, table.nextAttemptAt, table.id),
   ],
 );
 

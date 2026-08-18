@@ -138,3 +138,22 @@ P12 tam regresyonunda **90 test dosyası / 553 test** geçti. TypeScript, lint, 
 - [P9 E2E ve güvenlik matrisi](./p9-e2e-security-matrix.md)
 - [P8 tedarik zinciri durumu](./p8-supply-chain-status.md)
 - [P8 mobil release gate’i](./p8-mobile-release-gate.md)
+
+---
+
+## P13 FINAL VERIFIED INTERNAL CLOSURE — 18 Ağustos 2026 Eki
+
+**Baseline:** `7446563d` (P12 final). P13’de approved `TR-GOLD-2026-08-13-v1.0` paketi tek Türkiye source-of-truth olarak kaydedildi; kaynak paketinin gelişi Country Launch Gate’i otomatik olarak açmadı. Explicit requirement state ve immutable service-request jurisdiction/source/currency snapshot’ları additive `0061` ve `0063` ile uygulandı. Provider onboarding, yalnız approved source’dan türeyen dinamik belge kimlikleri (`0064`) ve güvenli kısa ömürlü belge erişimiyle kapatıldı. Karantinalı yükleme ile aynı transaction’da durable scanner outbox (`0062`) oluşturulur; retry, dead-letter, callback completion ve yapılandırmasız adapter davranışı fail-closed’dur.
+
+P13 ayrıca chat list/detail DTO’larında e-posta PII sızıntısını testle kilitledi; gerçek OTP’ye yönlenen legacy phone route’u düzeltti; örnek/değersiz route’ları gerçek başlangıç akışına uyumluluk yönlendirmelerine çevirdi; canonical environment contract ve parçalı sağlayıcı konfigürasyonu korumasını ekledi. Masraf, i18n/RTL/çeviri, partial dispute settlement, privacy, safety ve provider operating model sözleşmeleri P13 hedefli regresyonlarla yeniden doğrulandı.
+
+| P13 kalite kapısı | Sonuç |
+|---|---:|
+| Tam regresyon | **PASS — 96 dosya / 582 test** |
+| TypeScript / lint / backend build | **PASS / PASS / PASS** (`dist/index.js` 816.2 kB) |
+| iOS / Android / web export | **PASS — 26 / 27 / 100 dosya; web 78 rota** |
+| Lisans / SBOM | **PASS — 1.024 paket / 1.023 bileşen** |
+| Source integrity | **PASS — credential eşleşmesi 0, `git diff --check` temiz** |
+| `pnpm audit --audit-level=high` | **C — NO-GO gate: 5 moderate, 2 high**; kalan high Expo SDK 54/Metro zincirindeki `image-size@1.2.1` transitif advisory’dir |
+
+**P13 durumu:** Uygulanabilir iç kapsam **B — CONDITIONAL GO**; canlı production deployment **C — NO-GO**. Gerçek scanner/ödeme/iletişim credential’ları, production DNS/HTTPS, hukuk onayı, fiziksel cihaz E2E ve Expo araç zinciri audit remediation’ı dış release gate olarak kalır. Ayrıntılı kanıt: [P13 FINAL VERIFIED INTERNAL CLOSURE report](./compliance/P13_FINAL_VERIFIED_INTERNAL_CLOSURE_REPORT.md).

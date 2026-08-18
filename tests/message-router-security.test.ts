@@ -8,6 +8,7 @@ vi.mock("../server/db", async () => {
   return {
     ...actual,
     getConversation: vi.fn(),
+    getMessageConversations: vi.fn(),
     getAuthorizedVoiceMessageStorage: vi.fn(),
     getAuthorizedTextMessageForTranslation: vi.fn(),
     getCachedMessageTranslation: vi.fn(),
@@ -298,6 +299,53 @@ describe("message router security", () => {
     expect(messages[0]).not.toHaveProperty("mediaUrl");
     expect(messages[0]).not.toHaveProperty("mediaStorageKey");
     expect(messages[0]).not.toHaveProperty("mediaSha256");
+  });
+
+  it("does not expose participant email addresses in conversation-list or conversation-detail DTOs", async () => {
+    vi.mocked(messageDb.getMessageConversations).mockResolvedValue([
+      {
+        otherUserId: 20,
+        displayName: "Doğrulanmış Usta",
+        isProvider: true,
+        isVerified: true,
+        rating: "4.8",
+        requestId: 42,
+        requestTitle: "Musluk tamiri",
+        lastMessage: "Yoldayım.",
+        lastMessageAt: new Date("2026-08-18T08:00:00.000Z"),
+        unreadCount: 1,
+      },
+    ] as never);
+    vi.mocked(messageDb.getConversation).mockResolvedValue([
+      {
+        id: 504,
+        senderId: 20,
+        receiverId: 10,
+        requestId: 42,
+        content: "Yoldayım.",
+        kind: "text",
+        mediaMimeType: null,
+        mediaSizeBytes: null,
+        mediaDurationMs: null,
+        isRead: 0,
+        createdAt: new Date("2026-08-18T08:00:00.000Z"),
+      },
+    ]);
+    const caller = appRouter.createCaller(createContext(10));
+
+    const [conversationList, conversationDetail] = await Promise.all([
+      caller.messages.list(),
+      caller.messages.conversation({ requestId: 42, otherUserId: 20 }),
+    ]);
+
+    expect(conversationList).toHaveLength(1);
+    expect(conversationList[0]).not.toHaveProperty("email");
+    expect(conversationList[0]).not.toHaveProperty("participantEmail");
+    expect(conversationDetail).toHaveLength(1);
+    expect(conversationDetail[0]).not.toHaveProperty("email");
+    expect(conversationDetail[0]).not.toHaveProperty("participantEmail");
+    expect(messageDb.getMessageConversations).toHaveBeenCalledWith(10);
+    expect(messageDb.getConversation).toHaveBeenCalledWith(42, 10, 20);
   });
 
   it("binds audio playback access to the authenticated conversation participant", async () => {

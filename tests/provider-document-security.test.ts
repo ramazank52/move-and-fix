@@ -8,19 +8,21 @@ vi.mock("../server/db", async () => {
     getProviderProfile: vi.fn(),
     getProviderDocumentRequirements: vi.fn(),
     getProviderDocuments: vi.fn(),
+    getProviderDocumentById: vi.fn(),
     getProviderInsurancePolicies: vi.fn(),
     getProviderOperatingModel: vi.fn(),
     getJobSafetyRules: vi.fn(),
     listProviderCapabilityStatuses: vi.fn(),
     createProviderCapabilityAppeal: vi.fn(),
     assertMessageParticipant: vi.fn(),
+    logOperationEvent: vi.fn(),
   };
 });
 
-vi.mock("../server/storage", () => ({ storagePut: vi.fn() }));
+vi.mock("../server/storage", () => ({ storagePut: vi.fn(), storageGetSignedUrl: vi.fn() }));
 
 import * as providerDb from "../server/db";
-import { storagePut } from "../server/storage";
+import { storageGetSignedUrl, storagePut } from "../server/storage";
 import { appRouter } from "../server/routers";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -69,6 +71,80 @@ describe("provider document and voice media security", () => {
 
     await expect(caller.providers.getDocuments()).resolves.toEqual([]);
     expect(providerDb.getProviderDocuments).toHaveBeenCalledWith(901);
+  });
+
+  it("does not expose persistent document storage references from the private list DTO", async () => {
+    vi.mocked(providerDb.getProviderProfile).mockResolvedValue({ id: 901 } as Awaited<ReturnType<typeof providerDb.getProviderProfile>>);
+    vi.mocked(providerDb.getProviderDocuments).mockResolvedValue([{
+      id: 9011,
+      providerId: 901,
+      ownerUserId: 81,
+      type: "identity",
+      storageKey: "provider-documents/901/identity/private.pdf",
+      fileUrl: "/manus-storage/provider-documents/901/identity/private.pdf",
+      fileName: "kimlik.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 123,
+      sha256: "a".repeat(64),
+      status: "pending",
+      quarantineStatus: "pending_scan",
+      quarantineReason: null,
+      scannedAt: null,
+      releasedAt: null,
+      rejectionReason: null,
+      reviewedByUserId: null,
+      reviewedAt: null,
+      retentionDueAt: null,
+      contentPurgedAt: null,
+      purgeStatus: "not_scheduled",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }] as Awaited<ReturnType<typeof providerDb.getProviderDocuments>>);
+
+    const caller = appRouter.createCaller(createContext(81));
+    await expect(caller.providers.getDocuments()).resolves.toEqual([
+      expect.objectContaining({ id: 9011, contentAvailable: false }),
+    ]);
+    const result = await caller.providers.getDocuments();
+    expect(result[0]).not.toHaveProperty("storageKey");
+    expect(result[0]).not.toHaveProperty("fileUrl");
+  });
+
+  it("issues a storage URL only to the document owner after a clean, retained quarantine state", async () => {
+    vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({
+      id: 9012,
+      providerId: 901,
+      ownerUserId: 81,
+      storageKey: "provider-documents/901/identity/clean.pdf",
+      quarantineStatus: "clean",
+      contentPurgedAt: null,
+    } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
+    vi.mocked(storageGetSignedUrl).mockResolvedValue("https://signed.example/temporary");
+    const caller = appRouter.createCaller(createContext(81));
+
+    await expect(caller.providers.getDocumentAccess({ documentId: 9012 })).resolves.toEqual({ url: "https://signed.example/temporary" });
+    expect(storageGetSignedUrl).toHaveBeenCalledWith("provider-documents/901/identity/clean.pdf");
+    expect(providerDb.logOperationEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: "provider_document_access_granted",
+      subjectId: 9012,
+      actorId: 81,
+    }));
+  });
+
+  it("fails closed for another provider, unscanned content, purged content and unavailable signing", async () => {
+    const caller = appRouter.createCaller(createContext(81));
+    vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({ id: 9013, ownerUserId: 82 } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
+    await expect(caller.providers.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({ id: 9013, ownerUserId: 81, storageKey: "private", quarantineStatus: "pending_scan", contentPurgedAt: null } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
+    await expect(caller.providers.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+
+    vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({ id: 9013, ownerUserId: 81, storageKey: "private", quarantineStatus: "clean", contentPurgedAt: new Date() } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
+    await expect(caller.providers.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+
+    vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({ id: 9013, ownerUserId: 81, storageKey: "private", quarantineStatus: "clean", contentPurgedAt: null } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
+    vi.mocked(storageGetSignedUrl).mockRejectedValue(new Error("NOT_CONFIGURED"));
+    await expect(caller.providers.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 
   it("derives dynamic document requirements solely from the authenticated provider session", async () => {

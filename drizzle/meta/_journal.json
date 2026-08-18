@@ -421,6 +421,34 @@
       "when": 1787058556000,
       "tag": "0060_p12_media_quarantine_all_classes",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "5",
+      "when": 1787130000000,
+      "tag": "0061_p13_compliance_requirement_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "5",
+      "when": 1787131000000,
+      "tag": "0062_p13_media_scanner_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "5",
+      "when": 1787132000000,
+      "tag": "0063_p13_service_request_jurisdiction_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "5",
+      "when": 1787133000000,
+      "tag": "0064_p13_provider_document_dynamic_types",
+      "breakpoints": true
     }
   ]
 }

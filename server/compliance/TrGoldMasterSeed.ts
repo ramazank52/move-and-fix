@@ -1,12 +1,18 @@
 import type { Connection } from "mysql2/promise";
 
+import countryPack from "./approved-sources/TR-GOLD-2026-08-13-v1.0/TR_Gold_Master_Country_Pack_v1.json";
+import sourceRegistry from "./approved-sources/TR-GOLD-2026-08-13-v1.0/TR_Official_Source_Registry_v1.json";
+
 /**
- * Türkiye Gold Master, operasyonel lansman izni değildir. Bu paket yalnız
- * doğrulanmış resmi kaynakları ve insan/hukuk incelemesi bekleyen capability
- * kurallarını kaydeder. `enabled` durumuna geçiş, mevcut country launch gate
- * ve ayrı MFA-korumalı legal approval akışından geçmek zorundadır.
+ * This seed deliberately mirrors the approved source package rather than
+ * translating it into new legal assertions. The package is not a launch
+ * approval: all generated capability rules remain human-review gated.
  */
-export const TR_GOLD_MASTER_VERSION = "tr-gold-master-2026-08";
+export const TR_GOLD_MASTER_VERSION = countryPack.pack_id;
+
+type ApprovedSource = (typeof sourceRegistry.sources)[number];
+type ApprovedService = (typeof countryPack.services)[number];
+type ApprovedServiceRule = ApprovedService["rules"][number];
 
 type CapabilityRuleSeed = {
   key: string;
@@ -14,68 +20,81 @@ type CapabilityRuleSeed = {
   credentialType: string | null;
   ruleStatus: "conditional" | "required";
   rationale: string;
+  sourceReferenceIds: string[];
   scopeConstraints: Record<string, unknown>;
 };
 
-const TR_OFFICIAL_SOURCES = [
-  {
-    authorityName: "T.C. Mevzuat Bilgi Sistemi",
-    sourceUrl: "https://www.mevzuat.gov.tr/mevzuat?MevzuatNo=6502&MevzuatTur=1&MevzuatTertip=5",
-    sourceVersion: "6502",
-  },
-  {
-    authorityName: "Kişisel Verileri Koruma Kurumu",
-    sourceUrl: "https://www.kvkk.gov.tr/Icerik/6649/6698-Sayili-Kisisel-Verilerin-Korunmasi-Kanunu",
-    sourceVersion: "6698",
-  },
-  {
-    authorityName: "T.C. Ulaştırma ve Altyapı Bakanlığı",
-    sourceUrl: "https://uhdgm.uab.gov.tr/karayolu-tasima-yonetmeligi",
-    sourceVersion: "karayolu-tasima",
-  },
-] as const;
+const TR_OFFICIAL_SOURCES = sourceRegistry.sources.map((source: ApprovedSource) => ({
+  registryId: source.id,
+  authorityName: source.authority,
+  sourceUrl: source.url,
+  sourceVersion: `${sourceRegistry.pack_id}:${source.id}`,
+}));
 
-const TR_CAPABILITY_RULES: readonly CapabilityRuleSeed[] = [
-  {
-    key: "towing",
-    displayName: "Çekici",
-    credentialType: "towing_authorization",
-    ruleStatus: "required",
-    rationale: "Karayolu taşıma faaliyeti ve işletme kapsamı insan incelemesi olmadan doğrulanmış sayılmaz.",
-    scopeConstraints: { countryCode: "TR", serviceKeys: ["towing"], requiresVehicleMatch: true },
-  },
-  {
-    key: "courier",
-    displayName: "Kurye",
-    credentialType: "courier_authorization",
-    ruleStatus: "conditional",
-    rationale: "Faaliyetin araç, taşıma tipi ve yerel izin kapsamı için karar yalnız makine-okunur constraint ile sınırlanır.",
-    scopeConstraints: { countryCode: "TR", serviceKeys: ["courier"], requiresOperatingModel: true },
-  },
-  {
-    key: "roadside",
-    displayName: "Yol Yardımı",
-    credentialType: "roadside_service_authorization",
-    ruleStatus: "conditional",
-    rationale: "Riskli saha hizmeti; güvenlik, sigorta ve yetki kapsamı insan incelemesi olmadan genişletilemez.",
-    scopeConstraints: { countryCode: "TR", serviceKeys: ["roadside"], requiresInsurance: true },
-  },
-] as const;
+function capabilityKey(service: ApprovedService, rule: ApprovedServiceRule, index: number) {
+  const stableSubservice = rule.subservice
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 72);
+  return `tr-gold-${service.key}-${index + 1}-${stableSubservice || "scope"}`.slice(0, 120);
+}
+
+function isExplicitlyRequired(status: string) {
+  return /(^|_)(LEGAL_REQUIRED|DYNAMIC_LEGAL_MANDATORY|LOCAL_UTILITY_AUTHORIZATION_REQUIRED)(_|$)/.test(status);
+}
+
+const approvedSourceIds = new Set(sourceRegistry.sources.map((source) => source.id));
+
+const TR_CAPABILITY_RULES: readonly CapabilityRuleSeed[] = countryPack.services.flatMap((service: ApprovedService) =>
+  service.rules.map((rule: ApprovedServiceRule, index: number) => {
+    const sourceReferenceIds = (rule.sources ?? []).filter((sourceId) => approvedSourceIds.has(sourceId));
+    return {
+      key: capabilityKey(service, rule, index),
+      displayName: `${service.name} — ${rule.subservice}`,
+      credentialType: rule.credentials?.[0] ?? null,
+      // Only explicit package wording can produce "required". All remaining
+      // source statuses stay conditional and human-review gated.
+      ruleStatus: isExplicitlyRequired(rule.status) ? "required" : "conditional",
+      sourceReferenceIds,
+      rationale: rule.status,
+      scopeConstraints: {
+        countryCode: countryPack.country_code,
+        approvedPackId: countryPack.pack_id,
+        approvedPackStatus: countryPack.status,
+        serviceKey: service.key,
+        serviceName: service.name,
+        catalogListed: service.catalog,
+        subservice: rule.subservice,
+        sourceDecisionStatus: rule.status,
+        sourceCredentialLabels: rule.credentials,
+        sourceReferenceIds,
+        sourceFailurePolicy: rule.failure ?? null,
+        unknownPolicy: countryPack.verification_engine.unknown,
+        decisionStates: countryPack.verification_engine.decision_states,
+        requiresHumanReview: true,
+        unmappedSourceReferencePolicy: sourceReferenceIds.length === 0 ? "LEGAL_REVIEW_REQUIRED" : null,
+      },
+    };
+  }),
+);
 
 async function findOrCreateJurisdiction(connection: Connection) {
   const [existing] = await connection.execute<any[]>(
     "SELECT id FROM jurisdictions WHERE countryCode = ? AND regionCode IS NULL ORDER BY id ASC LIMIT 1",
-    ["TR"],
+    [countryPack.country_code],
   );
   if (existing[0]?.id) return Number(existing[0].id);
 
   await connection.execute(
     "INSERT INTO jurisdictions (countryCode, regionCode, displayName, status) VALUES (?, NULL, ?, 'draft')",
-    ["TR", "Türkiye"],
+    [countryPack.country_code, countryPack.country],
   );
   const [created] = await connection.execute<any[]>(
     "SELECT id FROM jurisdictions WHERE countryCode = ? AND regionCode IS NULL ORDER BY id DESC LIMIT 1",
-    ["TR"],
+    [countryPack.country_code],
   );
   if (!created[0]?.id) throw new Error("TR_GOLD_MASTER_JURISDICTION_CREATE_FAILED");
   return Number(created[0].id);
@@ -88,7 +107,7 @@ export async function applyTurkeyGoldMasterSeed(connection: Connection, actorUse
   }
 
   const jurisdictionId = await findOrCreateJurisdiction(connection);
-  const sourceIds: number[] = [];
+  const sourceIdByRegistryId = new Map<string, number>();
   for (const source of TR_OFFICIAL_SOURCES) {
     await connection.execute(
       `INSERT INTO official_compliance_sources
@@ -102,7 +121,7 @@ export async function applyTurkeyGoldMasterSeed(connection: Connection, actorUse
       [jurisdictionId, source.sourceUrl],
     );
     if (!rows[0]?.id) throw new Error("TR_GOLD_MASTER_SOURCE_LOOKUP_FAILED");
-    sourceIds.push(Number(rows[0].id));
+    sourceIdByRegistryId.set(source.registryId, Number(rows[0].id));
   }
 
   await connection.execute(
@@ -113,7 +132,7 @@ export async function applyTurkeyGoldMasterSeed(connection: Connection, actorUse
     [
       jurisdictionId,
       TR_GOLD_MASTER_VERSION,
-      "Türkiye Gold Master: resmi kaynaklar kaydedildi; hukuki onay, ödeme readiness ve country launch gate tamamlanmadan kullanıma açılamaz.",
+      `${countryPack.country} Gold Master ${countryPack.pack_id}: onaylı kaynak paketi kaydedildi; hukuk onayı, ödeme readiness ve country launch gate tamamlanmadan kullanıma açılamaz.`,
       actorUserId,
     ],
   );
@@ -138,13 +157,20 @@ export async function applyTurkeyGoldMasterSeed(connection: Connection, actorUse
     const capabilityId = Number(capabilities[0]?.id);
     if (!capabilityId) throw new Error("TR_GOLD_MASTER_CAPABILITY_LOOKUP_FAILED");
 
+    // A package rule without a listed registry source remains source-unlinked
+    // and blocked for legal review. It must never inherit an arbitrary source
+    // citation from a different rule.
+    const primarySourceId = rule.sourceReferenceIds
+      .map((referenceId) => sourceIdByRegistryId.get(referenceId))
+      .find((sourceId): sourceId is number => Boolean(sourceId)) ?? null;
+
     await connection.execute(
       `INSERT INTO capability_jurisdiction_rules
         (packageId, capabilityId, sourceId, requiredCredentialType, requiresHumanReview, ruleStatus, scopeConstraintsJson, conditionalStatus, rationale)
        VALUES (?, ?, ?, ?, 1, ?, CAST(? AS JSON), 'conditional', ?)
        ON DUPLICATE KEY UPDATE requiredCredentialType=VALUES(requiredCredentialType), requiresHumanReview=1,
          ruleStatus=VALUES(ruleStatus), scopeConstraintsJson=VALUES(scopeConstraintsJson), conditionalStatus='conditional', rationale=VALUES(rationale)`,
-      [packageId, capabilityId, sourceIds[0], rule.credentialType, rule.ruleStatus, JSON.stringify(rule.scopeConstraints), rule.rationale],
+      [packageId, capabilityId, primarySourceId, rule.credentialType, rule.ruleStatus, JSON.stringify(rule.scopeConstraints), rule.rationale],
     );
   }
 
@@ -153,6 +179,7 @@ export async function applyTurkeyGoldMasterSeed(connection: Connection, actorUse
 
 export const turkeyGoldMasterSeed = {
   version: TR_GOLD_MASTER_VERSION,
+  countryPack,
   sources: TR_OFFICIAL_SOURCES,
   rules: TR_CAPABILITY_RULES,
 };

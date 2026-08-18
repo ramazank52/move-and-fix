@@ -3159,8 +3159,8 @@
     {
       "type": "library",
       "name": "@types/send",
-      "version": "0.17.6",
-      "purl": "pkg:npm/%40types%2Fsend@0.17.6",
+      "version": "1.2.1",
+      "purl": "pkg:npm/%40types%2Fsend@1.2.1",
       "licenses": [
         {
           "license": {
@@ -4810,8 +4810,8 @@
     {
       "type": "library",
       "name": "commander",
-      "version": "4.1.1",
-      "purl": "pkg:npm/commander@4.1.1",
+      "version": "2.20.3",
+      "purl": "pkg:npm/commander@2.20.3",
       "licenses": [
         {
           "license": {
@@ -7163,8 +7163,8 @@
     {
       "type": "library",
       "name": "glob-parent",
-      "version": "5.1.2",
-      "purl": "pkg:npm/glob-parent@5.1.2",
+      "version": "6.0.2",
+      "purl": "pkg:npm/glob-parent@6.0.2",
       "licenses": [
         {
           "license": {
@@ -7345,8 +7345,8 @@
     {
       "type": "library",
       "name": "hermes-estree",
-      "version": "0.29.1",
-      "purl": "pkg:npm/hermes-estree@0.29.1",
+      "version": "0.32.0",
+      "purl": "pkg:npm/hermes-estree@0.32.0",
       "licenses": [
         {
           "license": {
@@ -8775,12 +8775,12 @@
     {
       "type": "library",
       "name": "lru-cache",
-      "version": "11.2.4",
-      "purl": "pkg:npm/lru-cache@11.2.4",
+      "version": "5.1.1",
+      "purl": "pkg:npm/lru-cache@5.1.1",
       "licenses": [
         {
           "license": {
-            "id": "BlueOak-1.0.0"
+            "id": "ISC"
           }
         }
       ]
@@ -12943,8 +12943,8 @@
     {
       "type": "library",
       "name": "webidl-conversions",
-      "version": "3.0.1",
-      "purl": "pkg:npm/webidl-conversions@3.0.1",
+      "version": "5.0.0",
+      "purl": "pkg:npm/webidl-conversions@5.0.0",
       "licenses": [
         {
           "license": {

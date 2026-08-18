@@ -510,3 +510,29 @@
 - [x] P1-18 — /verify/email nested rotasını oturumdaki gerçek e-posta ve gerçek OTP mutasyonlarını kullanan doğrulama ekranına yönlendir
 - [x] P12 — Tam regresyon, build/export, güvenlik taramaları, SBOM/lisans ve release evidence kalite kapılarını çalıştır
 - [x] P12 — Checkpoint ve kanıta dayalı final üretim durum raporunu tamamla
+
+## PASTED CONTENT 02 REVIEW
+- [x] Pasted_content_02.txt talimatlarını P12 checkpoint'iyle karşılaştır, uygulanabilir açıkları kapat ve doğrulanmış sonuçları raporla
+
+## P13 FINAL VERIFIED INTERNAL CLOSURE
+- [x] TR-GOLD-2026-08-13-v1.0 onaylı paketini MD, JSON ve Official Source Registry birlikte doğrulanmış tek hukuki source-of-truth olarak versioned fail-closed compliance katmanına bağla
+- [x] Onaylı TR Gold Master kaynak paketini doğrula; aktif katalog kapsamını yalnız kaynak temelli, sürümlü ve UNKNOWN=BLOCK kurallarıyla eşle
+- [x] P0 compliance, jurisdiction, country gate, safety, onboarding, credential catalog, document access ve scanner orchestration açıklarını kapat
+- [x] P0/P1 PII, masraf dosyası, payment/dispute, doğrulama rotaları, privacy UI ve environment sözleşmesi açıklarını kapat
+- [x] P1 doğru 13 dil, tam i18n, message translation, demo route temizliği, profesyonel işletme UI ve package hygiene maddelerini kapat
+- [x] P13 test, TypeScript, lint, build, export, supply-chain, audit ve güvenlik kalite kapılarını çalıştır
+- [x] P13 checkpoint ve kanıta dayalı final A/B/C raporunu teslim et
+
+## P13 Detailed Binding Closure Audit
+- [x] P13-1 — Compliance requirement state, approved TR Gold Master kapsamı ve country launch gate runtime sözleşmelerini doğrula
+- [x] P13-2 — Profesyonel onboarding, dinamik credential katalogu ve güvenli belge erişim akışlarını doğrula
+- [x] P13-3 — Tüm kullanıcı yüklemeleri için dayanıklı scanner adapter/outbox, retry, dead-letter ve callback tamamlama akışını kapat
+- [x] P13-4 — Sohbet/public DTO’larında e-posta ve telefon PII sızıntısı olmadığını liste, detay ve ilişkili yüzeylerde doğrula
+- [x] P13-5 — Masraf dosyası ürün akışı, müşteri paylaşım yetkisi ve sohbetten masraf dosyası erişimini doğrula
+- [x] P13-6 — Onaylı 13 dil, tam i18n, mesaj çevirisi ve RTL kapsamını doğrula
+- [x] P13-7 — Service request jurisdiction snapshot, country-based payment context ve partial dispute settlement sözleşmelerini doğrula
+- [x] P13-8 — Gizlilik merkezi, staged contact change ve gerçek telefon/e-posta doğrulama rotalarını doğrula
+- [x] P13-9 — Production demo/placeholder route, legacy cüzdan ve package hygiene temizliğini doğrula
+- [x] P13-10 — Job safety, provider operating model/insurance UI ve environment variable canonical contract açıklarını kapat
+- [x] P13-11 — P13 tam regresyon, derleme, export, supply-chain/audit ve release evidence kalite kapılarını çalıştır
+- [x] P13-12 — P13 checkpoint’i ve kanıta dayalı final A/B/C üretim raporunu hazırla

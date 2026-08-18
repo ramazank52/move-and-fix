@@ -49,6 +49,7 @@ describe("offer router security", () => {
       requestId: 12,
       jurisdictionId: 7,
       requiredCapabilityId: 3,
+      complianceRequirementState: "required",
       requiredCredentialType: null,
       requiredCredentialAssurance: null,
       requiresCredentialHumanReview: null,

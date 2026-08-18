@@ -1,0 +1,138 @@
+{
+  "pack_id": "TR-GOLD-2026-08-13-v1.0",
+  "as_of": "2026-08-13",
+  "sources": [
+    {
+      "id": "MYK_MANDATORY",
+      "authority": "MYK",
+      "title": "Belge Zorunluluğu Kapsamındaki Meslekler",
+      "url": "https://portal.myk.gov.tr/index.php?belge_zorunlu=1&option=com_yeterlilik&view=arama"
+    },
+    {
+      "id": "MYK_QUALIFICATIONS",
+      "authority": "MYK",
+      "title": "Ulusal Yeterlilik Arama",
+      "url": "https://portal.myk.gov.tr/index.php?option=com_yeterlilik&view=arama"
+    },
+    {
+      "id": "MYK_VERIFY",
+      "authority": "e-Devlet / MYK",
+      "title": "MYK Mesleki Yeterlilik Belgesi Sorgulama",
+      "url": "https://www.turkiye.gov.tr/myk-mesleki-yeterlilik-belgesi-sorgulama"
+    },
+    {
+      "id": "MYK_ISSUERS",
+      "authority": "e-Devlet / MYK",
+      "title": "Belge Vermeye Yetkili Kuruluşlar",
+      "url": "https://www.turkiye.gov.tr/myk-belge-vermeye-yetkili-kuruluslar-ve-ucret-tarifeleri"
+    },
+    {
+      "id": "MYK_EXEMPTION",
+      "authority": "MYK",
+      "title": "Belge zorunluluğu – diploma/ustalık muafiyetleri",
+      "url": "https://www.myk.gov.tr/tr/haberler/yeterlilik/belge-zorunluluuna-ilikin-skca-sorulan-sorular"
+    },
+    {
+      "id": "MYK_SAMPLE",
+      "authority": "MYK",
+      "title": "MYK Mesleki Yeterlilik Belgesi/Kartı resmî örnekleri",
+      "url": "https://www.myk.gov.tr/tr/page/59"
+    },
+    {
+      "id": "MEB_MASTER",
+      "authority": "MEB / e-Devlet",
+      "title": "Kalfalık, Ustalık, Usta Öğreticilik ve İş Yeri Açma Belgesi Sorgulama",
+      "url": "https://www.turkiye.gov.tr/milli-egitim-kalfalik-ustalik-usta-ogrencilik-ve-is-yeri-acma-belgesi-sorgulama"
+    },
+    {
+      "id": "EDEVLET_BARCODE",
+      "authority": "e-Devlet",
+      "title": "Barkodlu Belge Doğrulama",
+      "url": "https://www.turkiye.gov.tr/belge-dogrulama"
+    },
+    {
+      "id": "UAB_TYPES",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "Eşya Taşımacılığı Yetki Belgesi Türleri",
+      "url": "https://istanbul.uab.gov.tr/yetki-belgeleri-esya-tasimaciligi-yetki-belgesi-turleri"
+    },
+    {
+      "id": "UAB_VERIFY",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "Yetki Belgesi Hizmetleri",
+      "url": "https://uhdgm.uab.gov.tr/yetki-belgeleri-hizmetleri"
+    },
+    {
+      "id": "UAB_SRC",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "SRC / ODY / ÜDY Sık Sorulan Sorular",
+      "url": "https://uhdgm.uab.gov.tr/sikca-sorulan-sorular-ve-cevaplari"
+    },
+    {
+      "id": "UAB_COURIER_2025",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "Motokurye düzenlemesi – 15 Mayıs 2025",
+      "url": "https://www.uab.gov.tr/haberler/karayolu-tasima-yoenetmeliginde-degisiklik/"
+    },
+    {
+      "id": "UAB_COURIER_2026",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "Karayolu Taşıma Yönetmeliği değişikliği – 16 Mayıs 2026",
+      "url": "https://www.uab.gov.tr/haberler/otobues-bileti-12-saat-kalana-kadar-tam-iade-edilebilecek/"
+    },
+    {
+      "id": "ELECTRIC_2026",
+      "authority": "Çevre, Şehircilik ve İklim Değişikliği Bakanlığı",
+      "title": "Elektrik ile ilgili fen adamlarının yetkileri – 2026",
+      "url": "https://meslekihizmetler.csb.gov.tr/haberler/elektrik-ile-ilgili-fen-adamlarinin-yetkileri-yeniden-belirlendi-302595"
+    },
+    {
+      "id": "EPDK_GAS",
+      "authority": "EPDK",
+      "title": "Doğal Gaz Piyasası Sertifika İşlemleri",
+      "url": "https://www.epdk.gov.tr/Detay/Icerik/3-0-81/dogal-gazsertifika-islemleri"
+    },
+    {
+      "id": "F_GAS_2026",
+      "authority": "İklim Değişikliği Başkanlığı",
+      "title": "F-Gaz / TS 13905 / 19UY0401-5 / EKOMVET – 2026",
+      "url": "https://ozonturkiye.csb.gov.tr/haberler/iklimlendirme-ve-sogutma-sektorunde-iyi-uygulama-ornekleri-egitim-serisi-konya-ve-adana-illerinde-devam-etti-305934"
+    },
+    {
+      "id": "SERBIS",
+      "authority": "Ticaret Bakanlığı",
+      "title": "SERBİS Yetkili Servis Sorgulama",
+      "url": "https://www.servis.gov.tr/Genel/Sorgu"
+    },
+    {
+      "id": "TRADE_REGISTRY",
+      "authority": "Ticaret Bakanlığı / e-Devlet",
+      "title": "Ticari işletme, şirket ve esnaf sicil hizmetleri",
+      "url": "https://www.turkiye.gov.tr/ticaret-bakanligi"
+    },
+    {
+      "id": "GIB",
+      "authority": "Gelir İdaresi Başkanlığı",
+      "title": "2026 işe başlama / mükellefiyet kaynakları",
+      "url": "https://www.gib.gov.tr/yardim-kaynaklar/yayinlar"
+    },
+    {
+      "id": "FOREIGN_WORK",
+      "authority": "Çalışma ve Sosyal Güvenlik Bakanlığı",
+      "title": "Çalışma İzni Türleri",
+      "url": "https://www.csgb.gov.tr/uigm/calisma-izni/calisma-izni-turleri/"
+    },
+    {
+      "id": "WORKPLACE_LICENSE",
+      "authority": "İçişleri Bakanlığı",
+      "title": "İşyeri Açma ve Çalışma Ruhsatlarına İlişkin Yönetmelik bağlantısı",
+      "url": "https://www.icisleri.gov.tr/strateji/yikob-mevzuat"
+    },
+    {
+      "id": "MEB_TOW_OPERATOR",
+      "authority": "Millî Eğitim Bakanlığı",
+      "title": "Araç Kurtarma ve Taşıma Kamyonu Operatörü kurs/program kayıtları",
+      "url": "https://ookgm.meb.gov.tr/kurumlar.php"
+    }
+  ]
+}

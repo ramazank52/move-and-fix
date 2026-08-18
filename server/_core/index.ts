@@ -32,6 +32,7 @@ import * as db from "../db";
 import { runFinancialReconciliation } from "../payments/FinancialReconciliationService";
 import { errorMiddleware, logger, requestLoggingMiddleware } from "./errorHandler";
 import { verifyMediaScannerCallbackSignature } from "../security/MediaScannerCallbackSecurity";
+import { dispatchOneMediaScannerJob } from "../security/MediaScannerDispatchService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -138,7 +139,7 @@ export async function createApp() {
   // session. The endpoint remains unavailable until its dedicated signature
   // secret is configured; a missing secret never creates a synthetic clean result.
   app.post("/api/webhooks/media-scanner", async (req, res) => {
-    const configuredSecret = ENV.mediaScannerWebhookSecret;
+    const configuredSecret = ENV.mediaScannerCallbackSecret;
     if (!configuredSecret) {
       res.status(503).json({ error: "MEDIA_SCANNER_NOT_CONFIGURED" });
       return;
@@ -186,6 +187,34 @@ export async function createApp() {
         error,
       });
       res.status(500).json({ error: "MEDIA_SCANNER_CALLBACK_FAILED" });
+    }
+  });
+
+  // This scheduler-only bridge drains one durable outbox item. It is unavailable
+  // without the scanner trust secret and never creates a clean result: the
+  // scanner's separately signed callback remains authoritative.
+  app.post("/api/scheduled/media-scanner-dispatch", async (req, res) => {
+    const configuredSecret = ENV.mediaScannerCallbackSecret;
+    const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
+    const actualAuthorization = String(req.headers.authorization ?? "");
+    const hasAuthorizationMatch = expectedAuthorization.length > 0
+      && actualAuthorization.length === expectedAuthorization.length
+      && timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
+    if (!hasAuthorizationMatch) {
+      res.status(configuredSecret ? 401 : 503).json({
+        error: configuredSecret ? "Unauthorized scheduled callback" : "MEDIA_SCANNER_NOT_CONFIGURED",
+      });
+      return;
+    }
+    try {
+      const result = await dispatchOneMediaScannerJob();
+      res.status(result.status === "not_configured" ? 503 : 200).json(result);
+    } catch (error) {
+      console.error("[media-scanner] dispatch failed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        error,
+      });
+      res.status(500).json({ error: "MEDIA_SCANNER_DISPATCH_FAILED" });
     }
   });
 

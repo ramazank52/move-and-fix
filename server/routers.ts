@@ -176,12 +176,7 @@ const passwordSchema = z
   );
 const verificationCodeSchema = z.string().regex(/^\d{6}$/, "6 haneli güvenlik kodunu girin");
 const verificationPurposeSchema = z.enum(["verify_email", "verify_phone", "sensitive_transaction"]);
-const providerDocumentTypeSchema = z.enum([
-  "identity",
-  "driver_license",
-  "src_certificate",
-  "psychotechnic",
-]);
+const providerDocumentTypeSchema = z.string().trim().min(1).max(160).regex(/^[a-z0-9-]+$/, "Geçersiz belge türü");
 const voiceMimeTypeSchema = z.enum([
   "audio/mp4",
   "audio/m4a",
@@ -975,6 +970,9 @@ export const appRouter = router({
     create: protectedProcedure
       .input(z.object({
         categoryId: z.number().int().positive(),
+        // Optional only for backwards-compatible callers; db.ts rejects absence
+        // with JURISDICTION_UNRESOLVED and never derives a default country.
+        countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/, "Hizmet ülkesi iki harfli ISO kodu olmalıdır").transform((value) => value.toUpperCase()).optional(),
         title: z.string().trim().min(1).max(255),
         description: z.string().trim().max(5000).optional(),
         address: z.string().trim().max(500).optional(),
@@ -1029,7 +1027,18 @@ export const appRouter = router({
             }
           }
         }
-        return db.createServiceRequest({ ...input, userId: ctx.user.id });
+        try {
+          return await db.createServiceRequest({ ...input, userId: ctx.user.id });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "SERVICE_REQUEST_COMPLIANCE_BLOCKED";
+          if (["JURISDICTION_UNRESOLVED", "CAPABILITY_UNMAPPED", "CONDITIONAL", "PROHIBITED", "UNKNOWN", "LEGAL_REVIEW_REQUIRED", "COMPLIANCE_CONTEXT_NOT_CONFIGURED"].includes(message)) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Hizmet ülkesi ve uyum gereksinimleri doğrulanmadan talep oluşturulamaz",
+            });
+          }
+          throw error;
+        }
       }),
     uploadMedia: protectedProcedure
       .input(z.object({
@@ -1881,6 +1890,10 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const provider = await db.getProviderProfile(ctx.user.id);
         if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+        const requirements = await db.getProviderDocumentRequirements(ctx.user.id);
+        if (!requirements || !requirements.required.some((requirement) => requirement.type === input.type)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Bu belge türü mevcut sunucu gereksinimlerinde tanımlı değil" });
+        }
         const buffer = decodeStrictBase64(input.base64);
         if (!isWithinDecodedByteLimit(buffer.length, MEDIA_UPLOAD_LIMIT_BYTES.providerDocument)) {
           throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Belge en fazla 10 MB olabilir" });
@@ -1911,8 +1924,46 @@ export const appRouter = router({
     getDocuments: protectedProcedure.query(async ({ ctx }) => {
       const provider = await db.getProviderProfile(ctx.user.id);
       if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
-      return db.getProviderDocuments(provider.id);
+      const documents = await db.getProviderDocuments(provider.id);
+      return documents.map(({ storageKey: _storageKey, fileUrl: _fileUrl, ...document }) => ({
+        ...document,
+        contentAvailable: document.quarantineStatus === "clean" && !document.contentPurgedAt && Boolean(_storageKey),
+      }));
     }),
+    getDocumentAccess: protectedProcedure
+      .input(z.object({ documentId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const document = await db.getProviderDocumentById(input.documentId);
+        // NOT_FOUND avoids revealing the existence or ownership of another provider's document.
+        if (!document || document.ownerUserId !== ctx.user.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Belge bulunamadı" });
+        }
+        if (
+          document.quarantineStatus !== "clean" ||
+          document.contentPurgedAt ||
+          !document.storageKey
+        ) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Belge içeriği güvenli erişim için uygun değil",
+          });
+        }
+        try {
+          const url = await storageGetSignedUrl(document.storageKey);
+          await db.logOperationEvent({
+            eventType: "provider_document_access_granted",
+            subjectId: document.id,
+            actorId: ctx.user.id,
+            payload: { providerId: document.providerId, accessScope: "owner" },
+          });
+          return { url };
+        } catch {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Belge içeriğine güvenli erişim şu anda yapılandırılmamış",
+          });
+        }
+      }),
     getDocumentRequirements: protectedProcedure.query(async ({ ctx }) => {
       const requirements = await db.getProviderDocumentRequirements(ctx.user.id);
       if (!requirements) {

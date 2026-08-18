@@ -1,0 +1,739 @@
+{
+  "pack_id": "TR-GOLD-2026-08-13-v1.0",
+  "country": "Türkiye",
+  "country_code": "TR",
+  "as_of": "2026-08-13",
+  "status": "RESEARCH_COMPLETE_DRAFT__PRODUCTION_LEGAL_SIGNOFF_REQUIRED",
+  "common_rules": {
+    "identity": "Tüm profesyonellerde gerçek kişi kimliği ve belge sahibi eşleşmesi.",
+    "foreign_work_right": "Yabancı profesyonelde geçerli çalışma izni veya hukuken geçerli muafiyet.",
+    "provider_model": "EMPLOYEE | SELF_EMPLOYED | SOLE_TRADER | COMPANY_OWNER | COMPANY_WORKER",
+    "business_tax": "Bağımsız/ticari faaliyette modele göre vergi, esnaf/ticaret/MERSİS kaydı.",
+    "fixed_premises": "Sabit atölye/dükkan/servis noktasında yerel işyeri ruhsatı koşulu çözümlenir.",
+    "myk_alternatives": "MYK yeterliliği varlığı ile MYK belgesi zorunluluğunu karıştırma. Güncel zorunluluk listesi + diploma/ustalık muafiyet tablosu birlikte uygulanır.",
+    "authorized_service": "Marka 'yetkili servis' iddiası SERBİS/üretici resmî kaydıyla doğrulanmadan gösterilemez."
+  },
+  "verification_engine": {
+    "question": "Bu kişi/işletme, bu araç/sürücü/operatör ve belgelerle, bugün Türkiye'de seçilen il/ilçede bu alt hizmeti hukuken sunabilir mi?",
+    "source_priority": [
+      "official_api_or_registry",
+      "official_qr_barcode_digital_signature",
+      "user_authorized_government_portal_output",
+      "competent_authority_confirmation",
+      "manual_compliance_review"
+    ],
+    "image_reference": "AUXILIARY_ONLY",
+    "decision_states": [
+      "VERIFIED",
+      "VERIFIED_LIMITED_SCOPE",
+      "MANUAL_REVIEW",
+      "REJECTED",
+      "EXPIRED_OR_SUSPENDED",
+      "LEGAL_REVIEW_REQUIRED"
+    ],
+    "unknown": "BLOCK",
+    "cross_checks": [
+      "document_type",
+      "document_number",
+      "holder_identity",
+      "issuer_authority",
+      "official_registry_status",
+      "expiry_revocation",
+      "service_scope",
+      "business_scope",
+      "vehicle_linkage",
+      "driver_operator_scope",
+      "jurisdiction",
+      "rule_version_effective_date"
+    ],
+    "continuous_recheck": true,
+    "failure_policy": "Hesabı tamamen kapatmak yerine yalnız doğrulanamayan/sona eren hizmet kabiliyetini durdur."
+  },
+  "services": [
+    {
+      "key": "cleaning",
+      "name": "Temizlik",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Standart ev temizliği",
+          "status": "NO_SINGLE_NATIONWIDE_TRADE_LICENSE_IDENTIFIED_FOR_SCOPE",
+          "credentials": [
+            "Ortak kimlik/çalışma hakkı/faaliyet statüsü"
+          ],
+          "note": "Endüstriyel/tehlikeli temizlik ayrı yüksek-risk paketi olmadan açılmaz."
+        }
+      ]
+    },
+    {
+      "key": "plumbing",
+      "name": "Su Tesisatı",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Sıhhi tesisat montajı / yeni hat / armatür",
+          "status": "DYNAMIC_LEGAL_MANDATORY_OR_RECOGNIZED_EXEMPTION",
+          "credentials": [
+            "21UY0448-3 Sıhhi Tesisatçı (Seviye 3)",
+            "İlgili MEB ustalık belgesi / mevzuatça kabul edilen diploma-muafiyet"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "MYK_MANDATORY",
+            "MYK_EXEMPTION",
+            "MEB_MASTER"
+          ]
+        },
+        {
+          "subservice": "Bakım / arıza / onarım",
+          "status": "CAPABILITY_MATCH + CURRENT_MANDATORY_RULE",
+          "credentials": [
+            "21UY0447-4 Sıhhi Tesisat Bakım Onarım ve Servis Elemanı (Seviye 4)",
+            "İlgili MEB ustalık/diploma"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "MYK_MANDATORY",
+            "MEB_MASTER"
+          ]
+        },
+        {
+          "subservice": "Su sayacı / mühürlü-idare ekipmanı",
+          "status": "LOCAL_UTILITY_AUTHORIZATION_REQUIRED",
+          "credentials": [
+            "İlgili su idaresi/yerel yetki"
+          ],
+          "failure": "BLOCK_UNTIL_LOCAL_RULE_RESOLVED"
+        }
+      ]
+    },
+    {
+      "key": "electrical",
+      "name": "Elektrik",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Konut iç tesisat / priz / anahtar / aydınlatma / arıza",
+          "status": "LEGAL_REQUIRED_OR_RECOGNIZED_EXEMPTION_WHERE_MANDATORY",
+          "credentials": [
+            "15UY0241-3 Elektrik Tesisatçısı (Seviye 3)",
+            "15UY0241-4 Elektrik Tesisatçısı (Seviye 4)",
+            "17UY0288-5 Elektrik Tesisatçısı (Seviye 5) – kapsam göre",
+            "İlgili MEB ustalık/diploma-muafiyet",
+            "Fen adamı yetki sınırı – iş kapsamı/bağlantı gücü gerektiriyorsa"
+          ],
+          "sources": [
+            "MYK_MANDATORY",
+            "MYK_QUALIFICATIONS",
+            "MYK_EXEMPTION",
+            "MEB_MASTER",
+            "ELECTRIC_2026"
+          ]
+        },
+        {
+          "subservice": "Pano / yeni-esaslı tesisat / proje-yetki sınırı doğuran iş",
+          "status": "ENHANCED_SCOPE_CHECK_REQUIRED",
+          "credentials": [
+            "Uygun seviye elektrik yeterliliği",
+            "Fen adamı/mühendis yetkisi – işin kapsamı gerektiriyorsa",
+            "Dağıtım/proje süreci – uygulanıyorsa"
+          ],
+          "failure": "BLOCK_IF_SCOPE_NOT_PROVEN"
+        },
+        {
+          "subservice": "Elektrik sayacı / mühürlü dağıtım ekipmanı",
+          "status": "SEPARATE_CAPABILITY",
+          "credentials": [
+            "17UY0279-4 Elektrik Sayacı Sökme Takma Elemanı (uygulanabilir güncel kurala göre)",
+            "Dağıtım şirketi/şebeke yetkisi"
+          ],
+          "failure": "BLOCK_UNLESS_EXPLICITLY_AUTHORIZED"
+        }
+      ]
+    },
+    {
+      "key": "painting",
+      "name": "Boya & Badana",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "İç/dış cephe inşaat boyacılığı",
+          "status": "LEGAL_REQUIRED_OR_RECOGNIZED_EXEMPTION",
+          "credentials": [
+            "11UY0023-3 İnşaat Boyacısı (Seviye 3)",
+            "MYK muafiyet tablosunda kabul edilen ilgili MEB ustalık/diploma"
+          ],
+          "sources": [
+            "MYK_MANDATORY",
+            "MYK_QUALIFICATIONS",
+            "MYK_EXEMPTION",
+            "MEB_MASTER"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "air_conditioning",
+      "name": "Klima",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Filtre/dış temizlik – soğutucu devreye müdahale yok",
+          "status": "NO_AUTOMATIC_FGAS_REQUIREMENT",
+          "credentials": [
+            "18UY0377-4 varsa doğrulanmış kalite/kabiliyet göstergesi; tek başına 'kanunen zorunlu' varsayma"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS"
+          ]
+        },
+        {
+          "subservice": "Montaj / demontaj / servis",
+          "status": "CAPABILITY_BASED",
+          "credentials": [
+            "18UY0376-3 Bireysel ve Ticari Klima Sistemleri Montajcısı",
+            "18UY0377-4 Bireysel ve Ticari Klima Sistemleri Montaj ve Servis Elemanı",
+            "18UY0378-5 Bireysel, Ticari ve Değişken Debili Klima Sistemleri Uzmanı – ileri kapsam"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS"
+          ]
+        },
+        {
+          "subservice": "Soğutucu gaz devresi / vakum / şarj / geri kazanım / kaçak",
+          "status": "FGAS_SPECIAL_RULE",
+          "credentials": [
+            "19UY0401-5 Florlu Sera Gazlı Cihazlar Teknik Personeli – güncel F-gaz kuralı gerektirdiğinde",
+            "TS 13905 Hizmet Yeterlilik Belgesi – işletme açısından güncel kural gerektirdiğinde",
+            "EKOMVET kayıt/raporlama – ekipman/faaliyet gerektirdiğinde"
+          ],
+          "sources": [
+            "F_GAS_2026",
+            "MYK_QUALIFICATIONS"
+          ],
+          "failure": "BLOCK_FGAS_CAPABILITY_IF_REQUIRED_ELEMENT_UNVERIFIED"
+        }
+      ]
+    },
+    {
+      "key": "heating",
+      "name": "Kombi & Isıtma",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Isıtma tesisatı bakım-onarım/servis",
+          "status": "CAPABILITY_MATCH + CURRENT_LEGAL_RULE",
+          "credentials": [
+            "21UY0446-3 Isıtma Tesisat Bakım Onarım ve Servis Elemanı",
+            "22UY0481-5 Isıtma Sistemleri Servis Uzmanı – ileri kapsam",
+            "İlgili MEB ustalık/diploma"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "MYK_MANDATORY",
+            "MYK_EXEMPTION",
+            "MEB_MASTER"
+          ]
+        },
+        {
+          "subservice": "Gaz yakıcı cihaz/kombi servis",
+          "status": "PERSON_SCOPE + AUTHORIZED_SERVICE_CLAIM_IF_ANY",
+          "credentials": [
+            "21UY0446-3 ilgili gaz yakıcı cihaz kapsamı",
+            "22UY0481-5 uygun kapsam",
+            "SERBİS yalnız marka 'yetkili servis' iddiası varsa"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "SERBIS"
+          ]
+        },
+        {
+          "subservice": "Doğal gaz iç tesisat borulama/bağlantı/test/bakım",
+          "status": "HIGH_RISK_CERTIFIED_COMPANY_AND_PERSON_SCOPE",
+          "credentials": [
+            "11UY0031-3 Isıtma ve Doğal Gaz İç Tesisat Yapım Personeli – kişi kapsamı",
+            "EPDK/dağıtım sistemi İç Tesisat ve Servis Hatları Sertifikası / ilgili sertifika modeli",
+            "İlgili doğal gaz dağıtım şirketi proje/onay/test/işletmeye alma şartları"
+          ],
+          "sources": [
+            "EPDK_GAS",
+            "MYK_QUALIFICATIONS"
+          ],
+          "failure": "BLOCK_UNTIL_PERSON_BUSINESS_LOCAL_DISTRIBUTION_RULES_VERIFIED"
+        }
+      ]
+    },
+    {
+      "key": "moving",
+      "name": "Nakliyat",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Yurtiçi ticari ev ve büro eşyası taşıma",
+          "status": "LEGAL_TRANSPORT_CHAIN",
+          "credentials": [
+            "K3 Yetki Belgesi – işletme",
+            "Yetki belgesine kayıtlı taşıt / taşıt belgesi-kartı",
+            "Aracın sınıfına uygun sürücü belgesi",
+            "SRC4 – güncel Karayolu kuralının uygulandığı sürücüde",
+            "ODY4/ÜDY4 – yetki belgesi/işletme yapısına göre koşullu",
+            "Psikoteknik/sağlık şartı – güncel sürücü kuralına göre koşullu"
+          ],
+          "sources": [
+            "UAB_TYPES",
+            "UAB_VERIFY",
+            "UAB_SRC"
+          ],
+          "failure": "BLOCK_IF_REQUIRED_CHAIN_BREAKS"
+        },
+        {
+          "subservice": "Uluslararası + yurtiçi ticari ev/büro eşyası",
+          "status": "LEGAL_TRANSPORT_CHAIN",
+          "credentials": [
+            "C3 Yetki Belgesi",
+            "Yetki belgesine kayıtlı uygun taşıt",
+            "SRC3 – uygulanabilir sürücüde",
+            "ODY3/ÜDY3 – işletme/yetki modeline göre koşullu"
+          ],
+          "sources": [
+            "UAB_TYPES",
+            "UAB_VERIFY",
+            "UAB_SRC"
+          ]
+        },
+        {
+          "subservice": "Yurtiçi genel ticari eşya (ev/büro dışı)",
+          "status": "BY_VEHICLE_AND_ACTIVITY",
+          "credentials": [
+            "K1 veya yalnız kamyonet modelinde K1*",
+            "Yetki belgesine kayıtlı taşıt",
+            "SRC4 – uygulanıyorsa"
+          ],
+          "sources": [
+            "UAB_TYPES",
+            "UAB_VERIFY",
+            "UAB_SRC"
+          ]
+        },
+        {
+          "subservice": "Asansörlü nakliye / mobil vinç-kaldırma ekipmanı",
+          "status": "EQUIPMENT_SPECIFIC",
+          "credentials": [
+            "Gerçek ekipman tipine uygun iş makinesi/operatör belgesi – mevzuat gerektiriyorsa",
+            "Ekipman tescil/periyodik kontrol – uygulanıyorsa",
+            "Temel nakliye yetki zinciri"
+          ],
+          "failure": "BLOCK_UNTIL_EXACT_EQUIPMENT_RULE_RESOLVED"
+        }
+      ]
+    },
+    {
+      "key": "locksmith",
+      "name": "Çilingir",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Anahtar çoğaltma / kilit montaj-onarım",
+          "status": "OFFICIAL_PROFESSIONAL_CAPABILITY",
+          "credentials": [
+            "22UY0530-4 Anahtarcı (Çilingir) (Seviye 4) – güncel zorunluluk kuralına göre",
+            "Anahtarcılık ve Çilingirlik MEB Ustalık Belgesi / kabul edilen alternatif"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "MYK_MANDATORY",
+            "MEB_MASTER"
+          ]
+        },
+        {
+          "subservice": "Konut/işyeri acil kapı açma",
+          "status": "HIGH_RISK_ACCESS_CONTROL",
+          "credentials": [
+            "Doğrulanmış çilingir kabiliyeti",
+            "Müşterinin kimliği",
+            "Mülkiyet/kullanım/erişim yetkisi kanıtı veya denetlenebilir beyan"
+          ],
+          "failure": "BLOCK_IF_CUSTOMER_AUTHORITY_NOT_SUFFICIENT"
+        },
+        {
+          "subservice": "Araç kilidi açma",
+          "status": "HIGH_RISK_ACCESS_CONTROL",
+          "credentials": [
+            "Doğrulanmış çilingir kabiliyeti",
+            "Araç sahibi/kullanıcı yetkisi kanıtı"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "towing",
+      "name": "Çekici",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Ticari araç kurtarma / çekme / taşıma",
+          "status": "SPECIAL_PURPOSE_TRANSPORT + EQUIPMENT_SCOPE",
+          "credentials": [
+            "K1Ö – yalnız özel amaçlı taşıt eklenen ticari eşya yetkisi; somut oto-kurtarıcı modeline UAB kapsam teyidi zorunlu",
+            "Ruhsatta uygun araç türü + yetki belgesinde taşıt ilişkisi",
+            "Aracın sınıfına uygun sürücü belgesi",
+            "SRC4/SRC3 – güncel KTY uyguluyorsa",
+            "Araç Kurtarma ve Taşıma Kamyonu Operatörü / uygun iş makinesi operatör belgesi – ekipman sınıfı/kural gerektiriyorsa"
+          ],
+          "sources": [
+            "UAB_TYPES",
+            "UAB_VERIFY",
+            "UAB_SRC",
+            "MEB_TOW_OPERATOR"
+          ],
+          "failure": "BLOCK_IF_UAB_SCOPE_OR_REQUIRED_OPERATOR_CHAIN_UNRESOLVED"
+        }
+      ]
+    },
+    {
+      "key": "roadside_assistance",
+      "name": "Yol Yardım",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "Akü takviyesi / basit destek",
+          "status": "NO_SEPARATE_NATIONWIDE_TRADE_LICENSE_IDENTIFIED_FOR_BASIC_SCOPE",
+          "credentials": [
+            "Ortak kimlik/çalışma/faaliyet kontrolleri",
+            "Platform beceri ve güvenlik kontrolü"
+          ],
+          "note": "İleri elektrik/mekanik onarıma dönüşürse ilgili otomotiv kuralı çalışır."
+        },
+        {
+          "subservice": "Lastik/jant bakım-onarım",
+          "status": "CAPABILITY_MATCH + CURRENT_LEGAL_RULE",
+          "credentials": [
+            "18UY0360-3 Lastik Bakım Onarımcısı (Seviye 3)",
+            "İlgili MEB lastikçilik/ön düzen ustalık belgesi – uygulanıyorsa"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "MYK_MANDATORY",
+            "MEB_MASTER"
+          ]
+        },
+        {
+          "subservice": "Yol üstü mekanik arıza tespit/onarım",
+          "status": "LEGAL_REQUIRED_OR_RECOGNIZED_EXEMPTION_WHERE_MANDATORY",
+          "credentials": [
+            "11UY0021-4 Otomotiv Mekanikçisi (Seviye 4)",
+            "İlgili MEB otomotiv ustalık/diploma-muafiyeti"
+          ],
+          "sources": [
+            "MYK_MANDATORY",
+            "MYK_QUALIFICATIONS",
+            "MYK_EXEMPTION",
+            "MEB_MASTER"
+          ]
+        },
+        {
+          "subservice": "Araç çekme/kurtarma",
+          "status": "INHERIT_TOWING",
+          "inherits": "towing"
+        },
+        {
+          "subservice": "Araç kilidi açma",
+          "status": "INHERIT_LOCKSMITH",
+          "inherits": "locksmith.vehicle_unlock"
+        },
+        {
+          "subservice": "Yolda yakıt ulaştırma",
+          "status": "DISABLED_PENDING_DANGEROUS_GOODS_FUEL_PACK",
+          "failure": "BLOCK"
+        }
+      ]
+    },
+    {
+      "key": "courier",
+      "name": "Kurye & Evrak",
+      "catalog": true,
+      "rules": [
+        {
+          "subservice": "İliçi motorlu kurye",
+          "status": "LEGAL_COURIER_CHAIN + TRANSITION",
+          "credentials": [
+            "P1 Yetki Belgesi – uygulanabilir kurye işletmesi",
+            "Yetki belgesine kayıtlı uygun taşıt",
+            "SRC-KURYE – 01.01.2027'ye kadar geçiş; sonrası güncel kurala göre zorunluluk",
+            "Kurye Faaliyet Belgesi – 01.01.2027'ye kadar geçiş; sonrası güncel kurala göre zorunluluk",
+            "Motosiklet/araç sınıfına uygun sürücü belgesi",
+            "Kurye/taşıtın Bakanlık sisteminde gerekli bildirimi/kaydı"
+          ],
+          "sources": [
+            "UAB_TYPES",
+            "UAB_COURIER_2025",
+            "UAB_COURIER_2026",
+            "UAB_VERIFY"
+          ],
+          "failure": "BLOCK_IF_CURRENT_NON_TRANSITION_REQUIREMENTS_FAIL"
+        },
+        {
+          "subservice": "Yurtiçi geniş kapsam dağıtım/kurye",
+          "status": "BY_ACTIVITY_SCOPE",
+          "credentials": [
+            "P2 Yetki Belgesi – faaliyetin kapsamı gerektiriyorsa",
+            "SRC-KURYE geçiş kuralı",
+            "Kurye Faaliyet Belgesi geçiş kuralı"
+          ],
+          "sources": [
+            "UAB_TYPES",
+            "UAB_COURIER_2026"
+          ]
+        },
+        {
+          "subservice": "Yaya/bisikletli kurye",
+          "status": "ACTIVITY_SPECIFIC_RULE_RESOLUTION_REQUIRED",
+          "credentials": [
+            "İşletme/faaliyet statüsü",
+            "UAB düzenlemesinin somut faaliyet tipine uygulanabilirlik çözümü"
+          ],
+          "failure": "BLOCK_IF_RULE_NOT_RESOLVED"
+        }
+      ]
+    },
+    {
+      "key": "furniture",
+      "name": "Mobilya & Montaj",
+      "catalog": false,
+      "rules": [
+        {
+          "subservice": "Hazır mobilya/dekorasyon montajı",
+          "status": "PLATFORM_QUALITY_REFERENCE_NOT_AUTOMATIC_LEGAL_LICENSE",
+          "credentials": [
+            "11UMS0154-3/4 Mobilya ve Dekorasyon Montajcısı meslek standardı – referans",
+            "İlgili MEB mobilya/ağaç işleri ustalık belgesi – uygulanıyorsa"
+          ],
+          "note": "Meslek standardı bulunması tek başına MYK belgesi zorunluluğu değildir."
+        },
+        {
+          "subservice": "Ahşap mobilya imalatı / imalat kapsamlı onarım",
+          "status": "LEGAL_REQUIRED_OR_RECOGNIZED_EXEMPTION_WHERE_MANDATORY",
+          "credentials": [
+            "17UY0301-3 Ahşap Mobilya İmalatçısı (Seviye 3)",
+            "İlgili MEB ustalık/diploma muafiyeti"
+          ],
+          "sources": [
+            "MYK_MANDATORY",
+            "MYK_QUALIFICATIONS",
+            "MYK_EXEMPTION",
+            "MEB_MASTER"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "automotive",
+      "name": "Otomotiv / Motor Ustası",
+      "catalog": false,
+      "rules": [
+        {
+          "subservice": "Motor/mekanik bakım, arıza tespit ve onarım",
+          "status": "LEGAL_REQUIRED_OR_RECOGNIZED_EXEMPTION_WHERE_MANDATORY",
+          "credentials": [
+            "11UY0021-4 Otomotiv Mekanikçisi (Seviye 4)",
+            "İlgili MEB otomotiv ustalık/diploma muafiyeti"
+          ],
+          "sources": [
+            "MYK_MANDATORY",
+            "MYK_QUALIFICATIONS",
+            "MYK_EXEMPTION",
+            "MEB_MASTER"
+          ]
+        },
+        {
+          "subservice": "Otomotiv elektrik/elektronik/elektromekanik",
+          "status": "CAPABILITY_MATCH + CURRENT_LEGAL_RULE",
+          "credentials": [
+            "11UY0020-5 Otomotiv Elektromekanikçisi (Seviye 5)"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "MYK_MANDATORY"
+          ]
+        },
+        {
+          "subservice": "Lastik/jant",
+          "status": "CAPABILITY_MATCH",
+          "credentials": [
+            "18UY0360-3 Lastik Bakım Onarımcısı"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "MYK_MANDATORY"
+          ]
+        },
+        {
+          "subservice": "Gövde/kaporta/boya onarım",
+          "status": "CAPABILITY_MATCH + CURRENT_LEGAL_RULE",
+          "credentials": [
+            "14UY0191 serisi uygun Otomotiv Gövde Onarımcısı yeterliliği",
+            "11UY0018-4 Otomotiv Boya Onarımcısı"
+          ],
+          "sources": [
+            "MYK_QUALIFICATIONS",
+            "MYK_MANDATORY"
+          ]
+        },
+        {
+          "subservice": "Marka yetkili servis iddiası",
+          "status": "AUTHORIZED_SERVICE_CLAIM_ONLY",
+          "credentials": [
+            "SERBİS / üretici resmî kaydı"
+          ],
+          "sources": [
+            "SERBIS"
+          ]
+        }
+      ]
+    }
+  ],
+  "country_launch_gate": [
+    "Her aktif alt hizmette REQUIRED/CONDITIONAL/NOT_REQUIRED/UNKNOWN statüsü sürümlü olmalı.",
+    "UNKNOWN alt hizmet profesyonel kayda açılamaz.",
+    "Yerel dağıtım, belediye ruhsatı, araç/ekipman sınıfı gibi dinamik kural kayıt anında çözülmeli.",
+    "Resmî doğrulama servisi erişilemiyorsa otomatik VERIFIED üretilemez.",
+    "Türkiye'de yetkin hukuk/uyum uzmanı bu sürümü production öncesi doğrulamalı.",
+    "Kaynak değişiklik takibi, expiry/revocation re-check ve audit log aktif olmalı.",
+    "Shadow-mode testleri, manuel inceleme/itiraz ve fail-closed senaryoları geçmeli."
+  ],
+  "official_sources": [
+    {
+      "id": "MYK_MANDATORY",
+      "authority": "MYK",
+      "title": "Belge Zorunluluğu Kapsamındaki Meslekler",
+      "url": "https://portal.myk.gov.tr/index.php?belge_zorunlu=1&option=com_yeterlilik&view=arama"
+    },
+    {
+      "id": "MYK_QUALIFICATIONS",
+      "authority": "MYK",
+      "title": "Ulusal Yeterlilik Arama",
+      "url": "https://portal.myk.gov.tr/index.php?option=com_yeterlilik&view=arama"
+    },
+    {
+      "id": "MYK_VERIFY",
+      "authority": "e-Devlet / MYK",
+      "title": "MYK Mesleki Yeterlilik Belgesi Sorgulama",
+      "url": "https://www.turkiye.gov.tr/myk-mesleki-yeterlilik-belgesi-sorgulama"
+    },
+    {
+      "id": "MYK_ISSUERS",
+      "authority": "e-Devlet / MYK",
+      "title": "Belge Vermeye Yetkili Kuruluşlar",
+      "url": "https://www.turkiye.gov.tr/myk-belge-vermeye-yetkili-kuruluslar-ve-ucret-tarifeleri"
+    },
+    {
+      "id": "MYK_EXEMPTION",
+      "authority": "MYK",
+      "title": "Belge zorunluluğu – diploma/ustalık muafiyetleri",
+      "url": "https://www.myk.gov.tr/tr/haberler/yeterlilik/belge-zorunluluuna-ilikin-skca-sorulan-sorular"
+    },
+    {
+      "id": "MYK_SAMPLE",
+      "authority": "MYK",
+      "title": "MYK Mesleki Yeterlilik Belgesi/Kartı resmî örnekleri",
+      "url": "https://www.myk.gov.tr/tr/page/59"
+    },
+    {
+      "id": "MEB_MASTER",
+      "authority": "MEB / e-Devlet",
+      "title": "Kalfalık, Ustalık, Usta Öğreticilik ve İş Yeri Açma Belgesi Sorgulama",
+      "url": "https://www.turkiye.gov.tr/milli-egitim-kalfalik-ustalik-usta-ogrencilik-ve-is-yeri-acma-belgesi-sorgulama"
+    },
+    {
+      "id": "EDEVLET_BARCODE",
+      "authority": "e-Devlet",
+      "title": "Barkodlu Belge Doğrulama",
+      "url": "https://www.turkiye.gov.tr/belge-dogrulama"
+    },
+    {
+      "id": "UAB_TYPES",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "Eşya Taşımacılığı Yetki Belgesi Türleri",
+      "url": "https://istanbul.uab.gov.tr/yetki-belgeleri-esya-tasimaciligi-yetki-belgesi-turleri"
+    },
+    {
+      "id": "UAB_VERIFY",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "Yetki Belgesi Hizmetleri",
+      "url": "https://uhdgm.uab.gov.tr/yetki-belgeleri-hizmetleri"
+    },
+    {
+      "id": "UAB_SRC",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "SRC / ODY / ÜDY Sık Sorulan Sorular",
+      "url": "https://uhdgm.uab.gov.tr/sikca-sorulan-sorular-ve-cevaplari"
+    },
+    {
+      "id": "UAB_COURIER_2025",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "Motokurye düzenlemesi – 15 Mayıs 2025",
+      "url": "https://www.uab.gov.tr/haberler/karayolu-tasima-yoenetmeliginde-degisiklik/"
+    },
+    {
+      "id": "UAB_COURIER_2026",
+      "authority": "Ulaştırma ve Altyapı Bakanlığı",
+      "title": "Karayolu Taşıma Yönetmeliği değişikliği – 16 Mayıs 2026",
+      "url": "https://www.uab.gov.tr/haberler/otobues-bileti-12-saat-kalana-kadar-tam-iade-edilebilecek/"
+    },
+    {
+      "id": "ELECTRIC_2026",
+      "authority": "Çevre, Şehircilik ve İklim Değişikliği Bakanlığı",
+      "title": "Elektrik ile ilgili fen adamlarının yetkileri – 2026",
+      "url": "https://meslekihizmetler.csb.gov.tr/haberler/elektrik-ile-ilgili-fen-adamlarinin-yetkileri-yeniden-belirlendi-302595"
+    },
+    {
+      "id": "EPDK_GAS",
+      "authority": "EPDK",
+      "title": "Doğal Gaz Piyasası Sertifika İşlemleri",
+      "url": "https://www.epdk.gov.tr/Detay/Icerik/3-0-81/dogal-gazsertifika-islemleri"
+    },
+    {
+      "id": "F_GAS_2026",
+      "authority": "İklim Değişikliği Başkanlığı",
+      "title": "F-Gaz / TS 13905 / 19UY0401-5 / EKOMVET – 2026",
+      "url": "https://ozonturkiye.csb.gov.tr/haberler/iklimlendirme-ve-sogutma-sektorunde-iyi-uygulama-ornekleri-egitim-serisi-konya-ve-adana-illerinde-devam-etti-305934"
+    },
+    {
+      "id": "SERBIS",
+      "authority": "Ticaret Bakanlığı",
+      "title": "SERBİS Yetkili Servis Sorgulama",
+      "url": "https://www.servis.gov.tr/Genel/Sorgu"
+    },
+    {
+      "id": "TRADE_REGISTRY",
+      "authority": "Ticaret Bakanlığı / e-Devlet",
+      "title": "Ticari işletme, şirket ve esnaf sicil hizmetleri",
+      "url": "https://www.turkiye.gov.tr/ticaret-bakanligi"
+    },
+    {
+      "id": "GIB",
+      "authority": "Gelir İdaresi Başkanlığı",
+      "title": "2026 işe başlama / mükellefiyet kaynakları",
+      "url": "https://www.gib.gov.tr/yardim-kaynaklar/yayinlar"
+    },
+    {
+      "id": "FOREIGN_WORK",
+      "authority": "Çalışma ve Sosyal Güvenlik Bakanlığı",
+      "title": "Çalışma İzni Türleri",
+      "url": "https://www.csgb.gov.tr/uigm/calisma-izni/calisma-izni-turleri/"
+    },
+    {
+      "id": "WORKPLACE_LICENSE",
+      "authority": "İçişleri Bakanlığı",
+      "title": "İşyeri Açma ve Çalışma Ruhsatlarına İlişkin Yönetmelik bağlantısı",
+      "url": "https://www.icisleri.gov.tr/strateji/yikob-mevzuat"
+    },
+    {
+      "id": "MEB_TOW_OPERATOR",
+      "authority": "Millî Eğitim Bakanlığı",
+      "title": "Araç Kurtarma ve Taşıma Kamyonu Operatörü kurs/program kayıtları",
+      "url": "https://ookgm.meb.gov.tr/kurumlar.php"
+    }
+  ]
+}

@@ -179,6 +179,7 @@ export default function CreateServiceScreen() {
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState<string>("today");
   const [address, setAddress] = useState("");
+  const [countryCode, setCountryCode] = useState<"TR" | null>(null);
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [subcategoryId, setSubcategoryId] = useState<number | undefined>();
@@ -403,20 +404,25 @@ export default function CreateServiceScreen() {
       case 1: return title.trim().length >= 3;
       case 2: return urgency.length > 0;
       case 3:
-        return ROUTE_SERVICE_TYPES.has(serviceType)
+        return countryCode !== null && (ROUTE_SERVICE_TYPES.has(serviceType)
           ? pickupAddress.trim().length >= 3 && destinationAddress.trim().length >= 3
-          : address.trim().length >= 5;
+          : address.trim().length >= 5);
       case 4: return true;
       default: return false;
     }
-  }, [step, categoryId, title, urgency, address, pickupAddress, destinationAddress, serviceType]);
+  }, [step, categoryId, title, urgency, address, pickupAddress, destinationAddress, serviceType, countryCode]);
 
   const handleSubmit = () => {
+    if (!countryCode) {
+      Alert.alert("Hizmet ülkesi gerekli", "Talep oluşturmadan önce hizmet verilecek ülkeyi seçin.");
+      return;
+    }
     const normalizedAttributes = Object.fromEntries(
       Object.entries({ ...attributes, urgency }).filter(([, value]) => value !== "" && value != null),
     );
     createRequestMutation.mutate({
       categoryId,
+      countryCode,
       title: title.trim(),
       description: description.trim() || undefined,
       address: ROUTE_SERVICE_TYPES.has(serviceType)
@@ -1151,6 +1157,29 @@ export default function CreateServiceScreen() {
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
               {ROUTE_SERVICE_TYPES.has(serviceType) ? "Rota bilgilerini girin" : "Hizmet nerede verilecek?"}
             </Text>
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Hizmet ülkesi</Text>
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ selected: countryCode === "TR" }}
+                accessibilityLabel="Türkiye hizmet ülkesi"
+                onPress={() => setCountryCode("TR")}
+                style={({ pressed }) => ({
+                  alignItems: "center",
+                  backgroundColor: countryCode === "TR" ? colors.primary + "12" : colors.card,
+                  borderColor: countryCode === "TR" ? colors.primary : colors.border,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  opacity: pressed ? 0.8 : 1,
+                  padding: 14,
+                })}
+              >
+                <Text style={{ color: colors.foreground, fontWeight: "700" }}>Türkiye (TR)</Text>
+                <IconSymbol name={countryCode === "TR" ? "checkmark.circle.fill" : "circle"} size={21} color={countryCode === "TR" ? colors.primary : colors.muted} />
+              </Pressable>
+            </View>
             {ROUTE_SERVICE_TYPES.has(serviceType) ? (
               <View style={{ gap: 13 }}>
                 <View>

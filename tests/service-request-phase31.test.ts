@@ -120,6 +120,7 @@ describe("phase 31 service request contracts", () => {
     await expect(
       caller.requests.create({
         categoryId: 8,
+        countryCode: "tr",
         title: "Evden eve nakliyat",
         description: "Eşyalar paketlenecek",
         budgetMin: 4000,
@@ -130,6 +131,7 @@ describe("phase 31 service request contracts", () => {
 
     expect(requestDb.createServiceRequest).toHaveBeenCalledWith({
       categoryId: 8,
+      countryCode: "TR",
       title: "Evden eve nakliyat",
       description: "Eşyalar paketlenecek",
       budgetMin: 4000,
@@ -137,6 +139,22 @@ describe("phase 31 service request contracts", () => {
       details,
       userId: 73,
     });
+  });
+
+  it("does not derive a default jurisdiction when the request country is absent", async () => {
+    vi.mocked(requestDb.createServiceRequest).mockRejectedValue(new Error("JURISDICTION_UNRESOLVED"));
+    const caller = appRouter.createCaller(createContext(73));
+
+    await expect(
+      caller.requests.create({
+        categoryId: 8,
+        title: "Ülkesi belirtilmemiş talep",
+      }),
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+
+    const persistedInput = vi.mocked(requestDb.createServiceRequest).mock.calls[0]?.[0];
+    expect(persistedInput).toMatchObject({ categoryId: 8, userId: 73 });
+    expect(persistedInput).not.toHaveProperty("countryCode");
   });
 
   it("rejects category, subcategory and route-detail mismatches before persistence", async () => {

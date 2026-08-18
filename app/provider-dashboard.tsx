@@ -23,7 +23,6 @@ import { trpc } from "@/lib/trpc";
 const MENU_ITEMS = [
   { labelKey: "provider.menuNewJobs", icon: "briefcase.fill", color: "#FF7A1A", route: "/provider-opportunities" },
   { labelKey: "provider.menuActiveJobs", icon: "bolt.fill", color: "#4F8CFF", route: "/provider-jobs" },
-  { labelKey: "provider.menuCalendar", icon: "calendar", color: "#9B6CFF", route: "/calendar" },
   { labelKey: "provider.menuEarnings", icon: "wallet.pass.fill", color: "#22C55E", route: "/(tabs)/wallet" },
   { labelKey: "provider.menuMessages", icon: "message.fill", color: "#31B7D8", route: "/(tabs)/messages" },
   { labelKey: "provider.menuProfile", icon: "person.fill", color: "#F45B8A", route: "/(tabs)/profile" },

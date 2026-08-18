@@ -19,7 +19,7 @@ export function sanitizeMaskedMessageContent(content: string): string {
  * being presented as a proxy number.
  */
 export function getMaskedCommunicationReadiness() {
-  const configured = Boolean(ENV.proxyTelephonyBaseUrl && ENV.proxyTelephonyApiKey);
+  const configured = Boolean(ENV.proxyCommProviderBaseUrl && ENV.proxyCommProviderApiKey);
   return {
     configured,
     code: configured ? "CONFIGURED" : "NOT_CONFIGURED",
