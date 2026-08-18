@@ -50,9 +50,11 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-async function startServer() {
+export async function createApp() {
   const app = express();
-  const server = createServer(app);
+  // Production TLS terminates at the loopback reverse proxy. Express must only
+  // trust that local proxy before accepting its X-Forwarded-Proto signal.
+  app.set("trust proxy", "loopback");
 
   // Request ID middleware — every request gets a unique ID for tracing
   app.use(requestIdMiddleware);
@@ -108,6 +110,12 @@ async function startServer() {
       "Content-Security-Policy",
       "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
     );
+    // HSTS must never be advertised from HTTP or development responses. The
+    // production reverse proxy is trusted only on loopback, so req.secure is
+    // true for direct TLS or a proxy-authenticated HTTPS request.
+    if (process.env.NODE_ENV === "production" && req.secure) {
+      res.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+    }
     next();
   });
 
@@ -386,6 +394,12 @@ async function startServer() {
   );
   app.use(errorMiddleware(logger));
 
+  return app;
+}
+
+async function startServer() {
+  const app = await createApp();
+  const server = createServer(app);
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
 
@@ -398,4 +412,6 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+if (process.env.VITEST !== "true") {
+  startServer().catch(console.error);
+}

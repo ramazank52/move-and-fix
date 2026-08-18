@@ -378,6 +378,7 @@
 - [x] P11 — Profesyonel belge ekranını kategoriye göre sunucunun belirlediği gereksinimlerle ve fail-closed erişim kontrolüyle bağla
 - [x] P11 — Release hijyeni: düzeltilebilir yüksek/kritik audit yollarını güncelle, TODO/FIXME taramasını değerlendir ve kalan Expo SDK araç zinciri bulgularını kaydet
 - [x] P11 — Tam kalite kapıları: 81 test dosyası / 521 test, TypeScript, lint, backend build, iOS/Android/web export ve tracked-source secret taramasını doğrula
+- [x] Production HTTPS istekleri için koşullu HSTS başlığını ekle; ölü security config’i temizle/entegre et ve HTTP başlık testiyle doğrula
 - [x] Master Phase C — Kurumsal/organizasyon hesabı, üyelik yetkileri ve kurumsal hizmet talebi sahipliğini additive şema, API ve testlerle uygula
 - [x] Master Phase C — Super Admin rol ayrımı ve MoveOS kritik yetki sınırlarını IDOR regresyonlarıyla güçlendir
 - [x] Master Phase C — Merkezi TR/EN/RU i18n kapsamını, çoklu para birimi fail-closed sözleşmesini ve maskeli iletişim adapterini tamamla

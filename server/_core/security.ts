@@ -160,17 +160,6 @@ export const corsOptions = {
 };
 
 /**
- * Security Headers Configuration
- */
-export const helmetConfig = {
-  contentSecurityPolicy: true,
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
-  frameguard: { action: 'deny' },
-  noSniff: true,
-  xssFilter: true,
-};
-
-/**
  * Input Validation Schemas
  */
 export const ValidationSchemas = {
