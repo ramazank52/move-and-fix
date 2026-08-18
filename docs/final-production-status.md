@@ -23,7 +23,7 @@ P12 tam regresyonunda **90 test dosyası / 553 test** geçti. TypeScript, lint, 
 | P10 temel sürüm | PASS | `e2db3925` | Nihai master komut kapsamı ve 76 dosya / 498 test. |
 | P11 release closure | PASS | `1c607698` | Dinamik belge gereksinimleri, medya karantinası, mesaj çevirisi ve 81 dosya / 521 test. |
 | Security & accessibility baseline | PASS | `6a520e79` | HSTS, decoded-byte upload limiti, kritik erişilebilirlik ve 86 dosya / 531 test. |
-| P12 internal closure | **PENDING CHECKPOINT** | — | Tüm medya sınıfı karantinası, güvenli MoveAI fallback, gerçek profil/e-posta akışları ve 90 dosya / 553 test. |
+| P12 internal closure | **PASS** | `b0cfa3b8` | Tüm medya sınıfı karantinası, güvenli MoveAI fallback, gerçek profil/e-posta akışları ve 90 dosya / 553 test. |
 
 ## P12 Açık Kapatma Kaydı
 
