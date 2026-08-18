@@ -26,6 +26,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
 import { useTranslation } from "@/lib/i18n";
+import { getMoveAiClientFallbackResponse } from "@/lib/ai/client-fallback";
 
 interface Message {
   id: string;
@@ -98,7 +99,7 @@ export default function AIAssistantScreen() {
     },
     onError: (_error, variables) => {
       setLoading(false);
-      const fallback = getLocalResponse(variables.message);
+      const fallback = getMoveAiClientFallbackResponse(variables.message);
       setMessages((prev) => [
         ...prev,
         {
@@ -206,55 +207,6 @@ export default function AIAssistantScreen() {
     await audioRecorder.prepareToRecordAsync();
     audioRecorder.record();
   }, [audioRecorder, recorderState.isRecording, requireMediaConsent, stageLocalMedia]);
-
-  const getLocalResponse = (text: string): { text: string; suggestions?: string[]; category?: string } => {
-    const lower = text.toLowerCase();
-    if (lower.includes("su") && (lower.includes("akıyo") || lower.includes("patla"))) {
-      return {
-        text: "Su tesisatı acil durumu anlıyorum. Size en yakın su tesisatçısını buluyorum. Tahmini ücret: ₺200-₺500 (duruma göre). Acil servis için talep oluşturabilirim.",
-        suggestions: ["Su tesisatçısı çağır", "Fiyat öğren", "Başka bir sorunum var"],
-        category: "plumbing",
-      };
-    }
-    if (lower.includes("araba") && (lower.includes("kal") || lower.includes("bozul"))) {
-      return {
-        text: "Araç arızası için çekici veya yol yardımı gerekiyor. Çekici: ₺200 başlangıç + ₺25/km. Yol yardımı: ₺100 başlangıç + ₺18/km.",
-        suggestions: ["Çekici çağır", "Yol yardımı çağır", "Fiyat hesapla"],
-        category: "towing",
-      };
-    }
-    if (lower.includes("klima") && (lower.includes("soğut") || lower.includes("çalış"))) {
-      return {
-        text: "Klima arızası için size en yakın klima servisini buluyorum. Tahmini ücret: ₺600-₺1.200.",
-        suggestions: ["Klima servisi çağır", "Fiyat öğren", "Başka bir sorunum var"],
-        category: "hvac",
-      };
-    }
-    if (lower.includes("çekici")) {
-      return {
-        text: "Çekici hizmeti için konumunuzu paylaşır mısınız? Ücretlendirme: ₺200 başlangıç + ₺25/km.",
-        suggestions: ["Çekici çağır", "Fiyat hesapla"],
-        category: "towing",
-      };
-    }
-    if (lower.includes("kurye")) {
-      return {
-        text: "Kurye hizmeti için paket bilgilerinizi paylaşır mısınız? Ücretlendirme: ₺50 başlangıç + ₺12/km.",
-        suggestions: ["Kurye çağır", "Fiyat hesapla"],
-        category: "courier",
-      };
-    }
-    if (lower.includes("fiyat") || lower.includes("ücret") || lower.includes("kaç para")) {
-      return {
-        text: "Fiyat tahmini için hizmet türünü belirtir misiniz? Örneğin: temizlik (₺300-₺800), elektrik (₺200-₺600), su tesisatı (₺200-₺500), çekici (₺200+₺25/km), kurye (₺50+₺12/km).",
-        suggestions: ["Temizlik", "Elektrik", "Su Tesisatı", "Çekici"],
-      };
-    }
-    return {
-      text: "Sorununuzu anladım. Size yardımcı olmak istiyorum. Hangi hizmete ihtiyacınız var? Acil bir durum mu yoksa randevulu bir hizmet mi?",
-      suggestions: quickPrompts,
-    };
-  };
 
   const sendMessage = useCallback((textOverride?: string) => {
     const messageText = (textOverride ?? input).trim();

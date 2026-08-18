@@ -25,12 +25,10 @@ describe('service error contract', () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('uses NotFoundError for an unknown escrow operation', async () => {
+  it('fails closed for an escrow operation sent to the disabled legacy wallet service', async () => {
     const wallet = new WalletService();
 
-    await expect(wallet.releaseEscrowPayment('missing')).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(wallet.releaseEscrowPayment('missing')).rejects.toThrow('disabled');
   });
 
   it('uses PaymentError for insufficient withdrawal balance', async () => {

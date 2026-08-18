@@ -48,6 +48,7 @@ export const ENV = {
   financialReconciliationSecret: process.env.FINANCIAL_RECONCILIATION_CRON_SECRET ?? "",
   complianceReverificationSecret: process.env.COMPLIANCE_REVERIFICATION_CRON_SECRET ?? "",
   documentRetentionSecret: process.env.DOCUMENT_RETENTION_CRON_SECRET ?? "",
+  mediaScannerWebhookSecret: process.env.MEDIA_SCANNER_WEBHOOK_SECRET ?? "",
   encryptionKey: requiredInProduction("ENCRYPTION_KEY"),
   unsubscribeSecret: requiredInProduction("UNSUBSCRIBE_SECRET"),
 };

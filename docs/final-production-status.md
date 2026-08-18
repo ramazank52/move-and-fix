@@ -1,116 +1,126 @@
 # Move&Fix — Final Production Status
 
-**Rapor tarihi:** 17 Ağustos 2026  
-**Kapsam:** FINAL MASTER COMMAND P0–P11  
-**Kanıt ilkesi:** Bu raporda yalnız bu çalışma ağacında yeniden çalıştırılmış, çıktısı alınmış doğrulamalar `PASS` olarak işaretlenmiştir. Gerçek sağlayıcı hesabı, production alan adı, hukuk onayı veya fiziksel cihaz gerektiren maddeler başarı varsayılmadan `BLOCKED`/`EXTERNAL` olarak tutulur.
+**Rapor tarihi:** 18 Ağustos 2026  
+**Baseline:** `6a520e79` — Security & Accessibility Hardening Closure  
+**Kapsam:** P12 FINAL INTERNAL CLOSURE  
+**Kanıt ilkesi:** Bu raporda yalnız bu çalışma ağacında çalıştırılan test, derleme, export ve tarama komutlarının sonuçları `PASS` olarak işaretlenmiştir. Gerçek credential, üçüncü taraf hesabı, production alan adı, hukuk onayı veya fiziksel cihaz gerektiren sonuçlar başarı varsayılmadan **BLOCKED / EXTERNAL** olarak tutulur.
 
 ## Yönetici Özeti
 
-P11 ile profesyonel belge ekranı sabit istemci listesinden çıkarılarak kategoriye göre sunucunun belirlediği, profesyonel sahipliğiyle sınırlı belge gereksinimlerine bağlandı. Bu karar politikası ve API yetki sınırı birim/authorization regresyonlarıyla doğrulandı. Ayrıca P11 release hijyeninde Vitest `3.2.6` ve concurrently `10.0.5` sürümlerine yükseltildi; audit sonucu **kritik bulgusuz**, ancak Expo SDK 54 araç zincirinden gelen dört yüksek önem seviyeli transitif bulgu ile kaldı.
+P12, baseline denetiminde kalan uygulanabilir **P0/P1 iç açıkların tamamını** kapatmıştır. Sesli mesajlar ve MoveAI taslak medyaları ortak, taranmış olmadan yayınlanamayan karantina yaşam döngüsüne alınmıştır. Tarayıcı kararları imzalı callback ile doğrulanır; `MEDIA_SCANNER_CALLBACK_SECRET` yoksa callback kabul edilmez ve sistem `NOT_CONFIGURED`/fail-closed kalır. İstemci tarafındaki MoveAI sabit fiyat, uygunluk, ödeme ve garanti iddiaları kaldırılmış; profil düzenleme gerçek yetkili tRPC mutasyonuna; eski nested e-posta doğrulama rotası ise oturum sahibinin gerçek e-postası ve OTP akışına bağlanmıştır.
 
-Uygulanabilir P0–P11 kod işleri ve kalite kapıları tamamlandı. En güncel tam koşumda **81 test dosyasında 521 test** geçti; TypeScript, lint, backend paketleme ve iOS/Android/web exportları başarıyla üretildi. Buna rağmen dış sağlayıcı kabulü, production DNS/HTTPS, onaylı İngilizce hukuk metni ve fiziksel cihaz E2E tamamlanmadığı için canlı production deployment için **A / GO verilmemektedir**.
+P12 tam regresyonunda **90 test dosyası / 553 test** geçti. TypeScript, lint, backend paketleme, iOS/Android/web export, lisans politikası, SBOM, kaynak credential taraması ve whitespace denetimi başarıyla tamamlandı. Buna rağmen canlı production yayını için gereken dış sağlayıcı credential’ları, tarayıcı entegrasyonu, production DNS/HTTPS, onaylı İngilizce gizlilik metni, fiziksel cihaz kabulü ve Expo araç zincirindeki bağımlılık audit bulguları açık kalmaktadır.
 
-| Nihai karar | Durum | Gerekçe |
+| Karar alanı | Durum | Gerekçe |
 |---|---|---|
-| Mühendislik kapsamı ve sürüm artefaktı | **B — CONDITIONAL GO** | P0–P11 uygulanabilir değişiklikleri, testleri ve çoklu platform paketleme kanıtları tamamlandı. |
-| Canlı production deployment | **C — NO-GO** | Gerçek ödeme/bildirim/iletişim kabulü, production domain/hukuk metni, fiziksel cihaz doğrulaması ve araç zinciri release riski açık. |
+| P12 uygulanabilir iç kod ve ürün kapsamı | **B — CONDITIONAL GO** | Denetimde bulunan P0/P1 iç açıklar kod, migration, güvenlik sözleşmesi ve regresyonlarla kapatıldı. |
+| Canlı production deployment | **C — NO-GO** | Dış sağlayıcı kabulü, scanner callback secret/operasyonu, domain/hukuk/devices ve araç zinciri audit kapıları tamamlanmadı. |
 
 ## Checkpoint Zinciri
 
 | Faz | Durum | Checkpoint | Ana kanıt |
 |---|---|---|---|
-| P0–P3 | **PASS** | `d0e43a38` | Opaque media, capability/credential guard, privacy/proxy ve 13 dil/RTL. |
-| P4 | **PASS** | `9ff17ea1` | Rızalı görsel/ses MoveAI taslağı ve profesyonel AI sınırı. |
-| P5 | **PASS** | `7121aa4b` | TRY ödeme/lansman kapısı, provider operational policy. |
-| P6 | **PASS** | `8274bb4b` | Konum rızası, destek, claim/sigorta ve KDV kuralları. |
-| P7 | **PASS** | `9e9974e2` | MFA/Super Admin korumalı birleşik MoveOS vaka kuyruğu. |
-| P8 | **PASS WITH TOOLCHAIN RISK** | `63eac7f5` | SBOM, lisans, DR ve mağaza kontrol kaydı. |
-| P9 | **PASS** | `09cad993` | Uçtan uca/güvenlik matrisi, mobil paketleme ve secret taraması. |
-| P10 temel sürüm | **PASS** | `e2db3925` | 76 test dosyası / 498 testlik P10 kapanış kanıtı. |
-| P11 release closure | **PENDING CHECKPOINT** | — | Dinamik provider belge gereksinimi, audit sertleştirmesi ve 81/521 güncel kalite kapısı. |
+| P10 temel sürüm | PASS | `e2db3925` | Nihai master komut kapsamı ve 76 dosya / 498 test. |
+| P11 release closure | PASS | `1c607698` | Dinamik belge gereksinimleri, medya karantinası, mesaj çevirisi ve 81 dosya / 521 test. |
+| Security & accessibility baseline | PASS | `6a520e79` | HSTS, decoded-byte upload limiti, kritik erişilebilirlik ve 86 dosya / 531 test. |
+| P12 internal closure | **PENDING CHECKPOINT** | — | Tüm medya sınıfı karantinası, güvenli MoveAI fallback, gerçek profil/e-posta akışları ve 90 dosya / 553 test. |
+
+## P12 Açık Kapatma Kaydı
+
+| Madde | Önceki durum | Yapılan değişiklik | Kanıt |
+|---|---|---|---|
+| P0-6: tüm medya sınıflarında karantina | `messages` içindeki sesli içerik ve `move_ai_draft_media` için yaşam döngüsü eksikti | Additive `0060_p12_media_quarantine_all_classes.sql` ile `quarantineStatus`, `quarantineReason`, `scannedAt`, `releasedAt` ve durum indeksleri eklendi; temiz tarama olmadan ses oynatma / MoveAI medyası aktarımı engellendi | `all-media-classes-quarantine.test.ts`, mesaj güvenlik regresyonu, tam koşum PASS |
+| P0-6: scanner callback doğrulama | Ortak scanner callback imzası yoktu | `MediaScannerCallbackSecurity.ts` canonical payload + HMAC-SHA-256 + constant-time karşılaştırma ekledi; eksik secret veya imza karar yayınlamaz | İmzalı, hatalı imzalı ve yapılandırılmamış callback senaryoları hedefli testlerde PASS |
+| P1-12: MoveAI istemci fallback | İstemci sabit fiyat/uygunluk/garanti ifadesi üretebiliyordu | `lib/ai/client-fallback.ts` yalnız nötr yönlendirme ve sunucu doğrulamasına işaret eden yanıt döndürür | `move-ai-client-fallback.test.ts`: 6 test PASS |
+| P1-17: profil düzenleme | Statik placeholder veri | Yetkili `auth.updateProfile` mutasyonu, input doğrulama, yükleme/hata/başarı durumu ve oturum yenilemesi bağlandı; oturum sahibi telefon alanı gerçek `/me` sözleşmesine eklendi | `profile-edit-mutation.test.ts`, `profile-and-email-client-contract.test.ts` PASS |
+| P1-18: e-posta doğrulama | `/verify/email` sabit e-posta metni gösteriyordu | Nested rota çalışan e-posta doğrulama ekranına yönlendirildi; e-posta oturumdan, OTP işlemleri gerçek mutasyonlardan gelir | `profile-and-email-client-contract.test.ts` PASS |
+| Legacy cüzdan yüzeyi | Eski compatibility servisi statik sıfır bakiye, boş geçmiş ve örnek rapor üretebiliyordu | Tüm public sorgu/rapor/escrow çağrıları `Legacy WalletService is disabled` ile fail-closed oldu | `master-phase-a-security.test.ts`: 11 test PASS; tam koşum PASS |
 
 ## PRODUCTION STATUS
 
-**B — CONDITIONAL GO (mühendislik) / C — NO-GO (canlı yayın).** Sistem, eksik dış yapılandırma durumlarında `NOT_CONFIGURED` veya fail-closed davranacak şekilde tasarlanmıştır. Canlı para hareketi, iletişim teslimatı veya hukuki yayın için aşağıdaki harici kapılar kapanmadan production’a çıkılmamalıdır.
+**B — CONDITIONAL GO (iç mühendislik) / C — NO-GO (canlı yayın).** P12 kapsamındaki bilinen P0/P1 iç açıklar kapanmıştır. Ancak canlı para hareketi, malware tarayıcı kararı, mesaj/notification teslimatı veya hukuk yayını harici doğrulama olmadan etkinleştirilemez.
 
 ## CUSTOMER E2E
 
-**PASS (otomatik sözleşme/E2E).** Kayıt/oturum, hizmet talebi, teklif, teklif kabulü, aktif iş, ödeme hata yolları ve değerlendirme akışları HTTP ve router regresyonlarında çalıştırıldı. Gerçek müşteri cihazı ile manuel kabul testi yapılmadığından cihaz seviyesi kabul **BLOCKED** kalır.
+**PASS (otomatik sözleşme/E2E).** Kayıt/oturum, talep, teklif, kabul, aktif iş, ödeme hata yolları, mesaj ve değerlendirme akışları test kapsamındadır. Fiziksel cihazda gerçek müşteri kabulü **BLOCKED**’dır.
 
 ## PROFESSIONAL E2E
 
-**PASS (otomatik sözleşme/E2E).** Fırsat erişimi, teklif, atama, iş yaşam döngüsü, capability/credential sınırları ile P11’in dinamik belge gereksinimleri otomatik regresyonlarla doğrulandı. Gerçek GPS izni ve arka plan konum davranışı fiziksel cihaz olmadan doğrulanmadığı için **BLOCKED**’dır.
+**PASS (otomatik sözleşme/E2E).** Fırsat, teklif, atama, iş yaşam döngüsü ve sunucu-otoriteli belge/capability sınırları regresyonlarda çalıştırıldı. GPS/arka plan konum davranışı fiziksel cihaz olmadan **BLOCKED**’dır.
 
 ## MOVEAI E2E
 
-**PASS (policy/router seviyesi).** Metinli taslak, açık rıza, medyalı/medyasız fail-closed akış, staging sahipliği ve profesyonel erişim sınırı test edilmiştir. Model sağlayıcısı ile gerçek kullanıcı medyası üzerinde production kabul testi bu raporda PASS olarak sayılmamıştır.
+**PASS (policy/router ve medya karantina sözleşmesi).** Metinli taslak, açık rıza, staging sahipliği, görsel/ses metadata’sı ve tarama sonucu olmadan medya erişiminin reddi doğrulandı. İstemci fallback artık doğrulanmamış fiyat veya uygunluk iddiası vermez. Gerçek model sağlayıcısı ve gerçek tarayıcı operasyonu **BLOCKED**’dır.
 
 ## PAYMENT
 
-**PASS (uygulama katmanı) / BLOCKED (gerçek sağlayıcı).** TRY escrow, yüzde 10 komisyon, webhook imzası, gateway referansı, idempotency, reconciliation, refund/settlement ve P11 global ödeme sağlayıcı resolver’ı fail-closed regresyonlarla geçti. iyzico/Stripe ile gerçek tahsilat, webhook callback ve uzlaştırma credential/webhook URL’i olmadan test edilmediği için **BLOCKED**’dır.
+**PASS (uygulama katmanı) / BLOCKED (gerçek sağlayıcı).** TRY escrow, %10 komisyon, imzalı webhook, idempotency, refund/settlement ve reconciliation sözleşmeleri korunmuştur. Gerçek iyzico/Stripe tahsilatı, webhook callback’i ve uzlaştırma credential/webhook URL’i olmadan test edilmediğinden **BLOCKED**’dır.
 
 ## MESSAGING
 
-**PASS (uygulama katmanı).** Katılımcı sınırı, request bağlamı, IDOR reddi, soft delete, maskeli iletişim ve P11 kalıcı çeviri önbelleği ile viewer-only görünümden gizleme sözleşmeleri test kapsamındadır. Gerçek proxy telefon/iletişim teslimatı `PROXY_COMM_PROVIDER_API_KEY` olmadan **BLOCKED**’dır.
+**PASS (uygulama katmanı).** Katılımcı sınırı, IDOR reddi, soft delete, maskeli iletişim ve çeviri/görünürlük korumaları sürmektedir. Sesli mesaj medyası artık temiz tarama sonucu olmadan erişilemez. Gerçek proxy iletişim teslimatı ve scanner operasyonu **BLOCKED**’dır.
 
 ## NOTIFICATIONS
 
-**PASS (uygulama katmanı) / BLOCKED (teslimat).** Kullanıcı tercihleri, sahiplik, uygulama içi kayıt ve adapter fail-closed sözleşmeleri geçmiştir. NetGSM, SendGrid ve Expo/FCM ile gerçek SMS/e-posta/push teslimatı credential ve cihaz tokenı olmadan **BLOCKED**’dır.
+**PASS (uygulama katmanı) / BLOCKED (teslimat).** Tercihler, sahiplik ve fail-closed adapter sözleşmeleri geçmiştir. NetGSM, SendGrid ve Expo/FCM ile gerçek teslimat credential ve cihaz tokenı olmadan **BLOCKED**’dır.
 
 ## ADMIN
 
-**PASS.** MoveOS ortak backend sözleşmesi; Super Admin, MFA, RBAC, IDOR koruması, vaka kuyruğu, feature flag/uyum/vergi/publish kararları ve P11 sigorta, çalışma modeli, job-safety yönetimi regresyonlarla doğrulanmıştır. Gerçek MFA teslimat sağlayıcısı yapılandırılmamıştır; ilgili yönetsel kararlar fail-closed uygulanır.
+**PASS.** MoveOS ortak backend; Super Admin/MFA/RBAC/IDOR, vaka kuyruğu, feature flag, uyum, vergi ve publish sınırlarını fail-closed uygular. Gerçek MFA teslimat sağlayıcısı yapılandırılmadığı için ilgili canlı kabul **BLOCKED**’dır.
 
 ## SECURITY
 
-**PASS (doğrulanan kapsam).** Cookie-session bağlı CSRF, rol/kaynak sahipliği, Zod input doğrulaması, webhook doğrulaması, MFA rate-limit/replay savunması, PII-minimized DTO’lar, CORS fail-closed, production’da zorunlu şifreleme anahtarı ve tracked-source secret taraması doğrulandı. P11’de medya karantinası, raw storage proxy kapatması, hassas privacy yeniden doğrulaması ve OAuth/token debug log temizliği bu kapsama dahildir. Taramada gerçek credential bulunmadı.
+**PASS (doğrulanan kapsam).** CSRF, rol/kaynak sahipliği, Zod doğrulaması, webhook/scan callback imzası, MFA rate-limit/replay, PII-minimized DTO, CORS fail-closed, production şifreleme anahtarı zorunluluğu, HSTS ve tüm medya sınıflarında quarantine-released erişim kuralı doğrulandı. Daraltılmış tracked-source taramasında gerçek credential eşleşmesi **0**; `git diff --check` **PASS**’tir.
 
 ## MOBILE
 
-**PASS (statik paketleme) / BLOCKED (fiziksel cihaz).** Expo Router exportu kök rota, oturum/onboarding, MoveAI, ödeme, cüzdan, mesaj, canlı takip, provider belge yönetimi, claim, destek, profesyonel ve `/admin` rotalarını içererek üretildi. P11’de iOS exportu **26**, Android exportu **27**, web exportu **100 dosya / 78 statik rota** ile tamamlandı. Expo Go veya imzalı cihazda GPS, kamera/mikrofon, push, klavye, safe-area ve ödeme dönüşleri test edilmediği için cihaz E2E **BLOCKED**’dır.
+**PASS (statik paketleme) / BLOCKED (fiziksel cihaz).** iOS export **26**, Android export **27**, web export **100 dosya / 78 statik rota** üretti. Expo Go veya imzalı cihazda GPS, kamera/mikrofon, push, klavye, safe-area, ödeme dönüşü ve erişilebilirlik teknolojileri ile doğrulama yapılmadığından cihaz E2E **BLOCKED**’dır.
 
 ## DATABASE
 
-**PASS (migration envanteri ve şema).** Drizzle/MySQL migration günlüğü `0000`–`0059` aralığındadır. P11 kaynak/uygulanan migration’ları `0054`–`0059`; capability scope, koşullu kural durumu, medya karantinası, mesaj çeviri/görünürlük, privacy rectification, sigorta/çalışma modeli/job-safety tablolarını kapsar. TiDB trigger sınırı nedeniyle finansal ve uyum kuralları uygulama katmanında fail-closed yürütülür.
+**PASS.** Migration günlüğü `0000`–`0060` aralığındadır. `0060` yönetilen TiDB’ye uygulandı; `messages` ve `move_ai_draft_media` tablolarındaki ekler additive’dir. TiDB trigger sınırı nedeniyle tarama ve erişim kararları uygulama katmanında fail-closed yürütülür.
 
 ## BUILD
 
-| Kontrol | P11 sonucu | Kanıt |
+| Kontrol | Sonuç | Kanıt |
 |---|---:|---|
-| Tam regresyon | **PASS** | `pnpm test`: **81 dosya / 521 test geçti** |
-| Lint | **PASS** | `pnpm lint`: hata/uyarı üretmedi |
-| TypeScript | **PASS** | `pnpm check` (`tsc --noEmit`) |
-| Backend paketleme | **PASS** | `pnpm build`: `dist/index.js` üretildi |
-| iOS export | **PASS** | `expo export --platform ios`: 26 dosya |
-| Android export | **PASS** | `expo export --platform android`: 27 dosya |
-| Web export | **PASS** | `expo export --platform web`: 100 dosya, 78 statik rota |
-| Kaynak secret taraması | **PASS** | Canlı anahtar/sabit credential örüntüsü bulunmadı |
-| Release işaretleyici taraması | **PASS** | Yalnız telefon numarası maskeleme metnindeki `XX` bulundu |
-| Bağımlılık audit’i | **CONDITIONAL** | Kritik: 0; Yüksek: 4, Expo SDK 54 araç zincirindeki `postcss@8.4.49` ve yamalanamayan `image-size` transitif yolları |
+| Tam regresyon | **PASS** | `pnpm test -- --pool=forks --poolOptions.forks.singleFork=true`: **90 dosya / 553 test** |
+| TypeScript | **PASS** | `NODE_OPTIONS=--max-old-space-size=4096 pnpm check` |
+| Lint | **PASS** | `pnpm lint` |
+| Backend paketleme | **PASS** | `pnpm build`: `dist/index.js` (**758.9 kB**) |
+| iOS export | **PASS** | `expo export --platform ios`: **26 dosya** |
+| Android export | **PASS** | `expo export --platform android`: **27 dosya** |
+| Web export | **PASS** | `expo export --platform web`: **100 dosya / 78 rota** |
+| Lisans politikası | **PASS** | `pnpm supply:licenses`: **1.024 paket** |
+| SBOM | **PASS** | `pnpm supply:sbom`: CycloneDX 1.5, **1.023 bileşen** |
+| Credential/whitespace taraması | **PASS** | Gerçek credential eşleşmesi **0**; `git diff --check` temiz |
+| Bağımlılık audit’i | **CONDITIONAL / NO-GO** | `pnpm audit --audit-level=high`: **7 moderate, 4 high**; Expo SDK 54 araç zincirindeki `postcss@8.4.49` ve yamalanamayan `image-size` transitif yolları |
 
 ## TESTS
 
-**PASS.** P11 tam regresyonu **81 test dosyası / 521 test** ile başarısız veya atlanan test olmadan tamamlandı. Kapsam, P11 provider-document-requirements policy/authorization, ödeme resolver fail-closed, medya karantinası, mesaj görünürlüğü/çevirisi, privacy re-auth, sigorta/classification/job-safety, MoveOS MFA sınırları ve HTTP E2E sözleşmelerini içerir.
+**PASS — 90 test dosyası / 553 test.** Testler silinmeden veya skip edilmeden tam koşumda geçti. P12 ilaveleri, tüm medya sınıfları için karantina ve callback güvenliği, MoveAI fallback iddia engeli, self-service profil mutasyonu, oturumdan e-posta doğrulama ve legacy cüzdanın fail-closed davranışını kapsar.
 
 ## REMAINING BLOCKERS
 
 | Blokaj | Etki | Mevcut güvenli davranış |
 |---|---|---|
-| Gerçek iyzico/Stripe sandbox credential’ı, webhook URL’i ve callback | Canlı tahsilat, iade ve reconciliation kanıtı yok | Gateway callback olmadan settlement kesinleşmez; `NOT_CONFIGURED` |
-| NetGSM, SendGrid, Expo/FCM credential ve gerçek cihaz tokenı | SMS/e-posta/push teslimat kanıtı yok | Adapter fail-closed; sahte teslimat kaydı yok |
+| `MEDIA_SCANNER_CALLBACK_SECRET` ve gerçek malware scanner webhook’u | Gerçek tarama kararı/medya release operasyonu yok | Callback `NOT_CONFIGURED`; medya `pending_scan` iken erişim reddedilir |
+| iyzico/Stripe sandbox credential’ı, webhook URL’i ve callback | Canlı tahsilat/iade/uzlaştırma kanıtı yok | Gateway callback olmadan settlement kesinleşmez; `NOT_CONFIGURED` |
+| NetGSM, SendGrid, Expo/FCM credential ve cihaz tokenı | SMS/e-posta/push teslimat kanıtı yok | Adapter fail-closed; sahte teslimat kaydı yok |
 | `PROXY_COMM_PROVIDER_API_KEY` | Maskeli iletişim teslimatı yok | Proxy adapter `NOT_CONFIGURED` döner |
 | `DOCUMENT_RETENTION_CRON_SECRET` | İmzalı retention scheduler tetikleme yok | Endpoint `NOT_CONFIGURED`/fail-closed |
-| `APM_ENDPOINT` ve `APM_API_KEY` | Harici APM exportu yok | Redacted structured log/health yerel sözleşmesi çalışır |
+| `APM_ENDPOINT`, `APM_API_KEY` | Harici APM exportu yok | Redacted structured log/health yerel sözleşmesi çalışır |
 | Production DNS/HTTPS (`moveandfix.app`) | Public endpoint ve store link doğrulaması yok | Release gate bloklu |
 | Onaylı İngilizce gizlilik politikası | Hukuk yayın gate’i kapalı | Release gate bloklu |
-| Fiziksel iOS/Android cihaz ve imzalı artifact | Native izin, safe-area, GPS, kamera/mikrofon, push ve geri dönüş E2E yok | Statik export geçti; cihaz onayı açık |
-| Expo SDK 54 araç zinciri audit’i | `postcss@8.4.49` ve `image-size` transitif advisory | P11’de düzeltilebilir Vitest/concurrently yolları kapatıldı; upstream SDK uyumlu güncelleme beklenir |
+| Fiziksel iOS/Android cihaz ve imzalı artifact | Native izin, safe-area, GPS, kamera/mikrofon, push ve dönüş E2E yok | Statik export geçti; cihaz onayı açık |
+| Expo SDK 54 araç zinciri audit’i | `postcss@8.4.49` ve `image-size` transitif advisory | Uygulama runtime kodu değildir; SDK uyumlu upstream güncelleme release gate’idir |
 
 ## CREDENTIALS / SECRETS PENDING
 
 | Değişken / dış bağımlılık | Kullanım | Durum |
 |---|---|---|
 | `ENCRYPTION_KEY` | Production data encryption | **PENDING** |
+| `MEDIA_SCANNER_CALLBACK_SECRET` | İmzalı malware scanner callback doğrulaması | **PENDING** |
 | `DOCUMENT_RETENTION_CRON_SECRET` | İmzalı retention job | **PENDING** |
 | `IYZICO_API_KEY`, `IYZICO_SECRET_KEY` | Türkiye sandbox/canlı ödeme | **PENDING** |
 | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` | Uluslararası ödeme | **PENDING** |
@@ -123,8 +133,8 @@ Uygulanabilir P0–P11 kod işleri ve kalite kapıları tamamlandı. En güncel 
 
 ## Referans Kanıtlar
 
+- [P12 internal closure checklist](./p12-internal-closure-checklist.md)
+- [P11 security & accessibility hardening report](../SECURITY_ACCESSIBILITY_HARDENING_REPORT.md)
 - [P9 E2E ve güvenlik matrisi](./p9-e2e-security-matrix.md)
 - [P8 tedarik zinciri durumu](./p8-supply-chain-status.md)
-- [P8 mağaza release gate’i](./p8-mobile-release-gate.md)
-- [P8 felaket kurtarma çalışma kitabı](./p8-disaster-recovery-runbook.md)
-- [P8 kaynak bütünlüğü taraması](./p8-source-integrity-scan.md)
+- [P8 mobil release gate’i](./p8-mobile-release-gate.md)

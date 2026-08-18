@@ -98,6 +98,7 @@ export async function getMe(): Promise<{
   openId: string;
   name: string | null;
   email: string | null;
+  phone: string | null;
   loginMethod: string | null;
   role: "user" | "admin";
   accountType: "customer" | "provider" | "admin";

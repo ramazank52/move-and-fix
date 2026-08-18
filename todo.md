@@ -384,6 +384,12 @@
 - [x] Security & Accessibility Closure — Kritik akışlar ile tüm app/ interaktif öğelerinde erişilebilirlik denetimi ve regresyonlarını tamamla (fiziksel cihaz/ekran okuyucu doğrulaması dış bağımlılık nedeniyle PARTIAL)
 - [x] Security & Accessibility Closure — Cookie SameSite politikasını kod değiştirmeden A/B/C seçenekleriyle analiz et
 - [x] Security & Accessibility Closure — Kanıtlı kapanış raporunu üret, kalite kapılarını çalıştır ve checkpoint oluştur
+- [x] P12 P0 — Compliance fail-closed, Türkiye Gold Master ve country/jurisdiction çalışma zamanı sınırlarını doğrula ve eksikleri kapat
+- [x] P12 P0 — Profesyonel onboarding, dinamik belge gereksinimi, güvenli medya erişimi ve gerçek malware karantina pipeline’ını tamamla
+- [x] P12 P0 — Chat PII temizliği, Masraf Dosyası, mesaj çevirisi ve MoveAI fallback sınırlarını tamamla
+- [x] P12 P1 — Ödeme/dispute, privacy-silme, profil/e-posta doğrulama ve demo/placeholder yüzeylerini tamamla
+- [x] P12 P1 — 13 dil i18n, sigorta/çalışma modeli/safety ve legacy wallet temizliğini doğrula
+- [x] P12 — Tüm release evidence kalite kapılarını çalıştır, nihai raporu oluştur ve checkpoint kaydet
 - [x] Master Phase C — Kurumsal/organizasyon hesabı, üyelik yetkileri ve kurumsal hizmet talebi sahipliğini additive şema, API ve testlerle uygula
 - [x] Master Phase C — Super Admin rol ayrımı ve MoveOS kritik yetki sınırlarını IDOR regresyonlarıyla güçlendir
 - [x] Master Phase C — Merkezi TR/EN/RU i18n kapsamını, çoklu para birimi fail-closed sözleşmesini ve maskeli iletişim adapterini tamamla
@@ -488,11 +494,19 @@
 - [x] İstenen formatta tek nihai production durum raporunu teslim et
 
 ## P11 FINAL CORRECTION & RELEASE CLOSURE
-- [ ] P11 corrective migration’ları: scope/conditional rules, media quarantine, message translation/visibility, privacy rectification ve insurance/classification/safety modellerini additive olarak uygula
-- [ ] Provider insurance policy ve operating model kayıtlarını ownership, document quarantine, retention ve denetim kurallarıyla gerçek DB/tRPC katmanına bağla
-- [ ] Job safety rule kayıtlarını yalnız aktif kural DTO’suyla public okuma; MoveOS Super Admin + MFA ile inceleme/yönetim olarak uygula
-- [ ] Sigorta, worker classification ve job safety kararlarını teklif, kabul ve aktif iş yaşam döngüsünde server-authoritative fail-closed zorunlu kıl
-- [ ] Global payment resolver ve completion-dispute resolution politikasını gerçek checkout/refund/settlement sınırlarına bağla
-- [ ] P11 yetki, MFA, PII minimizasyonu, idempotency, hata ve edge-case regresyonlarını ekle
-- [ ] P11 bağımlılık denetimi, dead-code/TODO taraması, TypeScript, lint, build, test, iOS/Android/web export ve secret scan kalite kapılarını gerçek kanıtla tamamla
-- [ ] P11 checkpoint ve A/B/C nihai durum raporunu external blocker’ları ayrı listeleyerek teslim et
+- [x] P11 corrective migration’ları: scope/conditional rules, media quarantine, message translation/visibility, privacy rectification ve insurance/classification/safety modellerini additive olarak uygula
+- [x] Provider insurance policy ve operating model kayıtlarını ownership, document quarantine, retention ve denetim kurallarıyla gerçek DB/tRPC katmanına bağla
+- [x] Job safety rule kayıtlarını yalnız aktif kural DTO’suyla public okuma; MoveOS Super Admin + MFA ile inceleme/yönetim olarak uygula
+- [x] Sigorta, worker classification ve job safety kararlarını teklif, kabul ve aktif iş yaşam döngüsünde server-authoritative fail-closed zorunlu kıl
+- [x] Global payment resolver ve completion-dispute resolution politikasını gerçek checkout/refund/settlement sınırlarına bağla
+- [x] P11 yetki, MFA, PII minimizasyonu, idempotency, hata ve edge-case regresyonlarını ekle
+- [x] P11 bağımlılık denetimi, dead-code/TODO taraması, TypeScript, lint, build, test, iOS/Android/web export ve secret scan kalite kapılarını gerçek kanıtla tamamla
+- [x] P11 checkpoint ve A/B/C nihai durum raporunu external blocker’ları ayrı listeleyerek teslim et
+
+## P12 FINAL INTERNAL CLOSURE
+- [x] P0-6 — Sesli mesaj ve MoveAI taslak medyalarını additive 0060 migration ile ortak fail-closed karantina yaşam döngüsüne al; imzalı scanner callback’ini secret yokluğunda 503/NOT_CONFIGURED bırak
+- [x] P1-12 — MoveAI istemci fallback’indeki sabit fiyat, uygunluk, ödeme ve garanti iddialarını sunucu doğrulaması gerektiren nötr yönlendirmeyle değiştir
+- [x] P1-17 — Profil düzenleme ekranını oturum sahibine bağlı auth.updateProfile tRPC mutasyonu, yükleme/hata/başarı ve yeniden doğrulama akışıyla bağla
+- [x] P1-18 — /verify/email nested rotasını oturumdaki gerçek e-posta ve gerçek OTP mutasyonlarını kullanan doğrulama ekranına yönlendir
+- [x] P12 — Tam regresyon, build/export, güvenlik taramaları, SBOM/lisans ve release evidence kalite kapılarını çalıştır
+- [x] P12 — Checkpoint ve kanıta dayalı final üretim durum raporunu tamamla

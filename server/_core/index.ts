@@ -31,6 +31,7 @@ import { createCompletionAutoReleaseResponse } from "./completion-auto-release-r
 import * as db from "../db";
 import { runFinancialReconciliation } from "../payments/FinancialReconciliationService";
 import { errorMiddleware, logger, requestLoggingMiddleware } from "./errorHandler";
+import { verifyMediaScannerCallbackSignature } from "../security/MediaScannerCallbackSecurity";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -132,6 +133,61 @@ export async function createApp() {
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Scanner decisions are received from an external adapter, not from a user
+  // session. The endpoint remains unavailable until its dedicated signature
+  // secret is configured; a missing secret never creates a synthetic clean result.
+  app.post("/api/webhooks/media-scanner", async (req, res) => {
+    const configuredSecret = ENV.mediaScannerWebhookSecret;
+    if (!configuredSecret) {
+      res.status(503).json({ error: "MEDIA_SCANNER_NOT_CONFIGURED" });
+      return;
+    }
+    const body = req.body ?? {};
+    const payload = {
+      mediaClass: body.mediaClass,
+      mediaId: body.mediaId,
+      sha256: body.sha256,
+      outcome: body.outcome,
+      reason: typeof body.reason === "string" ? body.reason : undefined,
+    };
+    const validClass = ["provider_document", "service_request_media", "voice_message", "move_ai_draft_media"].includes(payload.mediaClass);
+    const validOutcome = payload.outcome === "clean" || payload.outcome === "blocked";
+    const validId = typeof payload.mediaId === "string" && payload.mediaId.length > 0 && payload.mediaId.length <= 96;
+    const validHash = typeof payload.sha256 === "string" && /^[a-f0-9]{64}$/i.test(payload.sha256);
+    const validReason = payload.reason === undefined || payload.reason.length <= 500;
+    if (!validClass || !validOutcome || !validId || !validHash || !validReason) {
+      res.status(400).json({ error: "INVALID_MEDIA_SCANNER_CALLBACK" });
+      return;
+    }
+    const signature = typeof req.header("x-media-scanner-signature") === "string"
+      ? req.header("x-media-scanner-signature")
+      : undefined;
+    if (!verifyMediaScannerCallbackSignature({ secret: configuredSecret, signature, payload })) {
+      res.status(401).json({ error: "INVALID_MEDIA_SCANNER_SIGNATURE" });
+      return;
+    }
+    try {
+      const result = await db.applyMediaScannerOutcome({
+        mediaClass: payload.mediaClass,
+        mediaId: payload.mediaId,
+        sha256: payload.sha256,
+        outcome: payload.outcome,
+        reason: payload.reason,
+      });
+      if (!result.accepted) {
+        res.status(409).json({ error: result.reason });
+        return;
+      }
+      res.status(200).json({ status: result.idempotent ? "idempotent" : "recorded" });
+    } catch (error) {
+      console.error("[media-scanner] callback processing failed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        error,
+      });
+      res.status(500).json({ error: "MEDIA_SCANNER_CALLBACK_FAILED" });
+    }
+  });
 
   // The database transition is idempotent; this endpoint is still protected so
   // only the configured scheduler can start automatic escrow resolution.

@@ -239,16 +239,7 @@ export class WalletService {
    * Bakiye getir
    */
   async getBalance(userId: string): Promise<WalletBalance> {
-    // Deprecated compatibility path: zero is intentionally fail-closed. Real
-    // balances are sourced from the immutable ledger in the active domain.
-    return {
-      userId,
-      userType: 'customer',
-      availableBalance: 0,
-      pendingBalance: 0,
-      totalBalance: 0,
-      lastUpdated: new Date(),
-    };
+    return this.legacyServiceDisabled();
   }
 
   /**
@@ -341,46 +332,28 @@ export class WalletService {
       offset?: number;
     }
   ): Promise<WalletTransaction[]> {
-    return [];
+    return this.legacyServiceDisabled();
   }
 
   /**
    * Escrow işlemi getir
    */
   async getEscrowTransaction(escrowId: string): Promise<EscrowTransaction | null> {
-    // Veritabanından getir
-    // Mock implementasyon
-    return null;
+    return this.legacyServiceDisabled();
   }
 
   /**
    * Şirket bakiyesi getir
    */
   async getCompanyBalance(): Promise<WalletBalance> {
-    return {
-      userId: 'company',
-      userType: 'owner',
-      availableBalance: 0,
-      pendingBalance: 0,
-      totalBalance: 0,
-      lastUpdated: new Date(),
-    };
+    return this.legacyServiceDisabled();
   }
 
   /**
    * Bakiye raporu (Admin için)
    */
   async getBalanceReport(dateRange?: { from: Date; to: Date }) {
-    return {
-      period: dateRange || 'All time',
-      totalDeposits: 500000,
-      totalWithdrawals: 375000,
-      totalCommissions: 125000,
-      totalRefunds: 12500,
-      activeEscrows: 45,
-      escrowValue: 67500,
-      companyBalance: 125000,
-    };
+    return this.legacyServiceDisabled();
   }
 }
 

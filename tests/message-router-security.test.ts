@@ -310,6 +310,7 @@ describe("message router security", () => {
       mimeType: "audio/mpeg",
       sizeBytes: 1_024,
       durationMs: 2_000,
+      quarantineStatus: "clean",
     });
     const caller = appRouter.createCaller(createContext(10));
 

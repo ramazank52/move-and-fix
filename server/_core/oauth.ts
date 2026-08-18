@@ -62,6 +62,7 @@ async function buildUserResponse(
     openId: user?.openId ?? null,
     name: user?.name ?? null,
     email: user?.email ?? null,
+    phone: (user as { phone?: string | null } | null)?.phone ?? null,
     loginMethod: user?.loginMethod ?? null,
     role,
     accountType,

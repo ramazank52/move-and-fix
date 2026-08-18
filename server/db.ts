@@ -245,6 +245,59 @@ export async function updateUserVerification(data: {
     .where(eq(users.id, data.userId));
 }
 
+/** Updates only the authenticated account's own contact profile in one transaction. */
+export async function updateOwnUserProfile(data: {
+  userId: number;
+  name: string;
+  email: string;
+  phone: string | null;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+
+  const emailNormalized = data.email.trim().toLowerCase();
+  return database.transaction(async (tx) => {
+    const current = (await tx.select().from(users).where(eq(users.id, data.userId)).limit(1))[0];
+    if (!current) throw new Error("PROFILE_USER_NOT_FOUND");
+
+    const emailChanged = (current.email ?? "").trim().toLowerCase() !== emailNormalized;
+    const phoneChanged = (current.phone ?? null) !== data.phone;
+    if (emailChanged) {
+      const conflict = (await tx
+        .select({ userId: userCredentials.userId })
+        .from(userCredentials)
+        .where(eq(userCredentials.emailNormalized, emailNormalized))
+        .limit(1))[0];
+      if (conflict && conflict.userId !== data.userId) throw new Error("PROFILE_EMAIL_IN_USE");
+    }
+
+    await tx
+      .update(users)
+      .set({
+        name: data.name,
+        email: emailNormalized,
+        phone: data.phone,
+        ...(emailChanged ? { emailVerifiedAt: null } : {}),
+        ...(phoneChanged ? { phoneVerifiedAt: null } : {}),
+      })
+      .where(eq(users.id, data.userId));
+
+    if (emailChanged || phoneChanged) {
+      await tx
+        .update(userCredentials)
+        .set({
+          ...(emailChanged ? { emailNormalized } : {}),
+          ...(phoneChanged ? { phoneE164: data.phone } : {}),
+        })
+        .where(eq(userCredentials.userId, data.userId));
+    }
+
+    const user = (await tx.select().from(users).where(eq(users.id, data.userId)).limit(1))[0];
+    if (!user) throw new Error("PROFILE_USER_NOT_FOUND");
+    return { user, emailChanged, phoneChanged };
+  });
+}
+
 export async function createLocalCredential(data: {
   userId: number;
   passwordHash: string;
@@ -918,6 +971,12 @@ import {
 import { evaluateInsuranceCapability } from "./compliance/InsuranceCapabilityPolicy";
 import { evaluateWorkerClassification } from "./compliance/WorkerClassificationPolicy";
 import { evaluateJobSafety } from "./compliance/JobSafetyEngine";
+import {
+  decideMediaQuarantineAccess,
+  decideMediaScannerTransition,
+  type MediaScannerMediaClass,
+  type MediaScannerOutcome,
+} from "./security/MediaQuarantinePolicy";
 
 export type OrganizationType = "corporate" | "fleet" | "facility";
 export type OrganizationMemberRole = "owner" | "admin" | "member";
@@ -3075,6 +3134,7 @@ export async function getVoiceMessageMetadata(messageId: number) {
       sizeBytes: messages.mediaSizeBytes,
       durationMs: messages.mediaDurationMs,
       sha256: messages.mediaSha256,
+      quarantineStatus: messages.quarantineStatus,
       createdAt: messages.createdAt,
     })
     .from(messages)
@@ -3103,6 +3163,7 @@ export async function getAuthorizedVoiceMessageStorage(
       mimeType: messages.mediaMimeType,
       sizeBytes: messages.mediaSizeBytes,
       durationMs: messages.mediaDurationMs,
+      quarantineStatus: messages.quarantineStatus,
     })
     .from(messages)
     .where(and(eq(messages.id, messageId), eq(messages.kind, "audio"), isNull(messages.deletedAt)))
@@ -3110,8 +3171,89 @@ export async function getAuthorizedVoiceMessageStorage(
   const message = rows[0];
   if (!message || message.requestId == null || !message.storageKey) return null;
   if (message.senderId !== actorUserId && message.receiverId !== actorUserId) return null;
+  if (!decideMediaQuarantineAccess(message.quarantineStatus).allowed) return null;
   await assertMessageParticipant(db, message.requestId, message.senderId, message.receiverId);
   return message;
+}
+
+/**
+ * Persists one authenticated scanner decision. The reference is class-scoped,
+ * the stored digest must match, and terminal states are immutable except for an
+ * idempotent replay of the identical result.
+ */
+export async function applyMediaScannerOutcome(input: {
+  mediaClass: MediaScannerMediaClass;
+  mediaId: string;
+  sha256: string;
+  outcome: MediaScannerOutcome;
+  reason?: string;
+}): Promise<{ accepted: boolean; idempotent: boolean; reason: string }> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const hash = input.sha256.toLowerCase();
+  const now = new Date();
+  const reason = input.reason?.trim() || null;
+  const parsedNumericId = Number(input.mediaId);
+  const numericId = Number.isInteger(parsedNumericId) && parsedNumericId > 0 ? parsedNumericId : null;
+
+  const record = await (async () => {
+    if (input.mediaClass === "provider_document") {
+      if (numericId == null) return null;
+      return (await database.select({ sha256: providerDocuments.sha256, quarantineStatus: providerDocuments.quarantineStatus })
+        .from(providerDocuments).where(eq(providerDocuments.id, numericId)).limit(1))[0] ?? null;
+    }
+    if (input.mediaClass === "service_request_media") {
+      return (await database.select({ sha256: serviceRequestMedia.sha256, quarantineStatus: serviceRequestMedia.quarantineStatus })
+        .from(serviceRequestMedia).where(eq(serviceRequestMedia.publicId, input.mediaId)).limit(1))[0] ?? null;
+    }
+    if (input.mediaClass === "voice_message") {
+      if (numericId == null) return null;
+      return (await database.select({ sha256: messages.mediaSha256, quarantineStatus: messages.quarantineStatus })
+        .from(messages).where(and(eq(messages.id, numericId), eq(messages.kind, "audio"))).limit(1))[0] ?? null;
+    }
+    return (await database.select({ sha256: moveAiDraftMedia.sha256, quarantineStatus: moveAiDraftMedia.quarantineStatus })
+      .from(moveAiDraftMedia).where(eq(moveAiDraftMedia.opaqueId, input.mediaId)).limit(1))[0] ?? null;
+  })();
+
+  if (!record) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_MEDIA_NOT_FOUND" };
+  if (!record.sha256 || record.sha256.toLowerCase() !== hash) {
+    return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_DIGEST_MISMATCH" };
+  }
+  const transition = decideMediaScannerTransition(record.quarantineStatus, input.outcome);
+  if (!transition.allowed) return { accepted: false, idempotent: false, reason: transition.reason };
+  if (transition.idempotent) return { accepted: true, idempotent: true, reason: transition.reason };
+
+  const update = {
+    quarantineStatus: input.outcome,
+    quarantineReason: reason,
+    scannedAt: now,
+    releasedAt: input.outcome === "clean" ? now : null,
+  } as const;
+  let affectedRows = 0;
+  if (input.mediaClass === "provider_document" && numericId != null) {
+    const result = await database.update(providerDocuments).set(update)
+      .where(and(eq(providerDocuments.id, numericId), eq(providerDocuments.sha256, hash), eq(providerDocuments.quarantineStatus, "pending_scan")));
+    affectedRows = Number(result[0].affectedRows);
+  } else if (input.mediaClass === "service_request_media") {
+    const result = await database.update(serviceRequestMedia).set(update)
+      .where(and(eq(serviceRequestMedia.publicId, input.mediaId), eq(serviceRequestMedia.sha256, hash), eq(serviceRequestMedia.quarantineStatus, "pending_scan")));
+    affectedRows = Number(result[0].affectedRows);
+  } else if (input.mediaClass === "voice_message" && numericId != null) {
+    const result = await database.update(messages).set(update)
+      .where(and(eq(messages.id, numericId), eq(messages.kind, "audio"), eq(messages.mediaSha256, hash), eq(messages.quarantineStatus, "pending_scan")));
+    affectedRows = Number(result[0].affectedRows);
+  } else if (input.mediaClass === "move_ai_draft_media") {
+    const result = await database.update(moveAiDraftMedia).set(update)
+      .where(and(eq(moveAiDraftMedia.opaqueId, input.mediaId), eq(moveAiDraftMedia.sha256, hash), eq(moveAiDraftMedia.quarantineStatus, "pending_scan")));
+    affectedRows = Number(result[0].affectedRows);
+  }
+  if (affectedRows !== 1) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_STATE_CONFLICT" };
+  await logOperationEvent({
+    eventType: "media_scanner_outcome_recorded",
+    payload: { mediaClass: input.mediaClass, mediaReference: input.mediaId, outcome: input.outcome },
+    severity: input.outcome === "clean" ? "info" : "warning",
+  });
+  return { accepted: true, idempotent: false, reason: transition.reason };
 }
 
 /** Returns source text only after proving that the requesting actor is a conversation participant. */
@@ -7179,6 +7321,9 @@ export async function createMoveAiDraft(input: {
     if (stagedMedia.length !== attachedMediaOpaqueIds.length) {
       throw new Error("MOVE_AI_MEDIA_NOT_OWNED_OR_UNAVAILABLE");
     }
+    if (stagedMedia.some((media) => media.quarantineStatus !== "clean")) {
+      throw new Error("MOVE_AI_MEDIA_QUARANTINE_PENDING_OR_BLOCKED");
+    }
     const result = await tx.insert(moveAiDrafts).values({
       userId: input.userId,
       sourceMessage: input.sourceMessage,
@@ -7309,6 +7454,9 @@ export async function confirmMoveAiDraft(input: { draftId: number; userId: numbe
       if (attachedMedia.length !== attachedMediaOpaqueIds.length) {
         throw new Error("MOVE_AI_MEDIA_NOT_OWNED_OR_UNAVAILABLE");
       }
+      if (attachedMedia.some((media) => media.quarantineStatus !== "clean")) {
+        throw new Error("MOVE_AI_MEDIA_QUARANTINE_PENDING_OR_BLOCKED");
+      }
       await tx.insert(serviceRequestMedia).values(attachedMedia.map((media) => ({
         publicId: media.opaqueId,
         requestId,
@@ -7320,6 +7468,10 @@ export async function confirmMoveAiDraft(input: { draftId: number; userId: numbe
         mimeType: media.mimeType,
         sizeBytes: media.sizeBytes,
         sha256: media.sha256,
+        quarantineStatus: media.quarantineStatus,
+        quarantineReason: media.quarantineReason,
+        scannedAt: media.scannedAt,
+        releasedAt: media.releasedAt,
       })));
       const transferred = await tx
         .update(moveAiDraftMedia)

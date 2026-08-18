@@ -1212,24 +1212,36 @@ export const operationalEvents = mysqlTable(
 );
 
 // Messages
-export const messages = mysqlTable("messages", {
-  id: int("id").autoincrement().primaryKey(),
-  senderId: int("senderId").notNull(),
-  receiverId: int("receiverId").notNull(),
-  requestId: int("requestId"),
-  content: text("content").notNull(),
-  kind: mysqlEnum("kind", ["text", "audio"]).default("text").notNull(),
-  mediaStorageKey: varchar("mediaStorageKey", { length: 512 }),
-  mediaUrl: text("mediaUrl"),
-  mediaMimeType: varchar("mediaMimeType", { length: 96 }),
-  mediaSizeBytes: int("mediaSizeBytes"),
-  mediaDurationMs: int("mediaDurationMs"),
-  mediaSha256: varchar("mediaSha256", { length: 64 }),
-  isRead: int("isRead").default(0),
-  deletedAt: timestamp("deletedAt"),
-  deletedByUserId: int("deletedByUserId"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+export const messages = mysqlTable(
+  "messages",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    senderId: int("senderId").notNull(),
+    receiverId: int("receiverId").notNull(),
+    requestId: int("requestId"),
+    content: text("content").notNull(),
+    kind: mysqlEnum("kind", ["text", "audio"]).default("text").notNull(),
+    mediaStorageKey: varchar("mediaStorageKey", { length: 512 }),
+    mediaUrl: text("mediaUrl"),
+    mediaMimeType: varchar("mediaMimeType", { length: 96 }),
+    mediaSizeBytes: int("mediaSizeBytes"),
+    mediaDurationMs: int("mediaDurationMs"),
+    mediaSha256: varchar("mediaSha256", { length: 64 }),
+    // Voice payloads are not playable until an external scanner records an
+    // explicit clean result. Text messages remain unaffected.
+    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "clean", "blocked", "expired"])
+      .default("pending_scan")
+      .notNull(),
+    quarantineReason: varchar("quarantineReason", { length: 500 }),
+    scannedAt: timestamp("scannedAt"),
+    releasedAt: timestamp("releasedAt"),
+    isRead: int("isRead").default(0),
+    deletedAt: timestamp("deletedAt"),
+    deletedByUserId: int("deletedByUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("messages_quarantine_audio_idx").on(table.kind, table.quarantineStatus, table.createdAt)],
+);
 
 // Cached translations preserve the original message as source of truth. The
 // source hash avoids stale translation reuse without storing participant PII.
@@ -1424,6 +1436,14 @@ export const moveAiDraftMedia = mysqlTable(
     mimeType: varchar("mimeType", { length: 100 }).notNull(),
     sizeBytes: int("sizeBytes").notNull(),
     sha256: varchar("sha256", { length: 64 }).notNull(),
+    // Staged MoveAI image/audio stays in quarantine until an authenticated
+    // scanner callback releases it. Draft confirmation may only transfer clean media.
+    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "clean", "blocked", "expired"])
+      .default("pending_scan")
+      .notNull(),
+    quarantineReason: varchar("quarantineReason", { length: 500 }),
+    scannedAt: timestamp("scannedAt"),
+    releasedAt: timestamp("releasedAt"),
     status: mysqlEnum("status", ["staged", "attached", "transferred", "purged"])
       .default("staged")
       .notNull(),
@@ -1434,6 +1454,7 @@ export const moveAiDraftMedia = mysqlTable(
   (table) => [
     uniqueIndex("move_ai_draft_media_opaque_unique").on(table.opaqueId),
     index("move_ai_draft_media_owner_status_idx").on(table.ownerUserId, table.status, table.createdAt),
+    index("move_ai_draft_media_quarantine_idx").on(table.quarantineStatus, table.createdAt),
     index("move_ai_draft_media_draft_idx").on(table.draftId, table.status),
   ],
 );

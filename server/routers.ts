@@ -506,6 +506,37 @@ export const appRouter = router({
         })));
         return { recorded: outstanding.length };
       }),
+    updateProfile: protectedProcedure
+      .input(z.object({
+        name: z.string().trim().min(2).max(120),
+        email: emailSchema,
+        phone: z.string().trim().min(7).max(32).nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const phone = input.phone === null ? null : normalizeTurkishPhone(input.phone);
+          const result = await db.updateOwnUserProfile({
+            userId: ctx.user.id,
+            name: input.name,
+            email: input.email.trim().toLowerCase(),
+            phone,
+          });
+          return {
+            user: result.user,
+            emailVerificationRequired: result.emailChanged,
+            phoneVerificationRequired: result.phoneChanged,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "PROFILE_UPDATE_FAILED";
+          if (message === "PROFILE_EMAIL_IN_USE") {
+            throw new TRPCError({ code: "CONFLICT", message: "Bu e-posta başka bir hesap tarafından kullanılıyor" });
+          }
+          if (message === "PROFILE_USER_NOT_FOUND") {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Hesap bulunamadı" });
+          }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Profil güncellenemedi" });
+        }
+      }),
     register: publicProcedure
       .input(z.object({
         name: z.string().trim().min(2).max(120),

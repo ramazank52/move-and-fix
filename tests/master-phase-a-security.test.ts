@@ -91,6 +91,11 @@ describe("Master Phase A P0 security contracts", () => {
       status: "completed" as never,
       description: "must not be persisted by the legacy service",
     })).rejects.toThrow("disabled");
+    await expect(wallet.getBalance("customer-1")).rejects.toThrow("disabled");
+    await expect(wallet.getTransactionHistory("customer-1")).rejects.toThrow("disabled");
+    await expect(wallet.getEscrowTransaction("escrow-1")).rejects.toThrow("disabled");
+    await expect(wallet.getCompanyBalance()).rejects.toThrow("disabled");
+    await expect(wallet.getBalanceReport()).rejects.toThrow("disabled");
   });
 
   it("does not claim legacy AI commands were executed when no verified executor exists", async () => {

@@ -414,6 +414,13 @@
       "when": 1786871200000,
       "tag": "0059_p11_insurance_classification_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "5",
+      "when": 1787058556000,
+      "tag": "0060_p12_media_quarantine_all_classes",
+      "breakpoints": true
     }
   ]
 }

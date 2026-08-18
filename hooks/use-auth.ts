@@ -13,6 +13,7 @@ function mapApiUser(apiUser: NonNullable<Awaited<ReturnType<typeof Api.getMe>>>)
     openId: apiUser.openId,
     name: apiUser.name,
     email: apiUser.email,
+    phone: apiUser.phone,
     loginMethod: apiUser.loginMethod,
     role: apiUser.role,
     accountType: apiUser.accountType,
