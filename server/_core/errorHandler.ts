@@ -66,6 +66,14 @@ function readRequestUserId(req: Request): string | undefined {
   return typeof id === 'string' || typeof id === 'number' ? String(id) : undefined;
 }
 
+function isBodyTooLargeError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    Reflect.get(error, 'type') === 'entity.too.large'
+  );
+}
+
 export class StructuredLogger {
   private logs: ErrorLog[] = [];
   private readonly maxLogs = 10_000;
@@ -226,6 +234,23 @@ export class StructuredLogger {
 export const errorMiddleware = (structuredLogger: StructuredLogger): ErrorRequestHandler =>
   (error, req, res, _next) => {
     const requestId = readRequestString(req, 'id') ?? 'unknown';
+    // express.json/urlencoded reject over-limit bodies before any route or tRPC
+    // parser runs. Preserve an explicit, non-sensitive 413 contract instead of
+    // allowing the generic error normalizer to emit a misleading 500 response.
+    if (isBodyTooLargeError(error)) {
+      structuredLogger.logWarning('http.request.payload_too_large', {
+        endpoint: req.path,
+        method: req.method,
+      }, requestId);
+      res.status(413).json({
+        error: {
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'İstek gövdesi en fazla 50 MB olabilir',
+          requestId,
+        },
+      });
+      return;
+    }
     const errorLog = structuredLogger.logError(
       error,
       requestId,

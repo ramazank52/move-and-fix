@@ -18,6 +18,7 @@ import {
   CSRFProtection,
   getCsrfSessionId,
   isAllowedCorsOrigin,
+  isTrustedHttpsRequest,
   rateLimiters,
   requestIdMiddleware,
   requiresCsrfProtection,
@@ -111,9 +112,9 @@ export async function createApp() {
       "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
     );
     // HSTS must never be advertised from HTTP or development responses. The
-    // production reverse proxy is trusted only on loopback, so req.secure is
-    // true for direct TLS or a proxy-authenticated HTTPS request.
-    if (process.env.NODE_ENV === "production" && req.secure) {
+    // production reverse proxy is trusted only on loopback. Forwarded HTTPS
+    // metadata from any other peer cannot cause HSTS to be emitted.
+    if (process.env.NODE_ENV === "production" && isTrustedHttpsRequest(req)) {
       res.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
     }
     next();

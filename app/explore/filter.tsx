@@ -71,13 +71,23 @@ export default function FilterScreen() {
           borderBottomColor: colors.border,
         }}
       >
-        <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
+        <Pressable
+          onPress={() => router.back()}
+          style={{ padding: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel="Filtreleme ekranından geri dön"
+        >
           <IconSymbol name="chevron.left.forwardslash.chevron.right" size={20} color={colors.foreground} />
         </Pressable>
         <Text style={{ flex: 1, textAlign: "center", fontSize: 17, fontWeight: "600", color: colors.foreground }}>
           Filtreleme
         </Text>
-        <Pressable onPress={handleReset} style={{ padding: 4 }}>
+        <Pressable
+          onPress={handleReset}
+          style={{ padding: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel="Hizmet filtrelerini temizle"
+        >
           <Text style={{ fontSize: 13, color: colors.primary, fontWeight: "600" }}>Sıfırla</Text>
         </Pressable>
       </View>

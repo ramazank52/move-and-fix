@@ -489,7 +489,12 @@ export default function CreateServiceScreen() {
           borderBottomColor: colors.border,
         }}
       >
-        <Pressable onPress={handleBack} style={{ padding: 4 }}>
+        <Pressable
+          onPress={handleBack}
+          style={{ padding: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel="Önceki hizmet talebi adımına dön"
+        >
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
         <Text style={{ flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700", color: colors.foreground }}>

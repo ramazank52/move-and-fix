@@ -106,6 +106,9 @@ export default function RegisterScreen() {
             {step === "form" ? (
               <>
                 <TextInput
+                  accessibilityLabel="Ad ve soyad"
+                  accessibilityHint="Hesabınızda görünecek ad ve soyadınızı girin"
+                  textContentType="name"
                   value={name}
                   onChangeText={setName}
                   placeholder="Ad Soyad"
@@ -121,6 +124,9 @@ export default function RegisterScreen() {
                   }}
                 />
                 <TextInput
+                  accessibilityLabel="E-posta adresi"
+                  accessibilityHint="Hesabınıza kayıtlı e-posta adresini girin"
+                  textContentType="emailAddress"
                   value={email}
                   onChangeText={setEmail}
                   placeholder="E-posta"
@@ -138,6 +144,9 @@ export default function RegisterScreen() {
                   }}
                 />
                 <TextInput
+                  accessibilityLabel="Telefon numarası"
+                  accessibilityHint="Doğrulama için telefon numaranızı girin"
+                  textContentType="telephoneNumber"
                   value={phone}
                   onChangeText={setPhone}
                   placeholder="Telefon"
@@ -154,6 +163,9 @@ export default function RegisterScreen() {
                   }}
                 />
                 <TextInput
+                  accessibilityLabel="Parola"
+                  accessibilityHint="En az on karakter, büyük harf, küçük harf ve rakam içeren bir parola girin"
+                  textContentType="newPassword"
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Şifre"
@@ -170,6 +182,8 @@ export default function RegisterScreen() {
                   }}
                 />
                 <Pressable
+                  accessibilityLabel="Kayıt bilgileriyle devam et"
+                  accessibilityState={{ disabled: localRegister.isPending }}
                   onPress={handleRegister}
                   style={({ pressed }) => [
                     {

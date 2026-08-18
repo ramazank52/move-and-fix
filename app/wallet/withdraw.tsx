@@ -97,6 +97,8 @@ export default function WalletWithdrawScreen() {
           </Text>
           <Text className="mb-2 text-sm font-semibold text-foreground">Tutar</Text>
           <TextInput
+            accessibilityLabel="Para çekme tutarı"
+            accessibilityHint="En az yüz Türk lirası tutarında çekim miktarı girin"
             value={amount}
             onChangeText={setAmount}
             keyboardType="number-pad"
@@ -106,6 +108,8 @@ export default function WalletWithdrawScreen() {
           />
           <Text className="mb-2 mt-5 text-sm font-semibold text-foreground">IBAN</Text>
           <TextInput
+            accessibilityLabel="Para çekme IBAN numarası"
+            accessibilityHint="Ödemenin gönderileceği Türk lirası IBAN numarasını girin"
             value={iban}
             onChangeText={setIban}
             autoCapitalize="characters"
@@ -117,6 +121,8 @@ export default function WalletWithdrawScreen() {
           />
           <Text className="mb-2 mt-5 text-sm font-semibold text-foreground">Parolanızla doğrulayın</Text>
           <TextInput
+            accessibilityLabel="Para çekme işlemi için parola"
+            accessibilityHint="İşlemi doğrulamak için hesap parolanızı girin"
             value={reauthPassword}
             onChangeText={setReauthPassword}
             secureTextEntry
@@ -130,6 +136,8 @@ export default function WalletWithdrawScreen() {
           <View style={{ marginTop: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <Text className="text-sm font-semibold text-foreground">E-posta güvenlik kodu</Text>
             <Pressable
+              accessibilityLabel="Para çekme işlemi için e-posta güvenlik kodu gönder"
+              accessibilityState={{ disabled: requestSecurityCode.isPending, busy: requestSecurityCode.isPending }}
               disabled={requestSecurityCode.isPending}
               onPress={() => requestSecurityCode.mutate({ purpose: "sensitive_transaction" })}
               style={({ pressed }) => ({ minHeight: 34, justifyContent: "center", paddingHorizontal: 10, borderRadius: 9, backgroundColor: colors.primary + "18", opacity: pressed || requestSecurityCode.isPending ? 0.6 : 1 })}
@@ -138,6 +146,8 @@ export default function WalletWithdrawScreen() {
             </Pressable>
           </View>
           <TextInput
+            accessibilityLabel="Para çekme e-posta güvenlik kodu"
+            accessibilityHint="E-posta adresinize gönderilen altı haneli kodu girin"
             value={reauthCode}
             onChangeText={(value) => setReauthCode(value.replace(/\D/g, "").slice(0, 6))}
             keyboardType="number-pad"
@@ -148,6 +158,8 @@ export default function WalletWithdrawScreen() {
           />
           <Text className="mt-2 text-xs leading-5 text-muted">Güvenlik kodu 10 dakika geçerlidir ve yalnız bir para çekme talebinde kullanılabilir.</Text>
           <Pressable
+            accessibilityLabel="Para çekme talebi oluştur"
+            accessibilityState={{ disabled: withdraw.isPending, busy: withdraw.isPending }}
             disabled={withdraw.isPending}
             onPress={submit}
             style={({ pressed }) => ({ height: 52, marginTop: 26, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary, opacity: withdraw.isPending ? 0.55 : pressed ? 0.84 : 1 })}

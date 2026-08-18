@@ -55,6 +55,29 @@ export function isAllowedCorsOrigin(origin: string, environment: SecurityEnviron
   );
 }
 
+/**
+ * HSTS is safe only when the request reached this process over direct TLS or
+ * through the explicitly trusted loopback TLS-terminating reverse proxy.
+ * Express applies the identical trust model through `app.set("trust proxy",
+ * "loopback")`; this helper keeps the HSTS decision independently testable.
+ */
+export function isTrustedHttpsRequest(request: Pick<Request, "secure" | "headers" | "socket">): boolean {
+  if (request.secure === true) return true;
+
+  const remoteAddress = request.socket.remoteAddress;
+  const isLoopbackProxy =
+    remoteAddress === "::1" ||
+    remoteAddress === "::ffff:127.0.0.1" ||
+    Boolean(remoteAddress?.startsWith("127."));
+  if (!isLoopbackProxy) return false;
+
+  const forwardedProto = request.headers["x-forwarded-proto"];
+  const firstForwardedProto = Array.isArray(forwardedProto)
+    ? forwardedProto[0]
+    : forwardedProto?.split(",", 1)[0];
+  return firstForwardedProto?.trim().toLowerCase() === "https";
+}
+
 /** Missing production material is fatal; development never uses a static fallback key. */
 export function resolveEncryptionKey(environment: SecurityEnvironment = process.env): string {
   const configuredKey = environment.ENCRYPTION_KEY?.trim();

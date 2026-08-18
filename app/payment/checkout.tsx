@@ -448,7 +448,7 @@ export default function CheckoutScreen() {
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.headerButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ödemeden geri dön" onPress={() => router.back()} style={styles.headerButton}>
           <IconSymbol name="chevron.left" size={20} color={colors.foreground} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>{t("checkout.title")}</Text>
@@ -459,7 +459,7 @@ export default function CheckoutScreen() {
       </KeyboardAvoidingView>
       {quoteQuery.data ? (
         <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
-          <Pressable onPress={handlePayment} disabled={!canSubmit} style={({ pressed }) => [styles.payButton, { backgroundColor: canSubmit ? colors.primary : colors.muted }, pressed && canSubmit && styles.pressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("checkout.payWith", { provider: provider === "iyzico" ? "iyzico" : "Stripe", amount: formatMoney(quoteQuery.data.amount) })} accessibilityState={{ disabled: !canSubmit, busy: processing }} onPress={handlePayment} disabled={!canSubmit} style={({ pressed }) => [styles.payButton, { backgroundColor: canSubmit ? colors.primary : colors.muted }, pressed && canSubmit && styles.pressed]}>
             {processing ? (
               <View style={styles.processingRow}><ActivityIndicator color="#FFFFFF" /><Text style={styles.processingText}>{t("checkout.processing")}</Text></View>
             ) : (
@@ -480,7 +480,7 @@ function SummaryRow({ label, value, colors }: { label: string; value: string; co
 
 function ProviderOption({ title, subtitle, icon, selected, disabled, onPress, colors, warning = false }: { title: string; subtitle: string; icon: Parameters<typeof IconSymbol>[0]["name"]; selected: boolean; disabled: boolean; onPress: () => void; colors: ReturnType<typeof useColors>; warning?: boolean }) {
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.methodCard, { backgroundColor: colors.card, borderColor: selected ? colors.primary : colors.border }, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="radio" accessibilityLabel={`${title}. ${subtitle}`} accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.methodCard, { backgroundColor: colors.card, borderColor: selected ? colors.primary : colors.border }, pressed && styles.pressed]}>
       <View style={[styles.methodIcon, { backgroundColor: `${colors.primary}18` }]}><IconSymbol name={icon} size={22} color={colors.primary} /></View>
       <View style={styles.methodCopy}><Text style={[styles.methodTitle, { color: colors.foreground }]}>{title}</Text><Text style={[styles.methodStatus, { color: warning ? colors.warning : colors.muted }]}>{subtitle}</Text></View>
       <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.border }]}>{selected ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}</View>
@@ -489,11 +489,11 @@ function ProviderOption({ title, subtitle, icon, selected, disabled, onPress, co
 }
 
 function CheckoutInput({ value, onChangeText, placeholder, colors, keyboardType = "default", maxLength, multiline = false, flex = false, compact = false }: { value: string; onChangeText: (value: string) => void; placeholder: string; colors: ReturnType<typeof useColors>; keyboardType?: "default" | "phone-pad" | "number-pad"; maxLength?: number; multiline?: boolean; flex?: boolean; compact?: boolean }) {
-  return <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.muted} keyboardType={keyboardType} maxLength={maxLength} multiline={multiline} textAlignVertical={multiline ? "top" : "center"} style={[styles.input, multiline && styles.addressInput, flex && styles.flexInput, compact && styles.compactInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]} />;
+  return <TextInput accessibilityLabel={placeholder} accessibilityHint={multiline ? "Fatura adresini girin" : `${placeholder} bilgisini girin`} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.muted} keyboardType={keyboardType} maxLength={maxLength} multiline={multiline} textAlignVertical={multiline ? "top" : "center"} style={[styles.input, multiline && styles.addressInput, flex && styles.flexInput, compact && styles.compactInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]} />;
 }
 
 function StateView({ title, body, icon, iconColor, actionLabel, onAction, colors, primary = false }: { title: string; body: string; icon: Parameters<typeof IconSymbol>[0]["name"]; iconColor: string; actionLabel: string; onAction: () => void; colors: ReturnType<typeof useColors>; primary?: boolean }) {
-  return <View style={styles.centerState}><IconSymbol name={icon} size={34} color={iconColor} /><Text style={[styles.stateTitle, { color: colors.foreground }]}>{title}</Text><Text style={[styles.stateBody, { color: colors.muted }]}>{body}</Text><Pressable onPress={onAction} style={[primary ? styles.primaryButton : styles.secondaryButton, { backgroundColor: primary ? colors.primary : "transparent", borderColor: colors.border }]}><Text style={primary ? styles.primaryButtonText : [styles.secondaryButtonText, { color: colors.foreground }]}>{actionLabel}</Text></Pressable></View>;
+  return <View style={styles.centerState}><IconSymbol name={icon} size={34} color={iconColor} /><Text accessibilityRole="alert" style={[styles.stateTitle, { color: colors.foreground }]}>{title}</Text><Text style={[styles.stateBody, { color: colors.muted }]}>{body}</Text><Pressable accessibilityRole="button" accessibilityLabel={actionLabel} onPress={onAction} style={[primary ? styles.primaryButton : styles.secondaryButton, { backgroundColor: primary ? colors.primary : "transparent", borderColor: colors.border }]}><Text style={primary ? styles.primaryButtonText : [styles.secondaryButtonText, { color: colors.foreground }]}>{actionLabel}</Text></Pressable></View>;
 }
 
 const styles = StyleSheet.create({

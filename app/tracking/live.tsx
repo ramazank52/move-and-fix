@@ -483,7 +483,7 @@ export default function LiveTrackingScreen() {
         <Text style={[styles.stateText, { color: colors.muted }]}>
           {trackingQuery.error?.message || "Bu işe erişiminiz bulunmuyor veya iş artık mevcut değil."}
         </Text>
-        <Pressable onPress={() => trackingQuery.refetch()} style={[styles.stateButton, { backgroundColor: colors.primary }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Aktif işi yeniden yükle" accessibilityState={{ busy: trackingQuery.isRefetching }} onPress={() => trackingQuery.refetch()} style={[styles.stateButton, { backgroundColor: colors.primary }]}>
           <Text style={styles.stateButtonText}>Tekrar Dene</Text>
         </Pressable>
       </ScreenContainer>
@@ -498,14 +498,14 @@ export default function LiveTrackingScreen() {
   return (
     <ScreenContainer edges={["top", "left", "right"]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerAction}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Önceki ekrana dön" onPress={() => router.back()} hitSlop={12} style={styles.headerAction}>
           <MaterialIcons name="chevron-left" size={26} color={colors.foreground} />
         </Pressable>
         <View style={styles.headerTextGroup}>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Aktif İş</Text>
           <Text style={[styles.headerSubtitle, { color: colors.muted }]}>#{requestId}</Text>
         </View>
-        <Pressable onPress={openExternalMap} hitSlop={12} style={styles.headerAction}>
+        <Pressable accessibilityRole="button" accessibilityLabel="İş konumunu haritada aç" onPress={openExternalMap} hitSlop={12} style={styles.headerAction}>
           <MaterialIcons name="open-in-new" size={20} color={colors.primary} />
         </Pressable>
       </View>
@@ -575,6 +575,7 @@ export default function LiveTrackingScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={isSharingLocation || tracking.locationSharingStatus === "enabled" ? "Canlı konum paylaşımını durdur" : "Canlı konum paylaşımını başlat"}
+              accessibilityState={{ busy: setLocationSharing.isPending, disabled: setLocationSharing.isPending }}
               disabled={setLocationSharing.isPending}
               onPress={() => {
                 if (isSharingLocation || tracking.locationSharingStatus === "enabled") stopLocationSharing();
@@ -616,6 +617,8 @@ export default function LiveTrackingScreen() {
             </View>
           </View>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${providerName} ile mesajlaşmayı aç`}
             onPress={() => {
               if (!tracking.providerUserId) {
                 Alert.alert("Mesaj kullanılamıyor", "Atanmış profesyonelin kullanıcı kaydı bulunamadı.");
@@ -680,6 +683,8 @@ export default function LiveTrackingScreen() {
             <Text style={[styles.completionHint, { color: colors.muted }]}>İşi bitirdiğinizi fotoğraf veya video ile belgeleyin. Müşterinin yanıt süresi 48 saattir.</Text>
             <Text style={[styles.aiDisclosure, { color: colors.muted }]}>Gönderdiğiniz görseller, yalnız incelemeyi desteklemek üzere MoveAI tarafından analiz edilebilir. Analiz onay veya ödeme kararı vermez.</Text>
             <TextInput
+              accessibilityLabel="İş kanıtı açıklaması"
+              accessibilityHint="Yapılan işlemi en fazla 2000 karakterle açıklayın"
               value={proofSummary}
               onChangeText={setProofSummary}
               placeholder="Yapılan işlemi açıklayın"
@@ -688,7 +693,7 @@ export default function LiveTrackingScreen() {
               maxLength={2000}
               style={[styles.completionInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
             />
-            <Pressable onPress={handlePickProofMedia} style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.72 : 1 }]}> 
+            <Pressable accessibilityRole="button" accessibilityLabel="İş kanıtı için fotoğraf veya video ekle" onPress={handlePickProofMedia} style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.primary, opacity: pressed ? 0.72 : 1 }]}> 
               <MaterialIcons name="add-photo-alternate" size={19} color={colors.primary} />
               <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>Fotoğraf veya Video Ekle</Text>
             </Pressable>
@@ -696,12 +701,12 @@ export default function LiveTrackingScreen() {
               <View key={item.id} style={[styles.proofMediaRow, { borderColor: colors.border }]}> 
                 <MaterialIcons name={item.kind === "video" ? "videocam" : "image"} size={18} color={colors.primary} />
                 <Text style={[styles.proofMediaName, { color: colors.foreground }]} numberOfLines={1}>{item.originalName}</Text>
-                <Pressable onPress={() => setPendingProofMedia((current) => current.filter((media) => media.id !== item.id))} hitSlop={10}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`${item.originalName} kanıt dosyasını kaldır`} onPress={() => setPendingProofMedia((current) => current.filter((media) => media.id !== item.id))} hitSlop={10}>
                   <MaterialIcons name="close" size={18} color={colors.muted} />
                 </Pressable>
               </View>
             ))}
-            <Pressable disabled={submitProof.isPending} onPress={handleSubmitProof} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary, opacity: pressed || submitProof.isPending ? 0.72 : 1 }]}> 
+            <Pressable accessibilityRole="button" accessibilityLabel="İş kanıtını gönder" accessibilityState={{ busy: submitProof.isPending, disabled: submitProof.isPending }} disabled={submitProof.isPending} onPress={handleSubmitProof} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary, opacity: pressed || submitProof.isPending ? 0.72 : 1 }]}> 
               {submitProof.isPending ? <ActivityIndicator color="#FFFFFF" /> : <MaterialIcons name="upload-file" size={20} color="#FFFFFF" />}
               <Text style={styles.primaryButtonText}>İş Kanıtını Gönder</Text>
             </Pressable>
@@ -749,17 +754,19 @@ export default function LiveTrackingScreen() {
             ) : null}
             {completionQuery.data.canCustomerRespond ? (
               <View style={styles.completionActions}>
-                <Pressable disabled={approveCompletion.isPending} onPress={handleApproveCompletion} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.success, opacity: pressed || approveCompletion.isPending ? 0.72 : 1 }]}> 
+                <Pressable accessibilityRole="button" accessibilityLabel="İş kanıtını onayla" accessibilityState={{ busy: approveCompletion.isPending, disabled: approveCompletion.isPending }} disabled={approveCompletion.isPending} onPress={handleApproveCompletion} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.success, opacity: pressed || approveCompletion.isPending ? 0.72 : 1 }]}> 
                   {approveCompletion.isPending ? <ActivityIndicator color="#FFFFFF" /> : <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />}
                   <Text style={styles.primaryButtonText}>İşi Onayla</Text>
                 </Pressable>
-                <Pressable onPress={() => setIsDisputeComposerOpen((open) => !open)} style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.error, opacity: pressed ? 0.72 : 1 }]}> 
+                <Pressable accessibilityRole="button" accessibilityLabel="İtiraz formunu aç veya kapat" accessibilityState={{ expanded: isDisputeComposerOpen }} onPress={() => setIsDisputeComposerOpen((open) => !open)} style={({ pressed }) => [styles.secondaryButton, { borderColor: colors.error, opacity: pressed ? 0.72 : 1 }]}> 
                   <MaterialIcons name="report-problem" size={19} color={colors.error} />
                   <Text style={[styles.secondaryButtonText, { color: colors.error }]}>İtiraz Oluştur</Text>
                 </Pressable>
                 {isDisputeComposerOpen ? (
                   <View style={styles.disputeComposer}>
                     <TextInput
+                      accessibilityLabel="İtiraz açıklaması"
+                      accessibilityHint="İtiraz nedeninizi en fazla 2000 karakterle açıklayın"
                       value={disputeDescription}
                       onChangeText={setDisputeDescription}
                       placeholder="İtiraz nedeninizi açıklayın"
@@ -768,7 +775,7 @@ export default function LiveTrackingScreen() {
                       maxLength={2000}
                       style={[styles.completionInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
                     />
-                    <Pressable disabled={openDispute.isPending} onPress={handleOpenDispute} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.error, opacity: pressed || openDispute.isPending ? 0.72 : 1 }]}> 
+                    <Pressable accessibilityRole="button" accessibilityLabel="İtirazı gönder" accessibilityState={{ busy: openDispute.isPending, disabled: openDispute.isPending }} disabled={openDispute.isPending} onPress={handleOpenDispute} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.error, opacity: pressed || openDispute.isPending ? 0.72 : 1 }]}> 
                       {openDispute.isPending ? <ActivityIndicator color="#FFFFFF" /> : <MaterialIcons name="gavel" size={20} color="#FFFFFF" />}
                       <Text style={styles.primaryButtonText}>İtirazı Gönder</Text>
                     </Pressable>
@@ -783,6 +790,10 @@ export default function LiveTrackingScreen() {
           <View style={styles.providerActions}>
             {lifecycleStatus !== "completed" && lifecycleStatus !== "cancelled" ? (
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isSharingLocation ? "Canlı konum paylaşımını durdur" : "Canlı konum paylaşımını başlat"}
+                accessibilityState={{ busy: setLocationSharing.isPending, disabled: setLocationSharing.isPending }}
+                disabled={setLocationSharing.isPending}
                 onPress={() => {
                   if (isSharingLocation) stopLocationSharing();
                   else void startLocationSharing();
@@ -797,6 +808,9 @@ export default function LiveTrackingScreen() {
             ) : null}
             {nextAction ? (
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t(nextAction.labelKey)}
+                accessibilityState={{ busy: updateLifecycle.isPending, disabled: updateLifecycle.isPending }}
                 disabled={updateLifecycle.isPending}
                 onPress={handleLifecycleAction}
                 style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary, opacity: pressed || updateLifecycle.isPending ? 0.72 : 1 }]}
@@ -808,6 +822,8 @@ export default function LiveTrackingScreen() {
           </View>
         ) : lifecycleStatus === "completed" && tracking.assignedProviderId ? (
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tamamlanan hizmeti değerlendir"
             onPress={() => router.push(`/review/create?requestId=${requestId}&providerId=${tracking.assignedProviderId}&providerName=${encodeURIComponent(providerName)}&jobTitle=${encodeURIComponent(serviceName)}` as never)}
             style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary, opacity: pressed ? 0.75 : 1 }]}
           >

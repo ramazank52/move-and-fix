@@ -79,6 +79,9 @@ export default function PaymentReturnScreen() {
 
         {pending ? (
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ödeme durumunu yenile"
+            accessibilityState={{ busy: paymentsQuery.isRefetching }}
             onPress={() => paymentsQuery.refetch()}
             style={[styles.primaryButton, { backgroundColor: colors.primary }]}
           >
@@ -87,6 +90,8 @@ export default function PaymentReturnScreen() {
         ) : null}
 
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="İşlerim ekranına dön"
           onPress={() => router.replace("/(tabs)/my-jobs")}
           style={[
             styles.secondaryButton,
@@ -95,7 +100,7 @@ export default function PaymentReturnScreen() {
         >
           <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>İşlerime Dön</Text>
         </Pressable>
-        <Pressable onPress={() => router.push("/payment/history")} style={styles.linkButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ödeme geçmişini aç" onPress={() => router.push("/payment/history")} style={styles.linkButton}>
           <Text style={[styles.linkText, { color: colors.primary }]}>Ödeme Geçmişini Aç</Text>
         </Pressable>
       </View>

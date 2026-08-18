@@ -100,13 +100,23 @@ export default function CalendarScreen() {
             borderColor: colors.border,
           }}
         >
-          <Pressable onPress={handlePrevMonth} style={{ padding: 4 }}>
+          <Pressable
+            onPress={handlePrevMonth}
+            style={{ padding: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel="Önceki ayı göster"
+          >
             <IconSymbol name="chevron.left.forwardslash.chevron.right" size={18} color={colors.primary} />
           </Pressable>
           <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>
             {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
           </Text>
-          <Pressable onPress={handleNextMonth} style={{ padding: 4 }}>
+          <Pressable
+            onPress={handleNextMonth}
+            style={{ padding: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel="Sonraki ayı göster"
+          >
             <IconSymbol name="chevron.right" size={18} color={colors.primary} />
           </Pressable>
         </View>

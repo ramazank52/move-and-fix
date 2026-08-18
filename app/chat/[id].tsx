@@ -181,7 +181,12 @@ export default function ChatRoomScreen() {
           borderBottomColor: colors.border,
         }}
       >
-        <Pressable onPress={() => router.back()} style={({ pressed }) => ({ padding: 5, opacity: pressed ? 0.6 : 1 })}>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Geri dön"
+          style={({ pressed }) => ({ padding: 5, opacity: pressed ? 0.6 : 1 })}
+        >
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
         <View
@@ -355,7 +360,7 @@ export default function ChatRoomScreen() {
         />
 
         {sendMessageMutation.isError || sendVoiceMutation.isError || translateMessageMutation.isError || hideForMeMutation.isError ? (
-          <Text style={{ paddingHorizontal: 16, paddingBottom: 6, color: colors.error, fontSize: 12 }}>
+          <Text accessibilityRole="alert" style={{ paddingHorizontal: 16, paddingBottom: 6, color: colors.error, fontSize: 12 }}>
             {translateMessageMutation.isError ? t("chat.translationUnavailable") : sendVoiceMutation.isError ? t("chat.voiceSendError") : t("chat.sendError")}
           </Text>
         ) : null}
@@ -376,6 +381,8 @@ export default function ChatRoomScreen() {
             value={input}
             onChangeText={setInput}
             placeholder={t("chat.placeholder")}
+            accessibilityLabel={t("chat.placeholder")}
+            accessibilityHint="Mesajınızı yazın ve gönder düğmesine basın"
             placeholderTextColor={colors.muted}
             returnKeyType="send"
             onSubmitEditing={sendMessage}
@@ -400,6 +407,10 @@ export default function ChatRoomScreen() {
             disabled={!hasValidConversationContext || sendVoiceMutation.isPending}
             accessibilityRole="button"
             accessibilityLabel={recorderState.isRecording ? t("chat.stopRecordAndSend") : t("chat.recordVoice")}
+            accessibilityState={{
+              disabled: !hasValidConversationContext || sendVoiceMutation.isPending,
+              busy: sendVoiceMutation.isPending,
+            }}
             style={({ pressed }) => ({
               width: 42,
               height: 42,
@@ -417,6 +428,12 @@ export default function ChatRoomScreen() {
           <Pressable
             onPress={sendMessage}
             disabled={!input.trim() || sendMessageMutation.isPending || otherUid <= 0}
+            accessibilityRole="button"
+            accessibilityLabel="Mesajı gönder"
+            accessibilityState={{
+              disabled: !input.trim() || sendMessageMutation.isPending || otherUid <= 0,
+              busy: sendMessageMutation.isPending,
+            }}
             style={({ pressed }) => ({
               width: 42,
               height: 42,

@@ -78,7 +78,12 @@ export default function AdminDashboardScreen() {
           <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.error }}>
             <Text style={{ color: colors.error, fontWeight: "600", marginBottom: 6 }}>Yönetim verileri kullanılamıyor</Text>
             <Text style={{ color: colors.muted, lineHeight: 20 }}>{errorMessage(error)}</Text>
-            <Pressable onPress={refresh} style={{ marginTop: 14, alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 12 }}>
+            <Pressable
+              onPress={refresh}
+              style={{ marginTop: 14, alignSelf: "flex-start", paddingVertical: 8, paddingHorizontal: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel="Yönetim verilerini yeniden yükle"
+            >
               <Text style={{ color: colors.primary, fontWeight: "600" }}>Tekrar dene</Text>
             </Pressable>
           </View>

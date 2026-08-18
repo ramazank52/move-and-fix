@@ -40,6 +40,7 @@ import { createPolicyBoundMoveAiResponse, resolveMoveAiCategory } from "./ai/Mov
 import { translateMessageOnDemand } from "./ai/OnDemandMessageTranslation";
 import { evaluateProfessionalAiBoundary } from "./ai/ProfessionalAiBoundary";
 import { evaluateMoveAiMediaConsent } from "./ai/MoveAiMediaPolicy";
+import { MEDIA_UPLOAD_LIMIT_BYTES, isWithinDecodedByteLimit } from "./security/MediaUploadLimits";
 
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
 // Döngüsel import'u önlemek için servisler burada birbirine bağlanır.
@@ -95,25 +96,25 @@ const serviceRequestDetailsSchema = z.object({
 });
 
 const allowedRequestMedia = {
-  "image/jpeg": { kind: "image", extension: "jpg", maxBytes: 8 * 1024 * 1024 },
-  "image/png": { kind: "image", extension: "png", maxBytes: 8 * 1024 * 1024 },
-  "image/webp": { kind: "image", extension: "webp", maxBytes: 8 * 1024 * 1024 },
-  "image/heic": { kind: "image", extension: "heic", maxBytes: 8 * 1024 * 1024 },
-  "image/heif": { kind: "image", extension: "heif", maxBytes: 8 * 1024 * 1024 },
-  "video/mp4": { kind: "video", extension: "mp4", maxBytes: 25 * 1024 * 1024 },
-  "video/quicktime": { kind: "video", extension: "mov", maxBytes: 25 * 1024 * 1024 },
+  "image/jpeg": { kind: "image", extension: "jpg", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.requestImage },
+  "image/png": { kind: "image", extension: "png", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.requestImage },
+  "image/webp": { kind: "image", extension: "webp", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.requestImage },
+  "image/heic": { kind: "image", extension: "heic", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.requestImage },
+  "image/heif": { kind: "image", extension: "heif", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.requestImage },
+  "video/mp4": { kind: "video", extension: "mp4", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.requestVideo },
+  "video/quicktime": { kind: "video", extension: "mov", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.requestVideo },
 } as const;
 
 const allowedMoveAiMedia = {
-  "image/jpeg": { kind: "image", extension: "jpg", maxBytes: 8 * 1024 * 1024 },
-  "image/png": { kind: "image", extension: "png", maxBytes: 8 * 1024 * 1024 },
-  "image/webp": { kind: "image", extension: "webp", maxBytes: 8 * 1024 * 1024 },
-  "audio/mp4": { kind: "audio", extension: "m4a", maxBytes: 12 * 1024 * 1024 },
-  "audio/m4a": { kind: "audio", extension: "m4a", maxBytes: 12 * 1024 * 1024 },
-  "audio/mpeg": { kind: "audio", extension: "mp3", maxBytes: 12 * 1024 * 1024 },
-  "audio/ogg": { kind: "audio", extension: "ogg", maxBytes: 12 * 1024 * 1024 },
-  "audio/webm": { kind: "audio", extension: "webm", maxBytes: 12 * 1024 * 1024 },
-  "audio/wav": { kind: "audio", extension: "wav", maxBytes: 12 * 1024 * 1024 },
+  "image/jpeg": { kind: "image", extension: "jpg", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiImage },
+  "image/png": { kind: "image", extension: "png", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiImage },
+  "image/webp": { kind: "image", extension: "webp", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiImage },
+  "audio/mp4": { kind: "audio", extension: "m4a", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiAudio },
+  "audio/m4a": { kind: "audio", extension: "m4a", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiAudio },
+  "audio/mpeg": { kind: "audio", extension: "mp3", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiAudio },
+  "audio/ogg": { kind: "audio", extension: "ogg", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiAudio },
+  "audio/webm": { kind: "audio", extension: "webm", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiAudio },
+  "audio/wav": { kind: "audio", extension: "wav", maxBytes: MEDIA_UPLOAD_LIMIT_BYTES.moveAiAudio },
 } as const;
 
 type AllowedRequestMime = keyof typeof allowedRequestMedia;
@@ -1043,7 +1044,7 @@ export const appRouter = router({
 
         const policy = allowedRequestMedia[input.mimeType];
         const buffer = decodeStrictBase64(input.base64);
-        if (buffer.length > policy.maxBytes) {
+        if (!isWithinDecodedByteLimit(buffer.length, policy.maxBytes)) {
           throw new TRPCError({
             code: "PAYLOAD_TOO_LARGE",
             message: policy.kind === "image" ? "Görsel en fazla 8 MB olabilir" : "Video en fazla 25 MB olabilir",
@@ -1473,7 +1474,7 @@ export const appRouter = router({
         const prepared = input.media.map((item) => {
           const policy = allowedRequestMedia[item.mimeType];
           const buffer = decodeStrictBase64(item.base64);
-          if (buffer.length > policy.maxBytes) {
+          if (!isWithinDecodedByteLimit(buffer.length, policy.maxBytes)) {
             throw new TRPCError({
               code: "PAYLOAD_TOO_LARGE",
               message: policy.kind === "image" ? "Görsel en fazla 8 MB olabilir" : "Video en fazla 25 MB olabilir",
@@ -1485,7 +1486,7 @@ export const appRouter = router({
           totalSize += buffer.length;
           return { item, policy, buffer, sha256: createHash("sha256").update(buffer).digest("hex") };
         });
-        if (totalSize > 32 * 1024 * 1024) {
+        if (!isWithinDecodedByteLimit(totalSize, MEDIA_UPLOAD_LIMIT_BYTES.completionProofTotal)) {
           throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Toplam kanıt dosyası boyutu en fazla 32 MB olabilir" });
         }
         const aiAnalysis = await analyzeCompletionEvidence({
@@ -1688,7 +1689,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         const buffer = decodeStrictBase64(input.base64);
-        if (buffer.length > 10 * 1024 * 1024) {
+        if (!isWithinDecodedByteLimit(buffer.length, MEDIA_UPLOAD_LIMIT_BYTES.voiceMessage)) {
           throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Sesli mesaj en fazla 10 MB olabilir" });
         }
         if (!hasExpectedVoiceSignature(buffer, input.mimeType)) {
@@ -1850,7 +1851,7 @@ export const appRouter = router({
         const provider = await db.getProviderProfile(ctx.user.id);
         if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
         const buffer = decodeStrictBase64(input.base64);
-        if (buffer.length > 10 * 1024 * 1024) {
+        if (!isWithinDecodedByteLimit(buffer.length, MEDIA_UPLOAD_LIMIT_BYTES.providerDocument)) {
           throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Belge en fazla 10 MB olabilir" });
         }
         if (!hasExpectedProviderDocumentSignature(buffer, input.mimeType)) {
@@ -2010,7 +2011,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const policy = allowedMoveAiMedia[input.mimeType];
         const buffer = decodeStrictBase64(input.base64);
-        if (buffer.length > policy.maxBytes) {
+        if (!isWithinDecodedByteLimit(buffer.length, policy.maxBytes)) {
           throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "MoveAI medyası izin verilen boyutu aşıyor" });
         }
         if (!hasExpectedMoveAiMediaSignature(buffer, input.mimeType)) {
