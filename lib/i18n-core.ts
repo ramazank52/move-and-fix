@@ -1,4 +1,5 @@
-export type Language = "tr" | "en" | "de" | "fr" | "ar" | "ru" | "es" | "it" | "pt" | "nl" | "zh" | "fa" | "uk";
+/** Production runtime language set. Unsupported legacy locale codes must fall back to Turkish. */
+export type Language = "tr" | "en" | "de" | "fr" | "ar" | "ru" | "zh" | "hi" | "es" | "pt" | "bn" | "id" | "ja";
 import type { SupportedDisplayCurrency } from "@/shared/currency-policy";
 
 export type SupportedCurrency = SupportedDisplayCurrency;
@@ -10,13 +11,13 @@ export const LANGUAGES: { code: Language; name: string; nativeName: string; loca
   { code: "fr", name: "French", nativeName: "Français", locale: "fr-FR", isRTL: false },
   { code: "ar", name: "Arabic", nativeName: "العربية", locale: "ar", isRTL: true },
   { code: "ru", name: "Russian", nativeName: "Русский", locale: "ru-RU", isRTL: false },
-  { code: "es", name: "Spanish", nativeName: "Español", locale: "es-ES", isRTL: false },
-  { code: "it", name: "Italian", nativeName: "Italiano", locale: "it-IT", isRTL: false },
-  { code: "pt", name: "Portuguese", nativeName: "Português", locale: "pt-PT", isRTL: false },
-  { code: "nl", name: "Dutch", nativeName: "Nederlands", locale: "nl-NL", isRTL: false },
   { code: "zh", name: "Chinese", nativeName: "中文", locale: "zh-CN", isRTL: false },
-  { code: "fa", name: "Persian", nativeName: "فارسی", locale: "fa-IR", isRTL: true },
-  { code: "uk", name: "Ukrainian", nativeName: "Українська", locale: "uk-UA", isRTL: false },
+  { code: "hi", name: "Hindi", nativeName: "हिन्दी", locale: "hi-IN", isRTL: false },
+  { code: "es", name: "Spanish", nativeName: "Español", locale: "es-ES", isRTL: false },
+  { code: "pt", name: "Portuguese", nativeName: "Português", locale: "pt-PT", isRTL: false },
+  { code: "bn", name: "Bengali", nativeName: "বাংলা", locale: "bn-BD", isRTL: false },
+  { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia", locale: "id-ID", isRTL: false },
+  { code: "ja", name: "Japanese", nativeName: "日本語", locale: "ja-JP", isRTL: false },
 ];
 
 export const SUPPORTED_CURRENCIES: { code: SupportedCurrency; label: string; locale: string }[] = [
