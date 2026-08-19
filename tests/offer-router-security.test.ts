@@ -8,6 +8,7 @@ vi.mock("../server/db", () => ({
   getOfferCapabilityTransitionContext: vi.fn(),
   listProviderCapabilityStatuses: vi.fn(),
   listProviderCredentialStatuses: vi.fn(),
+  resolveVerifiedProviderRequirementType: vi.fn(),
   assertProviderCapabilityForRequest: vi.fn(),
   assertProviderCredentialForRequest: vi.fn(),
 }));
@@ -54,6 +55,8 @@ describe("offer router security", () => {
       requiredCredentialAssurance: null,
       requiresCredentialHumanReview: null,
       compliancePackageVersion: "v1",
+      credentialRequirementsJson: null,
+      serviceCountryCode: "TR",
     });
     vi.mocked(offerDb.listProviderCapabilityStatuses).mockResolvedValue([
       {
@@ -75,6 +78,7 @@ describe("offer router security", () => {
       },
     ]);
     vi.mocked(offerDb.listProviderCredentialStatuses).mockResolvedValue([]);
+    vi.mocked(offerDb.resolveVerifiedProviderRequirementType).mockResolvedValue(null);
   });
 
   it("derives accept and reject ownership from the authenticated session", async () => {

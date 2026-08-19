@@ -10,12 +10,12 @@ export default function FavoritesScreen() {
   const colors = useColors();
   const router = useRouter();
   const utils = trpc.useUtils();
-  const favoritesQuery = trpc.providers.favoriteList.useQuery();
-  const removeMutation = trpc.providers.favoriteRemove.useMutation({
+  const favoritesQuery = trpc.provider.favoriteList.useQuery();
+  const removeMutation = trpc.provider.favoriteRemove.useMutation({
     onSuccess: async () => {
       await Promise.all([
-        utils.providers.favoriteList.invalidate(),
-        utils.providers.favoriteStatus.invalidate(),
+        utils.provider.favoriteList.invalidate(),
+        utils.provider.favoriteStatus.invalidate(),
       ]);
     },
     onError: (error) => Alert.alert("Favori güncellenemedi", error.message),

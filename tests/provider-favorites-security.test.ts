@@ -42,7 +42,7 @@ describe("provider favorites router security", () => {
     vi.mocked(favoritesDb.getFavoriteProviders).mockResolvedValue([]);
     const caller = appRouter.createCaller(createContext(55));
 
-    await expect(caller.providers.favoriteList()).resolves.toEqual([]);
+    await expect(caller.provider.favoriteList()).resolves.toEqual([]);
     expect(favoritesDb.getFavoriteProviders).toHaveBeenCalledWith(55);
   });
 
@@ -52,9 +52,9 @@ describe("provider favorites router security", () => {
     vi.mocked(favoritesDb.removeFavoriteProvider).mockResolvedValue({ success: true });
     const caller = appRouter.createCaller(createContext(77));
 
-    await expect(caller.providers.favoriteStatus({ providerId: 9 })).resolves.toBe(true);
-    await expect(caller.providers.favoriteAdd({ providerId: 9 })).resolves.toEqual({ success: true });
-    await expect(caller.providers.favoriteRemove({ providerId: 9 })).resolves.toEqual({ success: true });
+    await expect(caller.provider.favoriteStatus({ providerId: 9 })).resolves.toBe(true);
+    await expect(caller.provider.favoriteAdd({ providerId: 9 })).resolves.toEqual({ success: true });
+    await expect(caller.provider.favoriteRemove({ providerId: 9 })).resolves.toEqual({ success: true });
 
     expect(favoritesDb.isFavoriteProvider).toHaveBeenCalledWith(77, 9);
     expect(favoritesDb.addFavoriteProvider).toHaveBeenCalledWith(77, 9);
@@ -64,8 +64,8 @@ describe("provider favorites router security", () => {
   it("rejects unauthenticated favorite access", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
 
-    await expect(caller.providers.favoriteList()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.providers.favoriteAdd({ providerId: 9 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.favoriteList()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.favoriteAdd({ providerId: 9 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(favoritesDb.getFavoriteProviders).not.toHaveBeenCalled();
     expect(favoritesDb.addFavoriteProvider).not.toHaveBeenCalled();
   });

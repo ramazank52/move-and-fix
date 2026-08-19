@@ -43,7 +43,7 @@ export default function ExploreScreen() {
   );
 
   const categoriesQuery = trpc.categories.list.useQuery();
-  const providersQuery = trpc.providers.nearby.useQuery({});
+  const providersQuery = trpc.provider.nearby.useQuery({});
 
   const filteredCategories = useMemo(() => {
     let result = categoriesQuery.data ?? [];

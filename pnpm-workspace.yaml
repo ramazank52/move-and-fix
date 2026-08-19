@@ -4,6 +4,7 @@ packages:
 overrides:
   concurrently>shell-quote: 1.10.0
   flatted: 3.4.2
+  postcss: 8.5.26
   '@expo/metro-config>postcss': 8.5.26
   postcss@8.4.49: 8.5.26
   rollup: 4.59.0

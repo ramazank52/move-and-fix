@@ -17,9 +17,9 @@ export default function ProviderDocumentsScreen() {
   const router = useRouter();
   const utils = trpc.useUtils();
   const [uploadingType, setUploadingType] = useState<DocumentType | null>(null);
-  const documents = trpc.providers.getDocuments.useQuery();
-  const requirements = trpc.providers.getDocumentRequirements.useQuery();
-  const upload = trpc.providers.uploadDocument.useMutation({ onSuccess: async () => { await utils.providers.getDocuments.invalidate(); Alert.alert("Belge alındı", "Belgeniz incelenmek üzere güvenli biçimde kaydedildi."); }, onError: (error) => Alert.alert("Belge yüklenemedi", error.message), onSettled: () => setUploadingType(null) });
+  const documents = trpc.provider.getDocuments.useQuery();
+  const requirements = trpc.provider.getDocumentRequirements.useQuery();
+  const upload = trpc.provider.uploadDocument.useMutation({ onSuccess: async () => { await utils.provider.getDocuments.invalidate(); Alert.alert("Belge alındı", "Belgeniz incelenmek üzere güvenli biçimde kaydedildi."); }, onError: (error) => Alert.alert("Belge yüklenemedi", error.message), onSettled: () => setUploadingType(null) });
   const uploadDocument = async (type: DocumentType) => {
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: [...supportedTypes], copyToCacheDirectory: true, multiple: false });

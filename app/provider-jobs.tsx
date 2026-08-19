@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default function ProviderJobsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const jobsQuery = trpc.providers.myJobs.useQuery(undefined, { refetchOnMount: true });
+  const jobsQuery = trpc.provider.myJobs.useQuery(undefined, { refetchOnMount: true });
   const jobs = jobsQuery.data ?? [];
 
   return (

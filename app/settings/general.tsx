@@ -94,6 +94,7 @@ export default function GeneralSettingsScreen() {
           <LinkRow label={translate("activeDevices")} onPress={() => router.push("/settings/security" as never)} styles={styles} colors={colors} />
           <LinkRow label={translate("about")} onPress={() => router.push("/settings/help" as never)} styles={styles} colors={colors} />
           <LinkRow label={translate("privacyPolicy")} onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} />
+          <LinkRow label={translate("privacy.center.title" as never)} onPress={() => router.push("/privacy-center" as never)} styles={styles} colors={colors} />
           <LinkRow label={translate("terms")} onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} isLast />
         </View>
 

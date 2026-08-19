@@ -28,6 +28,29 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+// Contact verification is deliberately independent from the legacy timestamp
+// flags on users. It preserves the current lifecycle without treating a code
+// request as proof of ownership.
+export const contactVerificationStates = mysqlTable(
+  "contact_verification_states",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    contactType: mysqlEnum("contactType", ["email", "phone"]).notNull(),
+    contactValue: varchar("contactValue", { length: 320 }).notNull(),
+    status: mysqlEnum("status", ["unverified", "pending", "verified"]).default("unverified").notNull(),
+    challengeId: int("challengeId"),
+    initiatedAt: timestamp("initiatedAt"),
+    verifiedAt: timestamp("verifiedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("contact_verification_user_type_unique").on(table.userId, table.contactType),
+    index("contact_verification_user_status_idx").on(table.userId, table.status),
+  ],
+);
+
 // An organization is a separately auditable customer account. It never replaces
 // the natural person who created a request: request.userId remains the acting
 // member while organizationId identifies the billed/operating entity.
@@ -1400,12 +1423,30 @@ export const messageTranslationCache = mysqlTable(
     targetLanguage: varchar("targetLanguage", { length: 16 }).notNull(),
     translatedText: text("translatedText").notNull(),
     sourceContentHash: varchar("sourceContentHash", { length: 64 }).notNull(),
+    translationProvider: varchar("provider", { length: 96 }).default("unknown").notNull(),
+    model: varchar("model", { length: 191 }).default("unknown").notNull(),
+    modelVersion: varchar("modelVersion", { length: 191 }).default("unknown").notNull(),
+    translationVersion: varchar("translationVersion", { length: 64 }).default("v1").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("message_translation_cache_message_language_unique").on(table.messageId, table.targetLanguage),
     index("message_translation_cache_source_idx").on(table.sourceLanguage, table.targetLanguage),
   ],
+);
+
+// Per-user, explicit opt-in only. Translation is never automatically enabled
+// by locale selection or by a cached translated rendering.
+export const userTranslationPreferences = mysqlTable(
+  "user_translation_preferences",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    autoTranslateMessages: int("autoTranslateMessages").default(0).notNull(),
+    preferredTranslationLanguage: varchar("preferredTranslationLanguage", { length: 8 }).default("tr").notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [uniqueIndex("user_translation_preferences_user_unique").on(table.userId)],
 );
 
 // Per-viewer hiding never deletes the original message or affects another

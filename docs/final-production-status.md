@@ -157,3 +157,19 @@ P13 ayrıca chat list/detail DTO’larında e-posta PII sızıntısını testle 
 | `pnpm audit --audit-level=high` | **C — NO-GO gate: 5 moderate, 2 high**; kalan high Expo SDK 54/Metro zincirindeki `image-size@1.2.1` transitif advisory’dir |
 
 **P13 durumu:** Uygulanabilir iç kapsam **B — CONDITIONAL GO**; canlı production deployment **C — NO-GO**. Gerçek scanner/ödeme/iletişim credential’ları, production DNS/HTTPS, hukuk onayı, fiziksel cihaz E2E ve Expo araç zinciri audit remediation’ı dış release gate olarak kalır. Ayrıntılı kanıt: [P13 FINAL VERIFIED INTERNAL CLOSURE report](./compliance/P13_FINAL_VERIFIED_INTERNAL_CLOSURE_REPORT.md).
+
+---
+
+## P14 VERIFIED RESIDUAL CLOSURE — 19 Ağustos 2026 Eki
+
+**Baseline:** `7c8a618f` (P13 final); recovery anchor `dae5597f`. P14; canonical catalog/Gold Master/credential/onboarding/country gate korumalarını sürdürdü ve tam **13 locale** runtime sözleşmesini, Hizmet Talebi/Masraf Dosyası i18n–RTL–formatter kapanışını, sohbet çeviri provenance + alıcı opt-in tercihini, owner-only privacy center re-auth akışını ve staged email/phone doğrulamasını ekledi. `0072` ve `0073` TiDB’ye additive uygulandı. Production route/sample hijyeni kalıcı testle kapatıldı.
+
+| P14 kalite kapısı | Sonuç |
+|---|---:|
+| Tam regresyon | **PASS — 102 dosya / 616 test** |
+| TypeScript / lint / backend build | **PASS / PASS / PASS** |
+| iOS / Android / web export | **PASS / PASS / PASS** |
+| `git diff --check` | **PASS** |
+| High dependency audit | **C — NO-GO external gate**; Expo SDK 54/Metro transitif `postcss@8.4.49` advisory’si sürüyor |
+
+**P14 durumu:** Uygulanabilir internal residual kapsam **B — CONDITIONAL GO**; canlı production deployment **C — NO-GO**. Gerçek ödeme, scanner, SMS/e-posta/push, proxy communication ve APM credential’ları; DNS/HTTPS; onaylı İngilizce privacy metni; fiziksel cihaz E2E ve Expo/Metro toolchain advisory remediation’ı dış release gate olarak açıktır. Ayrıntılı kanıt: [P14 final change report](./compliance/P14_FINAL_CHANGE_REPORT.md) ve [P14 dependency audit gate](./compliance/P14_DEPENDENCY_AUDIT_GATE.md).

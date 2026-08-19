@@ -252,6 +252,104 @@ export async function updateUserVerification(data: {
       ...(data.phoneVerified ? { phoneVerifiedAt: now } : {}),
     })
     .where(eq(users.id, data.userId));
+  if (data.emailVerified) await markContactVerified(data.userId, "email");
+  if (data.phoneVerified) await markContactVerified(data.userId, "phone");
+}
+
+export type ContactVerificationType = "email" | "phone";
+export type ContactVerificationStatus = "unverified" | "pending" | "verified";
+
+export async function initContactVerification(input: {
+  userId: number;
+  contactType: ContactVerificationType;
+  contactValue: string;
+  challengeId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = new Date();
+  await db.insert(contactVerificationStates).values({
+    userId: input.userId,
+    contactType: input.contactType,
+    contactValue: input.contactValue,
+    status: "pending",
+    challengeId: input.challengeId,
+    initiatedAt: now,
+    verifiedAt: null,
+  }).onDuplicateKeyUpdate({
+    set: { contactValue: input.contactValue, status: "pending", challengeId: input.challengeId, initiatedAt: now, verifiedAt: null },
+  });
+}
+
+export async function markContactVerified(userId: number, contactType: ContactVerificationType) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = new Date();
+  const user = (await db.select({ email: users.email, phone: users.phone }).from(users).where(eq(users.id, userId)).limit(1))[0];
+  const contactValue = contactType === "email" ? user?.email : user?.phone;
+  if (!contactValue) return 0;
+  await db.insert(contactVerificationStates).values({
+    userId,
+    contactType,
+    contactValue,
+    status: "verified",
+    challengeId: null,
+    initiatedAt: now,
+    verifiedAt: now,
+  }).onDuplicateKeyUpdate({
+    set: { status: "verified", verifiedAt: now },
+  });
+  return 1;
+}
+
+export async function resetContactVerification(input: {
+  userId: number;
+  contactType: ContactVerificationType;
+  contactValue: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(contactVerificationStates).values({
+    userId: input.userId,
+    contactType: input.contactType,
+    contactValue: input.contactValue,
+    status: "unverified",
+    challengeId: null,
+    initiatedAt: null,
+    verifiedAt: null,
+  }).onDuplicateKeyUpdate({
+    set: { contactValue: input.contactValue, status: "unverified", challengeId: null, initiatedAt: null, verifiedAt: null },
+  });
+}
+
+export async function getContactVerificationStatus(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [user, states] = await Promise.all([
+    db.select({ email: users.email, phone: users.phone, emailVerifiedAt: users.emailVerifiedAt, phoneVerifiedAt: users.phoneVerifiedAt })
+      .from(users).where(eq(users.id, userId)).limit(1),
+    db.select({
+      contactType: contactVerificationStates.contactType,
+    status: contactVerificationStates.status,
+    initiatedAt: contactVerificationStates.initiatedAt,
+    verifiedAt: contactVerificationStates.verifiedAt,
+    }).from(contactVerificationStates).where(eq(contactVerificationStates.userId, userId)),
+  ]);
+  const current = user[0];
+  if (!current) return null;
+  const byType = new Map(states.map((state) => [state.contactType, state]));
+  const resolve = (contactType: ContactVerificationType, legacyVerifiedAt: Date | null) => {
+    const state = byType.get(contactType);
+    return {
+      status: (state?.status ?? (legacyVerifiedAt ? "verified" : "unverified")) as ContactVerificationStatus,
+      initiatedAt: state?.initiatedAt ?? null,
+      verifiedAt: state?.verifiedAt ?? legacyVerifiedAt ?? null,
+    };
+  };
+  return {
+    email: resolve("email", current.emailVerifiedAt),
+    phone: resolve("phone", current.phoneVerifiedAt),
+  };
 }
 
 /** Updates only the authenticated account's own contact profile in one transaction. */
@@ -299,6 +397,33 @@ export async function updateOwnUserProfile(data: {
           ...(phoneChanged ? { phoneE164: data.phone } : {}),
         })
         .where(eq(userCredentials.userId, data.userId));
+    }
+
+    if (emailChanged) {
+      await tx.insert(contactVerificationStates).values({
+        userId: data.userId,
+        contactType: "email",
+        contactValue: emailNormalized,
+        status: "unverified",
+        challengeId: null,
+        initiatedAt: null,
+        verifiedAt: null,
+      }).onDuplicateKeyUpdate({
+        set: { contactValue: emailNormalized, status: "unverified", challengeId: null, initiatedAt: null, verifiedAt: null },
+      });
+    }
+    if (phoneChanged) {
+      await tx.insert(contactVerificationStates).values({
+        userId: data.userId,
+        contactType: "phone",
+        contactValue: data.phone ?? "",
+        status: "unverified",
+        challengeId: null,
+        initiatedAt: null,
+        verifiedAt: null,
+      }).onDuplicateKeyUpdate({
+        set: { contactValue: data.phone ?? "", status: "unverified", challengeId: null, initiatedAt: null, verifiedAt: null },
+      });
     }
 
     const user = (await tx.select().from(users).where(eq(users.id, data.userId)).limit(1))[0];
@@ -1093,10 +1218,12 @@ import {
   providerOperatingModels,
   jobSafetyRules,
   messageTranslationCache,
+  userTranslationPreferences,
   messageVisibilityOverrides,
   taxRules,
   serviceRequestTaxSnapshots,
   mediaScannerJobs,
+  contactVerificationStates,
 } from "../drizzle/schema";
 import {
   type MaskedCommunicationChannel,
@@ -1658,7 +1785,7 @@ export function assertProviderCapabilityForRequest(input: {
 }
 
 export function assertProviderCredentialForRequest(input: {
-  request: Pick<
+  request: Omit<Pick<
     ServiceRequestComplianceContext,
     | "jurisdictionId"
     | "requiredCredentialType"
@@ -1666,7 +1793,10 @@ export function assertProviderCredentialForRequest(input: {
     | "requiresCredentialHumanReview"
     | "credentialRequirementsJson"
     | "compliancePackageVersion"
-  >;
+  >, "credentialRequirementsJson"> & {
+    /** Runtime doğrulaması aşağıda yapıldığı için Drizzle JSON alanı daraltılmadan alınır. */
+    credentialRequirementsJson: CredentialRequirementSnapshot[] | Record<string, unknown>[] | null;
+  };
   providerType: ProviderRequirementType | null;
   providerCredentials: Array<{
     jurisdictionId: number;
@@ -1694,7 +1824,7 @@ export function assertProviderCredentialForRequest(input: {
     typeof requirement.requirementState === "string" &&
     typeof requirement.minimumAssurance === "string" &&
     typeof requirement.ruleVersion === "string",
-  );
+  ) as CredentialRequirementSnapshot[];
   if (requirements.length !== rawRequirements.length) throw new Error("MALFORMED_CREDENTIAL_REQUIREMENT_CATALOG");
   const resolution = resolveCredentialRequirements({ providerType: input.providerType, requirements });
   if (resolution.status !== "RESOLVED") throw new Error(resolution.status);
@@ -2426,8 +2556,9 @@ export async function getActiveServiceCategories() {
 }
 
 type CatalogDatabaseClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type CatalogDatabaseReader = Pick<CatalogDatabaseClient, "select">;
 
-async function loadServiceCatalogSnapshot(database: CatalogDatabaseClient): Promise<ServiceCatalogSnapshot> {
+async function loadServiceCatalogSnapshot(database: CatalogDatabaseReader): Promise<ServiceCatalogSnapshot> {
   const [categories, subcategories, aliases] = await Promise.all([
     database.select({
       id: serviceCategories.id,
@@ -3823,7 +3954,14 @@ export async function getCachedMessageTranslation(input: {
   if (!db) return null;
   const sourceContentHash = messageContentHash(message.content);
   const rows = await db
-    .select({ translatedText: messageTranslationCache.translatedText })
+    .select({
+      translatedText: messageTranslationCache.translatedText,
+      sourceLanguage: messageTranslationCache.sourceLanguage,
+      targetLanguage: messageTranslationCache.targetLanguage,
+      translationProvider: messageTranslationCache.translationProvider,
+      modelVersion: messageTranslationCache.modelVersion,
+      translationVersion: messageTranslationCache.translationVersion,
+    })
     .from(messageTranslationCache)
     .where(and(
       eq(messageTranslationCache.messageId, message.id),
@@ -3841,6 +3979,11 @@ export async function cacheAuthorizedMessageTranslation(input: {
   actorUserId: number;
   targetLanguage: string;
   translatedText: string;
+  sourceLanguage: string;
+  translationProvider: string;
+  model: string;
+  modelVersion: string;
+  translationVersion: string;
 }) {
   const message = await getAuthorizedTextMessageForTranslation(input.messageId, input.actorUserId);
   if (!message) return false;
@@ -3851,19 +3994,64 @@ export async function cacheAuthorizedMessageTranslation(input: {
     .insert(messageTranslationCache)
     .values({
       messageId: message.id,
-      sourceLanguage: "und",
+      sourceLanguage: input.sourceLanguage,
       targetLanguage: input.targetLanguage,
       translatedText: input.translatedText,
       sourceContentHash,
+      translationProvider: input.translationProvider,
+      model: input.model,
+      modelVersion: input.modelVersion,
+      translationVersion: input.translationVersion,
     })
     .onDuplicateKeyUpdate({
       set: {
         translatedText: input.translatedText,
         sourceContentHash,
-        sourceLanguage: "und",
+        sourceLanguage: input.sourceLanguage,
+        translationProvider: input.translationProvider,
+        model: input.model,
+        modelVersion: input.modelVersion,
+        translationVersion: input.translationVersion,
       },
     });
   return true;
+}
+
+export async function getUserTranslationPreference(userId: number) {
+  const db = await getDb();
+  if (!db) return { autoTranslateMessages: false, preferredTranslationLanguage: "tr" };
+  const rows = await db
+    .select({
+      autoTranslateMessages: userTranslationPreferences.autoTranslateMessages,
+      preferredTranslationLanguage: userTranslationPreferences.preferredTranslationLanguage,
+    })
+    .from(userTranslationPreferences)
+    .where(eq(userTranslationPreferences.userId, userId))
+    .limit(1);
+  const preference = rows[0];
+  return preference
+    ? { autoTranslateMessages: preference.autoTranslateMessages === 1, preferredTranslationLanguage: preference.preferredTranslationLanguage }
+    : { autoTranslateMessages: false, preferredTranslationLanguage: "tr" };
+}
+
+export async function setUserTranslationPreference(input: {
+  userId: number;
+  autoTranslateMessages: boolean;
+  preferredTranslationLanguage: string;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(userTranslationPreferences).values({
+    userId: input.userId,
+    autoTranslateMessages: input.autoTranslateMessages ? 1 : 0,
+    preferredTranslationLanguage: input.preferredTranslationLanguage,
+  }).onDuplicateKeyUpdate({
+    set: {
+      autoTranslateMessages: input.autoTranslateMessages ? 1 : 0,
+      preferredTranslationLanguage: input.preferredTranslationLanguage,
+    },
+  });
+  return getUserTranslationPreference(input.userId);
 }
 
 /** Hides a message only from the current participant's own view. */
@@ -5030,6 +5218,9 @@ export async function updateJobLifecycle(data: {
       if (context.assignedProviderId == null) {
         throw new Error("COMPLIANCE_CONTEXT_NOT_CONFIGURED");
       }
+      if (context.serviceCountryCode == null) {
+        throw new Error("COMPLIANCE_CONTEXT_NOT_CONFIGURED");
+      }
       const capabilityStatuses = await tx
         .select({
           capabilityId: providerCapabilityStatuses.capabilityId,
@@ -5799,6 +5990,7 @@ export async function acceptOffer(offerId: number, userId: number) {
       jurisdictionId: request.jurisdictionId,
       transition: "OFFER_ACCEPTANCE",
     });
+    if (request.serviceCountryCode == null) throw new Error("COMPLIANCE_CONTEXT_NOT_CONFIGURED");
 
     const providerRows = await tx
       .select()
@@ -6885,7 +7077,7 @@ export async function getNewJobsForProvider(providerId: number) {
     .limit(100);
 
   const enabledCountries = new Set<string>();
-  for (const candidateCountryCode of [...new Set(candidates.map((candidate) => candidate.serviceCountryCode))]) {
+  for (const candidateCountryCode of [...new Set(candidates.map((candidate) => candidate.serviceCountryCode).filter((countryCode): countryCode is string => typeof countryCode === "string" && countryCode.length > 0))]) {
     try {
       await assertCountryMarketplaceTransition({
         countryCode: candidateCountryCode,
@@ -6899,7 +7091,7 @@ export async function getNewJobsForProvider(providerId: number) {
   }
 
   const eligibleCandidates = candidates.filter((candidate) => {
-    if (!enabledCountries.has(candidate.serviceCountryCode)) return false;
+    if (!candidate.serviceCountryCode || !enabledCountries.has(candidate.serviceCountryCode)) return false;
     const capabilityStatus =
       candidate.requiredCapabilityId == null || candidate.jurisdictionId == null
         ? null

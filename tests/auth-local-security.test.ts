@@ -15,6 +15,9 @@ vi.mock("../server/db", async () => {
     getLatestActiveAuthChallenge: vi.fn(),
     updateLocalCredentialPassword: vi.fn(),
     markAuthChallengeUsed: vi.fn(),
+    updateUserVerification: vi.fn(),
+    markContactVerified: vi.fn(),
+    getContactVerificationStatus: vi.fn(),
     getOutstandingRequiredLegalConsents: vi.fn(),
     recordConsentEvents: vi.fn(),
   };
@@ -128,6 +131,33 @@ describe("local authentication security", () => {
     const signedInWithoutPhone = appRouter.createCaller(createContext({ phone: null }));
     await expect(signedInWithoutPhone.auth.requestVerification({ purpose: "verify_phone" }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("returns staged contact status only for the authenticated owner", async () => {
+    vi.mocked(authDb.getContactVerificationStatus).mockResolvedValue({
+      email: { status: "pending", initiatedAt: new Date("2026-08-19T10:00:00Z"), verifiedAt: null },
+      phone: { status: "unverified", initiatedAt: null, verifiedAt: null },
+    } as never);
+
+    await expect(appRouter.createCaller(createContext({ id: 71 })).auth.getContactVerificationStatus())
+      .resolves.toMatchObject({ email: { status: "pending" }, phone: { status: "unverified" } });
+    expect(authDb.getContactVerificationStatus).toHaveBeenCalledWith(71);
+    await expect(appRouter.createCaller(createContext({ user: null })).auth.getContactVerificationStatus())
+      .rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("marks only the successfully verified staged contact channel as verified", async () => {
+    vi.mocked(authDb.getActiveAuthChallenge).mockResolvedValue({ id: 801 } as never);
+    vi.mocked(authDb.markAuthChallengeUsed).mockResolvedValue(undefined);
+    vi.mocked(authDb.updateUserVerification).mockResolvedValue(undefined);
+    vi.mocked(authDb.markContactVerified).mockResolvedValue(1);
+
+    await expect(appRouter.createCaller(createContext()).auth.verifyCode({ purpose: "verify_email", code: "123456" }))
+      .resolves.toEqual({ verified: "verify_email" });
+
+    expect(authDb.updateUserVerification).toHaveBeenCalledWith({ userId: 71, emailVerified: true, phoneVerified: false });
+    expect(authDb.markContactVerified).toHaveBeenCalledWith(71, "email");
+    expect(authDb.markContactVerified).not.toHaveBeenCalledWith(71, "phone");
   });
 
   it("returns only the authenticated user's server-derived outstanding legal consent versions", async () => {

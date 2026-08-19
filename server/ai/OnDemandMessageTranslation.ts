@@ -1,11 +1,24 @@
 import { invokeLLM, type InvokeResult } from "../_core/llm";
+import { createHash } from "node:crypto";
 
-const SUPPORTED_TARGET_LANGUAGES = new Set([
-  "tr", "en", "de", "fr", "ar", "ru", "es", "it", "pt", "nl", "zh", "fa", "uk",
-]);
+const SUPPORTED_MESSAGE_LOCALES = [
+  "tr", "en", "de", "fr", "ar", "ru", "zh", "hi", "es", "pt", "bn", "id", "ja",
+] as const;
+const SUPPORTED_TARGET_LANGUAGES = new Set<string>(SUPPORTED_MESSAGE_LOCALES);
+export type MessageTranslationLocale = (typeof SUPPORTED_MESSAGE_LOCALES)[number];
 
 export type MessageTranslationResult =
-  | { status: "translated"; translatedText: string; targetLanguage: string }
+  | {
+      status: "translated";
+      translatedText: string;
+      sourceLanguage: MessageTranslationLocale;
+      targetLanguage: MessageTranslationLocale;
+      translationProvider: "manus_builtin_llm";
+      model: "managed";
+      modelVersion: "managed";
+      translationVersion: "p14-1";
+      sourceHash: string;
+    }
   | { status: "unavailable"; code: "TRANSLATION_UNAVAILABLE" | "TRANSLATION_INVALID_OUTPUT" };
 
 export type MessageTranslationInvoker = (params: {
@@ -20,20 +33,26 @@ const translationOutputSchema = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: ["translatedText"],
+    required: ["translatedText", "sourceLanguage"],
     properties: {
       translatedText: { type: "string", minLength: 1, maxLength: 5000 },
+      sourceLanguage: { type: "string", enum: SUPPORTED_MESSAGE_LOCALES },
     },
   },
 } as const;
 
-const extractTranslatedText = (result: InvokeResult): string | null => {
+const extractTranslation = (result: InvokeResult): { translatedText: string; sourceLanguage: MessageTranslationLocale } | null => {
   const content = result.choices[0]?.message.content;
   if (typeof content !== "string") return null;
   try {
-    const parsed = JSON.parse(content) as { translatedText?: unknown };
+    const parsed = JSON.parse(content) as { translatedText?: unknown; sourceLanguage?: unknown };
     const translatedText = typeof parsed.translatedText === "string" ? parsed.translatedText.trim() : "";
-    return translatedText.length > 0 && translatedText.length <= 5000 ? translatedText : null;
+    const sourceLanguage = typeof parsed.sourceLanguage === "string" && SUPPORTED_TARGET_LANGUAGES.has(parsed.sourceLanguage)
+      ? parsed.sourceLanguage as MessageTranslationLocale
+      : null;
+    return translatedText.length > 0 && translatedText.length <= 5000 && sourceLanguage
+      ? { translatedText, sourceLanguage }
+      : null;
   } catch {
     return null;
   }
@@ -64,9 +83,19 @@ export async function translateMessageOnDemand(
         { role: "user", content: JSON.stringify({ targetLanguage: input.targetLanguage, sourceText }) },
       ],
     });
-    const translatedText = extractTranslatedText(result);
-    if (!translatedText) return { status: "unavailable", code: "TRANSLATION_INVALID_OUTPUT" };
-    return { status: "translated", translatedText, targetLanguage: input.targetLanguage };
+    const translation = extractTranslation(result);
+    if (!translation) return { status: "unavailable", code: "TRANSLATION_INVALID_OUTPUT" };
+    return {
+      status: "translated",
+      translatedText: translation.translatedText,
+      sourceLanguage: translation.sourceLanguage,
+      targetLanguage: input.targetLanguage as MessageTranslationLocale,
+      translationProvider: "manus_builtin_llm",
+      model: "managed",
+      modelVersion: "managed",
+      translationVersion: "p14-1",
+      sourceHash: createHash("sha256").update(sourceText, "utf8").digest("hex"),
+    };
   } catch {
     return { status: "unavailable", code: "TRANSLATION_UNAVAILABLE" };
   }

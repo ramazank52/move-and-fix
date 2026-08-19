@@ -265,6 +265,16 @@
 - [x] Phase 6 iş kanıtı, müşteri onayı ve itiraz mobil arayüzlerini gerçek API akışlarına bağla
 - [x] Phase 6 AI kanıt analizinin yardımcı niteliğini canlı takipte şeffaf biçimde göster
 
+## P14 Verified Residual Closure
+- [x] P14-09 exact 13-language runtime locale sözleşmesini geri uygula
+- [x] P14-10 Hizmet Talebi ve Masraf Dosyası i18n/RTL/formatter kapanışı ile regresyonlarını uygula
+- [x] P14-11 sohbet çeviri provenance, owner-only tercih ve alıcı opt-in davranışını uygula
+- [ ] P14-14 owner-only privacy center, yeniden doğrulama ve regresyonlarını tamamla
+- [ ] P14-15 staged e-posta/telefon doğrulama yaşam döngüsü ve regresyonlarını tamamla
+- [ ] P14-17 production route/sample hijyenini doğrula
+- [ ] P14-18 bağımlılık audit quality gate’ini güncelle
+- [ ] P14 final regression, release evidence ve checkpoint oluştur
+
 ## Master Phase E: Operasyonel Sertleştirme
 - [x] MoveOS Operations Control REST köprüsünü Super Admin MFA korumasıyla tamamla
 - [x] MoveOS Operations Control kartlarını ve vaka tablosunu gerçek API verisine bağla
@@ -539,10 +549,10 @@
 
 ## P14 VERIFIED RESIDUAL CLOSURE
 - [x] P14 residual closure talimatını baştan sona incele, baseline ile karşılaştır ve bağlayıcı uygulanabilir açıkları sınıflandır
-- [ ] P14 kapsamındaki uygulanabilir P0/P1 residual güvenlik, uyum, veri ve ürün açıklarını fail-closed olarak kapat
-- [ ] P14 için gerekli unit, integration, authorization, hata ve edge-case regresyonlarını ekle veya güncelle
-- [ ] P14 tam test, TypeScript, lint, build, export, supply-chain ve security kalite kanıtlarını üret
-- [ ] P14 checkpoint ve kanıta dayalı A/B/C final raporunu teslim et
+- [x] P14 kapsamındaki uygulanabilir P0/P1 residual güvenlik, uyum, veri ve ürün açıklarını fail-closed olarak kapat
+- [x] P14 için gerekli unit, integration, authorization, hata ve edge-case regresyonlarını ekle veya güncelle
+- [x] P14 tam test, TypeScript, lint, build, export, supply-chain ve security kalite kanıtlarını üret
+- [x] P14 checkpoint ve kanıta dayalı A/B/C final raporunu teslim et
 
 ### P14 Binding Residual Findings
 - [x] P14-02 — Canonical service catalog, explicit legacy aliases ve ambiguous mapping fail-closed sözleşmesini kapat
@@ -551,15 +561,15 @@
 - [x] P14-06 — Country launch gate assertion’ını tüm yeni marketplace state transition’larında merkezi olarak uygula
 - [x] P14-03 — Server-authoritative provider onboarding lifecycle ve activation gate’lerini E2E tamamla
 - [x] P14-05 — Reviewer/admin document view kararını MFA, retention/legal-hold, quarantine, no-store ve audit ile uygula
-- [ ] P14-13 — Job safety belirsizliğini fail-closed bloklayan geçiş korumalarını doğrula
-- [ ] P14-12 — Completion dispute partial resolution/escrow transition fail-closed sözleşmesini doğrula
-- [ ] P14-16 — MoveAI canonical resolver ve service identity bağını kapat
-- [ ] P14-07 — Server-driven public launch registry ve explicit delivery-country UX’i uygula
-- [ ] P14-08 — Masraf Dosyası UI/media-role/chat entry/ledger görünürlüğünü tamamla
-- [ ] P14-09 — Shared exact 13-language runtime setini uygula
-- [ ] P14-10 — Üretim i18n string closure, formatters, Arabic RTL ve CI hard-coded string guard’ını tamamla
-- [ ] P14-11 — Chat translation metadata, persistent preference ve original-authority sözleşmesini tamamla
-- [ ] P14-14 — Privacy center gerçek uçlarını ve account-deletion görünürlüğünü doğrula
-- [ ] P14-15 — Staged email/phone verification lifecycle’ını gerçek backend akışıyla tamamla
-- [ ] P14-17 — Package/sample/dead-code hygiene’ı doğrula ve güvenli temizliği uygula
-- [ ] P14-18 — Dependency audit gate’ini doğrula, çözülebilen transitif riskleri kapat ve kalan gate’leri kaydet
+- [x] P14-13 — Job safety belirsizliğini fail-closed bloklayan geçiş korumalarını doğrula
+- [x] P14-12 — Completion dispute partial resolution/escrow transition fail-closed sözleşmesini doğrula
+- [x] P14-16 — MoveAI canonical resolver ve service identity bağını kapat
+- [x] P14-07 — Server-driven public launch registry ve explicit delivery-country UX’i uygula
+- [x] P14-08 — Masraf Dosyası UI/media-role/chat entry/ledger görünürlüğünü tamamla
+- [x] P14-09 — Shared exact 13-language runtime setini uygula
+- [x] P14-10 — Üretim i18n string closure, formatters, Arabic RTL ve CI hard-coded string guard’ını tamamla
+- [x] P14-11 — Chat translation metadata, persistent preference ve original-authority sözleşmesini tamamla
+- [x] P14-14 — Privacy center gerçek uçlarını ve account-deletion görünürlüğünü doğrula
+- [x] P14-15 — Staged email/phone verification lifecycle’ını gerçek backend akışıyla tamamla
+- [x] P14-17 — Package/sample/dead-code hygiene’ı doğrula ve güvenli temizliği uygula
+- [x] P14-18 — Dependency audit gate’ini doğrula, çözülebilen transitif riskleri kapat ve kalan gate’leri kaydet

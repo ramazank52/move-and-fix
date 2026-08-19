@@ -13,6 +13,7 @@
     "lint": "expo lint",
     "format": "prettier --write .",
     "test": "vitest run",
+    "audit:high": "pnpm audit --audit-level=high",
     "supply:licenses": "node scripts/check-licenses.mjs",
     "supply:sbom": "node scripts/generate-sbom.mjs",
     "supply:verify": "pnpm supply:licenses && pnpm supply:sbom",

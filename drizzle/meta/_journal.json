@@ -470,6 +470,20 @@
       "when": 1787212800000,
       "tag": "0067_p14_provider_document_reviewer_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1787220000000,
+      "tag": "0072_p14_chat_translation_metadata_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1787221000000,
+      "tag": "0073_p14_contact_verification_stages",
+      "breakpoints": true
     }
   ]
 }

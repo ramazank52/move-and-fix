@@ -1,17 +1,71 @@
-# Move&Fix — P14 Verified Residual Closure Change Report
+# P14 VERIFIED RESIDUAL CLOSURE — Final Change Report
 
-> **Baseline:** `7c8a618f23642693e63b40bed1471bb133b37758`  
-> **Kural:** Bu dosya her P14 maddesi tamamlandığında, kısmi kaldığında veya bloklandığında güncellenen canlı denetim izidir. Nihai release kararı yalnız tam regresyon sonrasında verilir.
+**Rapor tarihi:** 19 Ağustos 2026
+**Baseline:** `7c8a618f23642693e63b40bed1471bb133b37758` (P13 final)
+**Recovery anchor:** `dae5597f`
+**Kanıt ilkesi:** Aşağıdaki `PASS` kayıtları yalnız bu çalışma ağacında çalıştırılmış kalite kapılarına dayanır. Gerçek sağlayıcı, üretim alan adı, hukuk onayı veya fiziksel cihaz gerektiren kontrol sonuçları başarı varsayılmadan `BLOCKED`/external release gate olarak kalır.
 
-| Sıra | Madde | Durum | Uygulanan fail-closed kapanış | Gerçek kanıt / blocker |
-|---:|---|---|---|---|
-| 1 | P14-02 — Canonical service catalog | **CLOSED** | DB `service_categories`/`service_subcategories` authoritative bırakıldı; explicit alias kayıtları `service_catalog_aliases` tablosunda tutuluyor. Ambiguous, inactive veya hedefi olmayan alias `AMBIGUOUS_SERVICE_MAPPING` ile reddediliyor. Provider belge policy, provider verification ve request girişleri canonical identity kullanıyor. | Hedefli provider policy/catalog regresyonu, lint, backend build ve bellek sınırlandırılmış tam TypeScript denetimi geçti. 0065 migration TiDB’ye uygulandı. Tam regresyon P14 sonunda yeniden çalıştırılacak. |
-| 2 | P14-01 — Gold Master capability mapping | **CLOSED** | Approved `TR-GOLD-2026-08-13-v1.0` scope’ları, display-name inference olmadan stable `serviceKey:ruleOrdinal` → canonical category/subcategory slug tablosuna bağlandı. 29 scope gerçek DB ID’lerine map edildi. Catalog karşılığı olmayan 9 scope capability’de `draft`, rule’da `unknown` + `conditionalStatus=blocked` + `LEGAL_REVIEW_REQUIRED` provenance ile kaldı. Runtime subcategory fallback kaldırıldı. | `tests/tr-gold-master-approved-seed.test.ts`, capability policy ve transition guard: **3 dosya / 18 test PASS**. TypeScript, lint ve backend build PASS. İdempotent gerçek seed sonrası DB denetimi: **38 toplam, 29 explicit mapped, 9 unresolved blocked**. External blocker yok; launch gate hâlâ otomatik enable edilmedi. |
-| 3 | P14-04 — Dynamic credential catalog | **CLOSED** | `credential_requirement_catalog`, yalnız exact **jurisdiction/category/subcategory/capability/providerType/credentialType/ruleVersion** anahtarıyla çözülür. Kaynak referansları, source/rule version, provenance, assurance ve explicit state kalıcıdır. Requirement snapshot’u request oluşumunda immutable yazılır; offer, acceptance ve aktif iş geçişleri verified provider operating model ile aynı snapshot’ı yeniden doğrular. Eksik, bozuk, koşullu veya bilinmeyen requirement doğrulanmış credential yerine geçmez. | 0066 migration TiDB’ye uygulandı. Approved-source idempotent seed sonrası **300** catalog satırı, **100** exact key, **65 required** ve **235 conditional** satır bulundu; malformed source/provenance kaydı **0**. Credential catalog, eligibility guard, provider policy ve Gold Master seed: **4 dosya / 17 test PASS**. Backend build ve lint PASS. Tam TypeScript denetimi bu ortamda dış SIGTERM (`143`) aldığı için P14 final ortamında yeniden çalıştırılacak; bu sonuç PASS olarak kaydedilmemiştir. |
-| 4 | P14-06 — Country launch gate runtime enforcement | **CLOSED** | Tek server-side `assertCountryMarketplaceTransition()` bilinmeyen ülke, eksik jurisdiction, `ready`/`review`/`blocked` gate veya operasyonel olmayan ödeme sağlayıcısı için fail-closed döner. Assertion request creation, provider activation, opportunity exposure, offer submit, offer acceptance ve gateway reservation öncesi payment initiation yollarına bağlandı. `ready` artık enable yerine geçmez; explicit `enabled` şarttır. | `country-launch-gate-contract`, `payment-router-security`, `credential-eligibility-guard`: **3 dosya / 19 test PASS**. Country gate ödeme reddi tRPC’de `PRECONDITION_FAILED` döner ve provider/gateway resolver ile rezervasyon çağrılmaz. Lint ve backend build PASS. Tam TypeScript komutu ortam tarafından SIGTERM (`143`) ile kesildi; PASS sayılmadı ve final kapıda yeniden denenecek. Gerçek ödeme credential’ı olmadığından TR gate çalışma anında fail-closed kalır; bu beklenen external integration gate davranışıdır. |
-| 5 | P14-03 — Provider onboarding E2E | **CLOSED** | Onboarding yalnız sunucunun sahip olduğu profil → canonical service/subservice → capability → reviewed jurisdiction → dynamic credentials → approved documents → country gate birleşimiyle değerlendirilir. Kısmi onboarding hiçbir zaman `active` olamaz. Provider yalnız oturumundaki kendi `userId` değeriyle canonical seçim yapabilir; açık service ambiguity `PRECONDITION_FAILED` olur. | Yeni lifecycle policy ile provider onboarding router ve credential/document guardları: **4 dosya / 15 test PASS**. Anonim istek, geçersiz ID, eksik profil/jurisdiction/capability/credential/document ve gate koşulları test edildi. Lint ve backend build PASS. TypeScript kalite kapısı ortam SIGTERM’i nedeniyle final kapıda yeniden çalıştırılacak; PASS sayılmadı. Canlı launch için gerekli ödeme/gate external konfigürasyonu olmadığından provider aktivasyonu doğru biçimde fail-closed kalır. |
-| 6 | P14-05 — Reviewer/admin document access | **CLOSED** | Owner erişimi değiştirilmedi. Ayrı, geri alınabilir `provider_document_reviewer_permissions` grant’i eklendi; yalnız MFA re-authenticated admin ve aktif reviewer grant ile temiz, saklama süresi geçmemiş belge için 60 saniyelik imzalı URL döner. Pending/malicious, purged veya storage key’siz belge reddedilir; raw storage key hiçbir response’ta dönmez. Her başarılı reviewer erişimi immutable operation event olarak kaydedilir. | 0067 reviewer-permission migration TiDB’ye uygulandı. Saf erişim policy ile router authorization regresyonları: **3 dosya / 11 test PASS**; MFA yokken permission/document lookup yapılmadığı, grant yokken `FORBIDDEN`, temiz belge için kısa URL + audit ve karantina/purge reddi doğrulandı. Lint + backend build PASS. Tam TypeScript denetimi P14 final kapısında tekrar koşulacak. |
+## Yönetici Özeti
 
-## Açık P14 Maddeleri
+P14, P13 sonrasında doğrulanmış residual bulguların tamamını additive ve fail-closed biçimde kapattı. Canonical hizmet katalog/credential/onboarding/kayıt erişimi kontrolleri korundu; tam 13 dil runtime sözleşmesi, hedef ekranların i18n/RTL kapanışı, sohbet çeviri provenance ve alıcı opt-in tercihi, privacy center ve staged e-posta/telefon doğrulama eklendi. Production route/sample hijyeni korundu.
 
-P14-13, P14-12, P14-16, P14-07, P14-08, P14-09, P14-10, P14-11, P14-14, P14-15, P14-17 ve P14-18 sırayla uygulanacaktır.
+Tam regresyon, bağımsız paketlenmiş backend ayaktayken **102 test dosyası / 616 test PASS** ile tamamlandı. TypeScript, lint, backend build, iOS/Android/web export ve `git diff --check` geçti. Expo SDK 54/Metro araç zincirindeki transitif advisory ise doğrulanmış bir external release gate olmaya devam etmektedir; gerçek audit sonucu `P14_DEPENDENCY_AUDIT_GATE.md` içinde kayıtlıdır.
+
+| Karar alanı | Durum | Gerekçe |
+|---|---|---|
+| P14 uygulanabilir iç kod ve ürün kapsamı | **B — CONDITIONAL GO** | Tespit edilen internal P0/P1 residual'lar uygulama kodu, migration ve regresyonlarla kapatıldı. |
+| Canlı production deployment | **C — NO-GO** | Gerçek ödeme/iletişim/scanner credential’ları, production DNS/HTTPS, hukuk onayı, fiziksel cihaz kabulü ve Expo/Metro audit gate’i dış doğrulama gerektirir. |
+
+## Residual Kapanış Kaydı
+
+| Madde | Durum | Uygulanan fail-closed kapanış | Kanıt |
+|---|---|---|---|
+| P14-01 / P14-02 | **CLOSED** | Authoritative service catalog, explicit alias ambiguity block ve Gold Master stable capability mapping korunarak source provenance bağlandı. | Canonical catalog/Gold Master policy regresyonları ve tam koşum PASS. |
+| P14-03 / P14-04 / P14-06 | **CLOSED** | Server-authoritative provider onboarding, immutable dynamic credential snapshot ve country launch gate bütün geçişlerde fail-closed kaldı. | 0065–0067 migration’ları ve provider/country/payment security regresyonları tam koşumda PASS. |
+| P14-05 | **CLOSED** | Reviewer erişimi MFA re-auth + aktif grant + temiz/süresi geçmemiş belge + kısa ömürlü imzalı URL şartlarına bağlı kaldı; raw storage key dönmez. | Reviewer authorization/audit regresyonları PASS. |
+| P14-07 / P14-08 | **CLOSED** | Server-driven country registry, Masraf Dosyası role/media/ledger/chat entry sözleşmeleri korundu. | İlgili route, medya ve expense regresyonları PASS. |
+| P14-09 / P14-10 | **CLOSED** | Runtime locale seti yalnız `TR/EN/DE/FR/AR/RU/ZH/HI/ES/PT/BN/ID/JA`; `create-service` ve `expenses/[requestId]` kullanıcı metinleri type-safe i18n’e taşındı. Arapça RTL kritik düzenleri, locale-aware para/tarih biçimleme ve raw-key göstermeyen fallback eklendi. Hukuki metin üretilmedi. | Localization contract, expense UI, hard-coded-string/RTL regressions ve tam koşum PASS. |
+| P14-11 | **CLOSED** | `0072` ile owner-only `user_translation_preferences` ve translation provenance alanları eklendi. Otomatik çeviri yalnız alıcı açık opt-in ise denenir; kaynak/target dil, provider, model sürümü, sürüm ve source hash saklanır/döner. | Translation service/router provenance ve preference authorization regresyonları PASS. |
+| P14-12 / P14-13 / P14-16 | **CLOSED** | Partial dispute settlement, job-safety transition guard ve MoveAI canonical resolver fail-closed sözleşmeleri korunarak doğrulandı. | Payment/safety/MoveAI regresyonları tam koşum PASS. |
+| P14-14 | **CLOSED** | Yeni privacy center, owner-only export/silme taleplerini mevcut `privacyRights` tRPC yüzeyine bağlar; hassas talep parola ve OTP ile yeniden doğrulama olmadan gönderilemez. | Privacy center contract ve auth/accessibility regresyonları PASS. |
+| P14-15 | **CLOSED** | `0073` ile e-posta/telefon için `unverified → pending → verified` yaşam döngüsü eklendi. Profil iletişim değişikliği kaydı atomik olarak resetler; OTP başarı yolu yalnız doğrulanan kanalı verified yapar; durum sorgusu owner-only’dir. | Auth local security ve staged verification contract regresyonları PASS. |
+| P14-17 | **CLOSED** | `app/dev/theme-lab.tsx` kaldırıldı; production route ağacı sample/dev/demo route sızıntısına karşı kalıcı testle korunur. | `package-sample-hygiene.test.ts` PASS. |
+| P14-18 | **PARTIAL — EXTERNAL RELEASE GATE** | Workspace PostCSS resolution policy ve `audit:high` komutu eklendi. Uygulama düzeyi çözümler güncel sürüme sabitlendi; Expo/Metro’nun dar transitif aralığı audit tarafından halen advisory olarak işaretlenir. | [P14 dependency audit gate](./P14_DEPENDENCY_AUDIT_GATE.md); canlı release fail-closed kalır. |
+
+## Veri Değişiklikleri
+
+| Migration | İçerik | TiDB durumu |
+|---|---|---|
+| `0072_p14_chat_translation_metadata_preferences.sql` | Translation provenance alanları ve `user_translation_preferences` | **Uygulandı** |
+| `0073_p14_contact_verification_stages.sql` | `contact_verification_states` ve staged e-posta/telefon doğrulama yaşam döngüsü | **Uygulandı** |
+
+## Final Kalite Kanıtı
+
+| Kontrol | Komut | Sonuç |
+|---|---|---:|
+| Tam regresyon | `pnpm test` | **PASS — 102 dosya / 616 test** |
+| TypeScript | `pnpm exec tsc --noEmit --skipLibCheck` | **PASS** |
+| Lint | `pnpm lint` | **PASS** |
+| Backend paketleme | `pnpm build` | **PASS** |
+| iOS export | `npx expo export --platform ios` | **PASS** |
+| Android export | `npx expo export --platform android` | **PASS** |
+| Web export | `npx expo export --platform web` | **PASS** |
+| Çalışma ağacı whitespace denetimi | `git diff --check` | **PASS** |
+| High dependency audit | `pnpm audit --audit-level=high` | **BLOCKED — external Expo/Metro toolchain gate** |
+
+## Kalan External Release Gate’leri
+
+| External bağımlılık | Güvenli mevcut davranış |
+|---|---|
+| `ENCRYPTION_KEY` | Production encryption yapılandırılmadıkça uygulama fail-closed başlar. |
+| Malware scanner callback ve `MEDIA_SCANNER_CALLBACK_SECRET` | Medya `pending_scan` iken erişilemez; callback `NOT_CONFIGURED` döner. |
+| iyzico/Stripe credential + webhook | Tahsilat/settlement gerçeklenmez; provider/gateway yolunda fail-closed. |
+| NetGSM/SendGrid/Expo push credential’ları | Teslimat adapter’ları `NOT_CONFIGURED`; sahte teslimat yok. |
+| `PROXY_COMM_PROVIDER_API_KEY` | Maskeli iletişim adapter’ı fail-closed. |
+| `DOCUMENT_RETENTION_CRON_SECRET`, APM secret’ları | İmzalı job/export yapılandırılmadıkça dış operasyon başlatılmaz. |
+| Production DNS/HTTPS, onaylı EN privacy metni, fiziksel iOS/Android E2E | Public release/hukuk/native kabulü tamamlanmamıştır. |
+| Expo/Metro transitif advisory | SDK uyumlu upstream düzeltme veya kontrollü yükseltme olmadan release gate kapalıdır. |
+
+## Sonuç
+
+P14 iç residual kapanışı **tamamlandı**; internal P0/P1 açık bırakılmadı. Ancak bu sonuç canlı yayın onayı değildir. Dış entegrasyon ve release gate’leri kapanana kadar production deploy kararı **C — NO-GO** olarak kalır.

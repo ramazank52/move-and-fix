@@ -14,7 +14,7 @@ describe("critical mobile accessibility source contracts", () => {
     for (const label of ["E-posta adresi", "Parola", "E-posta ve parola ile giriş yap", "Parolamı unuttum", "Kayıt ekranına git"]) {
       expect(login).toContain(`accessibilityLabel="${label}"`);
     }
-    expect(verifyPhone).toContain('accessibilityLabel="Altı haneli telefon doğrulama kodu"');
+    expect(verifyPhone).toContain('accessibilityLabel={t("verification.codePhoneAccessibility")}');
     expect(verifyPhone).toContain('accessibilityRole="alert"');
     expect(forgotPassword).toContain('accessibilityLabel="Parola sıfırlama e-posta adresi"');
     expect(forgotPassword).toContain('accessibilityLabel="Parola sıfırlama doğrulama kodu"');

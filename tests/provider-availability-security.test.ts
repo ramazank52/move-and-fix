@@ -36,27 +36,27 @@ describe("provider availability router security", () => {
 
   it("rejects unauthenticated availability changes", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
-    await expect(caller.providers.updateAvailability({ isAvailable: false })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.updateAvailability({ isAvailable: false })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(providerDb.updateProviderAvailability).not.toHaveBeenCalled();
   });
 
   it("derives provider ownership only from the authenticated session", async () => {
     vi.mocked(providerDb.updateProviderAvailability).mockResolvedValue({ isAvailable: false });
     const caller = appRouter.createCaller(createContext(77));
-    await expect(caller.providers.updateAvailability({ isAvailable: false })).resolves.toEqual({ isAvailable: false });
+    await expect(caller.provider.updateAvailability({ isAvailable: false })).resolves.toEqual({ isAvailable: false });
     expect(providerDb.updateProviderAvailability).toHaveBeenCalledWith(77, false);
   });
 
   it("rejects invalid payloads before reaching the database", async () => {
     const caller = appRouter.createCaller(createContext(77));
-    await expect(caller.providers.updateAvailability({ isAvailable: "yes" } as never)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.provider.updateAvailability({ isAvailable: "yes" } as never)).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(providerDb.updateProviderAvailability).not.toHaveBeenCalled();
   });
 
   it("maps a missing provider profile to a fail-closed response", async () => {
     vi.mocked(providerDb.updateProviderAvailability).mockRejectedValue(new Error("PROVIDER_NOT_FOUND"));
     const caller = appRouter.createCaller(createContext(99));
-    await expect(caller.providers.updateAvailability({ isAvailable: true })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(caller.provider.updateAvailability({ isAvailable: true })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("derives Business Cockpit ownership from the authenticated provider session", async () => {
@@ -72,13 +72,13 @@ describe("provider availability router security", () => {
     });
     const caller = appRouter.createCaller(createContext(77));
 
-    await expect(caller.providers.businessCockpit()).resolves.toMatchObject({ activeJobs: 2, averageRating: 4.8 });
+    await expect(caller.provider.businessCockpit()).resolves.toMatchObject({ activeJobs: 2, averageRating: 4.8 });
     expect(providerDb.getProviderBusinessCockpit).toHaveBeenCalledWith(77);
   });
 
   it("rejects unauthenticated Business Cockpit access", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
-    await expect(caller.providers.businessCockpit()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.businessCockpit()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(providerDb.getProviderBusinessCockpit).not.toHaveBeenCalled();
   });
 });

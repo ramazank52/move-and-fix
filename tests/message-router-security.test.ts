@@ -13,6 +13,8 @@ vi.mock("../server/db", async () => {
     getAuthorizedTextMessageForTranslation: vi.fn(),
     getCachedMessageTranslation: vi.fn(),
     cacheAuthorizedMessageTranslation: vi.fn(),
+    getUserTranslationPreference: vi.fn(),
+    setUserTranslationPreference: vi.fn(),
     hideMessageForViewer: vi.fn(),
     getMessageParticipant: vi.fn(),
     markConversationRead: vi.fn(),
@@ -122,6 +124,10 @@ describe("message router security", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(messageDb.getCachedMessageTranslation).mockResolvedValue(null);
+    vi.mocked(messageDb.getUserTranslationPreference).mockResolvedValue({
+      autoTranslateMessages: false,
+      preferredTranslationLanguage: "tr",
+    });
     vi.mocked(storageGetSignedUrl).mockResolvedValue("https://storage.example.test/signed-audio-url");
   });
 
@@ -276,6 +282,103 @@ describe("message router security", () => {
     expect(messageDb.getConversation).toHaveBeenCalledWith(42, 20, 10);
   });
 
+  it("keeps translation preference reads and writes bound to the authenticated owner", async () => {
+    vi.mocked(messageDb.getUserTranslationPreference).mockResolvedValue({
+      autoTranslateMessages: false,
+      preferredTranslationLanguage: "tr",
+    });
+    vi.mocked(messageDb.setUserTranslationPreference).mockResolvedValue({
+      autoTranslateMessages: true,
+      preferredTranslationLanguage: "en",
+    });
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.getTranslationPreference()).resolves.toEqual({
+      autoTranslateMessages: false,
+      preferredTranslationLanguage: "tr",
+    });
+    await expect(caller.messages.setTranslationPreference({
+      autoTranslateMessages: true,
+      preferredTranslationLanguage: "en",
+    })).resolves.toEqual({
+      autoTranslateMessages: true,
+      preferredTranslationLanguage: "en",
+    });
+
+    expect(messageDb.getUserTranslationPreference).toHaveBeenCalledWith(10);
+    expect(messageDb.setUserTranslationPreference).toHaveBeenCalledWith({
+      userId: 10,
+      autoTranslateMessages: true,
+      preferredTranslationLanguage: "en",
+    });
+  });
+
+  it("creates automatic recipient translations only after the recipient explicitly opts in", async () => {
+    vi.mocked(messageDb.sendMessage).mockResolvedValue(601);
+    vi.mocked(messageDb.getUserTranslationPreference).mockResolvedValue({
+      autoTranslateMessages: true,
+      preferredTranslationLanguage: "en",
+    });
+    vi.mocked(messageDb.getAuthorizedTextMessageForTranslation).mockResolvedValue({
+      id: 601,
+      requestId: 42,
+      senderId: 10,
+      receiverId: 20,
+      content: "Usta yolda.",
+    });
+    vi.mocked(translateMessageOnDemand).mockResolvedValue({
+      status: "translated",
+      targetLanguage: "en",
+      translatedText: "The professional is on the way.",
+      sourceLanguage: "tr",
+      translationProvider: "manus_builtin_llm",
+      model: "managed",
+      modelVersion: "managed",
+      translationVersion: "p14-1",
+      sourceHash: "c".repeat(64),
+    });
+    vi.mocked(messageDb.cacheAuthorizedMessageTranslation).mockResolvedValue(true);
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.send({
+      requestId: 42,
+      receiverId: 20,
+      content: "Usta yolda.",
+    })).resolves.toBe(601);
+
+    expect(messageDb.getUserTranslationPreference).toHaveBeenCalledWith(20);
+    expect(translateMessageOnDemand).toHaveBeenCalledWith({
+      sourceText: "Usta yolda.",
+      targetLanguage: "en",
+    });
+    expect(messageDb.cacheAuthorizedMessageTranslation).toHaveBeenCalledWith(expect.objectContaining({
+      messageId: 601,
+      actorUserId: 10,
+      targetLanguage: "en",
+      sourceLanguage: "tr",
+      translationProvider: "manus_builtin_llm",
+      translationVersion: "p14-1",
+    }));
+  });
+
+  it("does not create an automatic translation when the recipient has not opted in", async () => {
+    vi.mocked(messageDb.sendMessage).mockResolvedValue(602);
+    vi.mocked(messageDb.getUserTranslationPreference).mockResolvedValue({
+      autoTranslateMessages: false,
+      preferredTranslationLanguage: "en",
+    });
+    const caller = appRouter.createCaller(createContext(10));
+
+    await expect(caller.messages.send({
+      requestId: 42,
+      receiverId: 20,
+      content: "Usta yolda.",
+    })).resolves.toBe(602);
+
+    expect(translateMessageOnDemand).not.toHaveBeenCalled();
+    expect(messageDb.cacheAuthorizedMessageTranslation).not.toHaveBeenCalled();
+  });
+
   it("never exposes a permanent media address in a conversation DTO", async () => {
     vi.mocked(messageDb.getConversation).mockResolvedValue([
       {
@@ -384,6 +487,12 @@ describe("message router security", () => {
       status: "translated",
       targetLanguage: "en",
       translatedText: "The professional is on the way.",
+      sourceLanguage: "tr",
+      translationProvider: "manus_builtin_llm",
+      model: "managed",
+      modelVersion: "managed",
+      translationVersion: "p14-1",
+      sourceHash: "b".repeat(64),
     });
     vi.mocked(messageDb.cacheAuthorizedMessageTranslation).mockResolvedValue(true);
     const caller = appRouter.createCaller(createContext(10));
@@ -393,6 +502,14 @@ describe("message router security", () => {
       targetLanguage: "en",
       translatedText: "The professional is on the way.",
       source: "generated",
+      provenance: {
+        sourceLanguage: "tr",
+        targetLanguage: "en",
+        translationProvider: "manus_builtin_llm",
+        modelVersion: "managed",
+        translationVersion: "p14-1",
+        sourceHash: "b".repeat(64),
+      },
     });
     expect(messageDb.getCachedMessageTranslation).toHaveBeenCalledWith({
       messageId: 503,
@@ -406,6 +523,11 @@ describe("message router security", () => {
       actorUserId: 10,
       targetLanguage: "en",
       translatedText: "The professional is on the way.",
+      sourceLanguage: "tr",
+      translationProvider: "manus_builtin_llm",
+      model: "managed",
+      modelVersion: "managed",
+      translationVersion: "p14-1",
     });
   });
 
@@ -413,6 +535,11 @@ describe("message router security", () => {
     vi.mocked(messageDb.getCachedMessageTranslation).mockResolvedValue({
       translatedText: "The professional is on the way.",
       sourceContentHash: "a".repeat(64),
+      sourceLanguage: "tr",
+      targetLanguage: "en",
+      translationProvider: "manus_builtin_llm",
+      modelVersion: "managed",
+      translationVersion: "p14-1",
     });
     const caller = appRouter.createCaller(createContext(10));
 
@@ -421,6 +548,14 @@ describe("message router security", () => {
       targetLanguage: "en",
       translatedText: "The professional is on the way.",
       source: "cache",
+      provenance: {
+        sourceLanguage: "tr",
+        targetLanguage: "en",
+        translationProvider: "manus_builtin_llm",
+        modelVersion: "managed",
+        translationVersion: "p14-1",
+        sourceHash: "a".repeat(64),
+      },
     });
     expect(translateMessageOnDemand).not.toHaveBeenCalled();
     expect(messageDb.getAuthorizedTextMessageForTranslation).toHaveBeenCalledWith(503, 10);

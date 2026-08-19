@@ -31,7 +31,7 @@ export default function ProfileScreen() {
   const { t, locale } = useTranslation();
   const { user } = useAuth();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const providerQuery = trpc.providers.myProfile.useQuery(undefined, {
+  const providerQuery = trpc.provider.myProfile.useQuery(undefined, {
     enabled: Boolean(user),
     retry: false,
   });

@@ -92,6 +92,10 @@ export default function ChatRoomScreen() {
       void messagesQuery.refetch();
     },
   });
+  const translationPreferenceQuery = trpc.messages.getTranslationPreference.useQuery();
+  const setTranslationPreferenceMutation = trpc.messages.setTranslationPreference.useMutation({
+    onSuccess: () => translationPreferenceQuery.refetch(),
+  });
 
   useEffect(() => {
     if (
@@ -132,6 +136,18 @@ export default function ChatRoomScreen() {
     if (hideForMeMutation.isPending) return;
     hideForMeMutation.mutate({ messageId });
   }, [hideForMeMutation]);
+
+  const toggleAutoTranslation = useCallback(() => {
+    if (setTranslationPreferenceMutation.isPending) return;
+    const preference = translationPreferenceQuery.data ?? {
+      autoTranslateMessages: false,
+      preferredTranslationLanguage: language,
+    };
+    setTranslationPreferenceMutation.mutate({
+      autoTranslateMessages: !preference.autoTranslateMessages,
+      preferredTranslationLanguage: language,
+    });
+  }, [language, setTranslationPreferenceMutation, translationPreferenceQuery.data]);
 
   const toggleVoiceRecording = useCallback(async () => {
     if (!hasValidConversationContext || sendVoiceMutation.isPending) return;
@@ -184,7 +200,7 @@ export default function ChatRoomScreen() {
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Geri dön"
+          accessibilityLabel={t("chat.backAccessibility")}
           style={({ pressed }) => ({ padding: 5, opacity: pressed ? 0.6 : 1 })}
         >
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
@@ -222,6 +238,49 @@ export default function ChatRoomScreen() {
           </Text>
         </View>
       </View>
+
+      <Pressable
+        onPress={toggleAutoTranslation}
+        disabled={translationPreferenceQuery.isLoading || setTranslationPreferenceMutation.isPending}
+        accessibilityRole="switch"
+        accessibilityLabel={t("chat.autoTranslateTitle")}
+        accessibilityHint={t("chat.autoTranslateBody")}
+        accessibilityState={{
+          checked: translationPreferenceQuery.data?.autoTranslateMessages ?? false,
+          disabled: translationPreferenceQuery.isLoading || setTranslationPreferenceMutation.isPending,
+          busy: setTranslationPreferenceMutation.isPending,
+        }}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          marginHorizontal: 16,
+          marginTop: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderRadius: 12,
+          borderWidth: 0.5,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+          opacity: pressed || translationPreferenceQuery.isLoading || setTranslationPreferenceMutation.isPending ? 0.66 : 1,
+        })}
+      >
+        <View style={{ flex: 1, paddingRight: 12 }}>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{t("chat.autoTranslateTitle")}</Text>
+          <Text style={{ marginTop: 2, fontSize: 11, lineHeight: 16, color: colors.muted }}>{t("chat.autoTranslateBody")}</Text>
+        </View>
+        <View
+          style={{
+            minWidth: 36,
+            height: 22,
+            borderRadius: 11,
+            padding: 3,
+            justifyContent: translationPreferenceQuery.data?.autoTranslateMessages ? "flex-end" : "flex-start",
+            backgroundColor: translationPreferenceQuery.data?.autoTranslateMessages ? colors.primary : colors.border,
+          }}
+        >
+          <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: "#FFFFFF" }} />
+        </View>
+      </Pressable>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={8}>
         <FlatList
@@ -359,9 +418,15 @@ export default function ChatRoomScreen() {
           }}
         />
 
-        {sendMessageMutation.isError || sendVoiceMutation.isError || translateMessageMutation.isError || hideForMeMutation.isError ? (
+        {sendMessageMutation.isError || sendVoiceMutation.isError || translateMessageMutation.isError || hideForMeMutation.isError || setTranslationPreferenceMutation.isError ? (
           <Text accessibilityRole="alert" style={{ paddingHorizontal: 16, paddingBottom: 6, color: colors.error, fontSize: 12 }}>
-            {translateMessageMutation.isError ? t("chat.translationUnavailable") : sendVoiceMutation.isError ? t("chat.voiceSendError") : t("chat.sendError")}
+            {setTranslationPreferenceMutation.isError
+              ? t("chat.autoTranslateSaveError")
+              : translateMessageMutation.isError
+                ? t("chat.translationUnavailable")
+                : sendVoiceMutation.isError
+                  ? t("chat.voiceSendError")
+                  : t("chat.sendError")}
           </Text>
         ) : null}
         <View
@@ -382,7 +447,7 @@ export default function ChatRoomScreen() {
             onChangeText={setInput}
             placeholder={t("chat.placeholder")}
             accessibilityLabel={t("chat.placeholder")}
-            accessibilityHint="Mesajınızı yazın ve gönder düğmesine basın"
+            accessibilityHint={t("chat.inputHint")}
             placeholderTextColor={colors.muted}
             returnKeyType="send"
             onSubmitEditing={sendMessage}

@@ -9,6 +9,7 @@ vi.mock("../server/db", () => ({
   assertExpenseMediaUpload: vi.fn(),
   getActiveServiceCategories: vi.fn(),
   getActiveServiceSubcategories: vi.fn(),
+  assertServiceRequestDetailCatalog: vi.fn(),
   getProviderProfile: vi.fn(),
   getServiceCategoryBySlug: vi.fn(),
   getServiceRequestById: vi.fn(),
@@ -90,6 +91,11 @@ describe("phase 31 service request contracts", () => {
     vi.clearAllMocks();
     vi.mocked(requestDb.getActiveServiceCategories).mockResolvedValue([movingCategory]);
     vi.mocked(requestDb.getActiveServiceSubcategories).mockResolvedValue(movingCategory.subcategories);
+    vi.mocked(requestDb.assertServiceRequestDetailCatalog).mockImplementation(async ({ categoryId, subcategoryId, serviceType }) => {
+      if (categoryId !== 8 || ![null, 81].includes(subcategoryId ?? null) || serviceType !== "moving") {
+        throw new Error("SERVICE_CATALOG_TYPE_MISMATCH");
+      }
+    });
   });
 
   it("lists active subcategories through the public category contract", async () => {
@@ -180,7 +186,7 @@ describe("phase 31 service request contracts", () => {
         title: "Yanlış hizmet türü",
         details: { serviceType: "electrical", attributes: {} },
       }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
 
     await expect(
       caller.requests.create({

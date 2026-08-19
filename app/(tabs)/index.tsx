@@ -25,7 +25,7 @@ export default function HomeScreen() {
     enabled: !!user,
   });
 
-  const { data: nearbyProviders, isLoading: providersLoading } = trpc.providers.nearby.useQuery(
+  const { data: nearbyProviders, isLoading: providersLoading } = trpc.provider.nearby.useQuery(
     { lat: "41.0082", lng: "28.9784" },
     { enabled: !!user }
   );

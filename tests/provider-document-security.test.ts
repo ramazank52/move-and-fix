@@ -54,12 +54,12 @@ describe("provider document and voice media security", () => {
 
   it("rejects anonymous document reads, document uploads and voice uploads", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
-    await expect(caller.providers.getDocuments()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.providers.getDocumentRequirements()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.getDocuments()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.getDocumentRequirements()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.compliance.myCapabilities()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.providers.getInsurancePolicies()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.providers.getOperatingModel({ jurisdictionCode: "TR" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.providers.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.getInsurancePolicies()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.getOperatingModel({ jurisdictionCode: "TR" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.messages.sendVoice({ requestId: 9, receiverId: 10, mimeType: "audio/webm", durationMs: 500, base64: "AAAA" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(storagePut).not.toHaveBeenCalled();
   });
@@ -69,7 +69,7 @@ describe("provider document and voice media security", () => {
     vi.mocked(providerDb.getProviderDocuments).mockResolvedValue([]);
     const caller = appRouter.createCaller(createContext(81));
 
-    await expect(caller.providers.getDocuments()).resolves.toEqual([]);
+    await expect(caller.provider.getDocuments()).resolves.toEqual([]);
     expect(providerDb.getProviderDocuments).toHaveBeenCalledWith(901);
   });
 
@@ -102,10 +102,10 @@ describe("provider document and voice media security", () => {
     }] as Awaited<ReturnType<typeof providerDb.getProviderDocuments>>);
 
     const caller = appRouter.createCaller(createContext(81));
-    await expect(caller.providers.getDocuments()).resolves.toEqual([
+    await expect(caller.provider.getDocuments()).resolves.toEqual([
       expect.objectContaining({ id: 9011, contentAvailable: false }),
     ]);
-    const result = await caller.providers.getDocuments();
+    const result = await caller.provider.getDocuments();
     expect(result[0]).not.toHaveProperty("storageKey");
     expect(result[0]).not.toHaveProperty("fileUrl");
   });
@@ -122,7 +122,7 @@ describe("provider document and voice media security", () => {
     vi.mocked(storageGetSignedUrl).mockResolvedValue("https://signed.example/temporary");
     const caller = appRouter.createCaller(createContext(81));
 
-    await expect(caller.providers.getDocumentAccess({ documentId: 9012 })).resolves.toEqual({ url: "https://signed.example/temporary" });
+    await expect(caller.provider.getDocumentAccess({ documentId: 9012 })).resolves.toEqual({ url: "https://signed.example/temporary" });
     expect(storageGetSignedUrl).toHaveBeenCalledWith("provider-documents/901/identity/clean.pdf");
     expect(providerDb.logOperationEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "provider_document_access_granted",
@@ -134,17 +134,17 @@ describe("provider document and voice media security", () => {
   it("fails closed for another provider, unscanned content, purged content and unavailable signing", async () => {
     const caller = appRouter.createCaller(createContext(81));
     vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({ id: 9013, ownerUserId: 82 } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
-    await expect(caller.providers.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(caller.provider.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "NOT_FOUND" });
 
     vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({ id: 9013, ownerUserId: 81, storageKey: "private", quarantineStatus: "pending_scan", contentPurgedAt: null } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
-    await expect(caller.providers.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(caller.provider.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
 
     vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({ id: 9013, ownerUserId: 81, storageKey: "private", quarantineStatus: "clean", contentPurgedAt: new Date() } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
-    await expect(caller.providers.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(caller.provider.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
 
     vi.mocked(providerDb.getProviderDocumentById).mockResolvedValue({ id: 9013, ownerUserId: 81, storageKey: "private", quarantineStatus: "clean", contentPurgedAt: null } as Awaited<ReturnType<typeof providerDb.getProviderDocumentById>>);
     vi.mocked(storageGetSignedUrl).mockRejectedValue(new Error("NOT_CONFIGURED"));
-    await expect(caller.providers.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(caller.provider.getDocumentAccess({ documentId: 9013 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 
   it("derives dynamic document requirements solely from the authenticated provider session", async () => {
@@ -156,7 +156,7 @@ describe("provider document and voice media security", () => {
     } as Awaited<ReturnType<typeof providerDb.getProviderDocumentRequirements>>);
     const caller = appRouter.createCaller(createContext(94));
 
-    await expect(caller.providers.getDocumentRequirements()).resolves.toMatchObject({
+    await expect(caller.provider.getDocumentRequirements()).resolves.toMatchObject({
       providerId: 905,
       category: { slug: "courier" },
       required: [expect.objectContaining({ type: "identity" })],
@@ -170,8 +170,8 @@ describe("provider document and voice media security", () => {
     vi.mocked(providerDb.getProviderOperatingModel).mockResolvedValue(null as never);
     const caller = appRouter.createCaller(createContext(91));
 
-    await expect(caller.providers.getInsurancePolicies()).resolves.toEqual([]);
-    await expect(caller.providers.getOperatingModel({ jurisdictionCode: "tr" })).resolves.toBeNull();
+    await expect(caller.provider.getInsurancePolicies()).resolves.toEqual([]);
+    await expect(caller.provider.getOperatingModel({ jurisdictionCode: "tr" })).resolves.toBeNull();
     expect(providerDb.getProviderInsurancePolicies).toHaveBeenCalledWith(904);
     expect(providerDb.getProviderOperatingModel).toHaveBeenCalledWith(904, "TR");
   });
@@ -180,7 +180,7 @@ describe("provider document and voice media security", () => {
     vi.mocked(providerDb.getProviderProfile).mockResolvedValue(null);
     const caller = appRouter.createCaller(createContext(82));
 
-    await expect(caller.providers.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" }))
+    await expect(caller.provider.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" }))
       .rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(storagePut).not.toHaveBeenCalled();
   });
@@ -189,7 +189,7 @@ describe("provider document and voice media security", () => {
     vi.mocked(providerDb.getProviderProfile).mockResolvedValue({ id: 902 } as Awaited<ReturnType<typeof providerDb.getProviderProfile>>);
     const caller = appRouter.createCaller(createContext(83));
 
-    await expect(caller.providers.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "AAAA" }))
+    await expect(caller.provider.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "AAAA" }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(caller.messages.sendVoice({ requestId: 9, receiverId: 10, mimeType: "audio/webm", durationMs: 500, base64: "AAAA" }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
@@ -231,9 +231,9 @@ describe("provider document and voice media security", () => {
     vi.mocked(providerDb.getProviderProfile).mockResolvedValue(null);
     vi.mocked(providerDb.getProviderDocumentRequirements).mockResolvedValue(null);
     const nonProvider = appRouter.createCaller(createContext(92));
-    await expect(nonProvider.providers.getInsurancePolicies()).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(nonProvider.providers.getOperatingModel({ jurisdictionCode: "TR" })).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(nonProvider.providers.getDocumentRequirements()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(nonProvider.provider.getInsurancePolicies()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(nonProvider.provider.getOperatingModel({ jurisdictionCode: "TR" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(nonProvider.provider.getDocumentRequirements()).rejects.toMatchObject({ code: "FORBIDDEN" });
 
     vi.mocked(providerDb.getJobSafetyRules).mockResolvedValue([{
       id: 301,

@@ -11,7 +11,7 @@ const successfulInvoker: MessageTranslationInvoker = async () => ({
   model: "test-model",
   choices: [{
     index: 0,
-    message: { role: "assistant", content: JSON.stringify({ translatedText: "The plumber is on the way." }) },
+    message: { role: "assistant", content: JSON.stringify({ translatedText: "The plumber is on the way.", sourceLanguage: "tr" }) },
     finish_reason: "stop",
   }],
 });
@@ -23,11 +23,21 @@ describe("on-demand message translation", () => {
         { sourceText: "Usta yolda.", targetLanguage: "en" },
         successfulInvoker,
       ),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: "translated",
       targetLanguage: "en",
       translatedText: "The plumber is on the way.",
+      sourceLanguage: "tr",
+      translationProvider: "manus_builtin_llm",
+      model: "managed",
+      modelVersion: "managed",
+      translationVersion: "p14-1",
     });
+    const result = await translateMessageOnDemand(
+      { sourceText: "Usta yolda.", targetLanguage: "en" },
+      successfulInvoker,
+    );
+    expect(result.status === "translated" ? result.sourceHash : "").toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("fails closed when the language is unsupported or source text is outside the processing limit", async () => {

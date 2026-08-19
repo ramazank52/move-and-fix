@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { LANGUAGES, formatLocalDate, formatMoney, isRightToLeft, languageFromDeviceLocale, localeForLanguage, t } from "../lib/i18n-core";
@@ -44,19 +46,49 @@ describe("yerelleştirme sözleşmesi", () => {
     expect(t("provider.totalEarnings", "ru", { amount: "₺1 250,00" })).toContain("₺1 250,00");
   });
 
-  it("13 dili destekler, cihaz yerelini güvenle çözer ve iki RTL dilini yön bilgisiyle işaretler", () => {
+  it("P14-09 exact 13 dil sözleşmesini korur, kaldırılan yerelleri güvenle TR’ye çözer ve Arabic RTL yönünü işaretler", () => {
     expect(LANGUAGES).toHaveLength(13);
+    expect(LANGUAGES.map((language) => language.code)).toEqual([
+      "tr", "en", "de", "fr", "ar", "ru", "zh", "hi", "es", "pt", "bn", "id", "ja",
+    ]);
     expect(languageFromDeviceLocale("ar-SA")).toBe("ar");
-    expect(languageFromDeviceLocale("fa-IR")).toBe("fa");
-    expect(languageFromDeviceLocale("uk-UA")).toBe("uk");
+    expect(languageFromDeviceLocale("fa-IR")).toBe("tr");
+    expect(languageFromDeviceLocale("uk-UA")).toBe("tr");
     expect(languageFromDeviceLocale("unsupported-XX")).toBe("tr");
     expect(isRightToLeft("ar")).toBe(true);
-    expect(isRightToLeft("fa")).toBe(true);
     expect(isRightToLeft("tr")).toBe(false);
     expect(isRightToLeft("en")).toBe(false);
     expect(localeForLanguage("tr")).toBe("tr-TR");
     expect(localeForLanguage("ar")).toBe("ar");
-    expect(localeForLanguage("fa")).toBe("fa-IR");
+    expect(localeForLanguage("hi")).toBe("hi-IN");
+  });
+
+  it("Hizmet Talebi anahtarlarını 13 dilin tamamında raw-key göstermeden çözer", () => {
+    const keys = [
+      "request.title",
+      "request.details.heading",
+      "request.media.hint",
+      "request.route.distanceHint",
+      "request.submit",
+      "request.submitSuccessBody",
+    ] as const;
+
+    for (const language of LANGUAGES) {
+      for (const key of keys) {
+        const value = t(key, language.code, { limit: 5, count: 1 });
+        expect(value).toBeTruthy();
+        expect(value).not.toBe(key);
+      }
+    }
+    expect(t("request.details.heading", "tr")).toBe("Sorunu detaylı açıklayın");
+  });
+
+  it("Arabic kritik hizmet talebi akışında RTL bağlamını ve metin hizalamasını bağlar", () => {
+    expect(isRightToLeft("ar")).toBe(true);
+    const source = readFileSync(resolve(process.cwd(), "app/create-service.tsx"), "utf8");
+    expect(source).toContain("const { language, t, isRTL, formatMoney } = useTranslation()");
+    expect(source).toContain('textAlign: isRTL ? "right" : "left"');
+    expect(source).toContain("flexDirection: isRTL ? \"row-reverse\" : \"row\"");
   });
 
   it("genişletilmiş dil sözlüklerinde yerel navigasyon metinlerini çözer", () => {
@@ -102,5 +134,48 @@ describe("yerelleştirme sözleşmesi", () => {
     expect(t("security.sessionsRevokedBody", "tr", { count: 2 })).toContain("2");
     expect(t("security.revokeOthers", "en")).toBe("Close Others");
     expect(t("security.title", "ru")).toBe("Безопасность аккаунта");
+  });
+
+  it("Masraf Dosyası anahtarlarını 13 dilin tamamında raw-key göstermeden ve locale-aware para ile çözer", () => {
+    const keys = [
+      "expense.title",
+      "expense.totalNotice",
+      "expense.category.material",
+      "expense.receiptAdd",
+      "expense.refund.request",
+      "expense.alert.refundSubmittedBody",
+    ] as const;
+
+    for (const language of LANGUAGES) {
+      for (const key of keys) {
+        expect(t(key, language.code)).not.toBe(key);
+      }
+    }
+    expect(t("expense.title", "tr")).toBe("İş masrafları");
+    expect(formatMoney(1250, "ar")).toMatch(/TRY|₺/);
+  });
+
+  it("Arabic Masraf Dosyası akışında RTL yön ve metin hizalamasını bağlar", () => {
+    const source = readFileSync(resolve(process.cwd(), "app/expenses/[requestId].tsx"), "utf8");
+    expect(source).toContain("const { t, formatMoney, isRTL } = useTranslation()");
+    expect(source).toContain('flexDirection: isRTL ? "row-reverse" : "row"');
+    expect(source).toContain('textAlign: isRTL ? "right" : "left"');
+  });
+
+  it("P14-10 kapsamındaki üretim rotalarında denetlenmiş kullanıcı metinlerini i18n anahtarları dışında tutar", () => {
+    const auditedRoutes = ["app/create-service.tsx", "app/expenses/[requestId].tsx"];
+    const forbiddenLiterals = [
+      "Hizmet Talebi", "Masraf ekle", "İş masrafları", "Masrafı kaydet",
+      "İade talebini onayla", "İade talebini reddet", "Kaydediliyor…",
+    ];
+
+    for (const route of auditedRoutes) {
+      const source = readFileSync(resolve(process.cwd(), route), "utf8");
+      for (const literal of forbiddenLiterals) {
+        expect(source).not.toContain(`>${literal}<`);
+        expect(source).not.toContain(`placeholder="${literal}"`);
+        expect(source).not.toContain(`accessibilityLabel="${literal}"`);
+      }
+    }
   });
 });

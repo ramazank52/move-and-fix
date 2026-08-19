@@ -57,7 +57,7 @@ export default function CategoryDetailScreen() {
     { enabled: Boolean(id) && !specialRoute },
   );
   const category = categoryQuery.data;
-  const providersQuery = trpc.providers.byCategory.useQuery(
+  const providersQuery = trpc.provider.byCategory.useQuery(
     { categoryId: category?.id ?? 1 },
     { enabled: Boolean(category?.id) },
   );

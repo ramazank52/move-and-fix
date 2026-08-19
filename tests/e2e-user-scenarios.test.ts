@@ -112,7 +112,7 @@ describe("E2E HTTP: Ortak oturumlu MoveOS", () => {
     it("genel auth.me ve yakın profesyoneller prosedürlerini erişilebilir tutar", async () => {
       const [auth, providers] = await Promise.all([
         httpRequest("GET", "/api/trpc/auth.me"),
-        httpRequest("GET", "/api/trpc/providers.nearby?input=%7B%22json%22%3A%7B%22lat%22%3A%2241.0082%22%2C%22lng%22%3A%2228.9784%22%7D%7D"),
+        httpRequest("GET", "/api/trpc/provider.nearby?input=%7B%22json%22%3A%7B%22lat%22%3A%2241.0082%22%2C%22lng%22%3A%2228.9784%22%7D%7D"),
       ]);
       expect(auth.status).toBe(200);
       expect(providers.status).toBe(200);

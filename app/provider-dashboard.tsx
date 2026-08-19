@@ -36,12 +36,12 @@ export default function ProviderDashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [availabilityOverride, setAvailabilityOverride] = useState<boolean | null>(null);
 
-  const profileQuery = trpc.providers.myProfile.useQuery(undefined, { refetchOnMount: true });
-  const jobsQuery = trpc.providers.myJobs.useQuery(undefined, { refetchOnMount: true });
-  const earningsQuery = trpc.providers.myEarnings.useQuery(undefined, { refetchOnMount: true });
-  const opportunitiesQuery = trpc.providers.newJobs.useQuery(undefined, { refetchOnMount: true });
-  const cockpitQuery = trpc.providers.businessCockpit.useQuery(undefined, { refetchOnMount: true });
-  const availabilityMutation = trpc.providers.updateAvailability.useMutation();
+  const profileQuery = trpc.provider.myProfile.useQuery(undefined, { refetchOnMount: true });
+  const jobsQuery = trpc.provider.myJobs.useQuery(undefined, { refetchOnMount: true });
+  const earningsQuery = trpc.provider.myEarnings.useQuery(undefined, { refetchOnMount: true });
+  const opportunitiesQuery = trpc.provider.newJobs.useQuery(undefined, { refetchOnMount: true });
+  const cockpitQuery = trpc.provider.businessCockpit.useQuery(undefined, { refetchOnMount: true });
+  const availabilityMutation = trpc.provider.updateAvailability.useMutation();
 
   const profile = profileQuery.data;
   const earnings = earningsQuery.data;

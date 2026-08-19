@@ -30,7 +30,7 @@ export default function ProviderDetailScreen() {
   const utils = trpc.useUtils();
   const validProviderId = Number.isInteger(providerId) && providerId > 0;
 
-  const providerQuery = trpc.providers.byId.useQuery(
+  const providerQuery = trpc.provider.byId.useQuery(
     { providerId },
     { enabled: validProviderId }
   );
@@ -43,21 +43,21 @@ export default function ProviderDetailScreen() {
     { providerUserId: providerQuery.data?.providerUserId ?? 0 },
     { enabled: validProviderId && Boolean(providerQuery.data?.providerUserId) },
   );
-  const favoriteQuery = trpc.providers.favoriteStatus.useQuery(
+  const favoriteQuery = trpc.provider.favoriteStatus.useQuery(
     { providerId },
     { enabled: validProviderId && Boolean(providerQuery.data) }
   );
   const invalidateFavorites = async () => {
     await Promise.all([
-      utils.providers.favoriteList.invalidate(),
-      utils.providers.favoriteStatus.invalidate({ providerId }),
+      utils.provider.favoriteList.invalidate(),
+      utils.provider.favoriteStatus.invalidate({ providerId }),
     ]);
   };
-  const addFavorite = trpc.providers.favoriteAdd.useMutation({
+  const addFavorite = trpc.provider.favoriteAdd.useMutation({
     onSuccess: invalidateFavorites,
     onError: (error) => Alert.alert("Favori güncellenemedi", error.message),
   });
-  const removeFavorite = trpc.providers.favoriteRemove.useMutation({
+  const removeFavorite = trpc.provider.favoriteRemove.useMutation({
     onSuccess: invalidateFavorites,
     onError: (error) => Alert.alert("Favori güncellenemedi", error.message),
   });

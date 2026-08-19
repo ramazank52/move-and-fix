@@ -277,7 +277,7 @@ async function issueVerificationCode(data: {
 }) {
   const channel = data.purpose === "verify_phone" ? NotificationChannel.SMS : NotificationChannel.EMAIL;
   const code = randomInt(100_000, 1_000_000).toString();
-  await db.createAuthChallenge({
+  const challengeId = await db.createAuthChallenge({
     ...data,
     channel: channel === NotificationChannel.SMS ? "sms" : "email",
     codeHash: hashVerificationCode(data.userId, data.purpose, code),
@@ -293,6 +293,14 @@ async function issueVerificationCode(data: {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
       message: "Doğrulama mesajı gönderilemedi. Bildirim sağlayıcısı yapılandırılmalıdır.",
+    });
+  }
+  if (data.purpose === "verify_email" || data.purpose === "verify_phone") {
+    await db.initContactVerification({
+      userId: data.userId,
+      contactType: data.purpose === "verify_email" ? "email" : "phone",
+      contactValue: data.destination,
+      challengeId,
     });
   }
   return delivery;
@@ -639,6 +647,11 @@ export const appRouter = router({
         const verification = await issueVerificationCode({ userId: ctx.user.id, purpose: input.purpose, destination });
         return { verificationDelivery: verification };
       }),
+    getContactVerificationStatus: protectedProcedure.query(async ({ ctx }) => {
+      const status = await db.getContactVerificationStatus(ctx.user.id);
+      if (!status) throw new TRPCError({ code: "NOT_FOUND", message: "Hesap bulunamadı" });
+      return status;
+    }),
     sessions: protectedProcedure.query(({ ctx }) =>
       db.listLocalAuthSessions(ctx.user.id).then((sessions) => ({ sessions, currentSessionId: ctx.localSessionId })),
     ),
@@ -676,6 +689,9 @@ export const appRouter = router({
           emailVerified: input.purpose === "verify_email",
           phoneVerified: input.purpose === "verify_phone",
         });
+        if (input.purpose === "verify_email" || input.purpose === "verify_phone") {
+          await db.markContactVerified(ctx.user.id, input.purpose === "verify_email" ? "email" : "phone");
+        }
         return { verified: input.purpose };
       }),
     requestPasswordReset: publicProcedure
@@ -1655,7 +1671,7 @@ export const appRouter = router({
     translate: protectedProcedure
       .input(z.object({
         messageId: z.number().int().positive(),
-        targetLanguage: z.enum(["tr", "en", "de", "fr", "ar", "ru", "es", "it", "pt", "nl", "zh", "fa", "uk"]),
+        targetLanguage: z.enum(["tr", "en", "de", "fr", "ar", "ru", "zh", "hi", "es", "pt", "bn", "id", "ja"]),
       }))
       .mutation(async ({ ctx, input }) => {
         const message = await runMessageOperation(() =>
@@ -1679,6 +1695,14 @@ export const appRouter = router({
             targetLanguage: input.targetLanguage,
             translatedText: cached.translatedText,
             source: "cache" as const,
+            provenance: {
+              sourceLanguage: cached.sourceLanguage,
+              targetLanguage: cached.targetLanguage,
+              translationProvider: cached.translationProvider,
+              modelVersion: cached.modelVersion,
+              translationVersion: cached.translationVersion,
+              sourceHash: cached.sourceContentHash,
+            },
           };
         }
         const result = await translateMessageOnDemand({
@@ -1694,6 +1718,11 @@ export const appRouter = router({
             actorUserId: ctx.user.id,
             targetLanguage: result.targetLanguage,
             translatedText: result.translatedText,
+            sourceLanguage: result.sourceLanguage,
+            translationProvider: result.translationProvider,
+            model: result.model,
+            modelVersion: result.modelVersion,
+            translationVersion: result.translationVersion,
           }),
         );
         if (!saved) {
@@ -1704,8 +1733,27 @@ export const appRouter = router({
           targetLanguage: result.targetLanguage,
           translatedText: result.translatedText,
           source: "generated" as const,
+          provenance: {
+            sourceLanguage: result.sourceLanguage,
+            targetLanguage: result.targetLanguage,
+            translationProvider: result.translationProvider,
+            modelVersion: result.modelVersion,
+            translationVersion: result.translationVersion,
+            sourceHash: result.sourceHash,
+          },
         };
       }),
+    getTranslationPreference: protectedProcedure.query(({ ctx }) =>
+      runMessageOperation(() => db.getUserTranslationPreference(ctx.user.id)),
+    ),
+    setTranslationPreference: protectedProcedure
+      .input(z.object({
+        autoTranslateMessages: z.boolean(),
+        preferredTranslationLanguage: z.enum(["tr", "en", "de", "fr", "ar", "ru", "zh", "hi", "es", "pt", "bn", "id", "ja"]),
+      }))
+      .mutation(({ ctx, input }) =>
+        runMessageOperation(() => db.setUserTranslationPreference({ userId: ctx.user.id, ...input })),
+      ),
     hideForMe: protectedProcedure
       .input(z.object({ messageId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
@@ -1723,9 +1771,35 @@ export const appRouter = router({
         content: z.string().trim().min(1).max(4000),
         requestId: z.number().int().positive(),
       }))
-      .mutation(({ ctx, input }) =>
-        runMessageOperation(() => db.sendMessage({ ...input, senderId: ctx.user.id })),
-      ),
+      .mutation(async ({ ctx, input }) => {
+        const messageId = await runMessageOperation(() => db.sendMessage({ ...input, senderId: ctx.user.id }));
+        const recipientPreference = await runMessageOperation(() => db.getUserTranslationPreference(input.receiverId));
+        if (!recipientPreference.autoTranslateMessages) return messageId;
+        try {
+          const message = await runMessageOperation(() => db.getAuthorizedTextMessageForTranslation(messageId, ctx.user.id));
+          if (!message) return messageId;
+          const translated = await translateMessageOnDemand({
+            sourceText: message.content,
+            targetLanguage: recipientPreference.preferredTranslationLanguage,
+          });
+          if (translated.status === "translated") {
+            await runMessageOperation(() => db.cacheAuthorizedMessageTranslation({
+              messageId,
+              actorUserId: ctx.user.id,
+              targetLanguage: translated.targetLanguage,
+              translatedText: translated.translatedText,
+              sourceLanguage: translated.sourceLanguage,
+              translationProvider: translated.translationProvider,
+              model: translated.model,
+              modelVersion: translated.modelVersion,
+              translationVersion: translated.translationVersion,
+            }));
+          }
+        } catch {
+          // Translation is opt-in enhancement only; message delivery remains authoritative.
+        }
+        return messageId;
+      }),
     sendVoice: protectedProcedure
       .input(z.object({
         receiverId: z.number().int().positive(),
@@ -2496,7 +2570,9 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
     getDocumentAccess: adminMfaProcedure
       .input(z.object({ documentId: z.number().int().positive() }))
       .query(async ({ ctx, input }) => {
-        const hasReviewerPermission = await db.hasActiveProviderDocumentReviewerPermission(ctx.user.id);
+        const reviewerId = ctx.user?.id;
+        if (!reviewerId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const hasReviewerPermission = await db.hasActiveProviderDocumentReviewerPermission(reviewerId);
         if (!hasReviewerPermission) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Bu belge için ayrı reviewer yetkisi gerekli" });
         }
@@ -2522,7 +2598,7 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           await db.logOperationEvent({
             eventType: "provider_document_access_granted",
             subjectId: document.id,
-            actorId: ctx.user.id,
+            actorId: reviewerId,
             payload: {
               providerId: document.providerId,
               accessScope: "reviewer",
@@ -2541,14 +2617,20 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
     grantPermission: superAdminMfaProcedure
       .input(z.object({ userId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        await db.grantProviderDocumentReviewerPermission({ userId: input.userId, grantedByUserId: ctx.user.id });
+        const reviewerId = ctx.user?.id;
+        if (!reviewerId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        await db.grantProviderDocumentReviewerPermission({ userId: input.userId, grantedByUserId: reviewerId });
         return { granted: true };
       }),
     revokePermission: superAdminMfaProcedure
       .input(z.object({ userId: z.number().int().positive() }))
-      .mutation(async ({ ctx, input }) => ({
-        revoked: await db.revokeProviderDocumentReviewerPermission({ userId: input.userId, revokedByUserId: ctx.user.id }),
-      })),
+      .mutation(async ({ ctx, input }) => {
+        const reviewerId = ctx.user?.id;
+        if (!reviewerId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return {
+          revoked: await db.revokeProviderDocumentReviewerPermission({ userId: input.userId, revokedByUserId: reviewerId }),
+        };
+      }),
   }),
 
   featureFlags: router({

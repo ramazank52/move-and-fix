@@ -20,7 +20,7 @@ import type { RequestRouteCoordinate } from "@/components/request-route-map.type
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
-import { useLocalization } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 
 type ServiceType =
   | "generic"
@@ -97,14 +97,6 @@ function parseOptionalInteger(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function formatTryAmount(amount: number): string {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function calculateStraightLineDistanceKm(
   pickup: RequestRouteCoordinate,
   destination: RequestRouteCoordinate,
@@ -134,11 +126,11 @@ async function readUriAsBase64(uri: string): Promise<string> {
   return globalThis.btoa(binary);
 }
 
-const STEPS = ["Hizmet", "Detay", "Zaman", "Konum", "Onay"] as const;
+const STEP_KEYS = ["request.step.service", "request.step.details", "request.step.time", "request.step.location", "request.step.confirm"] as const;
 const URGENCY_OPTIONS = [
-  { id: "emergency", label: "Acil", icon: "bolt.fill", color: "#EF4444" },
-  { id: "today", label: "Bugün", icon: "clock.fill", color: "#F59E0B" },
-  { id: "scheduled", label: "Planlı", icon: "calendar", color: "#10B981" },
+  { id: "emergency", labelKey: "request.urgency.emergency", icon: "bolt.fill", color: "#EF4444" },
+  { id: "today", labelKey: "request.urgency.today", icon: "clock.fill", color: "#F59E0B" },
+  { id: "scheduled", labelKey: "request.urgency.scheduled", icon: "calendar", color: "#10B981" },
 ] as const;
 
 const CATEGORY_META: Record<string, { icon: string; color: string }> = {
@@ -166,7 +158,7 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
 export default function CreateServiceScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { language } = useLocalization();
+  const { language, t, isRTL, formatMoney } = useTranslation();
   const { height: viewportHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ categoryId?: string; categoryLabel?: string }>();
 
@@ -239,13 +231,14 @@ export default function CreateServiceScreen() {
       ? { lowAmount: priceEstimate.lowAmount, highAmount: priceEstimate.highAmount }
       : null;
   const priceEstimateLocale = language === "en" || language === "ru" ? language : "tr";
+  const formatTryAmount = useCallback((amount: number) => formatMoney(amount), [formatMoney]);
 
   const handleUseCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== Location.PermissionStatus.GRANTED) {
-        Alert.alert("Konum İzni Gerekli", "Yakındaki profesyonellerle eşleşmek için konum izni vermelisiniz.");
+        Alert.alert(t("request.locationPermissionTitle"), t("request.locationPermissionBody"));
         return;
       }
       const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -273,15 +266,15 @@ export default function CreateServiceScreen() {
         }
       }
     } catch (error) {
-      Alert.alert("Konum Alınamadı", error instanceof Error ? error.message : "Konum bilgisi okunamadı.");
+      Alert.alert(t("request.locationUnavailableTitle"), error instanceof Error ? error.message : t("request.locationUnavailableBody"));
     } finally {
       setIsLocating(false);
     }
-  }, [address, pickupAddress, serviceType]);
+  }, [address, pickupAddress, serviceType, t]);
 
   const handleResolveRoute = useCallback(async () => {
     if (pickupAddress.trim().length < 3 || destinationAddress.trim().length < 3) {
-      Alert.alert("Adres Bilgisi Eksik", "Rota oluşturmak için başlangıç ve varış adreslerini girin.");
+      Alert.alert(t("request.routeAddressMissingTitle"), t("request.routeAddressMissingBody"));
       return;
     }
 
@@ -294,7 +287,7 @@ export default function CreateServiceScreen() {
       const pickup = pickupResults[0];
       const destination = destinationResults[0];
       if (!pickup || !destination) {
-        throw new Error("Adreslerden en az biri haritada bulunamadı. İlçe ve şehir bilgilerini ekleyip tekrar deneyin.");
+        throw new Error(t("request.routeNotFoundBody"));
       }
 
       const nextPickup = { latitude: pickup.latitude, longitude: pickup.longitude };
@@ -306,24 +299,24 @@ export default function CreateServiceScreen() {
       setDistanceKm(String(Math.max(1, Math.round(calculateStraightLineDistanceKm(nextPickup, nextDestination)))));
     } catch (error) {
       Alert.alert(
-        "Rota Oluşturulamadı",
-        error instanceof Error ? error.message : "Adresler haritada çözümlenemedi.",
+        t("request.routeUnavailableTitle"),
+        error instanceof Error ? error.message : t("request.routeUnavailableBody"),
       );
     } finally {
       setIsResolvingRoute(false);
     }
-  }, [destinationAddress, pickupAddress]);
+  }, [destinationAddress, pickupAddress, t]);
 
   const handlePickMedia = useCallback(async () => {
     const remaining = REQUEST_MEDIA_LIMIT - pendingMedia.length;
     if (remaining <= 0) {
-      Alert.alert("Medya Sınırı", `Bir talebe en fazla ${REQUEST_MEDIA_LIMIT} fotoğraf veya video eklenebilir.`);
+      Alert.alert(t("request.mediaLimitTitle"), t("request.mediaLimitBody", { limit: REQUEST_MEDIA_LIMIT }));
       return;
     }
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Galeri İzni Gerekli", "Fotoğraf veya video eklemek için galeri erişimine izin vermelisiniz.");
+      Alert.alert(t("request.galleryPermissionTitle"), t("request.galleryPermissionBody"));
       return;
     }
 
@@ -357,9 +350,9 @@ export default function CreateServiceScreen() {
     });
     setPendingMedia((current) => [...current, ...accepted].slice(0, REQUEST_MEDIA_LIMIT));
     if (rejected.length > 0) {
-      Alert.alert("Bazı Dosyalar Eklenmedi", "Desteklenmeyen türde veya izin verilen boyuttan büyük dosyalar seçildi.");
+      Alert.alert(t("request.mediaRejectedTitle"), t("request.mediaRejectedBody"));
     }
-  }, [pendingMedia.length]);
+  }, [pendingMedia.length, t]);
 
   const createRequestMutation = trpc.requests.create.useMutation({
     onSuccess: async (requestId) => {
@@ -383,17 +376,17 @@ export default function CreateServiceScreen() {
       }
 
       const message = failedUploads > 0
-        ? `Hizmet talebiniz oluşturuldu; ${failedUploads} medya dosyası yüklenemedi. Talep detayından tekrar deneyebilirsiniz.`
-        : "Hizmet talebiniz başarıyla oluşturuldu. Ustalardan teklif geldiğinde size bildirim göndereceğiz.";
-      Alert.alert("Talep Oluşturuldu", message, [
-        { text: "Tamam", onPress: () => router.replace("/(tabs)/my-jobs" as never) },
+        ? t("request.submitPartialUploadBody", { count: failedUploads })
+        : t("request.submitSuccessBody");
+      Alert.alert(t("request.submitSuccessTitle"), message, [
+        { text: t("request.ok"), onPress: () => router.replace("/(tabs)/my-jobs" as never) },
       ]);
     },
     onError: (error) => {
       Alert.alert(
-        "Hata",
-        error.message || "Talep oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.",
-        [{ text: "Tamam" }],
+        t("request.submitErrorTitle"),
+        error.message || t("request.submitErrorBody"),
+        [{ text: t("request.ok") }],
       );
     },
   });
@@ -414,7 +407,7 @@ export default function CreateServiceScreen() {
 
   const handleSubmit = () => {
     if (!countryCode) {
-      Alert.alert("Hizmet ülkesi gerekli", "Talep oluşturmadan önce hizmet verilecek ülkeyi seçin.");
+      Alert.alert(t("request.countryRequiredTitle"), t("request.countryRequiredBody"));
       return;
     }
     const normalizedAttributes = Object.fromEntries(
@@ -499,12 +492,12 @@ export default function CreateServiceScreen() {
           onPress={handleBack}
           style={{ padding: 4 }}
           accessibilityRole="button"
-          accessibilityLabel="Önceki hizmet talebi adımına dön"
+          accessibilityLabel={t("request.backAccessibility")}
         >
           <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
         </Pressable>
         <Text style={{ flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700", color: colors.foreground }}>
-          Hizmet Talebi
+          {t("request.title")}
         </Text>
         <View style={{ width: 28 }} />
       </View>
@@ -512,8 +505,8 @@ export default function CreateServiceScreen() {
       {/* Step Indicator */}
       <View style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {STEPS.map((label, i) => (
-            <View key={label} style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+          {STEP_KEYS.map((labelKey, i) => (
+            <View key={labelKey} style={{ flex: 1, flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center" }}>
               <View
                 style={{
                   width: 28,
@@ -536,7 +529,7 @@ export default function CreateServiceScreen() {
                   {i + 1}
                 </Text>
               </View>
-              {i < STEPS.length - 1 && (
+              {i < STEP_KEYS.length - 1 && (
                 <View
                   style={{
                     flex: 1,
@@ -550,7 +543,7 @@ export default function CreateServiceScreen() {
           ))}
         </View>
         <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, textAlign: "center", marginTop: 8 }}>
-          Adım {step + 1}: {STEPS[step]}
+          {t("request.step", { step: step + 1, label: t(STEP_KEYS[step]) })}
         </Text>
       </View>
 
@@ -563,17 +556,17 @@ export default function CreateServiceScreen() {
         {step === 0 && (
           <View>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
-              Hangi hizmete ihtiyacınız var?
+              {t("request.chooseService")}
             </Text>
             {categoriesQuery.isLoading ? (
               <View style={{ minHeight: 160, alignItems: "center", justifyContent: "center" }}>
                 <ActivityIndicator color={colors.primary} />
-                <Text style={{ marginTop: 10, color: colors.muted, fontSize: 13 }}>Hizmetler yükleniyor…</Text>
+                <Text style={{ marginTop: 10, color: colors.muted, fontSize: 13 }}>{t("request.servicesLoading")}</Text>
               </View>
             ) : categoriesQuery.isError ? (
               <View style={{ minHeight: 160, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
                 <IconSymbol name="wifi.exclamationmark" size={32} color={colors.error} />
-                <Text style={{ marginTop: 10, color: colors.foreground, fontWeight: "700" }}>Hizmetler alınamadı</Text>
+                <Text style={{ marginTop: 10, color: colors.foreground, fontWeight: "700" }}>{t("request.servicesFailed")}</Text>
                 <Pressable
                   onPress={() => categoriesQuery.refetch()}
                   style={({ pressed }) => ({
@@ -585,7 +578,7 @@ export default function CreateServiceScreen() {
                     opacity: pressed ? 0.8 : 1,
                   })}
                 >
-                  <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Yeniden Dene</Text>
+                  <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>{t("request.retry")}</Text>
                 </Pressable>
               </View>
             ) : params.categoryId && selectedCategory ? (
@@ -667,7 +660,7 @@ export default function CreateServiceScreen() {
             {categoryId > 0 ? (
               <View style={{ marginTop: 18 }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: colors.foreground, marginBottom: 10 }}>
-                  Alt kategori
+                  {t("request.subcategory")}
                 </Text>
                 {subcategoriesQuery.isLoading ? (
                   <ActivityIndicator color={colors.primary} style={{ alignSelf: "flex-start" }} />
@@ -683,7 +676,7 @@ export default function CreateServiceScreen() {
                       opacity: pressed ? 0.8 : 1,
                     })}
                   >
-                    <Text style={{ color: colors.error, fontWeight: "700" }}>Alt kategoriler alınamadı — yeniden dene</Text>
+                    <Text style={{ color: colors.error, fontWeight: "700" }}>{t("request.subcategoriesFailed")}</Text>
                   </Pressable>
                 ) : subcategories.length > 0 ? (
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -711,7 +704,7 @@ export default function CreateServiceScreen() {
                     })}
                   </View>
                 ) : (
-                  <Text style={{ color: colors.muted, fontSize: 13 }}>Bu hizmet için alt kategori seçimi gerekmiyor.</Text>
+                  <Text style={{ color: colors.muted, fontSize: 13, textAlign: isRTL ? "right" : "left" }}>{t("request.noSubcategory")}</Text>
                 )}
               </View>
             ) : null}
@@ -722,15 +715,15 @@ export default function CreateServiceScreen() {
         {step === 1 && (
           <View>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
-              Sorunu detaylı açıklayın
+              {t("request.details.heading")}
             </Text>
             <View style={{ gap: 14 }}>
               <View>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Başlık</Text>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>{t("request.details.title")}</Text>
                 <TextInput
                   value={title}
                   onChangeText={setTitle}
-                  placeholder="Örn: Mutfak musluğu su akıyor"
+                  placeholder={t("request.details.titlePlaceholder")}
                   placeholderTextColor={colors.muted}
                   style={{
                     backgroundColor: colors.card,
@@ -745,11 +738,11 @@ export default function CreateServiceScreen() {
                 />
               </View>
               <View>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Açıklama (opsiyonel)</Text>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6, textAlign: isRTL ? "right" : "left" }}>{t("request.details.description")}</Text>
                 <TextInput
                   value={description}
                   onChangeText={setDescription}
-                  placeholder="Sorununuzu daha detaylı açıklayın..."
+                  placeholder={t("request.details.descriptionPlaceholder")}
                   placeholderTextColor={colors.muted}
                   multiline
                   numberOfLines={4}
@@ -770,25 +763,25 @@ export default function CreateServiceScreen() {
 
               {serviceType === "painting" ? (
                 <View style={{ gap: 12 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Boya & Badana Detayları</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, textAlign: isRTL ? "right" : "left" }}>{t("request.details.painting")}</Text>
                   <View style={{ flexDirection: "row", gap: 12 }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Alan (m²)</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.details.area")}</Text>
                       <TextInput
                         value={attributes.areaSqm == null ? "" : String(attributes.areaSqm)}
                         onChangeText={(value) => updateAttribute("areaSqm", parseOptionalInteger(value) ?? null)}
-                        placeholder="Örn: 90"
+                        placeholder={t("request.details.areaPlaceholder")}
                         placeholderTextColor={colors.muted}
                         keyboardType="numeric"
                         style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
                       />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Oda Sayısı</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.details.roomCount")}</Text>
                       <TextInput
                         value={attributes.roomCount == null ? "" : String(attributes.roomCount)}
                         onChangeText={(value) => updateAttribute("roomCount", parseOptionalInteger(value) ?? null)}
-                        placeholder="Örn: 3"
+                        placeholder={t("request.details.roomPlaceholder")}
                         placeholderTextColor={colors.muted}
                         keyboardType="numeric"
                         style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
@@ -799,7 +792,7 @@ export default function CreateServiceScreen() {
                     onPress={() => updateAttribute("paintIncluded", attributes.paintIncluded !== true)}
                     style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: colors.border, opacity: pressed ? 0.82 : 1 })}
                   >
-                    <Text style={{ color: colors.foreground, fontWeight: "700" }}>Boyayı profesyonel getirsin</Text>
+                    <Text style={{ color: colors.foreground, fontWeight: "700", textAlign: isRTL ? "right" : "left" }}>{t("request.details.paintIncluded")}</Text>
                     <IconSymbol name={attributes.paintIncluded === true ? "checkmark.circle.fill" : "circle"} size={21} color={attributes.paintIncluded === true ? colors.primary : colors.muted} />
                   </Pressable>
                 </View>
@@ -808,21 +801,31 @@ export default function CreateServiceScreen() {
               {serviceType === "electrical" || serviceType === "plumbing" ? (
                 <View>
                   <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, marginBottom: 9 }}>
-                    {serviceType === "electrical" ? "Elektrik İşlemi" : "Tesisat İşlemi"}
+                    {serviceType === "electrical" ? t("request.details.electrical") : t("request.details.plumbing")}
                   </Text>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                     {(serviceType === "electrical"
-                      ? ["Arıza", "Montaj", "Tesisat", "Sigorta / Pano"]
-                      : ["Su Kaçağı", "Tıkanıklık", "Montaj", "Tesisat Yenileme"]
+                      ? [
+                        { value: "Arıza", labelKey: "request.option.electricalFault" },
+                        { value: "Montaj", labelKey: "request.option.installation" },
+                        { value: "Tesisat", labelKey: "request.option.electricalWiring" },
+                        { value: "Sigorta / Pano", labelKey: "request.option.fusePanel" },
+                      ]
+                      : [
+                        { value: "Su Kaçağı", labelKey: "request.option.waterLeak" },
+                        { value: "Tıkanıklık", labelKey: "request.option.blockage" },
+                        { value: "Montaj", labelKey: "request.option.installation" },
+                        { value: "Tesisat Yenileme", labelKey: "request.option.plumbingRenewal" },
+                      ]
                     ).map((option) => {
-                      const selected = attributes.issueType === option;
+                      const selected = attributes.issueType === option.value;
                       return (
                         <Pressable
-                          key={option}
-                          onPress={() => updateAttribute("issueType", option)}
+                          key={option.value}
+                          onPress={() => updateAttribute("issueType", option.value)}
                           style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "16" : colors.card, opacity: pressed ? 0.8 : 1 })}
                         >
-                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{option}</Text>
+                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{t(option.labelKey as `request.${string}`)}</Text>
                         </Pressable>
                       );
                     })}
@@ -832,13 +835,18 @@ export default function CreateServiceScreen() {
 
               {serviceType === "cleaning" ? (
                 <View style={{ gap: 12 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Temizlik Detayları</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, textAlign: isRTL ? "right" : "left" }}>{t("request.details.cleaning")}</Text>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                    {["Ev", "Ofis", "İnşaat Sonrası", "Boş Daire"].map((option) => {
-                      const selected = attributes.placeType === option;
+                    {[
+                      { value: "Ev", labelKey: "request.option.home" },
+                      { value: "Ofis", labelKey: "request.option.office" },
+                      { value: "İnşaat Sonrası", labelKey: "request.option.postConstruction" },
+                      { value: "Boş Daire", labelKey: "request.option.emptyApartment" },
+                    ].map((option) => {
+                      const selected = attributes.placeType === option.value;
                       return (
-                        <Pressable key={option} onPress={() => updateAttribute("placeType", option)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "16" : colors.card, opacity: pressed ? 0.8 : 1 })}>
-                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{option}</Text>
+                        <Pressable key={option.value} onPress={() => updateAttribute("placeType", option.value)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "16" : colors.card, opacity: pressed ? 0.8 : 1 })}>
+                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{t(option.labelKey as `request.${string}`)}</Text>
                         </Pressable>
                       );
                     })}
@@ -846,7 +854,7 @@ export default function CreateServiceScreen() {
                   <TextInput
                     value={attributes.roomCount == null ? "" : String(attributes.roomCount)}
                     onChangeText={(value) => updateAttribute("roomCount", parseOptionalInteger(value) ?? null)}
-                    placeholder="Oda sayısı"
+                    placeholder={t("request.details.cleaningRoomPlaceholder")}
                     placeholderTextColor={colors.muted}
                     keyboardType="numeric"
                     style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
@@ -856,17 +864,17 @@ export default function CreateServiceScreen() {
 
               {serviceType === "moving" ? (
                 <View style={{ gap: 10 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Taşınacak Eşyalar</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, textAlign: isRTL ? "right" : "left" }}>{t("request.details.moving")}</Text>
                   <TextInput
                     value={typeof attributes.inventorySummary === "string" ? attributes.inventorySummary : ""}
                     onChangeText={(value) => updateAttribute("inventorySummary", value)}
-                    placeholder="Büyük eşyaları ve yaklaşık koli sayısını yazın"
+                    placeholder={t("request.details.movingPlaceholder")}
                     placeholderTextColor={colors.muted}
                     multiline
                     style={{ minHeight: 82, textAlignVertical: "top", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
                   />
                   <Pressable onPress={() => updateAttribute("packingAssistance", attributes.packingAssistance !== true)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: colors.border, opacity: pressed ? 0.82 : 1 })}>
-                    <Text style={{ color: colors.foreground, fontWeight: "700" }}>Paketleme desteği istiyorum</Text>
+                    <Text style={{ color: colors.foreground, fontWeight: "700", textAlign: isRTL ? "right" : "left" }}>{t("request.details.packing")}</Text>
                     <IconSymbol name={attributes.packingAssistance === true ? "checkmark.circle.fill" : "circle"} size={21} color={attributes.packingAssistance === true ? colors.primary : colors.muted} />
                   </Pressable>
                 </View>
@@ -874,13 +882,18 @@ export default function CreateServiceScreen() {
 
               {serviceType === "courier" ? (
                 <View style={{ gap: 10 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Kurye Gönderisi</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, textAlign: isRTL ? "right" : "left" }}>{t("request.details.courier")}</Text>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                    {["Evrak", "Küçük Paket", "Koli", "Hassas Ürün"].map((option) => {
-                      const selected = attributes.parcelType === option;
+                    {[
+                      { value: "Evrak", labelKey: "request.option.document" },
+                      { value: "Küçük Paket", labelKey: "request.option.smallPackage" },
+                      { value: "Koli", labelKey: "request.option.box" },
+                      { value: "Hassas Ürün", labelKey: "request.option.fragile" },
+                    ].map((option) => {
+                      const selected = attributes.parcelType === option.value;
                       return (
-                        <Pressable key={option} onPress={() => updateAttribute("parcelType", option)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "16" : colors.card, opacity: pressed ? 0.8 : 1 })}>
-                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{option}</Text>
+                        <Pressable key={option.value} onPress={() => updateAttribute("parcelType", option.value)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary + "16" : colors.card, opacity: pressed ? 0.8 : 1 })}>
+                          <Text style={{ color: selected ? colors.primary : colors.foreground, fontSize: 13, fontWeight: "700" }}>{t(option.labelKey as `request.${string}`)}</Text>
                         </Pressable>
                       );
                     })}
@@ -888,7 +901,7 @@ export default function CreateServiceScreen() {
                   <TextInput
                     value={attributes.weightKg == null ? "" : String(attributes.weightKg)}
                     onChangeText={(value) => updateAttribute("weightKg", Number(value.replace(",", ".")) || null)}
-                    placeholder="Yaklaşık ağırlık (kg)"
+                    placeholder={t("request.details.weightPlaceholder")}
                     placeholderTextColor={colors.muted}
                     keyboardType="decimal-pad"
                     style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
@@ -899,19 +912,19 @@ export default function CreateServiceScreen() {
               {serviceType === "tow_truck" || serviceType === "roadside" ? (
                 <View style={{ gap: 10 }}>
                   <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>
-                    {serviceType === "tow_truck" ? "Çekici Detayları" : "Yol Yardım Detayları"}
+                    {serviceType === "tow_truck" ? t("request.details.towTruck") : t("request.details.roadside")}
                   </Text>
                   <TextInput
                     value={typeof attributes.vehicle === "string" ? attributes.vehicle : ""}
                     onChangeText={(value) => updateAttribute("vehicle", value)}
-                    placeholder="Araç marka / model / plaka"
+                    placeholder={t("request.details.vehiclePlaceholder")}
                     placeholderTextColor={colors.muted}
                     style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
                   />
                   <TextInput
                     value={typeof attributes.problem === "string" ? attributes.problem : ""}
                     onChangeText={(value) => updateAttribute("problem", value)}
-                    placeholder="Arıza veya yardım ihtiyacını açıklayın"
+                    placeholder={t("request.details.problemPlaceholder")}
                     placeholderTextColor={colors.muted}
                     style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
                   />
@@ -921,14 +934,14 @@ export default function CreateServiceScreen() {
               <View style={{ gap: 10 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground }}>Fotoğraf / Video</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, textAlign: isRTL ? "right" : "left" }}>{t("request.media.title")}</Text>
                     <Text style={{ marginTop: 3, fontSize: 12, lineHeight: 17, color: colors.muted }}>
-                      En fazla {REQUEST_MEDIA_LIMIT} dosya; fotoğraf 8 MB, video 25 MB.
+                      {t("request.media.hint", { limit: REQUEST_MEDIA_LIMIT })}
                     </Text>
                   </View>
                   <Pressable onPress={handlePickMedia} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.primary + "16", opacity: pressed ? 0.78 : 1 })}>
                     <IconSymbol name="photo.fill" size={18} color={colors.primary} />
-                    <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 13 }}>Ekle</Text>
+                    <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 13 }}>{t("request.media.add")}</Text>
                   </Pressable>
                 </View>
                 {pendingMedia.map((media) => (
@@ -942,13 +955,13 @@ export default function CreateServiceScreen() {
                 ))}
               </View>
 
-              <View style={{ flexDirection: "row", gap: 12 }}>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Min Bütçe (₺)</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.budget.min")}</Text>
                   <TextInput
                     value={budgetMin}
                     onChangeText={setBudgetMin}
-                    placeholder="0"
+                    placeholder={t("request.budget.zero")}
                     placeholderTextColor={colors.muted}
                     keyboardType="numeric"
                     style={{
@@ -964,11 +977,11 @@ export default function CreateServiceScreen() {
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Max Bütçe (₺)</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.budget.max")}</Text>
                   <TextInput
                     value={budgetMax}
                     onChangeText={setBudgetMax}
-                    placeholder="0"
+                    placeholder={t("request.budget.zero")}
                     placeholderTextColor={colors.muted}
                     keyboardType="numeric"
                     style={{
@@ -1010,10 +1023,10 @@ export default function CreateServiceScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "800" }}>
-                      AI Fiyat Zekâsı
+                      {t("request.priceEstimate.title")}
                     </Text>
                     <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
-                      Benzer tamamlanmış işlerden türetilen gösterge aralığıdır; teklif veya ödeme tutarı değildir.
+                      {t("request.priceEstimate.description")}
                     </Text>
                   </View>
                 </View>
@@ -1035,7 +1048,7 @@ export default function CreateServiceScreen() {
                           {formatTryAmount(priceEstimateRange.lowAmount)} – {formatTryAmount(priceEstimateRange.highAmount)}
                         </Text>
                         <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>
-                          {priceEstimate.sampleSize} benzer iş kaydı üzerinden hesaplandı. Nihai üst fiyat, yalnız teklif kabul edildiğinde No Surprise Price olarak sabitlenir.
+                          {t("request.priceEstimate.sampleDescription", { count: priceEstimate.sampleSize })}
                         </Text>
                         {priceEstimate.narrative?.status === "available" && priceEstimate.narrative.summary ? (
                           <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>
@@ -1056,12 +1069,12 @@ export default function CreateServiceScreen() {
                             opacity: pressed ? 0.78 : 1,
                           })}
                         >
-                          <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "800" }}>Bu aralığı bütçeme uygula</Text>
+                          <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "800" }}>{t("request.priceEstimate.apply")}</Text>
                         </Pressable>
                       </>
                     ) : (
                       <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 17 }}>
-                        Bu hizmet için yeterli doğrulanmış fiyat verisi henüz oluşmadı. Bütçenizi kendiniz belirleyebilir ve teklifleri karşılaştırabilirsiniz.
+                        {t("request.priceEstimate.noData")}
                       </Text>
                     )}
                   </View>
@@ -1069,13 +1082,13 @@ export default function CreateServiceScreen() {
 
                 {priceEstimateMutation.isError ? (
                   <Text style={{ color: colors.error, fontSize: 12, lineHeight: 17 }}>
-                    Fiyat tahmini şu anda alınamadı. Talebinizi yine de oluşturabilir ve profesyonel tekliflerini karşılaştırabilirsiniz.
+                    {t("request.priceEstimate.error")}
                   </Text>
                 ) : null}
 
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="AI fiyat tahmini al"
+                  accessibilityLabel={t("request.priceEstimate.accessibility")}
                   disabled={priceEstimateMutation.isPending || categoryId <= 0}
                   onPress={() => priceEstimateMutation.mutate({
                     categoryId,
@@ -1095,7 +1108,7 @@ export default function CreateServiceScreen() {
                 >
                   {priceEstimateMutation.isPending ? <ActivityIndicator color="#FFFFFF" size="small" /> : <IconSymbol name={"sparkles" as any} size={17} color="#FFFFFF" />}
                   <Text style={{ marginLeft: 7, color: "#FFFFFF", fontSize: 13, fontWeight: "800" }}>
-                    {priceEstimateMutation.isPending ? "Tahmin hesaplanıyor…" : "AI fiyat aralığını göster"}
+                    {priceEstimateMutation.isPending ? t("request.priceEstimate.loading") : t("request.priceEstimate.show")}
                   </Text>
                 </Pressable>
               </View>
@@ -1107,7 +1120,7 @@ export default function CreateServiceScreen() {
         {step === 2 && (
           <View>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
-              Ne zaman ihtiyacınız var?
+              {t("request.time.title")}
             </Text>
             <View style={{ gap: 10 }}>
               {URGENCY_OPTIONS.map((opt) => (
@@ -1140,7 +1153,7 @@ export default function CreateServiceScreen() {
                     <IconSymbol name={opt.icon as any} size={22} color={opt.color} />
                   </View>
                   <Text style={{ flex: 1, marginLeft: 14, fontSize: 16, fontWeight: "700", color: colors.foreground }}>
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </Text>
                   {urgency === opt.id && (
                     <IconSymbol name="checkmark.circle.fill" size={22} color={opt.color} />
@@ -1155,14 +1168,14 @@ export default function CreateServiceScreen() {
         {step === 3 && (
           <View>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
-              {ROUTE_SERVICE_TYPES.has(serviceType) ? "Rota bilgilerini girin" : "Hizmet nerede verilecek?"}
+              {ROUTE_SERVICE_TYPES.has(serviceType) ? t("request.route.title") : t("request.location.title")}
             </Text>
             <View style={{ marginBottom: 14 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Hizmet ülkesi</Text>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.country")}</Text>
               <Pressable
                 accessibilityRole="radio"
                 accessibilityState={{ selected: countryCode === "TR" }}
-                accessibilityLabel="Türkiye hizmet ülkesi"
+                accessibilityLabel={t("request.countryTurkeyAccessibility")}
                 onPress={() => setCountryCode("TR")}
                 style={({ pressed }) => ({
                   alignItems: "center",
@@ -1176,19 +1189,19 @@ export default function CreateServiceScreen() {
                   padding: 14,
                 })}
               >
-                <Text style={{ color: colors.foreground, fontWeight: "700" }}>Türkiye (TR)</Text>
+                <Text style={{ color: colors.foreground, fontWeight: "700" }}>{t("request.countryTurkey")}</Text>
                 <IconSymbol name={countryCode === "TR" ? "checkmark.circle.fill" : "circle"} size={21} color={countryCode === "TR" ? colors.primary : colors.muted} />
               </Pressable>
             </View>
             {ROUTE_SERVICE_TYPES.has(serviceType) ? (
               <View style={{ gap: 13 }}>
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Nereden alınacak?</Text>
-                  <TextInput value={pickupAddress} onChangeText={(value) => { setPickupAddress(value); setPickupCoordinate(null); }} placeholder="Başlangıç adresi" placeholderTextColor={colors.muted} multiline style={{ minHeight: 72, textAlignVertical: "top", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.route.pickup")}</Text>
+                  <TextInput value={pickupAddress} onChangeText={(value) => { setPickupAddress(value); setPickupCoordinate(null); }} placeholder={t("request.route.pickupPlaceholder")} placeholderTextColor={colors.muted} multiline style={{ minHeight: 72, textAlignVertical: "top", textAlign: isRTL ? "right" : "left", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
                 </View>
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Nereye götürülecek?</Text>
-                  <TextInput value={destinationAddress} onChangeText={(value) => { setDestinationAddress(value); setDestinationCoordinate(null); }} placeholder="Varış adresi" placeholderTextColor={colors.muted} multiline style={{ minHeight: 72, textAlignVertical: "top", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.route.destination")}</Text>
+                  <TextInput value={destinationAddress} onChangeText={(value) => { setDestinationAddress(value); setDestinationCoordinate(null); }} placeholder={t("request.route.destinationPlaceholder")} placeholderTextColor={colors.muted} multiline style={{ minHeight: 72, textAlignVertical: "top", textAlign: isRTL ? "right" : "left", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
                 </View>
                 <Pressable
                   onPress={handleResolveRoute}
@@ -1211,15 +1224,15 @@ export default function CreateServiceScreen() {
                     <IconSymbol name="map.fill" size={18} color={colors.primary} />
                   )}
                   <Text style={{ color: colors.primary, fontSize: 14, fontWeight: "700", marginLeft: 8 }}>
-                    {isResolvingRoute ? "Rota hazırlanıyor…" : "Adresleri Haritada Göster"}
+                    {isResolvingRoute ? t("request.route.loading") : t("request.route.show")}
                   </Text>
                 </Pressable>
                 <View style={{ borderColor: colors.border, borderRadius: 16, borderWidth: 0.5, height: 210, overflow: "hidden" }}>
                   <RequestRouteMap
                     pickupCoordinate={pickupCoordinate}
                     destinationCoordinate={destinationCoordinate}
-                    pickupLabel={pickupAddress || "Başlangıç"}
-                    destinationLabel={destinationAddress || "Varış"}
+                    pickupLabel={pickupAddress || t("request.route.pickupFallback")}
+                    destinationLabel={destinationAddress || t("request.route.destinationFallback")}
                     primaryColor={colors.primary}
                     surfaceColor={colors.card}
                     borderColor={colors.border}
@@ -1228,30 +1241,30 @@ export default function CreateServiceScreen() {
                   />
                 </View>
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Yaklaşık Mesafe (km)</Text>
-                  <TextInput value={distanceKm} onChangeText={setDistanceKm} placeholder="Örn: 12" placeholderTextColor={colors.muted} keyboardType="numeric" style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.route.distance")}</Text>
+                  <TextInput value={distanceKm} onChangeText={setDistanceKm} placeholder={t("request.route.distancePlaceholder")} placeholderTextColor={colors.muted} keyboardType="numeric" style={{ textAlign: isRTL ? "right" : "left", backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
                   <Text style={{ color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 5 }}>
-                    Harita değeri kuş uçuşu yaklaşık mesafedir; gerçek yol mesafesini gerekirse düzenleyin.
+                    {t("request.route.distanceHint")}
                   </Text>
                 </View>
                 {serviceType === "moving" ? (
                   <View style={{ gap: 12 }}>
                     <View style={{ flexDirection: "row", gap: 12 }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Alınacak Kat</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.route.pickupFloor")}</Text>
                         <TextInput value={pickupFloor} onChangeText={setPickupFloor} placeholder="0" placeholderTextColor={colors.muted} keyboardType="number-pad" style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Varış Katı</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.route.destinationFloor")}</Text>
                         <TextInput value={destinationFloor} onChangeText={setDestinationFloor} placeholder="0" placeholderTextColor={colors.muted} keyboardType="number-pad" style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }} />
                       </View>
                     </View>
                     <Pressable onPress={() => setPickupHasElevator((value) => !value)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: colors.border, opacity: pressed ? 0.82 : 1 })}>
-                      <Text style={{ color: colors.foreground, fontWeight: "700" }}>Alınacak adreste asansör var</Text>
+                      <Text style={{ color: colors.foreground, fontWeight: "700", textAlign: isRTL ? "right" : "left" }}>{t("request.route.pickupElevator")}</Text>
                       <IconSymbol name={pickupHasElevator ? "checkmark.circle.fill" : "circle"} size={21} color={pickupHasElevator ? colors.primary : colors.muted} />
                     </Pressable>
                     <Pressable onPress={() => setDestinationHasElevator((value) => !value)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.card, borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: colors.border, opacity: pressed ? 0.82 : 1 })}>
-                      <Text style={{ color: colors.foreground, fontWeight: "700" }}>Varış adresinde asansör var</Text>
+                      <Text style={{ color: colors.foreground, fontWeight: "700", textAlign: isRTL ? "right" : "left" }}>{t("request.route.destinationElevator")}</Text>
                       <IconSymbol name={destinationHasElevator ? "checkmark.circle.fill" : "circle"} size={21} color={destinationHasElevator ? colors.primary : colors.muted} />
                     </Pressable>
                   </View>
@@ -1259,8 +1272,8 @@ export default function CreateServiceScreen() {
               </View>
             ) : (
               <View>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>Adres</Text>
-                <TextInput value={address} onChangeText={setAddress} placeholder="Örn: Bağdat Cad. No:123 Kadıköy, İstanbul" placeholderTextColor={colors.muted} multiline numberOfLines={3} style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border, textAlignVertical: "top", minHeight: 80 }} />
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.address")}</Text>
+                <TextInput value={address} onChangeText={setAddress} placeholder={t("request.addressPlaceholder")} placeholderTextColor={colors.muted} multiline numberOfLines={3} style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border, textAlignVertical: "top", textAlign: isRTL ? "right" : "left", minHeight: 80 }} />
               </View>
             )}
             <Pressable
@@ -1270,7 +1283,7 @@ export default function CreateServiceScreen() {
             >
               {isLocating ? <ActivityIndicator color={colors.primary} size="small" /> : <IconSymbol name="location.fill" size={18} color={colors.primary} />}
               <Text style={{ marginLeft: 8, color: colors.primary, fontWeight: "600", fontSize: 14 }}>
-                {isLocating ? "Konum alınıyor…" : latitude && longitude ? "Konum Güncellendi" : "Konumumu Kullan"}
+                {isLocating ? t("request.location.loading") : latitude && longitude ? t("request.location.updated") : t("request.location.use")}
               </Text>
             </Pressable>
           </View>
@@ -1280,7 +1293,7 @@ export default function CreateServiceScreen() {
         {step === 4 && (
           <View>
             <Text style={{ fontSize: 16, fontWeight: "700", color: colors.foreground, marginBottom: 14 }}>
-              Talep Özeti
+              {t("request.summary.heading")}
             </Text>
             <View
               style={{
@@ -1293,67 +1306,70 @@ export default function CreateServiceScreen() {
               }}
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ fontSize: 14, color: colors.muted }}>Hizmet</Text>
+                <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.service")}</Text>
                 <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                  {selectedCategory?.name || "Seçilmedi"}
+                  {selectedCategory?.name || t("request.summary.unselected")}
                 </Text>
               </View>
               {subcategoryId ? (
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ fontSize: 14, color: colors.muted }}>Alt Kategori</Text>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.subcategory")}</Text>
                   <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
                     {subcategories.find((item) => item.id === subcategoryId)?.name ?? "—"}
                   </Text>
                 </View>
               ) : null}
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ fontSize: 14, color: colors.muted }}>Başlık</Text>
+                <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.title")}</Text>
                 <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>
                   {title || "—"}
                 </Text>
               </View>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ fontSize: 14, color: colors.muted }}>Aciliyet</Text>
+                <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.urgency")}</Text>
                 <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                  {URGENCY_OPTIONS.find((u) => u.id === urgency)?.label || "—"}
+                  {(() => {
+                    const selectedUrgency = URGENCY_OPTIONS.find((u) => u.id === urgency);
+                    return selectedUrgency ? t(selectedUrgency.labelKey) : "—";
+                  })()}
                 </Text>
               </View>
               {ROUTE_SERVICE_TYPES.has(serviceType) ? (
                 <>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 14, color: colors.muted }}>Nereden</Text>
+                    <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.pickup")}</Text>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>{pickupAddress || "—"}</Text>
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 14, color: colors.muted }}>Nereye</Text>
+                    <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.destination")}</Text>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>{destinationAddress || "—"}</Text>
                   </View>
                   {distanceKm ? (
                     <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                      <Text style={{ fontSize: 14, color: colors.muted }}>Mesafe</Text>
+                      <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.distance")}</Text>
                       <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{distanceKm} km</Text>
                     </View>
                   ) : null}
                 </>
               ) : (
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ fontSize: 14, color: colors.muted }}>Adres</Text>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.address")}</Text>
                   <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, maxWidth: 200 }} numberOfLines={2}>{address || "—"}</Text>
                 </View>
               )}
               {pendingMedia.length > 0 ? (
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ fontSize: 14, color: colors.muted }}>Medya</Text>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{pendingMedia.length} dosya</Text>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.media")}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>{t("request.summary.fileCount", { count: pendingMedia.length })}</Text>
                 </View>
               ) : null}
               {(budgetMin || budgetMax) && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ fontSize: 14, color: colors.muted }}>Bütçe</Text>
+                  <Text style={{ fontSize: 14, color: colors.muted }}>{t("request.summary.budget")}</Text>
                   <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}>
-                    {budgetMin && `₺${budgetMin}`}
+                    {budgetMin && formatTryAmount(Number(budgetMin))}
                     {budgetMin && budgetMax && " - "}
-                    {budgetMax && `₺${budgetMax}`}
+                    {budgetMax && formatTryAmount(Number(budgetMax))}
                   </Text>
                 </View>
               )}
@@ -1372,7 +1388,7 @@ export default function CreateServiceScreen() {
             >
               <IconSymbol name="info.circle.fill" size={18} color={colors.primary} />
               <Text style={{ flex: 1, marginLeft: 8, fontSize: 12, color: colors.muted, lineHeight: 18 }}>
-                Talebiniz oluşturulduktan sonra size uygun ustalar teklif gönderecektir. Teklifleri “İşlerim” ekranından takip edebilirsiniz.
+                {t("request.summary.postSubmitInfo")}
               </Text>
             </View>
           </View>
@@ -1410,7 +1426,7 @@ export default function CreateServiceScreen() {
             <ActivityIndicator color="#FFF" />
           ) : (
             <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "700" }}>
-              {step < 4 ? "Devam" : "Talep Oluştur"}
+              {step < 4 ? t("request.next") : t("request.submit")}
             </Text>
           )}
         </Pressable>

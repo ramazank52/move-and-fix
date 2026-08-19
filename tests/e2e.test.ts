@@ -144,7 +144,7 @@ describe("E2E: Complete User Journey", () => {
     });
 
     it("should return nearby providers", async () => {
-      const res = await httpRequest("GET", "/api/trpc/providers.nearby?input=%7B%22json%22%3A%7B%22lat%22%3A%2241.0082%22%2C%22lng%22%3A%2228.9784%22%7D%7D");
+      const res = await httpRequest("GET", "/api/trpc/provider.nearby?input=%7B%22json%22%3A%7B%22lat%22%3A%2241.0082%22%2C%22lng%22%3A%2228.9784%22%7D%7D");
       expect(res.status).toBe(200);
     });
   });
