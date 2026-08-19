@@ -215,6 +215,46 @@ export async function getOutstandingRequiredLegalConsents(userId: number) {
   });
 }
 
+/** Returns only a user's latest marketing preference; legal acceptance is never inferred from it. */
+export async function getMarketingConsentPreference(userId: number): Promise<{
+  enabled: boolean;
+  documentVersion: string | null;
+  updatedAt: Date | null;
+}> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db
+    .select({ action: consentEvents.action, documentVersion: consentEvents.documentVersion, createdAt: consentEvents.createdAt })
+    .from(consentEvents)
+    .where(and(eq(consentEvents.userId, userId), eq(consentEvents.consentKey, "marketing_platform")))
+    .orderBy(desc(consentEvents.createdAt), desc(consentEvents.id))
+    .limit(1);
+  const latest = rows[0];
+  return {
+    enabled: latest?.action === "granted",
+    documentVersion: latest?.documentVersion ?? null,
+    updatedAt: latest?.createdAt ?? null,
+  };
+}
+
+/**
+ * Marketing is an independent, explicit opt-in. Withdrawal creates a new
+ * immutable event and cannot mutate legal or transactional consent evidence.
+ */
+export async function setMarketingConsentPreference(input: { userId: number; enabled: boolean; source: string }) {
+  const current = await getMarketingConsentPreference(input.userId);
+  if (current.enabled === input.enabled) return { ...current, idempotent: true };
+  await recordConsentEvents([{
+    userId: input.userId,
+    consentKey: "marketing_platform",
+    documentVersion: "1.0",
+    purpose: "marketing",
+    action: input.enabled ? "granted" : "withdrawn",
+    source: input.source,
+  }]);
+  return { enabled: input.enabled, documentVersion: "1.0", updatedAt: new Date(), idempotent: false };
+}
+
 /** Creates the minimal profile required before a locally registered provider can upload documents. */
 export async function createLocalProviderProfile(data: { userId: number; displayName: string }) {
   const db = await getDb();
@@ -1223,6 +1263,8 @@ import {
   taxRules,
   serviceRequestTaxSnapshots,
   mediaScannerJobs,
+  mediaScannerCallbackReceipts,
+  mediaScannerManualReviews,
   contactVerificationStates,
 } from "../drizzle/schema";
 import {
@@ -1255,9 +1297,11 @@ import { evaluateWorkerClassification } from "./compliance/WorkerClassificationP
 import { evaluateJobSafety } from "./compliance/JobSafetyEngine";
 import {
   decideMediaQuarantineAccess,
+  decideMediaScannerRetryTransition,
   decideMediaScannerTransition,
   type MediaScannerMediaClass,
   type MediaScannerOutcome,
+  type MediaQuarantineStatus,
 } from "./security/MediaQuarantinePolicy";
 import {
   buildMediaScannerJob,
@@ -1284,6 +1328,12 @@ function resetMediaScannerJobForRetry(input: { sha256: string; storageKey: strin
     outcome: job.outcome,
     outcomeReason: job.outcomeReason,
     completedAt: job.completedAt,
+    scanStartedAt: job.scanStartedAt,
+    scanCompletedAt: job.scanCompletedAt,
+    retryCount: job.retryCount,
+    scanFailureReason: job.scanFailureReason,
+    maxRetries: job.maxRetries,
+    operationalReviewRequired: job.operationalReviewRequired,
   } as const;
 }
 
@@ -3714,8 +3764,9 @@ export async function getAuthorizedVoiceMessageStorage(
 
 /**
  * Persists one authenticated scanner decision. The reference is class-scoped,
- * the stored digest must match, and terminal states are immutable except for an
- * idempotent replay of the identical result.
+ * the stored digest must match, and only an actively dispatched scan may make a
+ * terminal decision. Terminal states are immutable except for an idempotent
+ * replay of the exact same result.
  */
 export async function applyMediaScannerOutcome(input: {
   mediaClass: MediaScannerMediaClass;
@@ -3723,6 +3774,7 @@ export async function applyMediaScannerOutcome(input: {
   sha256: string;
   outcome: MediaScannerOutcome;
   reason?: string;
+  callbackNonce?: string;
 }): Promise<{ accepted: boolean; idempotent: boolean; reason: string }> {
   const database = await getDb();
   if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
@@ -3732,6 +3784,25 @@ export async function applyMediaScannerOutcome(input: {
   const parsedNumericId = Number(input.mediaId);
   const numericId = Number.isInteger(parsedNumericId) && parsedNumericId > 0 ? parsedNumericId : null;
   const outcome = await database.transaction(async (tx) => {
+    if (input.callbackNonce) {
+      const priorReceipt = (await tx.select({
+        mediaClass: mediaScannerCallbackReceipts.mediaClass,
+        mediaId: mediaScannerCallbackReceipts.mediaId,
+        sha256: mediaScannerCallbackReceipts.sha256,
+        outcome: mediaScannerCallbackReceipts.outcome,
+      }).from(mediaScannerCallbackReceipts).where(eq(mediaScannerCallbackReceipts.nonce, input.callbackNonce)).limit(1))[0] ?? null;
+      if (priorReceipt) {
+        const matches = priorReceipt.mediaClass === input.mediaClass
+          && priorReceipt.mediaId === input.mediaId
+          && priorReceipt.sha256.toLowerCase() === hash
+          && priorReceipt.outcome === input.outcome;
+        return {
+          accepted: matches,
+          idempotent: matches,
+          reason: matches ? "MEDIA_SCANNER_CALLBACK_REPLAY_NOOP" : "MEDIA_SCANNER_CALLBACK_NONCE_REUSED",
+        };
+      }
+    }
     const record = await (async () => {
       if (input.mediaClass === "provider_document") {
         if (numericId == null) return null;
@@ -3784,19 +3855,19 @@ export async function applyMediaScannerOutcome(input: {
     let affectedRows = 0;
     if (input.mediaClass === "provider_document" && numericId != null) {
       const result = await tx.update(providerDocuments).set(update)
-        .where(and(eq(providerDocuments.id, numericId), eq(providerDocuments.sha256, hash), eq(providerDocuments.quarantineStatus, "pending_scan")));
+        .where(and(eq(providerDocuments.id, numericId), eq(providerDocuments.sha256, hash), eq(providerDocuments.quarantineStatus, "scanning")));
       affectedRows = Number(result[0].affectedRows);
     } else if (input.mediaClass === "service_request_media") {
       const result = await tx.update(serviceRequestMedia).set(update)
-        .where(and(eq(serviceRequestMedia.publicId, input.mediaId), eq(serviceRequestMedia.sha256, hash), eq(serviceRequestMedia.quarantineStatus, "pending_scan")));
+        .where(and(eq(serviceRequestMedia.publicId, input.mediaId), eq(serviceRequestMedia.sha256, hash), eq(serviceRequestMedia.quarantineStatus, "scanning")));
       affectedRows = Number(result[0].affectedRows);
     } else if (input.mediaClass === "voice_message" && numericId != null) {
       const result = await tx.update(messages).set(update)
-        .where(and(eq(messages.id, numericId), eq(messages.kind, "audio"), eq(messages.mediaSha256, hash), eq(messages.quarantineStatus, "pending_scan")));
+        .where(and(eq(messages.id, numericId), eq(messages.kind, "audio"), eq(messages.mediaSha256, hash), eq(messages.quarantineStatus, "scanning")));
       affectedRows = Number(result[0].affectedRows);
     } else if (input.mediaClass === "move_ai_draft_media") {
       const result = await tx.update(moveAiDraftMedia).set(update)
-        .where(and(eq(moveAiDraftMedia.opaqueId, input.mediaId), eq(moveAiDraftMedia.sha256, hash), eq(moveAiDraftMedia.quarantineStatus, "pending_scan")));
+        .where(and(eq(moveAiDraftMedia.opaqueId, input.mediaId), eq(moveAiDraftMedia.sha256, hash), eq(moveAiDraftMedia.quarantineStatus, "scanning")));
       affectedRows = Number(result[0].affectedRows);
     }
     if (affectedRows !== 1) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_STATE_CONFLICT" };
@@ -3805,6 +3876,9 @@ export async function applyMediaScannerOutcome(input: {
       outcome: input.outcome,
       outcomeReason: reason,
       completedAt: now,
+      scanCompletedAt: now,
+      scanFailureReason: input.outcome === "scan_failed" ? reason ?? "MEDIA_SCANNER_CALLBACK_FAILED" : null,
+      operationalReviewRequired: input.outcome === "scan_failed" ? 1 : 0,
     }).where(and(
       eq(mediaScannerJobs.mediaClass, input.mediaClass),
       eq(mediaScannerJobs.mediaId, input.mediaId),
@@ -3812,6 +3886,15 @@ export async function applyMediaScannerOutcome(input: {
       eq(mediaScannerJobs.status, job.status),
     ));
     if (Number(jobUpdated[0].affectedRows) !== 1) throw new Error("MEDIA_SCAN_JOB_UPDATE_CONFLICT");
+    if (input.callbackNonce) {
+      await tx.insert(mediaScannerCallbackReceipts).values({
+        nonce: input.callbackNonce,
+        mediaClass: input.mediaClass,
+        mediaId: input.mediaId,
+        sha256: hash,
+        outcome: input.outcome,
+      });
+    }
     return { accepted: true, idempotent: false, reason: transition.reason };
   });
   if (outcome.accepted && !outcome.idempotent) {
@@ -3822,6 +3905,156 @@ export async function applyMediaScannerOutcome(input: {
     });
   }
   return outcome;
+}
+
+type MediaScanStatusTransitionInput = {
+  mediaClass: MediaScannerMediaClass;
+  mediaId: string;
+  sha256: string;
+  from: MediaQuarantineStatus;
+  to: MediaQuarantineStatus;
+  reason?: string;
+  now?: Date;
+};
+
+/** Compare-and-set media transition used only by trusted internal workers. */
+export async function transitionScanStatus(input: MediaScanStatusTransitionInput): Promise<{
+  transitioned: boolean;
+  idempotent: boolean;
+  reason: string;
+}> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const transition = decideMediaScannerTransition(input.from, input.to as "scanning" | MediaScannerOutcome);
+  if (!transition.allowed) return { transitioned: false, idempotent: false, reason: transition.reason };
+  if (transition.idempotent) return { transitioned: false, idempotent: true, reason: transition.reason };
+  const now = input.now ?? new Date();
+  const hash = input.sha256.toLowerCase();
+  const reason = input.reason?.trim().slice(0, 500) || null;
+  const parsedId = Number(input.mediaId);
+  const numericId = Number.isInteger(parsedId) && parsedId > 0 ? parsedId : null;
+  const values = {
+    quarantineStatus: input.to,
+    quarantineReason: reason,
+    scannedAt: input.to === "scanning" ? null : now,
+    releasedAt: input.to === "clean" ? now : null,
+  } as const;
+  let affectedRows = 0;
+  if (input.mediaClass === "provider_document" && numericId != null) {
+    const result = await database.update(providerDocuments).set(values)
+      .where(and(eq(providerDocuments.id, numericId), eq(providerDocuments.sha256, hash), eq(providerDocuments.quarantineStatus, input.from)));
+    affectedRows = Number(result[0].affectedRows);
+  } else if (input.mediaClass === "service_request_media") {
+    const result = await database.update(serviceRequestMedia).set(values)
+      .where(and(eq(serviceRequestMedia.publicId, input.mediaId), eq(serviceRequestMedia.sha256, hash), eq(serviceRequestMedia.quarantineStatus, input.from)));
+    affectedRows = Number(result[0].affectedRows);
+  } else if (input.mediaClass === "voice_message" && numericId != null) {
+    const result = await database.update(messages).set(values)
+      .where(and(eq(messages.id, numericId), eq(messages.kind, "audio"), eq(messages.mediaSha256, hash), eq(messages.quarantineStatus, input.from)));
+    affectedRows = Number(result[0].affectedRows);
+  } else if (input.mediaClass === "move_ai_draft_media") {
+    const result = await database.update(moveAiDraftMedia).set(values)
+      .where(and(eq(moveAiDraftMedia.opaqueId, input.mediaId), eq(moveAiDraftMedia.sha256, hash), eq(moveAiDraftMedia.quarantineStatus, input.from)));
+    affectedRows = Number(result[0].affectedRows);
+  }
+  return { transitioned: affectedRows === 1, idempotent: false, reason: affectedRows === 1 ? transition.reason : "MEDIA_SCAN_STATE_CONFLICT" };
+}
+
+export async function markScanStarted(jobId: number, now = new Date()) {
+  if (!Number.isInteger(jobId) || jobId <= 0) throw new Error("MEDIA_SCANNER_JOB_ID_INVALID");
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const job = (await database.select().from(mediaScannerJobs).where(eq(mediaScannerJobs.id, jobId)).limit(1))[0] ?? null;
+  if (!job) throw new Error("MEDIA_SCANNER_JOB_NOT_FOUND");
+  const transition = await transitionScanStatus({
+    mediaClass: job.mediaClass,
+    mediaId: job.mediaId,
+    sha256: job.sha256,
+    from: "pending_scan",
+    to: "scanning",
+    now,
+  });
+  if (!transition.transitioned) return transition;
+  const result = await database.update(mediaScannerJobs).set({
+    status: "dispatched",
+    deliveryAttempts: sql`${mediaScannerJobs.deliveryAttempts} + 1`,
+    lastDispatchAt: now,
+    scanStartedAt: now,
+    scanCompletedAt: null,
+    scanFailureReason: null,
+    operationalReviewRequired: 0,
+  }).where(and(eq(mediaScannerJobs.id, jobId), inArray(mediaScannerJobs.status, ["queued", "retry_scheduled"])));
+  if (Number(result[0].affectedRows) !== 1) throw new Error("MEDIA_SCANNER_JOB_START_CONFLICT");
+  return { transitioned: true, idempotent: false, reason: "MEDIA_SCAN_STARTED" };
+}
+
+export async function markScanFailed(jobId: number, failureReason: string, now = new Date()) {
+  if (!Number.isInteger(jobId) || jobId <= 0) throw new Error("MEDIA_SCANNER_JOB_ID_INVALID");
+  return recordMediaScannerDispatchResult({ jobId, accepted: false, reason: failureReason, now });
+}
+
+/** Internal-only lookup. Its storage key must only be used to mint a short-lived
+ * signed URL after router-level MFA proof; it is never returned to the client. */
+export async function getMediaForReviewerAccess(input: {
+  mediaClass: MediaScannerMediaClass;
+  mediaId: string;
+  reviewerId: number;
+}): Promise<{ storageKey: string; quarantineStatus: MediaQuarantineStatus; providerId: number } | null> {
+  if (input.mediaClass !== "provider_document" || !await hasActiveProviderDocumentReviewerPermission(input.reviewerId)) return null;
+  const documentId = Number(input.mediaId);
+  if (!Number.isInteger(documentId) || documentId <= 0) return null;
+  const database = await getDb();
+  if (!database) return null;
+  const document = (await database.select({
+    storageKey: providerDocuments.storageKey,
+    quarantineStatus: providerDocuments.quarantineStatus,
+    providerId: providerDocuments.providerId,
+    contentPurgedAt: providerDocuments.contentPurgedAt,
+  }).from(providerDocuments).where(eq(providerDocuments.id, documentId)).limit(1))[0] ?? null;
+  if (!document || document.contentPurgedAt || !document.storageKey || document.quarantineStatus !== "scan_failed") return null;
+  return { storageKey: document.storageKey, quarantineStatus: document.quarantineStatus, providerId: document.providerId };
+}
+
+/** A scanner failure can be manually released only after two distinct reviewers
+ * submit a reasoned approval. This remains exceptional and audit-logged. */
+export async function recordDualReviewerManualCleanApproval(input: {
+  documentId: number;
+  reviewerUserId: number;
+  rationale: string;
+  now?: Date;
+}): Promise<{ status: "awaiting_second_reviewer" | "released" | "not_eligible" }> {
+  const rationale = input.rationale.trim().slice(0, 1_000);
+  if (!Number.isInteger(input.documentId) || input.documentId <= 0 || !rationale) throw new Error("MEDIA_MANUAL_REMEDIATION_INPUT_INVALID");
+  if (!await hasActiveProviderDocumentReviewerPermission(input.reviewerUserId)) throw new Error("MEDIA_REVIEWER_PERMISSION_REQUIRED");
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const now = input.now ?? new Date();
+  const result = await database.transaction(async (tx) => {
+    const document = (await tx.select({ sha256: providerDocuments.sha256, quarantineStatus: providerDocuments.quarantineStatus })
+      .from(providerDocuments).where(eq(providerDocuments.id, input.documentId)).limit(1))[0] ?? null;
+    if (!document || document.quarantineStatus !== "scan_failed") return { status: "not_eligible" as const };
+    await tx.insert(mediaScannerManualReviews).values({
+      mediaClass: "provider_document", mediaId: String(input.documentId), reviewerUserId: input.reviewerUserId,
+      decision: "approve_clean", rationale, createdAt: now,
+    }).onDuplicateKeyUpdate({ set: { rationale, createdAt: now } });
+    const approvals = await tx.select({ reviewerUserId: mediaScannerManualReviews.reviewerUserId }).from(mediaScannerManualReviews)
+      .where(and(eq(mediaScannerManualReviews.mediaClass, "provider_document"), eq(mediaScannerManualReviews.mediaId, String(input.documentId))));
+    if (new Set(approvals.map((approval) => approval.reviewerUserId)).size < 2) return { status: "awaiting_second_reviewer" as const };
+    const mediaUpdate = await tx.update(providerDocuments).set({ quarantineStatus: "clean", quarantineReason: "MEDIA_MANUAL_DUAL_REVIEW_APPROVED", scannedAt: now, releasedAt: now })
+      .where(and(eq(providerDocuments.id, input.documentId), eq(providerDocuments.quarantineStatus, "scan_failed")));
+    if (Number(mediaUpdate[0].affectedRows) !== 1) return { status: "not_eligible" as const };
+    await tx.update(mediaScannerJobs).set({ status: "completed", outcome: "clean", outcomeReason: "MEDIA_MANUAL_DUAL_REVIEW_APPROVED", completedAt: now, scanCompletedAt: now, operationalReviewRequired: 0 })
+      .where(and(eq(mediaScannerJobs.mediaClass, "provider_document"), eq(mediaScannerJobs.mediaId, String(input.documentId)), eq(mediaScannerJobs.sha256, document.sha256), eq(mediaScannerJobs.status, "scan_failed")));
+    return { status: "released" as const };
+  });
+  await logOperationEvent({
+    eventType: result.status === "released" ? "media_manual_dual_review_released" : "media_manual_review_recorded",
+    severity: result.status === "released" ? "warning" : "info",
+    subjectId: input.documentId,
+    actorId: input.reviewerUserId,
+    payload: { mediaClass: "provider_document", manualRemediationStatus: result.status, rationalePresent: true },
+  });
+  return result;
 }
 
 export type ClaimedMediaScannerJob = {
@@ -3848,12 +4081,81 @@ export async function claimNextMediaScannerJob(now = new Date()): Promise<Claime
       .orderBy(mediaScannerJobs.nextAttemptAt, mediaScannerJobs.id)
       .limit(1))[0] ?? null;
     if (!candidate) return null;
+    const isRetry = candidate.status === "retry_scheduled";
+    if (isRetry) {
+      const retry = decideMediaScannerRetryTransition("scan_failed", candidate.retryCount, candidate.maxRetries);
+      if (!retry.allowed) {
+        const terminal = await tx.update(mediaScannerJobs).set({
+          status: "scan_failed",
+          scanCompletedAt: now,
+          scanFailureReason: retry.reason,
+          operationalReviewRequired: 1,
+        }).where(and(eq(mediaScannerJobs.id, candidate.id), eq(mediaScannerJobs.status, "retry_scheduled")));
+        if (Number(terminal[0].affectedRows) !== 1) return null;
+        return null;
+      }
+    }
+
+    const pendingSource = isRetry ? "scan_failed" : "pending_scan";
+    const startTransition = decideMediaScannerTransition("pending_scan", "scanning");
+    if (!startTransition.allowed) throw new Error("MEDIA_SCAN_START_POLICY_CONFLICT");
+    const numericMediaId = Number(candidate.mediaId);
+    const mediaIdIsNumeric = Number.isInteger(numericMediaId) && numericMediaId > 0;
+    let mediaAffectedRows = 0;
+    const markPending = async () => {
+      if (!isRetry) return 1;
+      if (candidate.mediaClass === "provider_document" && mediaIdIsNumeric) {
+        const result = await tx.update(providerDocuments).set({ quarantineStatus: "pending_scan", quarantineReason: "MEDIA_SCAN_RETRY_QUEUED" })
+          .where(and(eq(providerDocuments.id, numericMediaId), eq(providerDocuments.sha256, candidate.sha256), eq(providerDocuments.quarantineStatus, "scan_failed")));
+        return Number(result[0].affectedRows);
+      }
+      if (candidate.mediaClass === "service_request_media") {
+        const result = await tx.update(serviceRequestMedia).set({ quarantineStatus: "pending_scan", quarantineReason: "MEDIA_SCAN_RETRY_QUEUED" })
+          .where(and(eq(serviceRequestMedia.publicId, candidate.mediaId), eq(serviceRequestMedia.sha256, candidate.sha256), eq(serviceRequestMedia.quarantineStatus, "scan_failed")));
+        return Number(result[0].affectedRows);
+      }
+      if (candidate.mediaClass === "voice_message" && mediaIdIsNumeric) {
+        const result = await tx.update(messages).set({ quarantineStatus: "pending_scan", quarantineReason: "MEDIA_SCAN_RETRY_QUEUED" })
+          .where(and(eq(messages.id, numericMediaId), eq(messages.kind, "audio"), eq(messages.mediaSha256, candidate.sha256), eq(messages.quarantineStatus, "scan_failed")));
+        return Number(result[0].affectedRows);
+      }
+      if (candidate.mediaClass === "move_ai_draft_media") {
+        const result = await tx.update(moveAiDraftMedia).set({ quarantineStatus: "pending_scan", quarantineReason: "MEDIA_SCAN_RETRY_QUEUED" })
+          .where(and(eq(moveAiDraftMedia.opaqueId, candidate.mediaId), eq(moveAiDraftMedia.sha256, candidate.sha256), eq(moveAiDraftMedia.quarantineStatus, "scan_failed")));
+        return Number(result[0].affectedRows);
+      }
+      return 0;
+    };
+    if (await markPending() !== 1) throw new Error("MEDIA_SCAN_RETRY_MEDIA_STATE_CONFLICT");
+
+    if (candidate.mediaClass === "provider_document" && mediaIdIsNumeric) {
+      const result = await tx.update(providerDocuments).set({ quarantineStatus: "scanning", quarantineReason: null })
+        .where(and(eq(providerDocuments.id, numericMediaId), eq(providerDocuments.sha256, candidate.sha256), eq(providerDocuments.quarantineStatus, pendingSource === "scan_failed" ? "pending_scan" : "pending_scan")));
+      mediaAffectedRows = Number(result[0].affectedRows);
+    } else if (candidate.mediaClass === "service_request_media") {
+      const result = await tx.update(serviceRequestMedia).set({ quarantineStatus: "scanning", quarantineReason: null })
+        .where(and(eq(serviceRequestMedia.publicId, candidate.mediaId), eq(serviceRequestMedia.sha256, candidate.sha256), eq(serviceRequestMedia.quarantineStatus, "pending_scan")));
+      mediaAffectedRows = Number(result[0].affectedRows);
+    } else if (candidate.mediaClass === "voice_message" && mediaIdIsNumeric) {
+      const result = await tx.update(messages).set({ quarantineStatus: "scanning", quarantineReason: null })
+        .where(and(eq(messages.id, numericMediaId), eq(messages.kind, "audio"), eq(messages.mediaSha256, candidate.sha256), eq(messages.quarantineStatus, "pending_scan")));
+      mediaAffectedRows = Number(result[0].affectedRows);
+    } else if (candidate.mediaClass === "move_ai_draft_media") {
+      const result = await tx.update(moveAiDraftMedia).set({ quarantineStatus: "scanning", quarantineReason: null })
+        .where(and(eq(moveAiDraftMedia.opaqueId, candidate.mediaId), eq(moveAiDraftMedia.sha256, candidate.sha256), eq(moveAiDraftMedia.quarantineStatus, "pending_scan")));
+      mediaAffectedRows = Number(result[0].affectedRows);
+    }
+    if (mediaAffectedRows !== 1) throw new Error("MEDIA_SCAN_START_MEDIA_STATE_CONFLICT");
     const updated = await tx.update(mediaScannerJobs).set({
       status: "dispatched",
       deliveryAttempts: candidate.deliveryAttempts + 1,
       lastDispatchAt: now,
       nextAttemptAt: new Date(now.getTime() + 15 * 60 * 1_000),
       outcomeReason: null,
+      scanStartedAt: now,
+      scanCompletedAt: null,
+      scanFailureReason: null,
+      operationalReviewRequired: 0,
     }).where(and(
       eq(mediaScannerJobs.id, candidate.id),
       eq(mediaScannerJobs.status, candidate.status),
@@ -3877,7 +4179,7 @@ export async function recordMediaScannerDispatchResult(input: {
   scannerReference?: string;
   reason?: string;
   now?: Date;
-}): Promise<{ status: Extract<MediaScannerJobStatus, "dispatched" | "retry_scheduled" | "failed"> }> {
+}): Promise<{ status: Extract<MediaScannerJobStatus, "dispatched" | "retry_scheduled" | "scan_failed"> }> {
   if (!Number.isInteger(input.jobId) || input.jobId <= 0) throw new Error("MEDIA_SCANNER_JOB_ID_INVALID");
   const database = await getDb();
   if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
@@ -3894,11 +4196,55 @@ export async function recordMediaScannerDispatchResult(input: {
       if (Number(updated[0].affectedRows) !== 1) throw new Error("MEDIA_SCANNER_JOB_UPDATE_CONFLICT");
       return { status: "dispatched" as const, mediaClass: job.mediaClass, mediaId: job.mediaId };
     }
-    const failure = decideMediaScannerDispatchFailure(job.deliveryAttempts, now);
+    const failure = decideMediaScannerDispatchFailure(job.deliveryAttempts, job.maxRetries, now);
+    const failureReason = input.reason?.trim().slice(0, 500) || failure.reason;
+    const numericMediaId = Number(job.mediaId);
+    const mediaIdIsNumeric = Number.isInteger(numericMediaId) && numericMediaId > 0;
+    let mediaUpdated = 0;
+    if (job.mediaClass === "provider_document" && mediaIdIsNumeric) {
+      const result = await tx.update(providerDocuments).set({
+        quarantineStatus: "scan_failed",
+        quarantineReason: failureReason,
+        scannedAt: now,
+        releasedAt: null,
+      }).where(and(eq(providerDocuments.id, numericMediaId), eq(providerDocuments.sha256, job.sha256), eq(providerDocuments.quarantineStatus, "scanning")));
+      mediaUpdated = Number(result[0].affectedRows);
+    } else if (job.mediaClass === "service_request_media") {
+      const result = await tx.update(serviceRequestMedia).set({
+        quarantineStatus: "scan_failed",
+        quarantineReason: failureReason,
+        scannedAt: now,
+        releasedAt: null,
+      }).where(and(eq(serviceRequestMedia.publicId, job.mediaId), eq(serviceRequestMedia.sha256, job.sha256), eq(serviceRequestMedia.quarantineStatus, "scanning")));
+      mediaUpdated = Number(result[0].affectedRows);
+    } else if (job.mediaClass === "voice_message" && mediaIdIsNumeric) {
+      const result = await tx.update(messages).set({
+        quarantineStatus: "scan_failed",
+        quarantineReason: failureReason,
+        scannedAt: now,
+        releasedAt: null,
+      }).where(and(eq(messages.id, numericMediaId), eq(messages.kind, "audio"), eq(messages.mediaSha256, job.sha256), eq(messages.quarantineStatus, "scanning")));
+      mediaUpdated = Number(result[0].affectedRows);
+    } else if (job.mediaClass === "move_ai_draft_media") {
+      const result = await tx.update(moveAiDraftMedia).set({
+        quarantineStatus: "scan_failed",
+        quarantineReason: failureReason,
+        scannedAt: now,
+        releasedAt: null,
+      }).where(and(eq(moveAiDraftMedia.opaqueId, job.mediaId), eq(moveAiDraftMedia.sha256, job.sha256), eq(moveAiDraftMedia.quarantineStatus, "scanning")));
+      mediaUpdated = Number(result[0].affectedRows);
+    }
+    if (mediaUpdated !== 1) throw new Error("MEDIA_SCAN_FAILURE_MEDIA_STATE_CONFLICT");
     const updated = await tx.update(mediaScannerJobs).set({
       status: failure.nextStatus,
       nextAttemptAt: failure.nextAttemptAt ?? now,
-      outcomeReason: input.reason?.trim().slice(0, 500) || failure.reason,
+      outcome: failure.nextStatus === "scan_failed" ? "scan_failed" : null,
+      outcomeReason: failureReason,
+      completedAt: failure.nextStatus === "scan_failed" ? now : null,
+      scanCompletedAt: now,
+      retryCount: failure.retryCount,
+      scanFailureReason: failureReason,
+      operationalReviewRequired: failure.operationalReviewRequired ? 1 : 0,
     }).where(and(
       eq(mediaScannerJobs.id, job.id),
       eq(mediaScannerJobs.status, "dispatched"),
@@ -3906,7 +4252,7 @@ export async function recordMediaScannerDispatchResult(input: {
     if (Number(updated[0].affectedRows) !== 1) throw new Error("MEDIA_SCANNER_JOB_UPDATE_CONFLICT");
     return { status: failure.nextStatus, mediaClass: job.mediaClass, mediaId: job.mediaId };
   });
-  if (result.status === "failed") {
+  if (result.status === "scan_failed") {
     await logOperationEvent({
       eventType: "media_scanner_job_dead_letter",
       severity: "warning",

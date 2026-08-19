@@ -4,6 +4,7 @@ export type ProviderDocumentReviewAccessInput = {
   quarantineStatus: string | null;
   contentPurgedAt: Date | null;
   storageKey: string | null;
+  purpose?: "review_clean" | "remediate_scan_failure";
 };
 
 export type ProviderDocumentReviewAccessDecision =
@@ -27,7 +28,10 @@ export function decideProviderDocumentReviewAccess(
 ): ProviderDocumentReviewAccessDecision {
   if (!input.hasReviewerPermission) return { allowed: false, code: "REVIEWER_PERMISSION_REQUIRED" };
   if (!input.mfaReauthenticated) return { allowed: false, code: "MFA_REAUTH_REQUIRED" };
-  if (input.quarantineStatus !== "clean") return { allowed: false, code: "DOCUMENT_NOT_CLEAN" };
+  const purpose = input.purpose ?? "review_clean";
+  const permittedQuarantineState = input.quarantineStatus === "clean"
+    || (input.quarantineStatus === "scan_failed" && purpose === "remediate_scan_failure");
+  if (!permittedQuarantineState) return { allowed: false, code: "DOCUMENT_NOT_CLEAN" };
   if (input.contentPurgedAt || !input.storageKey) return { allowed: false, code: "DOCUMENT_CONTENT_UNAVAILABLE" };
   return { allowed: true };
 }

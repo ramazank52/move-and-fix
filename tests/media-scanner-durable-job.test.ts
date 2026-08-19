@@ -5,7 +5,7 @@ import {
 } from "../server/security/MediaScannerJobQueue";
 import {
   decideMediaScannerDispatchFailure,
-  MEDIA_SCANNER_MAX_DISPATCH_ATTEMPTS,
+  MEDIA_SCANNER_DEFAULT_MAX_RETRIES,
 } from "../server/security/MediaScannerDispatchPolicy";
 import type { MediaScannerMediaClass } from "../server/security/MediaQuarantinePolicy";
 
@@ -40,6 +40,12 @@ describe("durable media scanner job contract", () => {
       outcome: null,
       outcomeReason: null,
       completedAt: null,
+      scanStartedAt: null,
+      scanCompletedAt: null,
+      retryCount: 0,
+      scanFailureReason: null,
+      maxRetries: 3,
+      operationalReviewRequired: 0,
     });
   });
 
@@ -58,8 +64,8 @@ describe("durable media scanner job contract", () => {
     })).toThrow("MEDIA_SCANNER_JOB_DIGEST_INVALID");
   });
 
-  it("completes only durably queued jobs and makes exact scanner callback replays idempotent", () => {
-    expect(decideMediaScannerJobCompletion("queued", "clean")).toMatchObject({
+  it("completes only actively dispatched jobs and makes exact scanner callback replays idempotent", () => {
+    expect(decideMediaScannerJobCompletion("dispatched", "clean")).toMatchObject({
       allowed: true,
       idempotent: false,
       nextStatus: "completed",
@@ -70,21 +76,23 @@ describe("durable media scanner job contract", () => {
       nextStatus: "completed",
     });
     expect(decideMediaScannerJobCompletion("completed", "blocked")).toMatchObject({ allowed: false });
-    expect(decideMediaScannerJobCompletion("failed", "clean")).toMatchObject({ allowed: false });
+    expect(decideMediaScannerJobCompletion("scan_failed", "clean")).toMatchObject({ allowed: false });
   });
 
   it("uses bounded exponential retry and dead-letters a repeatedly unavailable scanner without releasing media", () => {
     const now = new Date("2026-08-18T00:00:00.000Z");
-    expect(decideMediaScannerDispatchFailure(1, now)).toMatchObject({
+    expect(decideMediaScannerDispatchFailure(1, MEDIA_SCANNER_DEFAULT_MAX_RETRIES, now)).toMatchObject({
       nextStatus: "retry_scheduled",
       reason: "MEDIA_SCANNER_RETRY_SCHEDULED",
       nextAttemptAt: new Date("2026-08-18T00:00:05.000Z"),
     });
-    expect(decideMediaScannerDispatchFailure(MEDIA_SCANNER_MAX_DISPATCH_ATTEMPTS, now)).toEqual({
-      nextStatus: "failed",
+    expect(decideMediaScannerDispatchFailure(4, MEDIA_SCANNER_DEFAULT_MAX_RETRIES, now)).toEqual({
+      nextStatus: "scan_failed",
       nextAttemptAt: null,
-      reason: "MEDIA_SCANNER_DEAD_LETTER",
+      reason: "MEDIA_SCANNER_OPERATIONAL_REVIEW_REQUIRED",
+      retryCount: 3,
+      operationalReviewRequired: true,
     });
-    expect(() => decideMediaScannerDispatchFailure(0, now)).toThrow("MEDIA_SCANNER_DISPATCH_ATTEMPTS_INVALID");
+    expect(() => decideMediaScannerDispatchFailure(0, MEDIA_SCANNER_DEFAULT_MAX_RETRIES, now)).toThrow("MEDIA_SCANNER_DISPATCH_ATTEMPTS_INVALID");
   });
 });

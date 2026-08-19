@@ -31,7 +31,10 @@ import { createCompletionAutoReleaseResponse } from "./completion-auto-release-r
 import * as db from "../db";
 import { runFinancialReconciliation } from "../payments/FinancialReconciliationService";
 import { errorMiddleware, logger, requestLoggingMiddleware } from "./errorHandler";
-import { verifyMediaScannerCallbackSignature } from "../security/MediaScannerCallbackSecurity";
+import {
+  parseFreshMediaScannerCallbackContext,
+  verifyMediaScannerCallbackSignature,
+} from "../security/MediaScannerCallbackSecurity";
 import { dispatchOneMediaScannerJob } from "../security/MediaScannerDispatchService";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -153,7 +156,7 @@ export async function createApp() {
       reason: typeof body.reason === "string" ? body.reason : undefined,
     };
     const validClass = ["provider_document", "service_request_media", "voice_message", "move_ai_draft_media"].includes(payload.mediaClass);
-    const validOutcome = payload.outcome === "clean" || payload.outcome === "blocked";
+    const validOutcome = payload.outcome === "clean" || payload.outcome === "blocked" || payload.outcome === "scan_failed";
     const validId = typeof payload.mediaId === "string" && payload.mediaId.length > 0 && payload.mediaId.length <= 96;
     const validHash = typeof payload.sha256 === "string" && /^[a-f0-9]{64}$/i.test(payload.sha256);
     const validReason = payload.reason === undefined || payload.reason.length <= 500;
@@ -164,7 +167,20 @@ export async function createApp() {
     const signature = typeof req.header("x-media-scanner-signature") === "string"
       ? req.header("x-media-scanner-signature")
       : undefined;
-    if (!verifyMediaScannerCallbackSignature({ secret: configuredSecret, signature, payload })) {
+    const timestamp = req.header("x-media-scanner-timestamp") ?? undefined;
+    const nonce = req.header("x-media-scanner-nonce") ?? undefined;
+    const callbackContext = parseFreshMediaScannerCallbackContext({ timestamp, nonce });
+    if (!callbackContext.valid) {
+      res.status(401).json({ error: callbackContext.reason });
+      return;
+    }
+    if (!verifyMediaScannerCallbackSignature({
+      secret: configuredSecret,
+      previousSecret: ENV.mediaScannerCallbackPreviousSecret,
+      signature,
+      payload,
+      context: callbackContext.context,
+    })) {
       res.status(401).json({ error: "INVALID_MEDIA_SCANNER_SIGNATURE" });
       return;
     }
@@ -175,6 +191,7 @@ export async function createApp() {
         sha256: payload.sha256,
         outcome: payload.outcome,
         reason: payload.reason,
+        callbackNonce: callbackContext.context.nonce,
       });
       if (!result.accepted) {
         res.status(409).json({ error: result.reason });

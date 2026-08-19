@@ -6,6 +6,8 @@ vi.mock("../server/db", () => ({
   hasActiveSuperAdminRole: vi.fn(),
   hasActiveProviderDocumentReviewerPermission: vi.fn(),
   getProviderDocumentById: vi.fn(),
+  getMediaForReviewerAccess: vi.fn(),
+  recordDualReviewerManualCleanApproval: vi.fn(),
   logOperationEvent: vi.fn(),
   grantProviderDocumentReviewerPermission: vi.fn(),
   revokeProviderDocumentReviewerPermission: vi.fn(),
@@ -101,5 +103,34 @@ describe("provider document reviewer router", () => {
       .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(storageGetSignedUrl).not.toHaveBeenCalled();
     expect(db.logOperationEvent).not.toHaveBeenCalled();
+  });
+
+  it("permits a scan-failed document only through the MFA + grant remediation path and keeps its URL short-lived", async () => {
+    vi.mocked(db.hasActiveProviderDocumentReviewerPermission).mockResolvedValue(true);
+    vi.mocked(db.getProviderDocumentById).mockResolvedValue({ ...cleanDocument, quarantineStatus: "scan_failed" } as never);
+    vi.mocked(db.getMediaForReviewerAccess).mockResolvedValue({
+      storageKey: "private/remediation/opaque-41", quarantineStatus: "scan_failed", providerId: 77,
+    } as never);
+    vi.mocked(storageGetSignedUrl).mockResolvedValue("https://signed.example.test/remediation/opaque-41");
+    const caller = appRouter.createCaller(createAdminContext());
+
+    await expect(caller.reviewerDocuments.getDocumentAccess({ documentId: 41 }))
+      .resolves.toEqual({ url: "https://signed.example.test/remediation/opaque-41", expiresInSeconds: 60 });
+    expect(db.getMediaForReviewerAccess).toHaveBeenCalledWith({ mediaClass: "provider_document", mediaId: "41", reviewerId: 901 });
+    expect(storageGetSignedUrl).toHaveBeenCalledWith("private/remediation/opaque-41", { expiresInSeconds: 60 });
+    expect(db.logOperationEvent).toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({ remediation: true, signedUrlTtlSeconds: 60 }),
+    }));
+  });
+
+  it("requires MFA and delegates a reasoned manual clean approval to the dual-review data boundary", async () => {
+    vi.mocked(db.recordDualReviewerManualCleanApproval).mockResolvedValue({ status: "awaiting_second_reviewer" } as never);
+    const caller = appRouter.createCaller(createAdminContext());
+
+    await expect(caller.reviewerDocuments.submitManualCleanApproval({ documentId: 41, rationale: "Scanner interruption was independently reviewed." }))
+      .resolves.toEqual({ status: "awaiting_second_reviewer" });
+    expect(db.recordDualReviewerManualCleanApproval).toHaveBeenCalledWith({
+      documentId: 41, reviewerUserId: 901, rationale: "Scanner interruption was independently reviewed.",
+    });
   });
 });

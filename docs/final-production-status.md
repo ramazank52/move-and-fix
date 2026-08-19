@@ -173,3 +173,22 @@ P13 ayrıca chat list/detail DTO’larında e-posta PII sızıntısını testle 
 | High dependency audit | **C — NO-GO external gate**; Expo SDK 54/Metro transitif `postcss@8.4.49` advisory’si sürüyor |
 
 **P14 durumu:** Uygulanabilir internal residual kapsam **B — CONDITIONAL GO**; canlı production deployment **C — NO-GO**. Gerçek ödeme, scanner, SMS/e-posta/push, proxy communication ve APM credential’ları; DNS/HTTPS; onaylı İngilizce privacy metni; fiziksel cihaz E2E ve Expo/Metro toolchain advisory remediation’ı dış release gate olarak açıktır. Ayrıntılı kanıt: [P14 final change report](./compliance/P14_FINAL_CHANGE_REPORT.md) ve [P14 dependency audit gate](./compliance/P14_DEPENDENCY_AUDIT_GATE.md).
+
+---
+
+## P15 FINAL CLOSURE — 20 Ağustos 2026 Eki
+
+**Baseline:** `0003661c` (P14 FINAL). P15; malware scanner yaşam döngüsünü `pending_scan → scanning → clean/blocked/scan_failed` olarak genişletti; callback HMAC/timestamp/nonce/replay kontrolleri, kalıcı callback receipt, bounded üç retry, operasyon inceleme kuyruğu ve iki-reviewer manual remediation kaydını `0074` ile ekledi. TR/EN legal manifest version/hash/re-consent metadata’sı ve default-off ayrı marketing preference ledger’ı eklendi; eksik gerçek şirket/hukuk bilgisi `LEGAL_*_REQUIRED` placeholder’larıyla release-blocker olarak kaldı. Encryption payload’ları versioned AES-256-GCM formatına geçirildi, controlled key/callback-secret rotation, PII/callback/storage-key log redaction ve P15 authorization/MoveAI/country gate negatif regresyonları tamamlandı.
+
+| P15 kalite kapısı | Sonuç |
+|---|---:|
+| Tam regresyon | **PASS — 108 dosya / 650 test** |
+| TypeScript / lint / backend build | **PASS / PASS / PASS** (`dist/index.js` 895.0 kB) |
+| iOS / Android / web export | **PASS / PASS / PASS** |
+| Expo Doctor | **PASS — 18/18** |
+| Migration integrity | **PASS — 70 SQL / 70 journal** |
+| Source secret scan / whitespace | **PASS — 0 eşleşme / temiz** |
+| License / SBOM | **PASS — 1,026 paket / CycloneDX 1.6, 1,292 bom-ref** |
+| `pnpm audit --audit-level=high` | **C — NO-GO external gate — 7 moderate / 4 high**; Expo/Metro transitif PostCSS/image-size |
+
+**P15 durumu:** Uygulanabilir iç kod, test ve platform export kapsamı **A — INTERNAL READY**; canlı production deployment **C — NO-GO**. High SCA gate, onaylı hukuk metinleri/şirket kimliği, gerçek scanner/ödeme/iletişim/APM credential’ları, production DNS/HTTPS ve fiziksel cihaz E2E hâlâ dış release gate’tir. Ayrıntılı kanıt: [P15 Faz 1](./compliance/P15_PHASE1_MALWARE_SCANNER_CLOSURE.md), [Faz 2](./compliance/P15_PHASE2_DEPENDENCY_GATE.md), [Faz 3](./compliance/P15_PHASE3_LEGAL_PRIVACY_CLOSURE.md), [Faz 4](./compliance/P15_PHASE4_SECURITY_OPERATIONS_CLOSURE.md) ve [Final Quality Evidence](./compliance/P15_FINAL_QUALITY_EVIDENCE.md).

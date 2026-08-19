@@ -14,7 +14,7 @@ export type ApmDeliveryResult =
   | { delivered: true }
   | { delivered: false; reason: "NOT_CONFIGURED" | "UNAVAILABLE" | "REJECTED" };
 
-const sensitiveKeyPattern = /authorization|cookie|password|passcode|token|secret|api[_-]?key|email|phone|iban|card|cvv|address/i;
+const sensitiveKeyPattern = /authorization|cookie|password|passcode|token|secret|api[_-]?key|signature|nonce|email|phone|iban|card|cvv|address|storage[_-]?key|object[_-]?key|file[_-]?path/i;
 const bearerPattern = /\b(?:bearer|basic)\s+[a-z0-9._~+/=-]+/gi;
 const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const phonePattern = /(?:\+?90|0)?\s*5\d{2}[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}/g;

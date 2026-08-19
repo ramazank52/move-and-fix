@@ -271,10 +271,27 @@ export class InputSanitizer {
  */
 export class EncryptionService {
   private algorithm = 'aes-256-gcm';
-  private encryptionKey: Buffer;
+  private encryptionKeys: Map<string, Buffer>;
+  private activeKeyVersion: string;
 
-  constructor(encryptionKeyMaterial = resolveEncryptionKey()) {
-    this.encryptionKey = crypto.createHash('sha256').update(encryptionKeyMaterial).digest();
+  constructor(
+    encryptionKeyMaterial = resolveEncryptionKey(),
+    options: {
+      keyVersion?: string;
+      previousKeyMaterial?: string;
+      previousKeyVersion?: string;
+    } = {},
+  ) {
+    this.activeKeyVersion = normalizeEncryptionKeyVersion(options.keyVersion ?? process.env.ENCRYPTION_KEY_VERSION ?? 'v1');
+    this.encryptionKeys = new Map([[this.activeKeyVersion, deriveEncryptionKey(encryptionKeyMaterial)]]);
+    const previousKeyMaterial = options.previousKeyMaterial ?? process.env.ENCRYPTION_KEY_PREVIOUS?.trim();
+    const previousKeyVersion = options.previousKeyVersion ?? process.env.ENCRYPTION_KEY_PREVIOUS_VERSION?.trim();
+    if (previousKeyMaterial || previousKeyVersion) {
+      if (!previousKeyMaterial || !previousKeyVersion) throw new Error('ENCRYPTION_ROTATION_CONFIGURATION_INVALID');
+      const version = normalizeEncryptionKeyVersion(previousKeyVersion);
+      if (version === this.activeKeyVersion) throw new Error('ENCRYPTION_ROTATION_CONFIGURATION_INVALID');
+      this.encryptionKeys.set(version, deriveEncryptionKey(previousKeyMaterial));
+    }
   }
 
   /**
@@ -282,7 +299,7 @@ export class EncryptionService {
    */
   encrypt(plaintext: string): string {
     const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(this.algorithm, this.encryptionKey, iv);
+    const cipher = crypto.createCipheriv(this.algorithm, this.requireKey(this.activeKeyVersion), iv);
 
     let encrypted = cipher.update(plaintext, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -290,7 +307,7 @@ export class EncryptionService {
     // GCM mode için auth tag
     const authTag = (cipher as any).getAuthTag?.() || Buffer.alloc(0);
 
-    return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+    return `${this.activeKeyVersion}:${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   }
 
   /**
@@ -298,14 +315,20 @@ export class EncryptionService {
    */
   decrypt(ciphertext: string): string {
     const parts = ciphertext.split(':');
-    const iv = Buffer.from(parts[0], 'hex');
-    const authTag = Buffer.from(parts[1], 'hex');
-    const encrypted = parts[2];
-
-    const decipher = crypto.createDecipheriv(this.algorithm, this.encryptionKey, iv);
-    if (authTag.length > 0) {
-      (decipher as any).setAuthTag?.(authTag);
+    const isLegacyPayload = parts.length === 3;
+    if (!isLegacyPayload && parts.length !== 4) throw new Error('ENCRYPTED_PAYLOAD_INVALID');
+    const [keyVersion, ivHex, authTagHex, encrypted] = isLegacyPayload
+      ? [this.activeKeyVersion, parts[0], parts[1], parts[2]]
+      : parts;
+    if (!ivHex || !authTagHex || !encrypted || !/^[a-f0-9]+$/i.test(ivHex) || !/^[a-f0-9]+$/i.test(authTagHex)) {
+      throw new Error('ENCRYPTED_PAYLOAD_INVALID');
     }
+    const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
+    if (iv.length !== 16 || authTag.length !== 16) throw new Error('ENCRYPTED_PAYLOAD_INVALID');
+
+    const decipher = crypto.createDecipheriv(this.algorithm, this.requireKey(normalizeEncryptionKeyVersion(keyVersion)), iv);
+    (decipher as any).setAuthTag?.(authTag);
 
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
@@ -326,6 +349,22 @@ export class EncryptionService {
   generateToken(length: number = 32): string {
     return crypto.randomBytes(length).toString('hex');
   }
+
+  private requireKey(version: string): Buffer {
+    const key = this.encryptionKeys.get(version);
+    if (!key) throw new Error('ENCRYPTION_KEY_VERSION_UNAVAILABLE');
+    return key;
+  }
+}
+
+function deriveEncryptionKey(keyMaterial: string): Buffer {
+  return crypto.createHash('sha256').update(keyMaterial).digest();
+}
+
+function normalizeEncryptionKeyVersion(value: string): string {
+  const version = value.trim();
+  if (!/^[A-Za-z0-9._-]{1,32}$/.test(version)) throw new Error('ENCRYPTION_KEY_VERSION_INVALID');
+  return version;
 }
 
 /**

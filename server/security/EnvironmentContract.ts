@@ -12,10 +12,19 @@ type EnvironmentDefinition = {
 };
 
 const DEFINITIONS = {
+  encryptionKey: { canonicalName: "ENCRYPTION_KEY" },
+  encryptionKeyVersion: { canonicalName: "ENCRYPTION_KEY_VERSION" },
+  encryptionPreviousKey: { canonicalName: "ENCRYPTION_KEY_PREVIOUS" },
+  encryptionPreviousKeyVersion: { canonicalName: "ENCRYPTION_KEY_PREVIOUS_VERSION" },
   mediaScannerCallbackSecret: {
     canonicalName: "MEDIA_SCANNER_CALLBACK_SECRET",
     aliases: ["MEDIA_SCANNER_WEBHOOK_SECRET"],
   },
+  mediaScannerCallbackPreviousSecret: { canonicalName: "MEDIA_SCANNER_CALLBACK_PREVIOUS_SECRET" },
+  mediaScannerSubmissionApiKey: { canonicalName: "MEDIA_SCANNER_SUBMISSION_API_KEY" },
+  documentRetentionCronSecret: { canonicalName: "DOCUMENT_RETENTION_CRON_SECRET" },
+  apmEndpoint: { canonicalName: "APM_ENDPOINT" },
+  apmApiKey: { canonicalName: "APM_API_KEY" },
   netgsmUsername: { canonicalName: "NETGSM_USERNAME" },
   netgsmPassword: { canonicalName: "NETGSM_PASSWORD" },
   netgsmMsgHeader: {
@@ -130,6 +139,11 @@ export function validateEnvironmentContract(env: EnvironmentRecord = process.env
   recordPartialConfiguration(issues, "PROXY_COMM", [
     values.proxyCommProviderBaseUrl,
     values.proxyCommProviderApiKey,
+  ]);
+  recordPartialConfiguration(issues, "APM", [values.apmEndpoint, values.apmApiKey]);
+  recordPartialConfiguration(issues, "ENCRYPTION_ROTATION", [
+    values.encryptionPreviousKey,
+    values.encryptionPreviousKeyVersion,
   ]);
 
   return {

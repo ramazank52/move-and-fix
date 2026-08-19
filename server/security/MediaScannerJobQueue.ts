@@ -6,7 +6,7 @@ export const mediaScannerJobStatuses = [
   "retry_scheduled",
   "completed",
   "blocked",
-  "failed",
+  "scan_failed",
 ] as const;
 
 export type MediaScannerJobStatus = (typeof mediaScannerJobStatuses)[number];
@@ -23,7 +23,10 @@ export type MediaScannerJobInput = {
   sha256: string;
   storageKey: string;
   now?: Date;
+  maxRetries?: number;
 };
+
+export const DEFAULT_MEDIA_SCANNER_MAX_RETRIES = 3;
 
 /**
  * Produces the durable outbox record that must accompany every quarantined
@@ -38,6 +41,8 @@ export function buildMediaScannerJob(input: MediaScannerJobInput) {
   if (!mediaId) throw new Error("MEDIA_SCANNER_JOB_MEDIA_ID_INVALID");
   if (!storageKey) throw new Error("MEDIA_SCANNER_JOB_STORAGE_KEY_INVALID");
   const now = input.now ?? new Date();
+  const maxRetries = input.maxRetries ?? DEFAULT_MEDIA_SCANNER_MAX_RETRIES;
+  if (!Number.isInteger(maxRetries) || maxRetries < 1 || maxRetries > 10) throw new Error("MEDIA_SCANNER_JOB_MAX_RETRIES_INVALID");
   return {
     mediaClass: input.mediaClass,
     mediaId,
@@ -51,6 +56,12 @@ export function buildMediaScannerJob(input: MediaScannerJobInput) {
     outcome: null,
     outcomeReason: null,
     completedAt: null,
+    scanStartedAt: null,
+    scanCompletedAt: null,
+    retryCount: 0,
+    scanFailureReason: null,
+    maxRetries,
+    operationalReviewRequired: 0,
   };
 }
 
@@ -63,7 +74,7 @@ export function decideMediaScannerJobCompletion(
   current: MediaScannerJobStatus,
   outcome: MediaScannerOutcome,
 ): { allowed: boolean; idempotent: boolean; nextStatus: MediaScannerJobStatus; reason: string } {
-  const expectedTerminal = outcome === "clean" ? "completed" : "blocked";
+  const expectedTerminal = outcome === "clean" ? "completed" : outcome === "blocked" ? "blocked" : "scan_failed";
   if (current === expectedTerminal) {
     return {
       allowed: true,
@@ -72,12 +83,16 @@ export function decideMediaScannerJobCompletion(
       reason: "MEDIA_SCANNER_JOB_CALLBACK_IDEMPOTENT",
     };
   }
-  if (current === "queued" || current === "dispatched" || current === "retry_scheduled") {
+  if (current === "dispatched") {
     return {
       allowed: true,
       idempotent: false,
       nextStatus: expectedTerminal,
-      reason: outcome === "clean" ? "MEDIA_SCANNER_JOB_COMPLETED" : "MEDIA_SCANNER_JOB_BLOCKED",
+      reason: outcome === "clean"
+        ? "MEDIA_SCANNER_JOB_COMPLETED"
+        : outcome === "blocked"
+          ? "MEDIA_SCANNER_JOB_BLOCKED"
+          : "MEDIA_SCANNER_JOB_SCAN_FAILED",
     };
   }
   return {
@@ -86,4 +101,59 @@ export function decideMediaScannerJobCompletion(
     nextStatus: current,
     reason: "MEDIA_SCANNER_JOB_STATE_CONFLICT",
   };
+}
+
+/** Bounded exponential retry schedule. It never turns a failed scan clean. */
+export function decideMediaScannerJobFailure(input: {
+  current: MediaScannerJobStatus;
+  retryCount: number;
+  maxRetries: number;
+}): {
+  allowed: boolean;
+  nextStatus: MediaScannerJobStatus;
+  retryable: boolean;
+  operationalReviewRequired: boolean;
+  reason: string;
+} {
+  if (input.current !== "dispatched") {
+    return {
+      allowed: false,
+      nextStatus: input.current,
+      retryable: false,
+      operationalReviewRequired: false,
+      reason: "MEDIA_SCANNER_JOB_FAILURE_STATE_CONFLICT",
+    };
+  }
+  if (!Number.isInteger(input.retryCount) || !Number.isInteger(input.maxRetries) || input.retryCount < 0 || input.maxRetries < 1) {
+    return {
+      allowed: false,
+      nextStatus: input.current,
+      retryable: false,
+      operationalReviewRequired: false,
+      reason: "MEDIA_SCANNER_JOB_RETRY_METADATA_INVALID",
+    };
+  }
+  if (input.retryCount < input.maxRetries) {
+    return {
+      allowed: true,
+      nextStatus: "retry_scheduled",
+      retryable: true,
+      operationalReviewRequired: false,
+      reason: "MEDIA_SCANNER_JOB_RETRY_SCHEDULED",
+    };
+  }
+  return {
+    allowed: true,
+    nextStatus: "scan_failed",
+    retryable: false,
+    operationalReviewRequired: true,
+    reason: "MEDIA_SCANNER_JOB_OPERATIONAL_REVIEW_REQUIRED",
+  };
+}
+
+export function mediaScannerRetryDelayMs(retryCount: number): number {
+  if (!Number.isInteger(retryCount) || retryCount < 1 || retryCount > DEFAULT_MEDIA_SCANNER_MAX_RETRIES) {
+    throw new Error("MEDIA_SCANNER_RETRY_COUNT_INVALID");
+  }
+  return 60_000 * (2 ** (retryCount - 1));
 }

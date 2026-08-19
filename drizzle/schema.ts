@@ -702,7 +702,7 @@ export const providerDocuments = mysqlTable(
     sizeBytes: int("sizeBytes").notNull(),
     sha256: varchar("sha256", { length: 64 }).notNull(),
     status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
-    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "clean", "blocked", "expired"])
+    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "scanning", "clean", "blocked", "scan_failed", "expired"])
       .default("pending_scan")
       .notNull(),
     quarantineReason: varchar("quarantineReason", { length: 500 }),
@@ -1133,7 +1133,7 @@ export const serviceRequestMedia = mysqlTable(
     mimeType: varchar("mimeType", { length: 100 }).notNull(),
     sizeBytes: int("sizeBytes").notNull(),
     sha256: varchar("sha256", { length: 64 }).notNull(),
-    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "clean", "blocked", "expired"])
+    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "scanning", "clean", "blocked", "scan_failed", "expired"])
       .default("pending_scan")
       .notNull(),
     quarantineReason: varchar("quarantineReason", { length: 500 }),
@@ -1166,22 +1166,77 @@ export const mediaScannerJobs = mysqlTable(
     mediaId: varchar("mediaId", { length: 64 }).notNull(),
     sha256: varchar("sha256", { length: 64 }).notNull(),
     storageKey: varchar("storageKey", { length: 512 }).notNull(),
-    status: mysqlEnum("status", ["queued", "dispatched", "retry_scheduled", "completed", "blocked", "failed"])
+    status: mysqlEnum("status", ["queued", "dispatched", "retry_scheduled", "completed", "blocked", "scan_failed"])
       .default("queued")
       .notNull(),
     deliveryAttempts: int("deliveryAttempts").default(0).notNull(),
     lastDispatchAt: timestamp("lastDispatchAt"),
     nextAttemptAt: timestamp("nextAttemptAt").defaultNow().notNull(),
     scannerReference: varchar("scannerReference", { length: 191 }),
-    outcome: mysqlEnum("outcome", ["clean", "blocked"]),
+    outcome: mysqlEnum("outcome", ["clean", "blocked", "scan_failed"]),
     outcomeReason: varchar("outcomeReason", { length: 500 }),
     completedAt: timestamp("completedAt"),
+    scanStartedAt: timestamp("scanStartedAt"),
+    scanCompletedAt: timestamp("scanCompletedAt"),
+    retryCount: int("retryCount").default(0).notNull(),
+    scanFailureReason: varchar("scanFailureReason", { length: 512 }),
+    maxRetries: int("maxRetries").default(3).notNull(),
+    operationalReviewRequired: int("operationalReviewRequired").default(0).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   (table) => [
     uniqueIndex("media_scanner_jobs_media_unique").on(table.mediaClass, table.mediaId),
     index("media_scanner_jobs_claim_idx").on(table.status, table.nextAttemptAt, table.id),
+  ],
+);
+
+// A failed malware scan may never be manually released by a single person.
+// Two distinct MFA-reauthenticated reviewers leave immutable reasoned approvals;
+// only then may server-side remediation transition the exact media object clean.
+export const mediaScannerManualReviews = mysqlTable(
+  "media_scanner_manual_reviews",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    mediaClass: mysqlEnum("mediaClass", [
+      "provider_document",
+      "service_request_media",
+      "voice_message",
+      "move_ai_draft_media",
+    ]).notNull(),
+    mediaId: varchar("mediaId", { length: 64 }).notNull(),
+    reviewerUserId: int("reviewerUserId").notNull(),
+    decision: mysqlEnum("decision", ["approve_clean"]).notNull(),
+    rationale: varchar("rationale", { length: 1000 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("media_scanner_manual_reviews_unique").on(table.mediaClass, table.mediaId, table.reviewerUserId),
+    index("media_scanner_manual_reviews_target_idx").on(table.mediaClass, table.mediaId, table.createdAt),
+  ],
+);
+
+// A successful callback nonce may be acknowledged again but never processed
+// twice. The unique nonce also turns concurrent replay races into a no-op.
+export const mediaScannerCallbackReceipts = mysqlTable(
+  "media_scanner_callback_receipts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    nonce: varchar("nonce", { length: 128 }).notNull(),
+    mediaClass: mysqlEnum("mediaClass", [
+      "provider_document",
+      "service_request_media",
+      "voice_message",
+      "move_ai_draft_media",
+    ]).notNull(),
+    mediaId: varchar("mediaId", { length: 64 }).notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    outcome: mysqlEnum("outcome", ["clean", "blocked", "scan_failed"]).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("media_scanner_callback_receipts_nonce_unique").on(table.nonce),
+    index("media_scanner_callback_receipts_target_idx").on(table.mediaClass, table.mediaId, table.createdAt),
   ],
 );
 
@@ -1398,7 +1453,7 @@ export const messages = mysqlTable(
     mediaSha256: varchar("mediaSha256", { length: 64 }),
     // Voice payloads are not playable until an external scanner records an
     // explicit clean result. Text messages remain unaffected.
-    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "clean", "blocked", "expired"])
+    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "scanning", "clean", "blocked", "scan_failed", "expired"])
       .default("pending_scan")
       .notNull(),
     quarantineReason: varchar("quarantineReason", { length: 500 }),
@@ -1625,7 +1680,7 @@ export const moveAiDraftMedia = mysqlTable(
     sha256: varchar("sha256", { length: 64 }).notNull(),
     // Staged MoveAI image/audio stays in quarantine until an authenticated
     // scanner callback releases it. Draft confirmation may only transfer clean media.
-    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "clean", "blocked", "expired"])
+    quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "scanning", "clean", "blocked", "scan_failed", "expired"])
       .default("pending_scan")
       .notNull(),
     quarantineReason: varchar("quarantineReason", { length: 500 }),

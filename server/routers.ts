@@ -29,6 +29,7 @@ import {
 import { eventService } from "./services/EventService";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { decideProviderDocumentReviewAccess } from "./compliance/ProviderDocumentReviewAccessPolicy";
+import { getLegalDocumentManifest, getLegalReleaseGate } from "./compliance/LegalDocumentCatalog";
 import * as pushStore from "./notifications/push-store";
 import { analyzeCompletionEvidence } from "./services/CompletionEvidenceAnalysisService";
 import {
@@ -486,6 +487,10 @@ export const appRouter = router({
   owner: ownerRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+    legalDocumentManifest: publicProcedure.query(() => ({
+      documents: getLegalDocumentManifest(),
+      releaseGate: getLegalReleaseGate(),
+    })),
     pendingLegalConsents: protectedProcedure.query(async ({ ctx }) => {
       return db.getOutstandingRequiredLegalConsents(ctx.user.id);
     }),
@@ -513,6 +518,16 @@ export const appRouter = router({
         })));
         return { recorded: outstanding.length };
       }),
+    marketingConsent: protectedProcedure
+      .input(z.object({}).strict())
+      .query(({ ctx }) => db.getMarketingConsentPreference(ctx.user.id)),
+    setMarketingConsent: protectedProcedure
+      .input(z.object({ enabled: z.boolean() }).strict())
+      .mutation(async ({ ctx, input }) => db.setMarketingConsentPreference({
+        userId: ctx.user.id,
+        enabled: input.enabled,
+        source: "privacy_center_marketing_preference",
+      })),
     updateProfile: protectedProcedure
       .input(z.object({
         name: z.string().trim().min(2).max(120),
@@ -2580,12 +2595,20 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
         if (!document) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Profesyonel belgesi bulunamadı" });
         }
+        const remediationMedia = document.quarantineStatus === "scan_failed"
+          ? await db.getMediaForReviewerAccess({
+            mediaClass: "provider_document",
+            mediaId: String(document.id),
+            reviewerId,
+          })
+          : null;
         const access = decideProviderDocumentReviewAccess({
           hasReviewerPermission,
           mfaReauthenticated: true,
           quarantineStatus: document.quarantineStatus,
           contentPurgedAt: document.contentPurgedAt,
-          storageKey: document.storageKey,
+          storageKey: remediationMedia?.storageKey ?? document.storageKey,
+          purpose: remediationMedia ? "remediate_scan_failure" : "review_clean",
         });
         if (!access.allowed) {
           throw new TRPCError({
@@ -2594,7 +2617,7 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           });
         }
         try {
-          const url = await storageGetSignedUrl(document.storageKey, { expiresInSeconds: 60 });
+          const url = await storageGetSignedUrl(remediationMedia?.storageKey ?? document.storageKey, { expiresInSeconds: 60 });
           await db.logOperationEvent({
             eventType: "provider_document_access_granted",
             subjectId: document.id,
@@ -2603,6 +2626,7 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
               providerId: document.providerId,
               accessScope: "reviewer",
               mfaReauthenticated: true,
+              remediation: Boolean(remediationMedia),
               signedUrlTtlSeconds: 60,
             },
           });
@@ -2612,6 +2636,24 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
             code: "PRECONDITION_FAILED",
             message: "Belge içeriğine güvenli erişim şu anda yapılandırılmamış",
           });
+        }
+      }),
+    submitManualCleanApproval: adminMfaProcedure
+      .input(z.object({ documentId: z.number().int().positive(), rationale: z.string().trim().min(8).max(1_000) }))
+      .mutation(async ({ ctx, input }) => {
+        const reviewerId = ctx.user?.id;
+        if (!reviewerId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        try {
+          return await db.recordDualReviewerManualCleanApproval({
+            documentId: input.documentId,
+            reviewerUserId: reviewerId,
+            rationale: input.rationale,
+          });
+        } catch (error) {
+          if (error instanceof Error && error.message === "MEDIA_REVIEWER_PERMISSION_REQUIRED") {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem için ayrı reviewer yetkisi gerekli" });
+          }
+          throw error;
         }
       }),
     grantPermission: superAdminMfaProcedure

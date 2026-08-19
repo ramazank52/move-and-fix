@@ -573,3 +573,24 @@
 - [x] P14-15 — Staged email/phone verification lifecycle’ını gerçek backend akışıyla tamamla
 - [x] P14-17 — Package/sample/dead-code hygiene’ı doğrula ve güvenli temizliği uygula
 - [x] P14-18 — Dependency audit gate’ini doğrula, çözülebilen transitif riskleri kapat ve kalan gate’leri kaydet
+
+## P15 FINAL CLOSURE
+- [x] P15-05 — Malware scanner state machine’i `pending_scan → scanning → clean/blocked/scan_failed` yaşam döngüsüyle, bounded retry ve operasyon kuyruğuyla güçlendir
+- [x] P15-05 — Scanner callback HMAC, timestamp, nonce/replay, idempotency ve sıralama yarışı korumalarını uygula
+- [x] P15-05 — Reviewer erişim ve manuel remediation için MFA, ayrı grant, kısa ömürlü signed URL, gerekçe ve audit sözleşmesini doğrula
+- [x] P15-05 — Malware lifecycle unit, integration, authorization, hata ve edge-case regresyonlarını ekle ve çalıştır
+- [x] P15-05 — Migration 0074’ü uygulayıp schema/veri katmanı sözleşmesini doğrula
+- [x] P15-06 — Expo/Metro dependency advisory’lerini dependency path, runtime etkisi ve uyumluluk sınırıyla denetle
+- [x] P15-06 — Resmi SDK 54 patch güncellemesini doğrula; kapanamayan Expo/Metro transitif bulguları VERIFIED EXTERNAL GATE olarak belgele
+- [x] P15-07 — TR/EN zorunlu legal/privacy katalogunu version, locale, effective date, content hash ve machine-readable approval placeholder’larıyla tamamla
+- [x] P15-07 — Server-authoritative legal re-consent ve ayrı, varsayılan kapalı marketing opt-in/withdrawal lifecycle’ını ekle
+- [x] P15-07 — Hesap/veri silme, destek, provider/community, yasaklı hizmet, ödeme/iptal/iade/uyuşmazlık çerçevesinin fail-closed legal metadata’sını tamamla
+- [x] P15-07 — Legal/privacy policy, authorization ve edge-case regresyonlarını ekle ve çalıştır
+- [x] P15-08 — Merkezi secret/environment contract’ını canonical isimler, rotation metadatası ve fail-closed production davranışıyla genişlet
+- [x] P15-08 — AES-256-GCM encrypted payload’larına key version ekle; legacy decrypt uyumluluğu ve plaintext-fallback reddi testlerini ekle
+- [x] P15-09 — Authorization/IDOR veri-minimizasyonu, MoveAI fail-closed ve country/capability gate regresyonlarını yeniden denetle ve eksikleri kapat
+- [x] P15-09 — Operasyonel readiness, PII redaction, cron/webhook secret kontrolü ve runbook/supply-chain kanıtlarını doğrula
+- [x] P15-10 — Tam regresyon, lint, TypeScript, backend build, iOS/Android/web export, Expo doctor ve diff denetimlerini çalıştır
+- [x] P15-10 — Dependency audit, source secret scan, SAST/SCA, SBOM/lisans, migration integrity ve production bundle hijyen kanıtını üret
+- [x] P15-10 — P15 final kalite sonuçlarını ham çıktı dosyalarına ve release gate matrisine kaydet
+- [x] P15-11 — Denetim amaçlı credential’sız kaynak ZIP/manifesti ve kanıta dayalı A/B/C closure raporunu hazırla; final checkpoint ile sürümü sabitle

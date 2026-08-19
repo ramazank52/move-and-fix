@@ -41,4 +41,16 @@ describe("P13 canonical environment contract", () => {
     expect(validation.values.proxyCommProviderApiKey).toBe("");
     expect(validation.values.mediaScannerCallbackSecret).toBe("");
   });
+
+  it("rejects a partial encryption rotation while permitting an entirely unconfigured optional operation", () => {
+    const partialRotation = validateEnvironmentContract({ ENCRYPTION_KEY_PREVIOUS: "previous-only" });
+    expect(partialRotation.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "PARTIAL_PROVIDER_CONFIGURATION", canonicalName: "ENCRYPTION_ROTATION" }),
+    ]));
+    expect(() => assertProductionEnvironmentContract(partialRotation)).toThrow("ENVIRONMENT_CONTRACT_INVALID");
+
+    const optionalOperations = validateEnvironmentContract({});
+    expect(optionalOperations.values.documentRetentionCronSecret).toBe("");
+    expect(optionalOperations.values.apmApiKey).toBe("");
+  });
 });

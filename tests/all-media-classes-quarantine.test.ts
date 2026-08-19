@@ -23,14 +23,19 @@ const mediaClasses: MediaScannerMediaClass[] = [
 describe("all media classes quarantine contract", () => {
   it.each(mediaClasses)("keeps %s non-servable until an explicit clean scanner result", (mediaClass) => {
     expect(decideMediaQuarantineAccess("pending_scan")).toMatchObject({ allowed: false });
-    const transition = decideMediaScannerTransition("pending_scan", "clean");
+    const start = decideMediaScannerTransition("pending_scan", "scanning");
+    expect(start).toMatchObject({ allowed: true, idempotent: false, nextStatus: "scanning" });
+    expect(decideMediaQuarantineAccess(start.nextStatus)).toMatchObject({ allowed: false });
+    const transition = decideMediaScannerTransition("scanning", "clean");
     expect(transition).toMatchObject({ allowed: true, idempotent: false, nextStatus: "clean" });
     expect(decideMediaQuarantineAccess(transition.nextStatus)).toMatchObject({ allowed: true });
     expect(mediaClass).toBeTruthy();
   });
 
   it.each(mediaClasses)("keeps %s blocked after a malicious scanner result", () => {
-    const transition = decideMediaScannerTransition("pending_scan", "blocked");
+    const start = decideMediaScannerTransition("pending_scan", "scanning");
+    expect(start).toMatchObject({ allowed: true, nextStatus: "scanning" });
+    const transition = decideMediaScannerTransition("scanning", "blocked");
     expect(transition).toMatchObject({ allowed: true, nextStatus: "blocked" });
     expect(decideMediaQuarantineAccess(transition.nextStatus)).toMatchObject({ allowed: false });
     expect(decideMediaScannerTransition("blocked", "clean")).toMatchObject({ allowed: false });
@@ -45,13 +50,14 @@ describe("all media classes quarantine contract", () => {
       reason: "signature verified",
     };
     const secret = "scanner-test-secret";
+    const context = { timestamp: Date.parse("2026-08-20T10:00:00.000Z"), nonce: "media-class-nonce-0001" };
     const signature = createHmac("sha256", secret)
-      .update(mediaScannerCallbackCanonicalPayload(payload), "utf8")
+      .update(mediaScannerCallbackCanonicalPayload(payload, context), "utf8")
       .digest("hex");
 
-    expect(verifyMediaScannerCallbackSignature({ secret, signature, payload })).toBe(true);
-    expect(verifyMediaScannerCallbackSignature({ secret, signature: "0".repeat(64), payload })).toBe(false);
-    expect(verifyMediaScannerCallbackSignature({ secret: "", signature, payload })).toBe(false);
+    expect(verifyMediaScannerCallbackSignature({ secret, signature, payload, context })).toBe(true);
+    expect(verifyMediaScannerCallbackSignature({ secret, signature: "0".repeat(64), payload, context })).toBe(false);
+    expect(verifyMediaScannerCallbackSignature({ secret: "", signature, payload, context })).toBe(false);
   });
 });
 

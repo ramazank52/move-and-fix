@@ -484,6 +484,13 @@
       "when": 1787221000000,
       "tag": "0073_p14_contact_verification_stages",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1787337600000,
+      "tag": "0074_p15_malware_scanner_lifecycle",
+      "breakpoints": true
     }
   ]
 }
