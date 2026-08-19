@@ -88,6 +88,23 @@ export const adminRoles = mysqlTable(
   ],
 );
 
+// Narrow, revocable scope for viewing provider document content during a review.
+// It intentionally does not grant broader MoveOS or provider-management powers.
+export const providerDocumentReviewerPermissions = mysqlTable(
+  "provider_document_reviewer_permissions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    grantedByUserId: int("grantedByUserId").notNull(),
+    grantedAt: timestamp("grantedAt").defaultNow().notNull(),
+    revokedAt: timestamp("revokedAt"),
+  },
+  (table) => [
+    uniqueIndex("provider_doc_reviewer_user_unique").on(table.userId),
+    index("provider_doc_reviewer_active_idx").on(table.userId, table.revokedAt),
+  ],
+);
+
 // Contains only an opaque provider-side reference; actual telephone numbers or
 // message addresses are never copied into the application database. A proxy
 // session can be created only for an assigned job's two participants.
@@ -492,6 +509,40 @@ export const serviceSubcategories = mysqlTable(
   ],
 );
 
+// Explicit aliases are compatibility metadata only. Canonical service identity
+// remains the active category/subcategory row; display-name matching is not a
+// permitted fallback for compliance, onboarding or request validation.
+export const serviceCatalogAliases = mysqlTable(
+  "service_catalog_aliases",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    namespace: mysqlEnum("namespace", [
+      "legacy_category",
+      "external_service",
+      "approved_source_service",
+      "request_service_type",
+    ]).notNull(),
+    alias: varchar("alias", { length: 160 }).notNull(),
+    categoryId: int("categoryId").notNull(),
+    // Zero is the persisted, explicit category-wide sentinel. Positive values
+    // reference a real service_subcategories row.
+    subcategoryId: int("subcategoryId").default(0).notNull(),
+    isActive: int("isActive").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("service_catalog_aliases_namespace_alias_target_unique").on(
+      table.namespace,
+      table.alias,
+      table.categoryId,
+      table.subcategoryId,
+    ),
+    index("service_catalog_aliases_lookup_idx").on(table.namespace, table.alias, table.isActive),
+    index("service_catalog_aliases_target_idx").on(table.categoryId, table.subcategoryId, table.isActive),
+  ],
+);
+
 // Provider profiles
 export const providers = mysqlTable("providers", {
   id: int("id").autoincrement().primaryKey(),
@@ -773,6 +824,38 @@ export const capabilityJurisdictionRules = mysqlTable(
   ],
 );
 
+// A source-provenanced dynamic credential definition is separate from the
+// capability rule because one capability may need multiple credentials and
+// eligibility depends on the reviewed provider operating type.
+export const credentialRequirementCatalog = mysqlTable(
+  "credential_requirement_catalog",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    jurisdictionId: int("jurisdictionId").notNull(),
+    categoryId: int("categoryId").notNull(),
+    subcategoryId: int("subcategoryId").notNull(),
+    capabilityId: int("capabilityId").notNull(),
+    providerType: mysqlEnum("providerType", ["employee", "self_employed", "sole_trader", "company_owner", "company_worker"]).notNull(),
+    credentialType: varchar("credentialType", { length: 160 }).notNull(),
+    requirementState: mysqlEnum("requirementState", ["required", "conditional", "not_required", "prohibited", "unknown"]).default("unknown").notNull(),
+    minimumAssurance: mysqlEnum("minimumAssurance", ["A", "B", "C", "D", "E", "F"]).default("F").notNull(),
+    requiresHumanReview: int("requiresHumanReview").default(1).notNull(),
+    officialSourceId: int("officialSourceId"),
+    sourceReferenceIdsJson: json("sourceReferenceIdsJson").$type<string[]>().notNull(),
+    sourceVersion: varchar("sourceVersion", { length: 160 }).notNull(),
+    ruleVersion: varchar("ruleVersion", { length: 64 }).notNull(),
+    provenanceJson: json("provenanceJson").$type<Record<string, unknown>>().notNull(),
+    isActive: int("isActive").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("credential_requirement_catalog_key_unique").on(table.jurisdictionId, table.categoryId, table.subcategoryId, table.capabilityId, table.providerType, table.credentialType, table.ruleVersion),
+    index("credential_requirement_catalog_lookup_idx").on(table.jurisdictionId, table.categoryId, table.subcategoryId, table.capabilityId, table.providerType, table.isActive),
+    index("credential_requirement_catalog_source_idx").on(table.officialSourceId, table.ruleVersion),
+  ],
+);
+
 // Immutable credential identity is minimised to hashes/metadata wherever possible.
 // The file remains in the existing owner-scoped provider_documents store.
 export const providerCredentials = mysqlTable(
@@ -957,6 +1040,7 @@ export const serviceRequests = mysqlTable("service_requests", {
   requiredCredentialType: varchar("requiredCredentialType", { length: 120 }),
   requiredCredentialAssurance: mysqlEnum("requiredCredentialAssurance", ["A", "B", "C", "D", "E", "F"]),
   requiresCredentialHumanReview: int("requiresCredentialHumanReview"),
+  credentialRequirementsJson: json("credentialRequirementsJson").$type<Record<string, unknown>[] | null>(),
   compliancePackageVersion: varchar("compliancePackageVersion", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

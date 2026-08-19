@@ -1,4 +1,5 @@
 import countryPack from "./approved-sources/TR-GOLD-2026-08-13-v1.0/TR_Gold_Master_Country_Pack_v1.json";
+import type { CanonicalServiceIdentity, CatalogResolution } from "./ServiceCatalogResolver";
 
 type ApprovedService = (typeof countryPack.services)[number];
 
@@ -14,49 +15,17 @@ export type ProviderDocumentRequirements = {
   policyVersion: string;
   countryCode: string;
   category: {
+    categoryId: number | null;
+    subcategoryId: number | null;
     slug: string | null;
     name: string | null;
     sourceServiceKey: string | null;
+    mappingStatus: CatalogResolution<string>["status"];
   };
   sourceMatched: boolean;
   legalReviewRequired: boolean;
   required: ProviderDocumentRequirement[];
 };
-
-const serviceAliases: Record<string, string> = {
-  "su-tesisati": "plumbing",
-  plumbing: "plumbing",
-  elektrik: "electrical",
-  electrical: "electrical",
-  "boya-badana": "painting",
-  painting: "painting",
-  klima: "air_conditioning",
-  "air-conditioning": "air_conditioning",
-  air_conditioning: "air_conditioning",
-  "kombi-isitma": "heating",
-  heating: "heating",
-  tasima: "moving",
-  moving: "moving",
-  temizlik: "cleaning",
-  cleaning: "cleaning",
-  cekici: "towing",
-  towing: "towing",
-  "yol-yardimi": "roadside_assistance",
-  "roadside-assistance": "roadside_assistance",
-  roadside_assistance: "roadside_assistance",
-  kurye: "courier",
-  courier: "courier",
-};
-
-function normalizeCategory(value: string | null) {
-  return value
-    ?.trim()
-    .toLocaleLowerCase("tr-TR")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || null;
-}
 
 function sourceDocumentType(serviceKey: string, ruleIndex: number, credentialIndex: number) {
   return `tr-gold-${serviceKey}-${ruleIndex + 1}-credential-${credentialIndex + 1}`.slice(0, 160);
@@ -75,15 +44,10 @@ const identityRequirement: ProviderDocumentRequirement = {
  * expanded by an inferred rule; downstream capability activation must block it.
  */
 export function resolveProviderDocumentRequirements(input: {
-  categorySlug: string | null;
-  categoryName: string | null;
+  catalogIdentity: CanonicalServiceIdentity | null;
+  sourceService: CatalogResolution<string>;
 }): ProviderDocumentRequirements {
-  const categorySlug = normalizeCategory(input.categorySlug);
-  const categoryName = input.categoryName?.trim() || null;
-  const normalizedName = normalizeCategory(categoryName);
-  const sourceServiceKey = (categorySlug && serviceAliases[categorySlug]) ||
-    (normalizedName && serviceAliases[normalizedName]) ||
-    null;
+  const sourceServiceKey = input.sourceService.status === "RESOLVED" ? input.sourceService.value : null;
   const service = sourceServiceKey
     ? countryPack.services.find((candidate) => candidate.key === sourceServiceKey) ?? null
     : null;
@@ -110,7 +74,14 @@ export function resolveProviderDocumentRequirements(input: {
   return {
     policyVersion: countryPack.pack_id,
     countryCode: countryPack.country_code,
-    category: { slug: categorySlug, name: categoryName, sourceServiceKey },
+    category: {
+      categoryId: input.catalogIdentity?.categoryId ?? null,
+      subcategoryId: input.catalogIdentity?.subcategoryId ?? null,
+      slug: input.catalogIdentity?.categorySlug ?? null,
+      name: input.catalogIdentity?.categoryName ?? null,
+      sourceServiceKey,
+      mappingStatus: input.sourceService.status,
+    },
     sourceMatched: Boolean(service),
     // The approved pack itself requires production legal sign-off. This flag is
     // informational for onboarding; unknown/mismatched scopes are enforced as a block.

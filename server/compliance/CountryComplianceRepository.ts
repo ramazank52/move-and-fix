@@ -19,6 +19,87 @@ import { evaluateTurkeyPaymentLaunchReadiness } from "./TurkeyPaymentLaunchPolic
 
 export type CompliancePackageStatus = "draft" | "legal_review" | "approved" | "enabled" | "blocked" | "retired";
 export type OfficialSourceStatus = "draft" | "verified" | "superseded" | "revoked";
+export type CountryMarketplaceTransition =
+  | "REQUEST_CREATION"
+  | "PROVIDER_ACTIVATION"
+  | "OPPORTUNITY_EXPOSURE"
+  | "OFFER_SUBMIT"
+  | "OFFER_ACCEPTANCE"
+  | "PAYMENT_INITIATION";
+
+type CountryLaunchGateStatus = "blocked" | "review" | "ready" | "enabled" | "suspended" | null;
+
+export function countryMarketplaceTransitionBlockReason(input: {
+  countryCode: string | null | undefined;
+  gateStatus: CountryLaunchGateStatus;
+  paymentReady: boolean;
+  transition: CountryMarketplaceTransition;
+}) {
+  const countryCode = input.countryCode?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{2}$/.test(countryCode)) {
+    return `COUNTRY_LAUNCH_GATE_BLOCKED:${input.transition}:COUNTRY_UNKNOWN`;
+  }
+  // `ready` is deliberately not sufficient. A legal/operational administrator
+  // must explicitly enable the marketplace after the evidence checklist passes.
+  if (input.gateStatus !== "enabled") {
+    return `COUNTRY_LAUNCH_GATE_BLOCKED:${input.transition}:GATE_${input.gateStatus?.toUpperCase() ?? "UNKNOWN"}`;
+  }
+  if (!input.paymentReady) {
+    return `COUNTRY_LAUNCH_GATE_BLOCKED:${input.transition}:PAYMENT_NOT_READY`;
+  }
+  return null;
+}
+
+/**
+ * The sole runtime authority for new marketplace transitions. Historical data
+ * readers intentionally do not call this function. Unknown country, missing
+ * jurisdiction, missing gate, a non-enabled gate, or current payment
+ * unavailability always blocks the transition.
+ */
+export async function assertCountryMarketplaceTransition(input: {
+  countryCode?: string | null;
+  jurisdictionId?: number | null;
+  transition: CountryMarketplaceTransition;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error(`COUNTRY_LAUNCH_GATE_BLOCKED:${input.transition}:DATABASE_UNAVAILABLE`);
+
+  const countryCode = input.countryCode?.trim().toUpperCase() ?? "";
+  let jurisdiction = null as (typeof jurisdictions.$inferSelect) | null;
+  if (input.jurisdictionId != null) {
+    const rows = await db.select().from(jurisdictions).where(eq(jurisdictions.id, input.jurisdictionId)).limit(1);
+    jurisdiction = rows[0] ?? null;
+  } else if (/^[A-Z]{2}$/.test(countryCode)) {
+    const rows = await db
+      .select()
+      .from(jurisdictions)
+      .where(and(eq(jurisdictions.countryCode, countryCode), isNull(jurisdictions.regionCode)))
+      .limit(2);
+    jurisdiction = rows.length === 1 ? rows[0]! : null;
+  }
+
+  const effectiveCountryCode = jurisdiction?.countryCode ?? countryCode;
+  const gateRows = jurisdiction
+    ? await db.select().from(jurisdictionLaunchGates).where(eq(jurisdictionLaunchGates.jurisdictionId, jurisdiction.id)).limit(2)
+    : [];
+  const gate = gateRows.length === 1 ? gateRows[0]! : null;
+  const paymentReadiness = jurisdiction
+    ? await getCountryPaymentLaunchReadiness(db, effectiveCountryCode)
+    : { ready: false };
+  const reason = countryMarketplaceTransitionBlockReason({
+    countryCode: effectiveCountryCode,
+    gateStatus: gate?.status ?? null,
+    paymentReady: paymentReadiness.ready,
+    transition: input.transition,
+  });
+  if (reason) throw new Error(reason);
+  return {
+    countryCode: effectiveCountryCode,
+    jurisdictionId: jurisdiction!.id,
+    transition: input.transition,
+    gateStatus: "enabled" as const,
+  };
+}
 
 async function getTurkeyPaymentLaunchReadiness(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
   const records = await db

@@ -4,6 +4,7 @@ import type { TrpcContext } from "../server/_core/context";
 vi.mock("../server/db", () => ({
   getPaymentQuote: vi.fn(),
   createPayment: vi.fn(),
+  assertPaymentInitiationCountryLaunch: vi.fn(),
   assertPaymentProviderOperational: vi.fn(),
   resolvePaymentProviderForCheckout: vi.fn(),
   reservePaymentGateway: vi.fn(),
@@ -183,6 +184,22 @@ describe("payments router security", () => {
       buyer: {},
     })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
 
+    expect(paymentDb.reservePaymentGateway).not.toHaveBeenCalled();
+  });
+
+  it("blocks payment initiation at the country launch gate before resolving or reserving a gateway", async () => {
+    vi.mocked(paymentDb.assertPaymentInitiationCountryLaunch).mockRejectedValue(
+      new Error("COUNTRY_LAUNCH_GATE_BLOCKED:PAYMENT_INITIATION:GATE_REVIEW"),
+    );
+    const caller = appRouter.createCaller(createContext("user", 41));
+
+    await expect(caller.payments.initializeGateway({
+      paymentId: 71,
+      provider: "stripe",
+      buyer: {},
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+
+    expect(paymentDb.resolvePaymentProviderForCheckout).not.toHaveBeenCalled();
     expect(paymentDb.reservePaymentGateway).not.toHaveBeenCalled();
   });
 });

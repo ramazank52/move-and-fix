@@ -16,7 +16,7 @@ import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { ownerRouter } from "./_core/ownerRouter";
 import { complianceRouter } from "./compliance/router";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { adminMfaProcedure, publicProcedure, protectedProcedure, router, superAdminMfaProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
@@ -28,6 +28,7 @@ import {
 } from "./services/NotificationServiceV2";
 import { eventService } from "./services/EventService";
 import { storageGetSignedUrl, storagePut } from "./storage";
+import { decideProviderDocumentReviewAccess } from "./compliance/ProviderDocumentReviewAccessPolicy";
 import * as pushStore from "./notifications/push-store";
 import { analyzeCompletionEvidence } from "./services/CompletionEvidenceAnalysisService";
 import {
@@ -234,6 +235,9 @@ function mapPhaseDError(error: unknown): never {
 
 function mapCapabilityTransitionError(error: unknown): never {
   const message = error instanceof Error ? error.message : "CAPABILITY_TRANSITION_FORBIDDEN";
+  if (message.startsWith("COUNTRY_LAUNCH_GATE_BLOCKED:")) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+  }
   if (
     message === "COMPLIANCE_CONTEXT_NOT_CONFIGURED" ||
     message === "PROVIDER_CAPABILITY_NOT_ELIGIBLE" ||
@@ -1006,20 +1010,18 @@ export const appRouter = router({
         }
 
         if (input.details) {
-          const categoryTypeMap: Record<string, db.ServiceRequestType> = {
-            painting: "painting",
-            electrical: "electrical",
-            plumbing: "plumbing",
-            cleaning: "cleaning",
-            moving: "moving",
-            courier: "courier",
-            towing: "tow_truck",
-            tow_truck: "tow_truck",
-            roadside: "roadside",
-          };
-          const expectedType = categoryTypeMap[category.slug] ?? "generic";
-          if (input.details.serviceType !== "generic" && input.details.serviceType !== expectedType) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: "Hizmet ayrıntıları seçilen kategoriyle uyuşmuyor" });
+          try {
+            await db.assertServiceRequestDetailCatalog({
+              categoryId: category.id,
+              subcategoryId: input.details.subcategoryId ?? null,
+              serviceType: input.details.serviceType,
+            });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "MISSING_SERVICE_CATALOG_MAPPING";
+            if (["AMBIGUOUS_SERVICE_MAPPING", "MISSING_SERVICE_CATALOG_MAPPING", "SERVICE_CATALOG_TYPE_MISMATCH", "SERVICE_CATALOG_NOT_CONFIGURED"].includes(message)) {
+              throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Hizmet ayrıntıları canonical hizmet kataloğuyla doğrulanamadı" });
+            }
+            throw error;
           }
           if (["moving", "courier", "tow_truck"].includes(input.details.serviceType)) {
             if (!input.details.pickupAddress || !input.details.destinationAddress) {
@@ -1177,12 +1179,13 @@ export const appRouter = router({
         }
 
         try {
-          const [capabilityStatuses, providerCredentials] = await Promise.all([
+          const [capabilityStatuses, providerCredentials, providerType] = await Promise.all([
             db.listProviderCapabilityStatuses(provider.id),
             db.listProviderCredentialStatuses(provider.id),
+            db.resolveVerifiedProviderRequirementType({ providerId: provider.id, countryCode: request.serviceCountryCode }),
           ]);
           db.assertProviderCapabilityForRequest({ request, capabilityStatuses });
-          db.assertProviderCredentialForRequest({ request, providerCredentials });
+          db.assertProviderCredentialForRequest({ request, providerType, providerCredentials });
           return await db.createOffer({ ...input, providerId: provider.id });
         } catch (error) {
           if (error instanceof Error && error.message.includes("daha önce")) {
@@ -1197,12 +1200,16 @@ export const appRouter = router({
         const transitionContext = await db.getOfferCapabilityTransitionContext(input.offerId);
         if (!transitionContext) throw new TRPCError({ code: "NOT_FOUND", message: "Teklif bulunamadı" });
         try {
-          const [capabilityStatuses, providerCredentials] = await Promise.all([
+          const [capabilityStatuses, providerCredentials, providerType] = await Promise.all([
             db.listProviderCapabilityStatuses(transitionContext.providerId),
             db.listProviderCredentialStatuses(transitionContext.providerId),
+            db.resolveVerifiedProviderRequirementType({
+              providerId: transitionContext.providerId,
+              countryCode: transitionContext.serviceCountryCode,
+            }),
           ]);
           db.assertProviderCapabilityForRequest({ request: transitionContext, capabilityStatuses });
-          db.assertProviderCredentialForRequest({ request: transitionContext, providerCredentials });
+          db.assertProviderCredentialForRequest({ request: transitionContext, providerType, providerCredentials });
           return await db.acceptOffer(input.offerId, ctx.user.id);
         } catch (error) {
           return mapCapabilityTransitionError(error);
@@ -1842,7 +1849,7 @@ export const appRouter = router({
       }),
   }),
   // Providers
-  providers: router({
+  provider: router({
     businessCockpit: protectedProcedure.query(({ ctx }) => db.getProviderBusinessCockpit(ctx.user.id)),
     nearby: publicProcedure
       .input(z.object({ lat: z.string().optional(), lng: z.string().optional() }).optional())
@@ -1971,6 +1978,30 @@ export const appRouter = router({
       }
       return requirements;
     }),
+    getOnboardingStatus: protectedProcedure.query(async ({ ctx }) => {
+      const status = await db.getProviderOnboardingStatus(ctx.user.id);
+      if (!status) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+      }
+      return status;
+    }),
+    configureOnboarding: protectedProcedure
+      .input(z.object({
+        categoryId: z.number().int().positive(),
+        subcategoryId: z.number().int().positive().nullable(),
+        capabilityId: z.number().int().positive(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.configureProviderOnboarding({ userId: ctx.user.id, ...input });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "ONBOARDING_CONFIGURATION_FAILED";
+          if (message === "PROVIDER_NOT_FOUND") {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+          }
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+        }
+      }),
     getInsurancePolicies: protectedProcedure.query(async ({ ctx }) => {
       const provider = await db.getProviderProfile(ctx.user.id);
       if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
@@ -2346,6 +2377,10 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       }))
       .mutation(async ({ ctx, input }) => {
         try {
+          await db.assertPaymentInitiationCountryLaunch({
+            paymentId: input.paymentId,
+            userId: ctx.user.id,
+          });
           await db.resolvePaymentProviderForCheckout({
             provider: input.provider,
             countryCode: "TR",
@@ -2393,6 +2428,9 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           }
           if (message.includes("INVALID_STATUS") || message.includes("CONFLICT")) {
             throw new TRPCError({ code: "CONFLICT", message: "Ödeme sağlayıcısı mevcut ödeme durumunda başlatılamaz" });
+          }
+          if (message.startsWith("COUNTRY_LAUNCH_GATE_BLOCKED:")) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message });
           }
           if (message.startsWith("PAYMENT_PROVIDER_") || message.startsWith("GLOBAL_PAYMENT_")) {
             throw new TRPCError({
@@ -2452,6 +2490,65 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           cause: { paymentId: input.paymentId, reason: "PAYMENT_REFUND_GATEWAY_CALLBACK_REQUIRED" },
         });
       }),
+  }),
+
+  reviewerDocuments: router({
+    getDocumentAccess: adminMfaProcedure
+      .input(z.object({ documentId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const hasReviewerPermission = await db.hasActiveProviderDocumentReviewerPermission(ctx.user.id);
+        if (!hasReviewerPermission) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Bu belge için ayrı reviewer yetkisi gerekli" });
+        }
+        const document = await db.getProviderDocumentById(input.documentId);
+        if (!document) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Profesyonel belgesi bulunamadı" });
+        }
+        const access = decideProviderDocumentReviewAccess({
+          hasReviewerPermission,
+          mfaReauthenticated: true,
+          quarantineStatus: document.quarantineStatus,
+          contentPurgedAt: document.contentPurgedAt,
+          storageKey: document.storageKey,
+        });
+        if (!access.allowed) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Belge içeriği güvenli inceleme için uygun değil",
+          });
+        }
+        try {
+          const url = await storageGetSignedUrl(document.storageKey, { expiresInSeconds: 60 });
+          await db.logOperationEvent({
+            eventType: "provider_document_access_granted",
+            subjectId: document.id,
+            actorId: ctx.user.id,
+            payload: {
+              providerId: document.providerId,
+              accessScope: "reviewer",
+              mfaReauthenticated: true,
+              signedUrlTtlSeconds: 60,
+            },
+          });
+          return { url, expiresInSeconds: 60 };
+        } catch {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Belge içeriğine güvenli erişim şu anda yapılandırılmamış",
+          });
+        }
+      }),
+    grantPermission: superAdminMfaProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.grantProviderDocumentReviewerPermission({ userId: input.userId, grantedByUserId: ctx.user.id });
+        return { granted: true };
+      }),
+    revokePermission: superAdminMfaProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => ({
+        revoked: await db.revokeProviderDocumentReviewerPermission({ userId: input.userId, revokedByUserId: ctx.user.id }),
+      })),
   }),
 
   featureFlags: router({

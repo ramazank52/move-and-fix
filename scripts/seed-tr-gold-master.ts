@@ -1,3 +1,4 @@
+import "./load-env.js";
 import mysql from "mysql2/promise";
 import { applyTurkeyGoldMasterSeed } from "../server/compliance/TrGoldMasterSeed";
 

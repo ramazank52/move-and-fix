@@ -6,6 +6,7 @@ import {
   evaluateCountryLaunch,
   parseCountryLaunchChecklist,
 } from "../server/compliance/CountryLaunchGateService";
+import { countryMarketplaceTransitionBlockReason } from "../server/compliance/CountryComplianceRepository";
 
 describe("country professional marketplace launch gate", () => {
   it("fails closed for an empty, incomplete or malformed checklist", () => {
@@ -48,5 +49,36 @@ describe("country professional marketplace launch gate", () => {
       missing: [],
       status: "ready",
     });
+  });
+
+  it("requires an explicitly enabled country and operational payment readiness for every new marketplace transition", () => {
+    const transitions = [
+      "REQUEST_CREATION",
+      "PROVIDER_ACTIVATION",
+      "OPPORTUNITY_EXPOSURE",
+      "OFFER_SUBMIT",
+      "OFFER_ACCEPTANCE",
+      "PAYMENT_INITIATION",
+    ] as const;
+    for (const transition of transitions) {
+      expect(countryMarketplaceTransitionBlockReason({
+        countryCode: "TR",
+        gateStatus: "ready",
+        paymentReady: true,
+        transition,
+      })).toBe(`COUNTRY_LAUNCH_GATE_BLOCKED:${transition}:GATE_READY`);
+      expect(countryMarketplaceTransitionBlockReason({
+        countryCode: "TR",
+        gateStatus: "enabled",
+        paymentReady: false,
+        transition,
+      })).toBe(`COUNTRY_LAUNCH_GATE_BLOCKED:${transition}:PAYMENT_NOT_READY`);
+      expect(countryMarketplaceTransitionBlockReason({
+        countryCode: "TR",
+        gateStatus: "enabled",
+        paymentReady: true,
+        transition,
+      })).toBeNull();
+    }
   });
 });

@@ -12,6 +12,7 @@ import {
   adminMfaGrants,
   providerDocuments,
   providerCredentials,
+  providerDocumentReviewerPermissions,
   walletAccounts,
   walletTransactions,
   walletWithdrawals,
@@ -20,6 +21,14 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { resolveProviderDocumentRequirements } from "./compliance/ProviderDocumentRequirementsPolicy";
+import {
+  resolveApprovedSourceService,
+  resolveCanonicalServiceIdentity,
+  resolveServiceCatalogAlias,
+  type ServiceCatalogSnapshot,
+} from "./compliance/ServiceCatalogResolver";
+import { assertCountryMarketplaceTransition } from "./compliance/CountryComplianceRepository";
+import { decideProviderOnboardingActivation } from "./compliance/ProviderOnboardingPolicy";
 import { getApmConfigurationStatus } from "./_core/observability";
 import {
   assertPaymentStatusTransition,
@@ -739,6 +748,59 @@ export async function getProviderDocumentById(id: number) {
   return rows[0] ?? null;
 }
 
+export async function hasActiveProviderDocumentReviewerPermission(userId: number): Promise<boolean> {
+  const database = await getDb();
+  if (!database) return false;
+  const rows = await database
+    .select({ id: providerDocumentReviewerPermissions.id })
+    .from(providerDocumentReviewerPermissions)
+    .where(and(eq(providerDocumentReviewerPermissions.userId, userId), isNull(providerDocumentReviewerPermissions.revokedAt)))
+    .limit(1);
+  return rows.length === 1;
+}
+
+export async function grantProviderDocumentReviewerPermission(input: {
+  userId: number;
+  grantedByUserId: number;
+}): Promise<void> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_UNAVAILABLE");
+  await database
+    .insert(providerDocumentReviewerPermissions)
+    .values({ userId: input.userId, grantedByUserId: input.grantedByUserId, revokedAt: null })
+    .onDuplicateKeyUpdate({
+      set: { grantedByUserId: input.grantedByUserId, grantedAt: new Date(), revokedAt: null },
+    });
+  await logOperationEvent({
+    eventType: "provider_document_reviewer_permission_granted",
+    subjectId: input.userId,
+    actorId: input.grantedByUserId,
+    payload: { permission: "provider_document_reviewer" },
+  });
+}
+
+export async function revokeProviderDocumentReviewerPermission(input: {
+  userId: number;
+  revokedByUserId: number;
+}): Promise<boolean> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_UNAVAILABLE");
+  const result = await database
+    .update(providerDocumentReviewerPermissions)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(providerDocumentReviewerPermissions.userId, input.userId), isNull(providerDocumentReviewerPermissions.revokedAt)));
+  const revoked = (result[0]?.affectedRows ?? 0) === 1;
+  if (revoked) {
+    await logOperationEvent({
+      eventType: "provider_document_reviewer_permission_revoked",
+      subjectId: input.userId,
+      actorId: input.revokedByUserId,
+      payload: { permission: "provider_document_reviewer" },
+    });
+  }
+  return revoked;
+}
+
 export async function listProviderCapabilityStatuses(providerId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -767,6 +829,27 @@ export async function listProviderCredentialStatuses(providerId: number) {
     .from(providerCredentials)
     .where(eq(providerCredentials.providerId, providerId))
     .orderBy(desc(providerCredentials.updatedAt), desc(providerCredentials.id));
+}
+
+export async function resolveVerifiedProviderRequirementType(input: {
+  providerId: number;
+  countryCode: string | null;
+}): Promise<ProviderRequirementType | null> {
+  const countryCode = input.countryCode?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{2}$/.test(countryCode)) return null;
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  const rows = await db
+    .select({ operatingModel: providerOperatingModels.operatingModel })
+    .from(providerOperatingModels)
+    .where(and(
+      eq(providerOperatingModels.providerId, input.providerId),
+      eq(providerOperatingModels.jurisdictionCode, countryCode),
+      eq(providerOperatingModels.reviewStatus, "verified"),
+    ))
+    .limit(2);
+  if (rows.length !== 1 || rows[0]?.operatingModel === "unresolved") return null;
+  return rows[0]!.operatingModel as ProviderRequirementType;
 }
 
 export async function createProviderCapabilityAppeal(data: {
@@ -871,17 +954,13 @@ export async function refreshProviderVerificationStatus(providerId: number) {
   if (!db) throw new Error("Database not available");
   const documents = await getProviderDocuments(providerId);
   const providerRows = await db
-    .select({ categorySlug: serviceCategories.slug, categoryName: serviceCategories.name })
+    .select({ categoryId: providers.categoryId, userId: providers.userId })
     .from(providers)
-    .leftJoin(serviceCategories, eq(providers.categoryId, serviceCategories.id))
     .where(eq(providers.id, providerId))
     .limit(1);
   const provider = providerRows[0];
   if (!provider) throw new Error("PROVIDER_NOT_FOUND");
-  const requirements = resolveProviderDocumentRequirements({
-    categorySlug: provider.categorySlug ?? null,
-    categoryName: provider.categoryName ?? null,
-  });
+  const requirements = await getProviderRequirementsForCatalog(db, { categoryId: provider.categoryId ?? null });
   const requiredTypes = new Set(requirements.required.map((requirement) => requirement.type));
   const requiredDocuments = documents.filter((document) => requiredTypes.has(document.type));
   const hasRejected = requiredDocuments.some((document) => document.status === "rejected");
@@ -898,23 +977,58 @@ export async function refreshProviderVerificationStatus(providerId: number) {
       : requiredDocuments.length > 0
         ? "pending"
         : "unsubmitted";
+  let activationGateBlocked = false;
+  if (status === "approved") {
+    const jurisdictionRows = await db
+      .select({ countryCode: providerOperatingModels.jurisdictionCode })
+      .from(providerOperatingModels)
+      .where(and(
+        eq(providerOperatingModels.providerId, providerId),
+        eq(providerOperatingModels.reviewStatus, "verified"),
+      ))
+      .limit(20);
+    const countryCodes = [...new Set(jurisdictionRows.map((row) => row.countryCode.trim().toUpperCase()))];
+    if (countryCodes.length === 0) {
+      activationGateBlocked = true;
+    } else {
+      for (const countryCode of countryCodes) {
+        try {
+          await assertCountryMarketplaceTransition({ countryCode, transition: "PROVIDER_ACTIVATION" });
+        } catch {
+          activationGateBlocked = true;
+          break;
+        }
+      }
+    }
+  }
+  const onboarding = await getProviderOnboardingStatus(provider.userId);
+  const activationEligible = onboarding?.activation === "eligible";
+  const verificationStatus = status === "approved" && !activationGateBlocked && activationEligible
+    ? "approved"
+    : status === "rejected"
+      ? "rejected"
+      : status === "unsubmitted"
+        ? "unsubmitted"
+        : "pending";
   await db
     .update(providers)
     .set({
-      verificationStatus: status,
-      isVerified: status === "approved" ? 1 : 0,
-      verificationSubmittedAt: status === "pending" ? new Date() : undefined,
-      verificationReviewedAt: status === "pending" ? null : new Date(),
+      verificationStatus,
+      isVerified: verificationStatus === "approved" ? 1 : 0,
+      verificationSubmittedAt: verificationStatus === "pending" ? new Date() : undefined,
+      verificationReviewedAt: verificationStatus === "pending" ? null : new Date(),
     })
     .where(eq(providers.id, providerId));
-  return status;
+  return verificationStatus;
 }
 
 
 import {
   serviceCategories,
   serviceSubcategories,
+  serviceCatalogAliases,
   serviceCapabilities,
+  credentialRequirementCatalog,
   jurisdictions,
   jurisdictionCompliancePackages,
   officialComplianceSources,
@@ -999,6 +1113,11 @@ import { evaluateCompletionDisputeResolution } from "./payments/CompletionDisput
 import { quoteTurkeyVat } from "./tax/TurkeyVatPolicy";
 import { EncryptionService } from "./_core/security";
 import { assertCapabilityTransition, assertServiceRequestCapabilityContext, evaluateCapabilityTransition } from "./compliance/CapabilityTransitionGuard";
+import {
+  resolveCredentialRequirements,
+  type CredentialRequirementSnapshot,
+  type ProviderRequirementType,
+} from "./compliance/CredentialRequirementCatalog";
 import {
   assertCredentialEligibility,
   evaluateCredentialEligibility,
@@ -1322,6 +1441,7 @@ export type ServiceRequestComplianceContext = {
   requiredCredentialType: string | null;
   requiredCredentialAssurance: CredentialAssurance | null;
   requiresCredentialHumanReview: number | null;
+  credentialRequirementsJson: CredentialRequirementSnapshot[] | null;
   compliancePackageVersion: string | null;
 };
 
@@ -1359,6 +1479,7 @@ export async function resolveServiceRequestComplianceContext(input: {
     requiredCredentialType: null,
     requiredCredentialAssurance: null,
     requiresCredentialHumanReview: null,
+    credentialRequirementsJson: null,
     compliancePackageVersion,
   });
   if (!/^[A-Z]{2}$/.test(countryCode)) return blockedContext("JURISDICTION_UNRESOLVED");
@@ -1385,11 +1506,11 @@ export async function resolveServiceRequestComplianceContext(input: {
     .select({ id: serviceCapabilities.id, subcategoryId: serviceCapabilities.subcategoryId })
     .from(serviceCapabilities)
     .where(and(eq(serviceCapabilities.categoryId, input.categoryId), eq(serviceCapabilities.status, "active")));
-  const capability =
-    (input.subcategoryId == null
-      ? undefined
-      : categoryCapabilities.find((candidate) => candidate.subcategoryId === input.subcategoryId)) ??
-    categoryCapabilities.find((candidate) => candidate.subcategoryId === null);
+  // Gold Master capability scopes require an explicit canonical subcategory.
+  // Category-wide fallback could bind an unrelated legal scope and is forbidden.
+  const capability = input.subcategoryId == null
+    ? undefined
+    : categoryCapabilities.find((candidate) => candidate.subcategoryId === input.subcategoryId);
   if (!capability) return blockedContext("CAPABILITY_UNMAPPED", jurisdiction.id, compliancePackage.version, compliancePackage.id);
 
   const ruleRows = await db
@@ -1434,7 +1555,54 @@ export async function resolveServiceRequestComplianceContext(input: {
         ? "CONDITIONAL"
         : rule.ruleStatus === "prohibited"
           ? "PROHIBITED"
-          : "UNKNOWN";
+        : "UNKNOWN";
+  const requirementRows = await db
+    .select({
+      id: credentialRequirementCatalog.id,
+      jurisdictionId: credentialRequirementCatalog.jurisdictionId,
+      categoryId: credentialRequirementCatalog.categoryId,
+      subcategoryId: credentialRequirementCatalog.subcategoryId,
+      capabilityId: credentialRequirementCatalog.capabilityId,
+      providerType: credentialRequirementCatalog.providerType,
+      credentialType: credentialRequirementCatalog.credentialType,
+      requirementState: credentialRequirementCatalog.requirementState,
+      minimumAssurance: credentialRequirementCatalog.minimumAssurance,
+      requiresHumanReview: credentialRequirementCatalog.requiresHumanReview,
+      officialSourceId: credentialRequirementCatalog.officialSourceId,
+      sourceReferenceIds: credentialRequirementCatalog.sourceReferenceIdsJson,
+      sourceVersion: credentialRequirementCatalog.sourceVersion,
+      ruleVersion: credentialRequirementCatalog.ruleVersion,
+      provenance: credentialRequirementCatalog.provenanceJson,
+    })
+    .from(credentialRequirementCatalog)
+    .where(and(
+      eq(credentialRequirementCatalog.jurisdictionId, jurisdiction.id),
+      eq(credentialRequirementCatalog.categoryId, input.categoryId),
+      eq(credentialRequirementCatalog.subcategoryId, input.subcategoryId ?? 0),
+      eq(credentialRequirementCatalog.capabilityId, capability.id),
+      eq(credentialRequirementCatalog.isActive, 1),
+    ));
+  const credentialRequirements: CredentialRequirementSnapshot[] = requirementRows.map((row) => ({
+    requirementId: row.id,
+    jurisdictionId: row.jurisdictionId,
+    categoryId: row.categoryId,
+    subcategoryId: row.subcategoryId,
+    capabilityId: row.capabilityId,
+    providerType: row.providerType,
+    credentialType: row.credentialType,
+    requirementState: row.requirementState,
+    minimumAssurance: row.minimumAssurance,
+    requiresHumanReview: row.requiresHumanReview === 1,
+    officialSourceId: row.officialSourceId,
+    sourceReferenceIds: row.sourceReferenceIds,
+    sourceVersion: row.sourceVersion,
+    ruleVersion: row.ruleVersion,
+    provenance: row.provenance,
+  }));
+  if (rule.ruleStatus === "required" && credentialRequirements.length === 0) {
+    return blockedContext("LEGAL_REVIEW_REQUIRED", jurisdiction.id, compliancePackage.version, compliancePackage.id);
+  }
+  const firstRequiredCredential = credentialRequirements.find((requirement) => requirement.requirementState === "required") ?? null;
   return {
     jurisdictionId: jurisdiction.id,
     serviceCountryCode: countryCode,
@@ -1446,15 +1614,18 @@ export async function resolveServiceRequestComplianceContext(input: {
     officialSourceId: source.id,
     sourceStatus: source.status,
     currencyContext: countryCode === "TR" ? "TRY" : null,
-    requiredCredentialType: rule?.ruleStatus === "required" ? rule.requiredCredentialType : null,
+    // Legacy scalar fields remain read-compatible. New transition guards rely
+    // exclusively on credentialRequirementsJson and never fall back to them.
+    requiredCredentialType: firstRequiredCredential?.credentialType ?? null,
     requiredCredentialAssurance:
-      rule?.ruleStatus === "required" && rule.requiredCredentialType !== null
-        ? rule.minimumAssurance
+      firstRequiredCredential !== null
+        ? firstRequiredCredential.minimumAssurance
         : null,
     requiresCredentialHumanReview:
-      rule?.ruleStatus === "required" && rule.requiredCredentialType !== null
-        ? rule.requiresHumanReview
+      firstRequiredCredential !== null
+        ? Number(firstRequiredCredential.requiresHumanReview)
         : null,
+    credentialRequirementsJson: credentialRequirements,
     compliancePackageVersion: compliancePackage.version,
   };
 }
@@ -1493,8 +1664,10 @@ export function assertProviderCredentialForRequest(input: {
     | "requiredCredentialType"
     | "requiredCredentialAssurance"
     | "requiresCredentialHumanReview"
+    | "credentialRequirementsJson"
     | "compliancePackageVersion"
   >;
+  providerType: ProviderRequirementType | null;
   providerCredentials: Array<{
     jurisdictionId: number;
     credentialType: string;
@@ -1508,18 +1681,35 @@ export function assertProviderCredentialForRequest(input: {
   }>;
   now?: Date;
 }): void {
-  assertCredentialEligibility({
-    requiredCredentialType: input.request.requiredCredentialType,
-    minimumAssurance: input.request.requiredCredentialAssurance,
-    requiresHumanReview:
-      input.request.requiresCredentialHumanReview == null
-        ? null
-        : input.request.requiresCredentialHumanReview === 1,
-    compliancePackageVersion: input.request.compliancePackageVersion,
-    jurisdictionId: input.request.jurisdictionId,
-    providerCredentials: input.providerCredentials,
-    now: input.now,
-  });
+  const rawRequirements = input.request.credentialRequirementsJson;
+  if (!Array.isArray(rawRequirements)) {
+    if (input.request.requiredCredentialType !== null) throw new Error("MISSING_CREDENTIAL_REQUIREMENT_CATALOG");
+    return;
+  }
+  const requirements = rawRequirements.filter((requirement): requirement is CredentialRequirementSnapshot =>
+    requirement !== null &&
+    typeof requirement === "object" &&
+    typeof requirement.credentialType === "string" &&
+    typeof requirement.providerType === "string" &&
+    typeof requirement.requirementState === "string" &&
+    typeof requirement.minimumAssurance === "string" &&
+    typeof requirement.ruleVersion === "string",
+  );
+  if (requirements.length !== rawRequirements.length) throw new Error("MALFORMED_CREDENTIAL_REQUIREMENT_CATALOG");
+  const resolution = resolveCredentialRequirements({ providerType: input.providerType, requirements });
+  if (resolution.status !== "RESOLVED") throw new Error(resolution.status);
+  for (const requirement of resolution.requirements) {
+    if (requirement.requirementState !== "required") continue;
+    assertCredentialEligibility({
+      requiredCredentialType: requirement.credentialType,
+      minimumAssurance: requirement.minimumAssurance,
+      requiresHumanReview: requirement.requiresHumanReview,
+      compliancePackageVersion: requirement.ruleVersion,
+      jurisdictionId: input.request.jurisdictionId,
+      providerCredentials: input.providerCredentials,
+      now: input.now,
+    });
+  }
 }
 
 async function getOrganizationAccess(input: { organizationId: number; userId: number }) {
@@ -2235,6 +2425,80 @@ export async function getActiveServiceCategories() {
   }));
 }
 
+type CatalogDatabaseClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+async function loadServiceCatalogSnapshot(database: CatalogDatabaseClient): Promise<ServiceCatalogSnapshot> {
+  const [categories, subcategories, aliases] = await Promise.all([
+    database.select({
+      id: serviceCategories.id,
+      slug: serviceCategories.slug,
+      name: serviceCategories.name,
+      isActive: serviceCategories.isActive,
+    }).from(serviceCategories),
+    database.select({
+      id: serviceSubcategories.id,
+      categoryId: serviceSubcategories.categoryId,
+      slug: serviceSubcategories.slug,
+      name: serviceSubcategories.name,
+      isActive: serviceSubcategories.isActive,
+    }).from(serviceSubcategories),
+    database.select({
+      namespace: serviceCatalogAliases.namespace,
+      alias: serviceCatalogAliases.alias,
+      categoryId: serviceCatalogAliases.categoryId,
+      subcategoryId: serviceCatalogAliases.subcategoryId,
+      isActive: serviceCatalogAliases.isActive,
+    }).from(serviceCatalogAliases),
+  ]);
+  return { categories, subcategories, aliases };
+}
+
+async function getProviderRequirementsForCatalog(
+  database: CatalogDatabaseClient,
+  input: { categoryId: number | null; subcategoryId?: number | null },
+) {
+  const categoryId = input.categoryId;
+  if (categoryId == null) {
+    return resolveProviderDocumentRequirements({
+      catalogIdentity: null,
+      sourceService: { status: "MISSING_SERVICE_CATALOG_MAPPING", value: null },
+    });
+  }
+  const snapshot = await loadServiceCatalogSnapshot(database);
+  const identity = resolveCanonicalServiceIdentity(snapshot, { ...input, categoryId });
+  if (identity.status !== "RESOLVED") {
+    return resolveProviderDocumentRequirements({ catalogIdentity: null, sourceService: identity });
+  }
+  return resolveProviderDocumentRequirements({
+    catalogIdentity: identity.value,
+    sourceService: resolveApprovedSourceService(snapshot, identity.value),
+  });
+}
+
+/** Request service types are external aliases and must have an explicit DB target. */
+export async function assertServiceRequestDetailCatalog(input: {
+  categoryId: number;
+  subcategoryId?: number | null;
+  serviceType: string;
+}) {
+  if (input.serviceType === "generic") return;
+  const database = await getDb();
+  if (!database) throw new Error("SERVICE_CATALOG_NOT_CONFIGURED");
+  const snapshot = await loadServiceCatalogSnapshot(database);
+  const identity = resolveCanonicalServiceIdentity(snapshot, input);
+  if (identity.status !== "RESOLVED") throw new Error(identity.status);
+  const mapped = resolveServiceCatalogAlias(snapshot, {
+    namespace: "request_service_type",
+    alias: input.serviceType,
+    categoryId: identity.value.categoryId,
+    subcategoryId: identity.value.subcategoryId,
+  });
+  if (mapped.status !== "RESOLVED") throw new Error(mapped.status);
+  if (mapped.value.categoryId !== identity.value.categoryId || mapped.value.subcategoryId !== identity.value.subcategoryId) {
+    throw new Error("SERVICE_CATALOG_TYPE_MISMATCH");
+  }
+}
+
 export async function getServiceCategoryBySlug(slug: string) {
   const db = await getDb();
   if (!db) return null;
@@ -2630,6 +2894,11 @@ export async function createServiceRequest(data: {
     requiredCapabilityId: complianceContext.requiredCapabilityId,
     jurisdictionId: complianceContext.jurisdictionId,
   });
+  await assertCountryMarketplaceTransition({
+    countryCode: complianceContext.serviceCountryCode,
+    jurisdictionId: complianceContext.jurisdictionId,
+    transition: "REQUEST_CREATION",
+  });
   const { details, countryCode: _countryCode, ...requestData } = data;
   return db.transaction(async (tx) => {
     const result = await tx.insert(serviceRequests).values({ ...requestData, ...complianceContext });
@@ -2894,19 +3163,27 @@ export async function createOffer(data: {
       requiredCredentialType: serviceRequests.requiredCredentialType,
       requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
       requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
+      credentialRequirementsJson: serviceRequests.credentialRequirementsJson,
       compliancePackageVersion: serviceRequests.compliancePackageVersion,
+      serviceCountryCode: serviceRequests.serviceCountryCode,
     })
     .from(serviceRequests)
     .where(eq(serviceRequests.id, data.requestId))
     .limit(1);
   const request = requestRows[0];
   if (!request) throw new Error("SERVICE_REQUEST_NOT_FOUND");
-  const [capabilityStatuses, providerCredentials] = await Promise.all([
+  await assertCountryMarketplaceTransition({
+    countryCode: request.serviceCountryCode,
+    jurisdictionId: request.jurisdictionId,
+    transition: "OFFER_SUBMIT",
+  });
+  const [capabilityStatuses, providerCredentials, providerType] = await Promise.all([
     listProviderCapabilityStatuses(data.providerId),
     listProviderCredentialStatuses(data.providerId),
+    resolveVerifiedProviderRequirementType({ providerId: data.providerId, countryCode: request.serviceCountryCode }),
   ]);
   assertProviderCapabilityForRequest({ request, capabilityStatuses });
-  assertProviderCredentialForRequest({ request, providerCredentials });
+  assertProviderCredentialForRequest({ request, providerType, providerCredentials });
   await assertProviderP11PolicyEligibility({
     providerId: data.providerId,
     requestId: data.requestId,
@@ -2935,7 +3212,9 @@ export async function getOfferCapabilityTransitionContext(offerId: number) {
       requiredCredentialType: serviceRequests.requiredCredentialType,
       requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
       requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
+      credentialRequirementsJson: serviceRequests.credentialRequirementsJson,
       compliancePackageVersion: serviceRequests.compliancePackageVersion,
+      serviceCountryCode: serviceRequests.serviceCountryCode,
     })
     .from(offers)
     .innerJoin(serviceRequests, eq(serviceRequests.id, offers.requestId))
@@ -4101,6 +4380,220 @@ export async function getProviderProfile(userId: number) {
   return rows[0] ?? null;
 }
 
+export type ProviderOnboardingStatus = {
+  providerId: number;
+  profile: "complete" | "incomplete";
+  canonicalService: "selected" | "missing" | "invalid";
+  jurisdiction: "verified" | "pending_or_missing";
+  capability: "verified" | "pending_or_missing";
+  credentials: "verified" | "blocked_or_missing";
+  documents: "approved" | "pending_or_missing";
+  launchGate: "eligible" | "blocked";
+  activation: "eligible" | "blocked";
+};
+
+/** A provider can select only an active canonical scope and capability. The
+ * selection always enters legal review and never self-activates the provider. */
+export async function configureProviderOnboarding(input: {
+  userId: number;
+  categoryId: number;
+  subcategoryId: number | null;
+  capabilityId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    const providerRows = await tx.select({ id: providers.id }).from(providers)
+      .where(eq(providers.userId, input.userId)).limit(1);
+    const provider = providerRows[0];
+    if (!provider) throw new Error("PROVIDER_NOT_FOUND");
+    const identity = resolveCanonicalServiceIdentity(await loadServiceCatalogSnapshot(tx), {
+      categoryId: input.categoryId,
+      subcategoryId: input.subcategoryId,
+    });
+    if (identity.status !== "RESOLVED") throw new Error(identity.status);
+    const capabilityRows = await tx.select({
+      id: serviceCapabilities.id,
+      categoryId: serviceCapabilities.categoryId,
+      subcategoryId: serviceCapabilities.subcategoryId,
+      status: serviceCapabilities.status,
+    }).from(serviceCapabilities).where(eq(serviceCapabilities.id, input.capabilityId)).limit(1);
+    const capability = capabilityRows[0];
+    if (!capability || capability.status !== "active" ||
+      capability.categoryId !== identity.value.categoryId ||
+      (capability.subcategoryId ?? null) !== identity.value.subcategoryId) {
+      throw new Error("CAPABILITY_CATALOG_SCOPE_MISMATCH");
+    }
+    await tx.update(providers)
+      .set({ categoryId: identity.value.categoryId, verificationStatus: "pending", isVerified: 0 })
+      .where(eq(providers.id, provider.id));
+    const jurisdictionRows = await tx.select({ id: jurisdictions.id }).from(jurisdictions)
+      .innerJoin(providerOperatingModels, and(
+        eq(providerOperatingModels.jurisdictionCode, jurisdictions.countryCode),
+        eq(providerOperatingModels.providerId, provider.id),
+      ))
+      .where(and(eq(jurisdictions.status, "active"), eq(providerOperatingModels.reviewStatus, "verified")));
+    for (const jurisdiction of jurisdictionRows) {
+      await tx.insert(providerCapabilityStatuses).values({
+        providerId: provider.id,
+        capabilityId: capability.id,
+        jurisdictionId: jurisdiction.id,
+        status: "LEGAL_REVIEW_REQUIRED",
+        evaluatedAt: new Date(),
+      }).onDuplicateKeyUpdate({
+        set: { status: "LEGAL_REVIEW_REQUIRED", evaluatedAt: new Date(), updatedAt: new Date() },
+      });
+    }
+    return {
+      providerId: provider.id,
+      catalog: identity.value,
+      capabilityId: capability.id,
+      capabilityReviewState: "LEGAL_REVIEW_REQUIRED" as const,
+      jurisdictionBindingCount: jurisdictionRows.length,
+    };
+  });
+}
+
+/** Read-only lifecycle projection. It deliberately treats every missing or
+ * unresolved source-derived condition as blocked; callers cannot set it. */
+export async function getProviderOnboardingStatus(userId: number): Promise<ProviderOnboardingStatus | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const providerRows = await db.select({
+    id: providers.id,
+    displayName: providers.displayName,
+    categoryId: providers.categoryId,
+  }).from(providers).where(eq(providers.userId, userId)).limit(1);
+  const provider = providerRows[0];
+  if (!provider) return null;
+
+  const catalog = provider.categoryId == null
+    ? "missing" as const
+    : resolveCanonicalServiceIdentity(await loadServiceCatalogSnapshot(db), { categoryId: provider.categoryId }).status === "RESOLVED"
+      ? "selected" as const
+      : "invalid" as const;
+  const models = await db.select({
+    countryCode: providerOperatingModels.jurisdictionCode,
+    providerType: providerOperatingModels.operatingModel,
+    jurisdictionId: jurisdictions.id,
+  }).from(providerOperatingModels).innerJoin(jurisdictions,
+    eq(jurisdictions.countryCode, providerOperatingModels.jurisdictionCode),
+  ).where(and(
+    eq(providerOperatingModels.providerId, provider.id),
+    eq(providerOperatingModels.reviewStatus, "verified"),
+    eq(jurisdictions.status, "active"),
+  ));
+  const verifiedModels = models.filter((model) => model.providerType !== "unresolved");
+  const capabilities = await db.select({
+    capabilityId: providerCapabilityStatuses.capabilityId,
+    jurisdictionId: providerCapabilityStatuses.jurisdictionId,
+    decision: providerCapabilityStatuses.status,
+    categoryId: serviceCapabilities.categoryId,
+    capabilityStatus: serviceCapabilities.status,
+  }).from(providerCapabilityStatuses).innerJoin(serviceCapabilities,
+    eq(serviceCapabilities.id, providerCapabilityStatuses.capabilityId),
+  ).where(eq(providerCapabilityStatuses.providerId, provider.id));
+  const verifiedCapabilities = capabilities.filter((capability) =>
+    capability.capabilityStatus === "active" && capability.categoryId === provider.categoryId &&
+    (capability.decision === "VERIFIED" || capability.decision === "VERIFIED_LIMITED_SCOPE"),
+  );
+  const requirements = await getProviderRequirementsForCatalog(db, { categoryId: provider.categoryId ?? null });
+  const documents = await getProviderDocuments(provider.id);
+  const documentsApproved = requirements.required.every((requirement) =>
+    documents.some((document) => document.type === requirement.type && document.status === "approved"),
+  );
+  const credentialRows = await db.select({
+    jurisdictionId: providerCredentials.jurisdictionId,
+    credentialType: providerCredentials.credentialType,
+    assuranceLevel: providerCredentials.assuranceLevel,
+    status: providerCredentials.status,
+    expiresAt: providerCredentials.expiresAt,
+    verifiedAt: providerCredentials.verifiedAt,
+    reviewedByUserId: providerCredentials.reviewedByUserId,
+    revocationStatus: providerCredentials.revocationStatus,
+    ruleVersion: providerCredentials.ruleVersion,
+  }).from(providerCredentials).where(eq(providerCredentials.providerId, provider.id));
+
+  let launchGate: ProviderOnboardingStatus["launchGate"] = "blocked";
+  let credentials: ProviderOnboardingStatus["credentials"] = "blocked_or_missing";
+  try {
+    if (verifiedModels.length === 0 || verifiedCapabilities.length === 0) throw new Error("ONBOARDING_REVIEW_INCOMPLETE");
+    for (const model of verifiedModels) {
+      await assertCountryMarketplaceTransition({ countryCode: model.countryCode, transition: "PROVIDER_ACTIVATION" });
+    }
+    launchGate = "eligible";
+    for (const capability of verifiedCapabilities) {
+      const model = verifiedModels.find((candidate) => candidate.jurisdictionId === capability.jurisdictionId);
+      if (!model) throw new Error("PROVIDER_TYPE_UNRESOLVED");
+      const requirementRows = await db.select({
+        requirementId: credentialRequirementCatalog.id,
+        jurisdictionId: credentialRequirementCatalog.jurisdictionId,
+        categoryId: credentialRequirementCatalog.categoryId,
+        subcategoryId: credentialRequirementCatalog.subcategoryId,
+        capabilityId: credentialRequirementCatalog.capabilityId,
+        providerType: credentialRequirementCatalog.providerType,
+        credentialType: credentialRequirementCatalog.credentialType,
+        requirementState: credentialRequirementCatalog.requirementState,
+        minimumAssurance: credentialRequirementCatalog.minimumAssurance,
+        requiresHumanReview: credentialRequirementCatalog.requiresHumanReview,
+        officialSourceId: credentialRequirementCatalog.officialSourceId,
+        sourceReferenceIds: credentialRequirementCatalog.sourceReferenceIdsJson,
+        sourceVersion: credentialRequirementCatalog.sourceVersion,
+        ruleVersion: credentialRequirementCatalog.ruleVersion,
+        provenance: credentialRequirementCatalog.provenanceJson,
+      }).from(credentialRequirementCatalog).where(and(
+        eq(credentialRequirementCatalog.jurisdictionId, capability.jurisdictionId),
+        eq(credentialRequirementCatalog.capabilityId, capability.capabilityId),
+        eq(credentialRequirementCatalog.providerType, model.providerType as ProviderRequirementType),
+        eq(credentialRequirementCatalog.isActive, 1),
+      ));
+      assertProviderCredentialForRequest({
+        request: {
+          jurisdictionId: capability.jurisdictionId,
+          requiredCredentialType: null,
+          requiredCredentialAssurance: null,
+          requiresCredentialHumanReview: null,
+          credentialRequirementsJson: requirementRows.map((requirement) => ({
+            ...requirement,
+            requiresHumanReview: requirement.requiresHumanReview === 1,
+          })),
+          compliancePackageVersion: requirementRows[0]?.ruleVersion ?? "unknown",
+        },
+        providerType: model.providerType as ProviderRequirementType,
+        providerCredentials: credentialRows,
+      });
+    }
+    credentials = "verified";
+  } catch {
+    launchGate = "blocked";
+    credentials = "blocked_or_missing";
+  }
+  const profile = provider.displayName.trim().length > 0 ? "complete" as const : "incomplete" as const;
+  const jurisdiction = verifiedModels.length > 0 ? "verified" as const : "pending_or_missing" as const;
+  const capability = verifiedCapabilities.length > 0 ? "verified" as const : "pending_or_missing" as const;
+  const activationDecision = decideProviderOnboardingActivation({
+    profileComplete: profile === "complete",
+    canonicalServiceSelected: catalog === "selected",
+    verifiedJurisdictionCount: verifiedModels.length,
+    verifiedCapabilityCount: verifiedCapabilities.length,
+    dynamicCredentialsVerified: credentials === "verified",
+    documentsApproved,
+    countryLaunchEligible: launchGate === "eligible",
+  });
+  const activation = activationDecision.status === "ELIGIBLE" ? "eligible" as const : "blocked" as const;
+  return {
+    providerId: provider.id,
+    profile,
+    canonicalService: catalog,
+    jurisdiction,
+    capability,
+    credentials,
+    documents: documentsApproved ? "approved" : "pending_or_missing",
+    launchGate,
+    activation,
+  };
+}
+
 export async function getProviderDocumentRequirements(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -4108,21 +4601,16 @@ export async function getProviderDocumentRequirements(userId: number) {
   const rows = await db
     .select({
       providerId: providers.id,
-      categorySlug: serviceCategories.slug,
-      categoryName: serviceCategories.name,
+      categoryId: providers.categoryId,
     })
     .from(providers)
-    .leftJoin(serviceCategories, eq(serviceCategories.id, providers.categoryId))
     .where(eq(providers.userId, userId));
   const provider = rows[0];
   if (!provider) return null;
 
   return {
     providerId: provider.providerId,
-    ...resolveProviderDocumentRequirements({
-      categorySlug: provider.categorySlug ?? null,
-      categoryName: provider.categoryName ?? null,
-    }),
+    ...await getProviderRequirementsForCatalog(db, { categoryId: provider.categoryId ?? null }),
   };
 }
 
@@ -4315,7 +4803,9 @@ async function getTrackingAccessContext(requestId: number) {
       requiredCredentialType: serviceRequests.requiredCredentialType,
       requiredCredentialAssurance: serviceRequests.requiredCredentialAssurance,
       requiresCredentialHumanReview: serviceRequests.requiresCredentialHumanReview,
+      credentialRequirementsJson: serviceRequests.credentialRequirementsJson,
       compliancePackageVersion: serviceRequests.compliancePackageVersion,
+      serviceCountryCode: serviceRequests.serviceCountryCode,
       categoryName: serviceCategories.name,
       providerUserId: providers.userId,
       providerName: providers.displayName,
@@ -4567,8 +5057,21 @@ export async function updateJobLifecycle(data: {
         })
         .from(providerCredentials)
         .where(eq(providerCredentials.providerId, context.assignedProviderId));
+      const operatingModelRows = await tx
+        .select({ operatingModel: providerOperatingModels.operatingModel })
+        .from(providerOperatingModels)
+        .where(and(
+          eq(providerOperatingModels.providerId, context.assignedProviderId),
+          eq(providerOperatingModels.jurisdictionCode, context.serviceCountryCode),
+          eq(providerOperatingModels.reviewStatus, "verified"),
+        ))
+        .limit(2);
+      const providerType = operatingModelRows.length === 1 && operatingModelRows[0]?.operatingModel !== "unresolved"
+        ? operatingModelRows[0]!.operatingModel as ProviderRequirementType
+        : null;
       assertProviderCredentialForRequest({
         request: context,
+        providerType,
         providerCredentials: providerCredentialStatuses,
       });
       await assertProviderP11PolicyEligibility({
@@ -5291,6 +5794,11 @@ export async function acceptOffer(offerId: number, userId: number) {
     if (request.userId !== userId) throw new Error("OFFER_ACCEPT_FORBIDDEN");
     if (request.status !== "pending") throw new Error("OFFER_ACCEPT_REQUEST_NOT_PENDING");
     if (offer.status !== "pending") throw new Error("OFFER_ACCEPT_NOT_PENDING");
+    await assertCountryMarketplaceTransition({
+      countryCode: request.serviceCountryCode,
+      jurisdictionId: request.jurisdictionId,
+      transition: "OFFER_ACCEPTANCE",
+    });
 
     const providerRows = await tx
       .select()
@@ -5324,7 +5832,19 @@ export async function acceptOffer(offerId: number, userId: number) {
       })
       .from(providerCredentials)
       .where(eq(providerCredentials.providerId, provider.id));
-    assertProviderCredentialForRequest({ request, providerCredentials: providerCredentialStatuses });
+    const operatingModelRows = await tx
+      .select({ operatingModel: providerOperatingModels.operatingModel })
+      .from(providerOperatingModels)
+      .where(and(
+        eq(providerOperatingModels.providerId, provider.id),
+        eq(providerOperatingModels.jurisdictionCode, request.serviceCountryCode),
+        eq(providerOperatingModels.reviewStatus, "verified"),
+      ))
+      .limit(2);
+    const providerType = operatingModelRows.length === 1 && operatingModelRows[0]?.operatingModel !== "unresolved"
+      ? operatingModelRows[0]!.operatingModel as ProviderRequirementType
+      : null;
+    assertProviderCredentialForRequest({ request, providerType, providerCredentials: providerCredentialStatuses });
     await assertProviderP11PolicyEligibility({
       providerId: provider.id,
       requestId: request.id,
@@ -6331,15 +6851,7 @@ export async function getNewJobsForProvider(providerId: number) {
   const categoryId = provider.categoryId;
   if (!categoryId || provider.isAvailable !== 1 || provider.isVerified !== 1 || provider.verificationStatus !== "approved") return [];
 
-  const categoryRows = await db
-    .select({ slug: serviceCategories.slug, name: serviceCategories.name })
-    .from(serviceCategories)
-    .where(eq(serviceCategories.id, categoryId))
-    .limit(1);
-  const onboardingRequirements = resolveProviderDocumentRequirements({
-    categorySlug: categoryRows[0]?.slug ?? null,
-    categoryName: categoryRows[0]?.name ?? null,
-  });
+  const onboardingRequirements = await getProviderRequirementsForCatalog(db, { categoryId });
   // A category with no approved-source mapping may not receive work. This keeps
   // UNKNOWN = BLOCK while still permitting the provider to access their documents.
   if (!onboardingRequirements.sourceMatched) return [];
@@ -6372,7 +6884,22 @@ export async function getNewJobsForProvider(providerId: number) {
     .orderBy(desc(serviceRequests.createdAt))
     .limit(100);
 
+  const enabledCountries = new Set<string>();
+  for (const candidateCountryCode of [...new Set(candidates.map((candidate) => candidate.serviceCountryCode))]) {
+    try {
+      await assertCountryMarketplaceTransition({
+        countryCode: candidateCountryCode,
+        transition: "OPPORTUNITY_EXPOSURE",
+      });
+      enabledCountries.add(candidateCountryCode);
+    } catch {
+      // A disabled or unknown country must not expose a new opportunity. The
+      // candidate remains historically readable to customer and admin paths.
+    }
+  }
+
   const eligibleCandidates = candidates.filter((candidate) => {
+    if (!enabledCountries.has(candidate.serviceCountryCode)) return false;
     const capabilityStatus =
       candidate.requiredCapabilityId == null || candidate.jurisdictionId == null
         ? null
@@ -6492,6 +7019,30 @@ export async function getPaymentQuote(requestId: number, userId: number) {
     commissionAmount: agreement.commissionAmount,
     providerPayout: agreement.providerPayout,
   };
+}
+
+/** Validates checkout country readiness before a gateway reservation or external call. */
+export async function assertPaymentInitiationCountryLaunch(input: { paymentId: number; userId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("COUNTRY_LAUNCH_GATE_BLOCKED:PAYMENT_INITIATION:DATABASE_UNAVAILABLE");
+  const rows = await db
+    .select({
+      paymentUserId: payments.userId,
+      countryCode: serviceRequests.serviceCountryCode,
+      jurisdictionId: serviceRequests.jurisdictionId,
+    })
+    .from(payments)
+    .innerJoin(serviceRequests, eq(serviceRequests.id, payments.requestId))
+    .where(eq(payments.id, input.paymentId))
+    .limit(1);
+  const payment = rows[0];
+  if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+  if (payment.paymentUserId !== input.userId) throw new Error("PAYMENT_FORBIDDEN");
+  return assertCountryMarketplaceTransition({
+    countryCode: payment.countryCode,
+    jurisdictionId: payment.jurisdictionId,
+    transition: "PAYMENT_INITIATION",
+  });
 }
 
 /** Returns the immutable, customer-visible price ceiling to an authorized job participant. */

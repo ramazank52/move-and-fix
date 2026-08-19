@@ -449,6 +449,27 @@
       "when": 1787133000000,
       "tag": "0064_p13_provider_document_dynamic_types",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "5",
+      "when": 1787140000000,
+      "tag": "0065_p14_canonical_service_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "5",
+      "when": 1787141000000,
+      "tag": "0066_p14_dynamic_credential_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1787212800000,
+      "tag": "0067_p14_provider_document_reviewer_permission",
+      "breakpoints": true
     }
   ]
 }
