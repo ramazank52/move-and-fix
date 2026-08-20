@@ -3,14 +3,18 @@ import { describe, expect, it } from "vitest";
 import { createPolicyBoundMoveAiResponse, resolveMoveAiCategory } from "../server/ai/MoveAiResponsePolicy";
 
 describe("MoveAI response policy", () => {
-  it("accepts only known service categories", () => {
+  it("normalizes only syntactically valid pre-validated canonical aliases", () => {
     expect(resolveMoveAiCategory("plumbing")).toBe("plumbing");
-    expect(resolveMoveAiCategory("regulated-expert")).toBe("general");
+    expect(resolveMoveAiCategory("Regulated-Expert")).toBe("regulated-expert");
     expect(resolveMoveAiCategory(undefined)).toBe("general");
   });
 
   it("returns deterministic, proposal-only language without pricing or availability claims", () => {
-    const output = createPolicyBoundMoveAiResponse({ category: "towing", draftCreated: true });
+    const output = createPolicyBoundMoveAiResponse({
+      category: "towing",
+      categoryLabel: "Çekici",
+      draftCreated: true,
+    });
 
     expect(output.category).toBe("towing");
     expect(output.response).toContain("hizmet taslağı");
@@ -28,5 +32,17 @@ describe("MoveAI response policy", () => {
     const output = createPolicyBoundMoveAiResponse({ category: "electrical", draftCreated: false, riskBlocked: true });
     expect(output.response).toContain("güvenlik incelemesi");
     expect(output.response).toContain("acil yardım");
+  });
+
+  it("uses the selected supported language without reverting to a separate policy dictionary", () => {
+    const output = createPolicyBoundMoveAiResponse({
+      category: "plumbing",
+      categoryLabel: "Plumbing",
+      draftCreated: true,
+      language: "en",
+    });
+
+    expect(output.response).toContain("service draft");
+    expect(output.suggestions).toEqual(["Review request", "Add details", "Confirm draft"]);
   });
 });

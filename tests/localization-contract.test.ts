@@ -208,4 +208,38 @@ describe("yerelleştirme sözleşmesi", () => {
     expect(profileSource).not.toContain(">Profil Bilgileri<");
     expect(profileSource).not.toContain('accessibilityLabel="Profil bilgilerini kaydet"');
   });
+
+  it("P17-06 profesyonel belge kapsamı ve durum metinlerini 13 dilde raw-key olmadan çözer", () => {
+    const keys = [
+      "provider.documents.scopeReviewTitle",
+      "provider.documents.scopeReviewBody",
+      "provider.documents.scopeCapabilitiesTitle",
+      "provider.documents.scopeCapabilitiesBody",
+      "provider.documents.workingModel",
+      "provider.documents.assurance",
+      "provider.documents.status",
+      "provider.documents.statusRequired",
+      "provider.documents.statusConditional",
+      "provider.documents.statusProhibited",
+      "provider.documents.statusNotRequired",
+      "provider.documents.statusLegalReview",
+      "provider.documents.humanReview",
+    ] as const;
+
+    for (const language of LANGUAGES) {
+      for (const key of keys) {
+        expect(t(key, language.code)).not.toBe(key);
+      }
+    }
+    expect(t("provider.documents.scopeReviewTitle", "tr")).toBe("Yetkinlik belgesi incelemesi bekliyor");
+  });
+
+  it("P17-06 profesyonel belge ekranında denetlenmiş kapsam/durum metinleri ve upload hatası yerelleştirilir", () => {
+    const source = readFileSync(resolve(process.cwd(), "app/provider-documents.tsx"), "utf8");
+    expect(source).toContain('t("provider.documents.scopeCapabilitiesTitle")');
+    expect(source).toContain("t(stateKey)");
+    expect(source).toContain('t("provider.documents.readFailedBody")');
+    expect(source).not.toContain("onError: (error) => Alert.alert");
+    expect(source).not.toContain(">Hizmet kapsamı yetkinlikleri<");
+  });
 });

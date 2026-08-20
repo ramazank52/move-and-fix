@@ -30,6 +30,20 @@ describe("P16 MoveAI canonical catalog and country launch contract", () => {
     expect(source).toContain("trpc.countryRegistry.list.useQuery()");
     expect(source).toContain("countryCode: selectableCountries[0]!.countryCode");
     expect(source).toContain("countryCode: country.countryCode");
+    expect(source).toContain("language,");
+  });
+
+  it("accepts a model alias only when it is an active canonical catalog candidate", () => {
+    const source = readProjectFile("server/routers.ts");
+    const repository = readProjectFile("server/db.ts");
+
+    expect(source).toContain("const catalogCandidates = await db.listMoveAiCatalogCandidates()");
+    expect(source).toContain("const canonicalCandidate = catalogCandidates.find((item) => item.alias === category)");
+    expect(source).toContain("if (parsed.shouldCreateRequest && canonicalCandidate)");
+    expect(source).toContain("const catalogResolution = await db.resolveMoveAiCatalogCategory(category)");
+    expect(source).toContain('catalogResolution: "MISSING_SERVICE_CATALOG_MAPPING" as const');
+    expect(repository).toContain('if (entry.namespace !== "external_service" || entry.isActive !== 1) continue');
+    expect(repository).toContain('if (resolution.status !== "RESOLVED") continue');
   });
 
   it("exposes enabled and payment-ready jurisdictions as selectable, while retaining explicit non-selectable availability", () => {

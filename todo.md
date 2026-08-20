@@ -632,8 +632,8 @@
 - [x] P17-03-R — Uygulanmış 0081 scanner migration’ı için eksik Drizzle journal kaydını source-of-truth ile hizala
 - [x] P17-04 — Explicit legacy encryption key contract, gerçek old-key decrypt/migration roundtrip ve fail-closed rotation testlerini uygula
 - [x] P17-05 — Masraf Dosyası multi-evidence collection, secure video desteği ve scanner-bound persistence akışını uygula
-- [ ] P17-06 — Tüm production app/components user-facing metinlerini 13-dil i18n’ye taşı, RTL/hard-coded UI scanner kapsamını genişlet
-- [ ] P17-07 — MoveAI candidate taxonomy’yi public-safe canonical catalog snapshot ve locale-aware response policy ile birleştir
+- [x] P17-06 — Tüm production app/components user-facing metinlerini 13-dil i18n’ye taşı, RTL/hard-coded UI scanner kapsamını genişlet
+- [x] P17-07 — MoveAI candidate taxonomy’yi public-safe canonical catalog snapshot ve locale-aware response policy ile birleştir
 - [ ] P17-08 — SPDX expression-aware license policy, attribution çıktısı ve behavioral parser testlerini uygula
 - [ ] P17-09 — qs runtime vulnerability için uyumlu remediable resolution/upgrade araştır, uygulayabiliyorsa güvenli yükseltme ve finansal regressions çalıştır
 - [ ] P17-10 — Deterministik JSON tabanlı SCA parser/CI policy, advisory/path/disposition raporları ve approved toolchain exception kaydını uygula

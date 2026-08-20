@@ -2352,6 +2352,7 @@ export const appRouter = router({
         message: z.string().min(1).max(500),
         attachedMediaOpaqueIds: z.array(z.string().uuid()).max(4).optional(),
         mediaConsentGranted: z.boolean().optional().default(false),
+        language: z.enum(["tr", "en", "de", "fr", "ar", "ru", "zh", "hi", "es", "pt", "bn", "id", "ja"]).optional().default("tr"),
       }).superRefine((value, validation) => {
         const decision = evaluateMoveAiMediaConsent({
           opaqueIds: value.attachedMediaOpaqueIds,
@@ -2365,10 +2366,19 @@ export const appRouter = router({
         // Use built-in LLM to understand intent and generate response
         try {
           const { invokeLLM } = await import("./_core/llm.js");
-          const systemPrompt = `Sen MoveAI'sin, bir Türk hizmet pazaryeri asistanı. Kullanıcının niyetini anla ve uygun hizmet kategorisini belirle.
-Kategoriler: plumbing (Su Tesisatı), electrical (Elektrik), cleaning (Temizlik), hvac (Klima/Isıtma), towing (Çekici), courier (Kurye), roadside (Yol Yardımı), locksmith (Çilingir), painting (Boyacı), gardening (Bahçe), moving (Nakliyat), appliance (Beyaz Eşya).
-Yanıt formatı: { "response": "cevap metni", "category": "kategori_id", "suggestions": ["öneri1", "öneri2"], "shouldCreateRequest": true/false }
-Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
+          const catalogCandidates = await db.listMoveAiCatalogCandidates();
+          if (catalogCandidates.length === 0) {
+            return {
+              ...createPolicyBoundMoveAiResponse({ category: "general", draftCreated: false, language: input.language }),
+              requestId: undefined,
+              draftId: undefined,
+              draftStatus: undefined,
+              catalogResolution: "MISSING_SERVICE_CATALOG_MAPPING" as const,
+            };
+          }
+          const systemPrompt = `You are MoveAI, a service marketplace intent classifier. Select a category alias only from this current server-authoritative canonical catalog: ${JSON.stringify(catalogCandidates)}.
+Return strict JSON only: { "category": "canonical_alias_or_general", "shouldCreateRequest": true|false }.
+Do not infer unavailable categories. If no candidate is exact enough, use "general" and false. Do not make availability, pricing, payment, legal, insurance, or completion claims.`;
           const result = await invokeLLM({
             messages: [
               { role: "system", content: systemPrompt },
@@ -2381,35 +2391,25 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
             ? result.choices[0].message.content
             : "";
 
-          // Try to parse as JSON first; if that fails, use the raw text as the response
-          let parsed: { response?: string; category?: string; suggestions?: string[]; shouldCreateRequest?: boolean } = {};
+          // Non-JSON model output is intentionally treated as general. Keyword
+          // inference would be a second, non-canonical service taxonomy.
+          let parsed: { category?: string; shouldCreateRequest?: boolean } = {};
           try {
             parsed = contentStr ? JSON.parse(contentStr) : {};
-          } catch {
-            // Not JSON — use the raw text as the response and try keyword-based category detection
-            const lower = input.message.toLowerCase();
-            let category = "general";
-            if (lower.includes("su") && (lower.includes("akı") || lower.includes("patla"))) category = "plumbing";
-            else if (lower.includes("araba") && (lower.includes("kal") || lower.includes("bozul"))) category = "towing";
-            else if (lower.includes("klima") && (lower.includes("soğut") || lower.includes("çalış"))) category = "hvac";
-            else if (lower.includes("çekici")) category = "towing";
-            else if (lower.includes("kurye")) category = "courier";
-            else if (lower.includes("elektrik")) category = "electrical";
-            else if (lower.includes("temizlik")) category = "cleaning";
-            parsed = { response: contentStr || "Size yardımcı olmaya çalışıyorum.", category, shouldCreateRequest: true };
-          }
+          } catch { parsed = {}; }
 
           // AI output is a proposal only. It never creates a service request
           // until its owner uses the separate explicit confirmation endpoint.
           let draftId: number | undefined;
           let draftStatus: "draft" | "blocked" | undefined;
           const category = resolveMoveAiCategory(parsed.category);
+          const canonicalCandidate = catalogCandidates.find((item) => item.alias === category);
           let riskBlocked = false;
-          if (parsed.shouldCreateRequest && category !== "general") {
+          if (parsed.shouldCreateRequest && canonicalCandidate) {
             const catalogResolution = await db.resolveMoveAiCatalogCategory(category);
             if (catalogResolution.status !== "RESOLVED") {
               return {
-                ...createPolicyBoundMoveAiResponse({ category: "general", draftCreated: false }),
+                ...createPolicyBoundMoveAiResponse({ category: "general", draftCreated: false, language: input.language }),
                 requestId: undefined,
                 draftId: undefined,
                 draftStatus: undefined,
@@ -2425,9 +2425,9 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
             const draft = await db.createMoveAiDraft({
               userId: ctx.user.id,
               sourceMessage: input.message,
-              assistantSummary: parsed.response ?? "Hizmet taslağı hazırlandı.",
+              assistantSummary: `MoveAI canonical classification: ${canonicalCandidate.alias}`,
               categoryId: catalogResolution.value.categoryId,
-              suggestions: parsed.suggestions ?? [],
+              suggestions: [],
               riskLevel,
               attachedMediaOpaqueIds: input.attachedMediaOpaqueIds,
               mediaConsentGrantedAt: input.mediaConsentGranted ? new Date() : undefined,
@@ -2438,9 +2438,11 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           }
 
           const safeResponse = createPolicyBoundMoveAiResponse({
-            category,
+            category: canonicalCandidate?.alias ?? "general",
+            categoryLabel: canonicalCandidate?.label,
             draftCreated: draftStatus === "draft",
             riskBlocked,
+            language: input.language,
           });
 
           return {
@@ -2461,30 +2463,8 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
               cause: error,
             });
           }
-          // Fallback: keyword-based intent detection
-          const lower = input.message.toLowerCase();
-          let category = "general";
-          let response = "Size uygun bir hizmet taslağı hazırlayabilmem için ihtiyacınızla ilgili biraz daha ayrıntı paylaşın.";
-          const suggestions = ["Hizmet türünü belirt", "Konumu ekle", "Zaman tercihini paylaş"];
-
-          if (lower.includes("su") && (lower.includes("akı") || lower.includes("patla"))) {
-            category = "plumbing";
-            response = "Su tesisatı ihtiyacınız için ayrıntıları kontrol ederek bir hizmet taslağı hazırlayabilirim.";
-          } else if (lower.includes("araba") && (lower.includes("kal") || lower.includes("bozul"))) {
-            category = "towing";
-            response = "Araç arızası için çekici veya yol yardımı talep taslağı hazırlayabilirim.";
-          } else if (lower.includes("klima") && (lower.includes("soğut") || lower.includes("çalış"))) {
-            category = "hvac";
-            response = "Klima hizmeti için talep taslağınızı ayrıntılarla birlikte hazırlayabilirim.";
-          } else if (lower.includes("çekici")) {
-            category = "towing";
-            response = "Çekici talebi için konum ve araç bilgilerini ekleyebilirsiniz.";
-          } else if (lower.includes("kurye")) {
-            category = "courier";
-            response = "Kurye talebi için paket ve teslimat bilgilerini ekleyebilirsiniz.";
-          }
-
-          return { response, category, suggestions, requestId: undefined, draftId: undefined, draftStatus: undefined };
+          const safeResponse = createPolicyBoundMoveAiResponse({ category: "general", draftCreated: false, language: input.language });
+          return { ...safeResponse, requestId: undefined, draftId: undefined, draftStatus: undefined };
         }
       }),
     getDraft: protectedProcedure

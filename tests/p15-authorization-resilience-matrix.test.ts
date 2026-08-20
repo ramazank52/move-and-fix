@@ -18,7 +18,11 @@ describe("P15 authorization and resilience matrix", () => {
   });
 
   it("keeps permitted MoveAI text non-authoritative and draft-only", () => {
-    const result = createPolicyBoundMoveAiResponse({ category: "plumbing", draftCreated: true });
+    const result = createPolicyBoundMoveAiResponse({
+      category: "plumbing",
+      categoryLabel: "Tesisat",
+      draftCreated: true,
+    });
     const serialized = JSON.stringify(result).toLowerCase();
 
     expect(result.category).toBe("plumbing");

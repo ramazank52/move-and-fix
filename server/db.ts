@@ -2871,6 +2871,31 @@ export async function resolveMoveAiCatalogCategory(category: string) {
   });
 }
 
+/**
+ * The model receives only aliases whose current canonical resolution is unique
+ * and active. This intentionally excludes display names and stale aliases.
+ */
+export async function listMoveAiCatalogCandidates() {
+  const database = await getDb();
+  if (!database) throw new Error("SERVICE_CATALOG_NOT_CONFIGURED");
+  const snapshot = await loadServiceCatalogSnapshot(database);
+  const categories = new Map(snapshot.categories.filter((item) => item.isActive === 1).map((item) => [item.id, item]));
+  const subcategories = new Map(snapshot.subcategories.filter((item) => item.isActive === 1).map((item) => [item.id, item]));
+  const candidates = new Map<string, { alias: string; label: string }>();
+
+  for (const entry of snapshot.aliases) {
+    if (entry.namespace !== "external_service" || entry.isActive !== 1) continue;
+    const resolution = resolveServiceCatalogAlias(snapshot, { namespace: "external_service", alias: entry.alias });
+    if (resolution.status !== "RESOLVED") continue;
+    const category = categories.get(resolution.value.categoryId);
+    const subcategory = resolution.value.subcategoryId == null ? undefined : subcategories.get(resolution.value.subcategoryId);
+    if (!category || (resolution.value.subcategoryId != null && !subcategory)) continue;
+    candidates.set(entry.alias, { alias: entry.alias, label: subcategory?.name ?? category.name });
+  }
+
+  return [...candidates.values()].sort((left, right) => left.alias.localeCompare(right.alias));
+}
+
 async function getProviderRequirementsForCatalog(
   database: CatalogDatabaseClient,
   input: { categoryId: number | null; subcategoryId?: number | null },

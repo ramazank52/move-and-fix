@@ -48,7 +48,7 @@ type MoveAiAttachment = {
 export default function AIAssistantScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { t, locale } = useTranslation();
+  const { t, language, locale } = useTranslation();
   const { height: viewportHeight } = useWindowDimensions();
   const quickPrompts = useMemo(
     () => [t("ai.prompt.plumbing"), t("ai.prompt.roadside"), t("ai.prompt.airConditioning"), t("ai.prompt.towTruck"), t("ai.prompt.courier"), t("ai.prompt.priceEstimate")],
@@ -245,8 +245,9 @@ export default function AIAssistantScreen() {
       message: messageText,
       attachedMediaOpaqueIds: attachments.map((attachment) => attachment.opaqueId),
       mediaConsentGranted: attachments.length > 0 ? mediaConsentGranted : false,
+      language,
     });
-  }, [input, loading, aiCommandMutation, attachments, mediaConsentGranted]);
+  }, [input, loading, aiCommandMutation, attachments, mediaConsentGranted, language]);
 
   const handleSuggestion = (suggestion: string) => {
     sendMessage(suggestion);

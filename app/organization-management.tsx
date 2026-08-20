@@ -7,16 +7,9 @@ import { useColors } from "@/hooks/use-colors";
 import { useTranslation } from "@/lib/i18n";
 import { trpc } from "@/lib/trpc";
 
-const COPY = {
-  tr: { title: "Kurumsal Yönetim", subtitle: "Tesis, araç ve planlı bakım", none: "Aktif kurumsal üyeliğiniz yok.", sites: "Lokasyonlar", assets: "Varlıklar", schedules: "Bakım Takvimi", batches: "Toplu İş Talepleri", invoices: "Kurumsal Faturalar", loading: "Kurumsal veriler yükleniyor…", noSites: "Lokasyon eklenmemiş", noAssets: "Kayıtlı varlık yok", noSchedules: "Planlı bakım yok", noBatches: "Toplu iş talebi yok", noInvoices: "Doğrulanmış ödeme kaynaklı fatura yok", error: "Kurumsal veriler yüklenemedi." },
-  en: { title: "Organization Management", subtitle: "Facilities, assets and planned maintenance", none: "You do not have an active organization membership.", sites: "Locations", assets: "Assets", schedules: "Maintenance Schedule", batches: "Bulk Service Requests", invoices: "Organization Invoices", loading: "Loading organization data…", noSites: "No location added", noAssets: "No registered asset", noSchedules: "No planned maintenance", noBatches: "No bulk service request", noInvoices: "No invoice backed by a verified payment", error: "Organization data could not be loaded." },
-  ru: { title: "Управление организацией", subtitle: "Объекты, активы и плановое обслуживание", none: "У вас нет активного членства в организации.", sites: "Локации", assets: "Активы", schedules: "График обслуживания", batches: "Пакетные заявки", invoices: "Корпоративные счета", loading: "Загрузка данных организации…", noSites: "Локации не добавлены", noAssets: "Нет зарегистрированных активов", noSchedules: "Нет планового обслуживания", noBatches: "Пакетных заявок нет", noInvoices: "Нет счёта на основе подтверждённой оплаты", error: "Не удалось загрузить данные организации." },
-} as const;
-
 export default function OrganizationManagementScreen() {
   const colors = useColors();
-  const { locale } = useTranslation();
-  const copy = COPY[locale === "en" || locale === "ru" ? locale : "tr"];
+  const { locale, t } = useTranslation();
   const styles = createStyles(colors);
   const organizations = trpc.organizations.list.useQuery(undefined, { retry: false });
   const organization = organizations.data?.[0] ?? null;
@@ -41,11 +34,11 @@ export default function OrganizationManagementScreen() {
               <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
                 <IconSymbol name="chevron.left" size={20} color={colors.foreground} />
               </Pressable>
-              <View style={styles.headerText}><Text style={styles.title}>{copy.title}</Text><Text style={styles.subtitle}>{copy.subtitle}</Text></View>
+              <View style={styles.headerText}><Text style={styles.title}>{t("organization.title")}</Text><Text style={styles.subtitle}>{t("organization.subtitle")}</Text></View>
             </View>
-            {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary} /><Text style={styles.stateText}>{copy.loading}</Text></View> : null}
-            {hasError ? <View style={styles.state}><Text style={styles.errorText}>{copy.error}</Text></View> : null}
-            {!loading && !hasError && !organization ? <View style={styles.state}><IconSymbol name="building.2.fill" size={30} color={colors.muted} /><Text style={styles.stateText}>{copy.none}</Text></View> : null}
+            {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary} /><Text style={styles.stateText}>{t("organization.loading")}</Text></View> : null}
+            {hasError ? <View style={styles.state}><Text style={styles.errorText}>{t("organization.error")}</Text></View> : null}
+            {!loading && !hasError && !organization ? <View style={styles.state}><IconSymbol name="building.2.fill" size={30} color={colors.muted} /><Text style={styles.stateText}>{t("organization.none")}</Text></View> : null}
           </>
         )}
         renderItem={({ item }) => (
@@ -54,11 +47,11 @@ export default function OrganizationManagementScreen() {
               <View style={styles.organizationIcon}><IconSymbol name={item.type === "fleet" ? "car.fill" : "building.2.fill"} size={22} color={colors.primary} /></View>
               <View style={styles.flex}><Text style={styles.organizationName}>{item.name}</Text><Text style={styles.organizationMeta}>{item.type} · {item.memberRole}</Text></View>
             </View>
-            <Section title={copy.sites} icon="location.fill" empty={copy.noSites} items={sites.data?.map((site) => ({ id: site.id, title: site.name, subtitle: site.address })) ?? []} styles={styles} colors={colors} />
-            <Section title={copy.assets} icon="briefcase.fill" empty={copy.noAssets} items={assets.data?.map((asset) => ({ id: asset.id, title: asset.name, subtitle: asset.kind })) ?? []} styles={styles} colors={colors} />
-            <Section title={copy.schedules} icon="calendar" empty={copy.noSchedules} items={schedules.data?.map((schedule) => ({ id: schedule.id, title: schedule.title, subtitle: `${schedule.cadence} · ${new Date(schedule.nextRunAt).toLocaleDateString(locale === "tr" ? "tr-TR" : locale === "ru" ? "ru-RU" : "en-US")}` })) ?? []} styles={styles} colors={colors} />
-            <Section title={copy.batches} icon="briefcase.fill" empty={copy.noBatches} items={batches.data?.map((batch) => ({ id: batch.id, title: batch.title, subtitle: `${batch.status} · ${batch.requestIds.length}` })) ?? []} styles={styles} colors={colors} />
-            <Section title={copy.invoices} icon="calendar" empty={copy.noInvoices} items={invoices.data?.map((invoice) => ({ id: invoice.id, title: invoice.invoiceNumber, subtitle: `${invoice.status} · ${invoice.totalAmount} ${invoice.currency}` })) ?? []} styles={styles} colors={colors} />
+            <Section title={t("organization.sites")} icon="location.fill" empty={t("organization.noSites")} items={sites.data?.map((site) => ({ id: site.id, title: site.name, subtitle: site.address })) ?? []} styles={styles} colors={colors} />
+            <Section title={t("organization.assets")} icon="briefcase.fill" empty={t("organization.noAssets")} items={assets.data?.map((asset) => ({ id: asset.id, title: asset.name, subtitle: asset.kind })) ?? []} styles={styles} colors={colors} />
+            <Section title={t("organization.schedules")} icon="calendar" empty={t("organization.noSchedules")} items={schedules.data?.map((schedule) => ({ id: schedule.id, title: schedule.title, subtitle: `${schedule.cadence} · ${new Date(schedule.nextRunAt).toLocaleDateString(locale)}` })) ?? []} styles={styles} colors={colors} />
+            <Section title={t("organization.batches")} icon="briefcase.fill" empty={t("organization.noBatches")} items={batches.data?.map((batch) => ({ id: batch.id, title: batch.title, subtitle: `${batch.status} · ${batch.requestIds.length}` })) ?? []} styles={styles} colors={colors} />
+            <Section title={t("organization.invoices")} icon="calendar" empty={t("organization.noInvoices")} items={invoices.data?.map((invoice) => ({ id: invoice.id, title: invoice.invoiceNumber, subtitle: `${invoice.status} · ${invoice.totalAmount} ${invoice.currency}` })) ?? []} styles={styles} colors={colors} />
           </>
         )}
       />
