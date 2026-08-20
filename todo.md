@@ -637,8 +637,8 @@
 - [x] P17-08 — SPDX expression-aware license policy, attribution çıktısı ve behavioral parser testlerini uygula
 - [x] P17-09 — qs runtime vulnerability için uyumlu remediable resolution/upgrade araştır, uygulayabiliyorsa güvenli yükseltme ve finansal regressions çalıştır
 - [x] P17-10 — Deterministik JSON tabanlı SCA parser/CI policy, advisory/path/disposition raporları ve approved toolchain exception kaydını uygula
-- [ ] P17-11 — Partial settlement downstream analytics, reconciliation ve admin/payment semantic ayrımını authoritative realized amounts ile düzelt
-- [ ] P17-12 — Canonical `MEDIA_SCANNER_CRON_SECRET` dokümantasyon/config sözleşmesini hizala ve config-contract testini ekle
+- [x] P17-11 — Partial settlement downstream analytics, reconciliation ve admin/payment semantic ayrımını authoritative realized amounts ile düzelt
+- [x] P17-12 — Canonical `MEDIA_SCANNER_CRON_SECRET` dokümantasyon/config sözleşmesini hizala ve config-contract testini ekle
 - [ ] P17-13 — Authoritative final-production-status belgesini current P17 durumu en üstte görünecek şekilde yeniden düzenle
 - [ ] P17-14 — Kritik P17 sözleşme smoke testlerinin yanına router/database behavioral test kanıtlarını tamamla
 - [x] P17-15 — qs disposition’ını release classification ile açıkça bağla ve safe resolution yoksa BLOCKED_INTERNAL_DEPENDENCY olarak kaydet

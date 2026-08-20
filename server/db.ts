@@ -10265,6 +10265,18 @@ function percentile(sortedAmounts: number[], p: number) {
   return sortedAmounts[index] ?? null;
 }
 
+/**
+ * A released payment remains usable as price evidence only when no completion
+ * dispute exists, or when that dispute was fully resolved for the provider.
+ * This intentionally treats unknown/new outcomes as ineligible rather than
+ * assuming that the original agreed amount was paid out.
+ */
+export function isEligiblePriceIntelligenceSettlement(
+  disputeStatus: "open" | "under_review" | "resolved_customer" | "resolved_provider" | "resolved_partial" | null | undefined,
+) {
+  return disputeStatus == null || disputeStatus === "resolved_provider";
+}
+
 /** Creates an auditable, non-binding price range from completed settled jobs only. */
 export async function createPriceIntelligenceAssessment(input: {
   requestedByUserId: number;
@@ -10287,11 +10299,16 @@ export async function createPriceIntelligenceAssessment(input: {
     .from(serviceAgreements)
     .innerJoin(serviceRequests, eq(serviceRequests.id, serviceAgreements.requestId))
     .innerJoin(payments, eq(payments.requestId, serviceAgreements.requestId))
+    .leftJoin(completionDisputes, eq(completionDisputes.requestId, serviceAgreements.requestId))
     .where(
       and(
         eq(serviceRequests.categoryId, input.categoryId),
         eq(serviceAgreements.currency, currency),
         eq(payments.status, "released"),
+        // A disputed request is price evidence only after a provider-favoring
+        // full resolution. Partial/customer resolutions and unknown states must
+        // not be interpreted as the original agreed price.
+        or(isNull(completionDisputes.id), eq(completionDisputes.status, "resolved_provider")),
       ),
     )
     .orderBy(serviceAgreements.acceptedAt)
@@ -10305,7 +10322,7 @@ export async function createPriceIntelligenceAssessment(input: {
     nonBinding: true,
     sampleThreshold: 5,
     sampleSize: amounts.length,
-    excluded: "pending, held, refunded, cancelled, external quotes",
+    excluded: "pending, held, refunded, cancelled, customer/partial/unknown disputes, external quotes",
   };
   const result = {
     status: isAvailable ? "available" as const : "insufficient_data" as const,

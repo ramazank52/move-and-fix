@@ -43,6 +43,22 @@ describe("P13 canonical environment contract", () => {
     expect(validation.values.encryptionLegacyKey).toBe("");
   });
 
+  it("uses MEDIA_SCANNER_CRON_SECRET as the only canonical scanner cron authority without inventing a legacy alias", () => {
+    const canonical = validateEnvironmentContract({
+      MEDIA_SCANNER_CRON_SECRET: "cron-secret",
+    });
+    expect(canonical.values.mediaScannerCronSecret).toBe("cron-secret");
+    expect(canonical.issues).toHaveLength(0);
+
+    const undeclaredLegacyName = validateEnvironmentContract({
+      SCANNER_CRON_SECRET: "legacy-secret",
+    });
+    expect(undeclaredLegacyName.values.mediaScannerCronSecret).toBe("");
+    expect(undeclaredLegacyName.issues).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ canonicalName: "MEDIA_SCANNER_CRON_SECRET" }),
+    ]));
+  });
+
   it("rejects a partial encryption rotation while permitting an entirely unconfigured optional operation", () => {
     const partialRotation = validateEnvironmentContract({ ENCRYPTION_KEY_PREVIOUS: "previous-only" });
     expect(partialRotation.issues).toEqual(expect.arrayContaining([
