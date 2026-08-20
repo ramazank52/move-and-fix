@@ -491,6 +491,34 @@
       "when": 1787337600000,
       "tag": "0074_p15_malware_scanner_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1788960000000,
+      "tag": "0075_p16_completion_dispute_partial_settlement",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1788970000000,
+      "tag": "0076_p16_job_safety_fail_closed",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1788980000000,
+      "tag": "0077_p16_expense_evidence_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1788990000000,
+      "tag": "0078_p16_staged_contact_change",
+      "breakpoints": true
     }
   ]
 }

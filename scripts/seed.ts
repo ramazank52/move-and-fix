@@ -1,8 +1,25 @@
 import "dotenv/config";
 import mysql from "mysql2/promise";
+import { pathToFileURL } from "node:url";
 
-async function main() {
-  const conn = await mysql.createConnection(process.env.DATABASE_URL!);
+export const DEV_SEED_FORBIDDEN_IN_PRODUCTION = "DEV_SEED_FORBIDDEN_IN_PRODUCTION";
+export const DEV_SEED_EXPLICIT_OPT_IN_REQUIRED = "DEV_SEED_EXPLICIT_OPT_IN_REQUIRED";
+
+export function assertDevelopmentFixtureSeedAllowed(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.NODE_ENV === "production") {
+    throw new Error(DEV_SEED_FORBIDDEN_IN_PRODUCTION);
+  }
+  if (env.ALLOW_DEV_SEED !== "true") {
+    throw new Error(DEV_SEED_EXPLICIT_OPT_IN_REQUIRED);
+  }
+  if (!env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required for an explicitly enabled development fixture seed.");
+  }
+}
+
+export async function runDevelopmentFixtureSeed(env: NodeJS.ProcessEnv = process.env) {
+  assertDevelopmentFixtureSeedAllowed(env);
+  const conn = await mysql.createConnection(env.DATABASE_URL!);
 
   // 1. Service Categories — matches actual DB schema
   const categories: Array<[number, string, string, string, string, "fixed" | "km_based", number | null, number | null]> = [
@@ -77,4 +94,13 @@ async function main() {
   await conn.end();
 }
 
-main().catch(console.error);
+async function main() {
+  await runDevelopmentFixtureSeed();
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  void main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

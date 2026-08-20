@@ -43,8 +43,10 @@ type OwnerProcedure =
   | "createSettlementPolicy"
   | "retireSettlementPolicy"
   | "cancellationCases"
+  | "completionDisputes"
   | "changeOrders"
   | "reviewCancellationCase"
+  | "planPartialCompletionDisputeSettlement"
   | "riskFlags"
   | "reviewRiskFlag"
   | "featureFlags"
@@ -354,6 +356,22 @@ export function registerOwnerRestRoutes(app: Express) {
     }
   });
 
+  app.get("/api/owner/completion-disputes", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "completionDisputes", {
+          limit: req.query.limit ? Number(req.query.limit) : 20,
+          offset: req.query.offset ? Number(req.query.offset) : 0,
+          status: typeof req.query.status === "string" ? req.query.status : undefined,
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Tamamlanma uyuşmazlığı kayıtları alınamadı");
+    }
+  });
+
   app.get("/api/owner/change-orders", async (req, res) => {
     const user = await requireMoveOsAdmin(req, res);
     if (!user) return;
@@ -382,6 +400,21 @@ export function registerOwnerRestRoutes(app: Express) {
       );
     } catch (error) {
       sendOwnerError(res, error, "İptal kaydı çözümlenemedi");
+    }
+  });
+
+  app.post("/api/owner/completion-disputes/:requestId/partial-settlement", async (req, res) => {
+    const user = await requireMoveOsAdmin(req, res);
+    if (!user) return;
+    try {
+      res.json(
+        await callOwnerProcedure(req, res, user, "planPartialCompletionDisputeSettlement", {
+          ...req.body,
+          requestId: Number(req.params.requestId),
+        }),
+      );
+    } catch (error) {
+      sendOwnerError(res, error, "Kısmi uzlaşma planı kaydedilemedi");
     }
   });
 

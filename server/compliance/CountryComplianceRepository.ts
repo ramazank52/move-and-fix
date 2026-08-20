@@ -170,6 +170,47 @@ export async function listCountryComplianceOverviews() {
   });
 }
 
+/**
+ * Public/mobile-safe projection of the operational country launch state.
+ * Locale, currency and seed data never imply a selectable country.
+ */
+export async function listPublicCountryLaunchOptions() {
+  const overviews = await listCountryComplianceOverviews();
+  return overviews
+    .filter(({ jurisdiction }) => jurisdiction.regionCode === null)
+    .map(({ jurisdiction, gate, paymentReadiness }) => {
+      const selectable = gate?.status === "enabled" && paymentReadiness.ready;
+      return {
+        countryCode: jurisdiction.countryCode,
+        displayName: jurisdiction.displayName,
+        selectable,
+        availability: selectable
+          ? "AVAILABLE" as const
+          : gate?.status === "ready" || gate?.status === "review"
+            ? "COMING_SOON" as const
+            : "BLOCKED" as const,
+      };
+    });
+}
+
+/**
+ * Resolves transaction currency only after the country launch gate authorizes
+ * the requested transition. The client never supplies a trusted currency.
+ */
+export async function resolveCountryPaymentContext(input: {
+  countryCode: string;
+  transition: CountryMarketplaceTransition;
+}) {
+  const transition = await assertCountryMarketplaceTransition(input);
+  if (transition.countryCode !== "TR") {
+    // Every currently non-TR country is blocked by the launch/payment gate;
+    // keep this explicit guard so a future gate cannot silently invent a
+    // transaction currency before a reviewed resolver is introduced.
+    throw new Error(`COUNTRY_CURRENCY_CONTEXT_UNRESOLVED:${transition.countryCode}`);
+  }
+  return { countryCode: transition.countryCode, currency: "TRY" as const };
+}
+
 export async function createCountryJurisdiction(input: {
   countryCode: string;
   regionCode?: string | null;

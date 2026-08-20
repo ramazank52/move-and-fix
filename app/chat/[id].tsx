@@ -237,6 +237,17 @@ export default function ChatRoomScreen() {
               : t("chat.userMeta")}
           </Text>
         </View>
+        {hasValidConversationContext && requestId ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("chat.expenseFileAccessibility")}
+            accessibilityHint={t("chat.expenseFileHint")}
+            onPress={() => router.push(`/expenses/${requestId}` as any)}
+            style={({ pressed }) => ({ paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10, backgroundColor: colors.primary + "16", opacity: pressed ? 0.7 : 1 })}
+          >
+            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "800" }}>{t("chat.expenseFile")}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <Pressable

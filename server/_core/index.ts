@@ -207,11 +207,11 @@ export async function createApp() {
     }
   });
 
-  // This scheduler-only bridge drains one durable outbox item. It is unavailable
-  // without the scanner trust secret and never creates a clean result: the
-  // scanner's separately signed callback remains authoritative.
+  // This scheduler-only bridge drains one durable outbox item. Its credential
+  // is intentionally distinct from the scanner callback HMAC secret: cron may
+  // schedule work but cannot forge an authoritative scan decision.
   app.post("/api/scheduled/media-scanner-dispatch", async (req, res) => {
-    const configuredSecret = ENV.mediaScannerCallbackSecret;
+    const configuredSecret = ENV.mediaScannerCronSecret;
     const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
     const actualAuthorization = String(req.headers.authorization ?? "");
     const hasAuthorizationMatch = expectedAuthorization.length > 0
@@ -219,7 +219,7 @@ export async function createApp() {
       && timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
     if (!hasAuthorizationMatch) {
       res.status(configuredSecret ? 401 : 503).json({
-        error: configuredSecret ? "Unauthorized scheduled callback" : "MEDIA_SCANNER_NOT_CONFIGURED",
+        error: configuredSecret ? "Unauthorized scheduled callback" : "MEDIA_SCANNER_CRON_NOT_CONFIGURED",
       });
       return;
     }
@@ -232,6 +232,38 @@ export async function createApp() {
         error,
       });
       res.status(500).json({ error: "MEDIA_SCANNER_DISPATCH_FAILED" });
+    }
+  });
+
+  // The watchdog never marks media clean. It only treats elapsed callback
+  // deadlines as a bounded dispatch failure, preserving quarantine and audit.
+  app.post("/api/scheduled/media-scanner-watchdog", async (req, res) => {
+    const configuredSecret = ENV.mediaScannerCronSecret;
+    const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
+    const actualAuthorization = String(req.headers.authorization ?? "");
+    const hasAuthorizationMatch = expectedAuthorization.length > 0
+      && actualAuthorization.length === expectedAuthorization.length
+      && timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
+    if (!hasAuthorizationMatch) {
+      res.status(configuredSecret ? 401 : 503).json({
+        error: configuredSecret ? "Unauthorized scheduled callback" : "MEDIA_SCANNER_CRON_NOT_CONFIGURED",
+      });
+      return;
+    }
+    const limit = req.body?.limit == null ? undefined : Number(req.body.limit);
+    try {
+      const result = await db.recoverTimedOutMediaScannerJobs({ limit });
+      res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof Error && error.message === "MEDIA_SCANNER_WATCHDOG_LIMIT_INVALID") {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      console.error("[media-scanner] watchdog failed", {
+        requestId: req.header("x-request-id") ?? "unknown",
+        error,
+      });
+      res.status(500).json({ error: "MEDIA_SCANNER_WATCHDOG_FAILED" });
     }
   });
 

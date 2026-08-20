@@ -171,7 +171,7 @@ export default function CreateServiceScreen() {
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState<string>("today");
   const [address, setAddress] = useState("");
-  const [countryCode, setCountryCode] = useState<"TR" | null>(null);
+  const [countryCode, setCountryCode] = useState<string | null>(null);
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [subcategoryId, setSubcategoryId] = useState<number | undefined>();
@@ -191,11 +191,13 @@ export default function CreateServiceScreen() {
   const [attributes, setAttributes] = useState<Record<string, RequestAttributeValue>>({});
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const categoriesQuery = trpc.categories.list.useQuery();
+  const countryRegistryQuery = trpc.countryRegistry.list.useQuery(undefined, { refetchOnMount: true });
   const categories = useMemo<NonNullable<typeof categoriesQuery.data>>(
     () => categoriesQuery.data ?? [],
     [categoriesQuery.data],
   );
   const selectedCategory = categories.find((category) => category.id === categoryId);
+  const countryOptions = countryRegistryQuery.data ?? [];
   const serviceType = selectedCategory ? (SERVICE_TYPE_BY_SLUG[selectedCategory.slug] ?? "generic") : "generic";
   const subcategoriesQuery = trpc.categories.subcategories.useQuery(
     { categoryId },
@@ -1089,11 +1091,10 @@ export default function CreateServiceScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t("request.priceEstimate.accessibility")}
-                  disabled={priceEstimateMutation.isPending || categoryId <= 0}
+                  disabled={priceEstimateMutation.isPending || categoryId <= 0 || !countryCode}
                   onPress={() => priceEstimateMutation.mutate({
                     categoryId,
-                    countryCode: "TR",
-                    currency: "TRY",
+                    countryCode: countryCode!,
                     locale: priceEstimateLocale,
                   })}
                   style={({ pressed }) => ({
@@ -1103,7 +1104,7 @@ export default function CreateServiceScreen() {
                     borderRadius: 12,
                     paddingVertical: 11,
                     backgroundColor: colors.primary,
-                    opacity: pressed || priceEstimateMutation.isPending || categoryId <= 0 ? 0.65 : 1,
+                    opacity: pressed || priceEstimateMutation.isPending || categoryId <= 0 || !countryCode ? 0.65 : 1,
                   })}
                 >
                   {priceEstimateMutation.isPending ? <ActivityIndicator color="#FFFFFF" size="small" /> : <IconSymbol name={"sparkles" as any} size={17} color="#FFFFFF" />}
@@ -1172,26 +1173,35 @@ export default function CreateServiceScreen() {
             </Text>
             <View style={{ marginBottom: 14 }}>
               <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.country")}</Text>
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ selected: countryCode === "TR" }}
-                accessibilityLabel={t("request.countryTurkeyAccessibility")}
-                onPress={() => setCountryCode("TR")}
-                style={({ pressed }) => ({
-                  alignItems: "center",
-                  backgroundColor: countryCode === "TR" ? colors.primary + "12" : colors.card,
-                  borderColor: countryCode === "TR" ? colors.primary : colors.border,
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  opacity: pressed ? 0.8 : 1,
-                  padding: 14,
+              {countryRegistryQuery.isLoading ? <View style={{ paddingVertical: 12 }}><Text style={{ color: colors.muted, fontSize: 13 }}>{t("request.countryLoading")}</Text></View> : null}
+              {!countryRegistryQuery.isLoading && countryOptions.length === 0 ? <Text style={{ color: colors.error, fontSize: 13, lineHeight: 18 }}>{t("request.countryUnavailable")}</Text> : null}
+              <View style={{ gap: 8 }}>
+                {countryOptions.map((option) => {
+                  const selected = countryCode === option.countryCode;
+                  const availabilityKey = option.availability === "AVAILABLE"
+                    ? "request.countryAvailable"
+                    : option.availability === "COMING_SOON"
+                      ? "request.countryComingSoon"
+                      : "request.countryBlocked";
+                  return <Pressable
+                    key={option.countryCode}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected, disabled: !option.selectable }}
+                    accessibilityLabel={`${option.displayName}: ${t(availabilityKey)}`}
+                    disabled={!option.selectable}
+                    onPress={() => setCountryCode(option.countryCode)}
+                    style={({ pressed }) => ({
+                      alignItems: "center", backgroundColor: selected ? colors.primary + "12" : colors.card,
+                      borderColor: selected ? colors.primary : colors.border, borderRadius: 14, borderWidth: 1,
+                      flexDirection: "row", justifyContent: "space-between",
+                      opacity: !option.selectable ? 0.52 : pressed ? 0.8 : 1, padding: 14,
+                    })}
+                  >
+                    <View style={{ flex: 1, paddingRight: 10 }}><Text style={{ color: colors.foreground, fontWeight: "700" }}>{option.displayName}</Text><Text style={{ color: option.selectable ? colors.success : colors.muted, fontSize: 12, marginTop: 2 }}>{t(availabilityKey)}</Text></View>
+                    <IconSymbol name={selected ? "checkmark.circle.fill" : "circle"} size={21} color={selected ? colors.primary : colors.muted} />
+                  </Pressable>;
                 })}
-              >
-                <Text style={{ color: colors.foreground, fontWeight: "700" }}>{t("request.countryTurkey")}</Text>
-                <IconSymbol name={countryCode === "TR" ? "checkmark.circle.fill" : "circle"} size={21} color={countryCode === "TR" ? colors.primary : colors.muted} />
-              </Pressable>
+              </View>
             </View>
             {ROUTE_SERVICE_TYPES.has(serviceType) ? (
               <View style={{ gap: 13 }}>

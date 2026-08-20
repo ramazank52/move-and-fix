@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -177,5 +178,35 @@ describe("yerelleştirme sözleşmesi", () => {
         expect(source).not.toContain(`accessibilityLabel="${literal}"`);
       }
     }
+  });
+
+  it("P16-06 provider onboarding ve profil düzenleme metinlerini 13 dilde raw-key olmadan çözer", () => {
+    const keys = [
+      "provider.onboarding.title",
+      "provider.onboarding.scope.help",
+      "provider.onboarding.activationStatus",
+      "profile.edit.title",
+      "profile.edit.verificationRequiredBody",
+      "profile.edit.updateFailedBody",
+    ] as const;
+
+    for (const language of LANGUAGES) {
+      for (const key of keys) {
+        expect(t(key, language.code, { status: "BLOCKED" })).not.toBe(key);
+      }
+    }
+    expect(t("provider.onboarding.title", "tr")).toBe("Profesyonel kurulumu");
+    expect(t("profile.edit.title", "tr")).toBe("Profil Bilgileri");
+  });
+
+  it("P16-06 denetlenen ekranlarda kullanıcı metinleri çeviri hook’u üzerinden sunulur", () => {
+    const providerSource = readFileSync(resolve(process.cwd(), "app/provider-onboarding.tsx"), "utf8");
+    const profileSource = readFileSync(resolve(process.cwd(), "app/settings/profile-edit.tsx"), "utf8");
+    expect(providerSource).toContain("useTranslation");
+    expect(providerSource).toContain('t("provider.onboarding.title")');
+    expect(profileSource).toContain("useTranslation");
+    expect(profileSource).toContain('t("profile.edit.title")');
+    expect(profileSource).not.toContain(">Profil Bilgileri<");
+    expect(profileSource).not.toContain('accessibilityLabel="Profil bilgilerini kaydet"');
   });
 });

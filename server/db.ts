@@ -13,6 +13,7 @@ import {
   providerDocuments,
   providerCredentials,
   providerDocumentReviewerPermissions,
+  completionDisputeReviewerPermissions,
   walletAccounts,
   walletTransactions,
   walletWithdrawals,
@@ -41,6 +42,8 @@ import { trustRestrictionForReviewedRisk } from "./trust/policy";
 import {
   buildCancellationPartialRefundLedgerEntry,
   buildCancellationProviderSettlementLedgerEntry,
+  buildCompletionDisputePartialRefundLedgerEntry,
+  buildCompletionDisputeProviderSettlementLedgerEntry,
   buildEscrowReleasedLedgerEntry,
   buildPaymentHeldLedgerEntry,
   buildRefundLedgerEntry,
@@ -392,84 +395,208 @@ export async function getContactVerificationStatus(userId: number) {
   };
 }
 
-/** Updates only the authenticated account's own contact profile in one transaction. */
+/** Updates only non-contact profile data; contact promotion is staged and verified separately. */
 export async function updateOwnUserProfile(data: {
   userId: number;
   name: string;
-  email: string;
-  phone: string | null;
 }) {
   const database = await getDb();
   if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
 
-  const emailNormalized = data.email.trim().toLowerCase();
   return database.transaction(async (tx) => {
     const current = (await tx.select().from(users).where(eq(users.id, data.userId)).limit(1))[0];
     if (!current) throw new Error("PROFILE_USER_NOT_FOUND");
-
-    const emailChanged = (current.email ?? "").trim().toLowerCase() !== emailNormalized;
-    const phoneChanged = (current.phone ?? null) !== data.phone;
-    if (emailChanged) {
-      const conflict = (await tx
-        .select({ userId: userCredentials.userId })
-        .from(userCredentials)
-        .where(eq(userCredentials.emailNormalized, emailNormalized))
-        .limit(1))[0];
-      if (conflict && conflict.userId !== data.userId) throw new Error("PROFILE_EMAIL_IN_USE");
-    }
-
-    await tx
-      .update(users)
-      .set({
-        name: data.name,
-        email: emailNormalized,
-        phone: data.phone,
-        ...(emailChanged ? { emailVerifiedAt: null } : {}),
-        ...(phoneChanged ? { phoneVerifiedAt: null } : {}),
-      })
-      .where(eq(users.id, data.userId));
-
-    if (emailChanged || phoneChanged) {
-      await tx
-        .update(userCredentials)
-        .set({
-          ...(emailChanged ? { emailNormalized } : {}),
-          ...(phoneChanged ? { phoneE164: data.phone } : {}),
-        })
-        .where(eq(userCredentials.userId, data.userId));
-    }
-
-    if (emailChanged) {
-      await tx.insert(contactVerificationStates).values({
-        userId: data.userId,
-        contactType: "email",
-        contactValue: emailNormalized,
-        status: "unverified",
-        challengeId: null,
-        initiatedAt: null,
-        verifiedAt: null,
-      }).onDuplicateKeyUpdate({
-        set: { contactValue: emailNormalized, status: "unverified", challengeId: null, initiatedAt: null, verifiedAt: null },
-      });
-    }
-    if (phoneChanged) {
-      await tx.insert(contactVerificationStates).values({
-        userId: data.userId,
-        contactType: "phone",
-        contactValue: data.phone ?? "",
-        status: "unverified",
-        challengeId: null,
-        initiatedAt: null,
-        verifiedAt: null,
-      }).onDuplicateKeyUpdate({
-        set: { contactValue: data.phone ?? "", status: "unverified", challengeId: null, initiatedAt: null, verifiedAt: null },
-      });
-    }
+    await tx.update(users).set({ name: data.name }).where(eq(users.id, data.userId));
 
     const user = (await tx.select().from(users).where(eq(users.id, data.userId)).limit(1))[0];
     if (!user) throw new Error("PROFILE_USER_NOT_FOUND");
-    return { user, emailChanged, phoneChanged };
+    return { user };
   });
+}
+
+export type StagedContactType = "email" | "phone";
+
+function contactChangeValueHash(contactType: StagedContactType, value: string): string {
+  return createHash("sha256").update(`movefix:contact-change:${contactType}:${value}`).digest("hex");
+}
+
+function stagedChallengePurpose(contactType: StagedContactType): AuthChallengePurpose {
+  return contactType === "email" ? "verify_email" : "verify_phone";
+}
+
+/** Creates a pending contact challenge without changing the active contact fields. */
+export async function initiateStagedContactChange(data: {
+  userId: number;
+  contactType: StagedContactType;
+  destination: string;
+  codeHash: string;
+  expiresAt: Date;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const destination = data.contactType === "email" ? data.destination.trim().toLowerCase() : data.destination;
+  const purpose = stagedChallengePurpose(data.contactType);
+
+  return database.transaction(async (tx) => {
+    const current = (await tx.select().from(users).where(eq(users.id, data.userId)).limit(1))[0];
+    if (!current) throw new Error("PROFILE_USER_NOT_FOUND");
+    const currentValue = data.contactType === "email" ? (current.email ?? "").trim().toLowerCase() : current.phone;
+    if (currentValue === destination) return { changed: false as const, challengeId: null };
+
+    const primaryConflict = (await tx.select({ id: users.id }).from(users).where(
+      data.contactType === "email" ? eq(users.email, destination) : eq(users.phone, destination),
+    ).limit(1))[0];
+    const credentialConflict = (await tx.select({ userId: userCredentials.userId }).from(userCredentials).where(
+      data.contactType === "email" ? eq(userCredentials.emailNormalized, destination) : eq(userCredentials.phoneE164, destination),
+    ).limit(1))[0];
+    if ((primaryConflict && primaryConflict.id !== data.userId) || (credentialConflict && credentialConflict.userId !== data.userId)) {
+      throw new Error(data.contactType === "email" ? "PROFILE_EMAIL_IN_USE" : "PROFILE_PHONE_IN_USE");
+    }
+
+    await tx.update(authChallenges).set({ consumedAt: new Date() }).where(and(
+      eq(authChallenges.userId, data.userId),
+      eq(authChallenges.purpose, purpose),
+      isNull(authChallenges.consumedAt),
+    ));
+    const created = await tx.insert(authChallenges).values({
+      userId: data.userId,
+      purpose,
+      channel: data.contactType === "email" ? "email" : "sms",
+      destination,
+      codeHash: data.codeHash,
+      expiresAt: data.expiresAt,
+    });
+    const challengeId = Number(created[0].insertId);
+    await tx.update(users).set(data.contactType === "email"
+      ? { pendingEmailChange: destination, pendingEmailToken: data.codeHash, pendingEmailTokenExpiry: data.expiresAt }
+      : { pendingPhoneChange: destination, pendingPhoneToken: data.codeHash, pendingPhoneTokenExpiry: data.expiresAt },
+    ).where(eq(users.id, data.userId));
+    await tx.insert(contactChangeEvents).values({
+      userId: data.userId,
+      contactType: data.contactType,
+      eventType: "initiated",
+      contactValueHash: contactChangeValueHash(data.contactType, destination),
+      challengeId,
+      metadata: { expiresAt: data.expiresAt.toISOString() },
+    });
+    return { changed: true as const, challengeId };
+  });
+}
+
+/** Removes an undeliverable staged challenge while retaining immutable cancellation evidence. */
+export async function cancelStagedContactChange(data: { userId: number; contactType: StagedContactType; codeHash: string }) {
+  const database = await getDb();
+  if (!database) return;
+  await database.transaction(async (tx) => {
+    const current = (await tx.select().from(users).where(eq(users.id, data.userId)).limit(1))[0];
+    const pendingValue = data.contactType === "email" ? current?.pendingEmailChange : current?.pendingPhoneChange;
+    const pendingHash = data.contactType === "email" ? current?.pendingEmailToken : current?.pendingPhoneToken;
+    if (!pendingValue || pendingHash !== data.codeHash) return;
+    await tx.update(users).set(data.contactType === "email"
+      ? { pendingEmailChange: null, pendingEmailToken: null, pendingEmailTokenExpiry: null }
+      : { pendingPhoneChange: null, pendingPhoneToken: null, pendingPhoneTokenExpiry: null },
+    ).where(eq(users.id, data.userId));
+    await tx.update(authChallenges).set({ consumedAt: new Date() }).where(and(
+      eq(authChallenges.userId, data.userId),
+      eq(authChallenges.purpose, stagedChallengePurpose(data.contactType)),
+      eq(authChallenges.codeHash, data.codeHash),
+      isNull(authChallenges.consumedAt),
+    ));
+    await tx.insert(contactChangeEvents).values({
+      userId: data.userId,
+      contactType: data.contactType,
+      eventType: "cancelled",
+      contactValueHash: contactChangeValueHash(data.contactType, pendingValue),
+      challengeId: null,
+      metadata: { reason: "delivery_failed" },
+    });
+  });
+}
+
+/** Atomically promotes only the pending value bound to the owner’s current one-time code. */
+export async function confirmStagedContactChange(data: {
+  userId: number;
+  contactType: StagedContactType;
+  codeHash: string;
+  now?: Date;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const now = data.now ?? new Date();
+  const purpose = stagedChallengePurpose(data.contactType);
+  return database.transaction(async (tx) => {
+    const current = (await tx.select().from(users).where(eq(users.id, data.userId)).limit(1))[0];
+    if (!current) throw new Error("PROFILE_USER_NOT_FOUND");
+    const pendingValue = data.contactType === "email" ? current.pendingEmailChange : current.pendingPhoneChange;
+    const pendingHash = data.contactType === "email" ? current.pendingEmailToken : current.pendingPhoneToken;
+    const pendingExpiry = data.contactType === "email" ? current.pendingEmailTokenExpiry : current.pendingPhoneTokenExpiry;
+    if (!pendingValue || pendingHash !== data.codeHash || !pendingExpiry || pendingExpiry.getTime() < now.getTime()) {
+      if (pendingValue && pendingExpiry && pendingExpiry.getTime() < now.getTime()) {
+        await tx.insert(contactChangeEvents).values({ userId: data.userId, contactType: data.contactType, eventType: "expired", contactValueHash: contactChangeValueHash(data.contactType, pendingValue), challengeId: null, metadata: null });
+      }
+      throw new Error("STAGED_CONTACT_CHANGE_INVALID_OR_EXPIRED");
+    }
+    const challenge = (await tx.select().from(authChallenges).where(and(
+      eq(authChallenges.userId, data.userId),
+      eq(authChallenges.purpose, purpose),
+      eq(authChallenges.codeHash, data.codeHash),
+      isNull(authChallenges.consumedAt),
+      gte(authChallenges.expiresAt, now),
+    )).orderBy(desc(authChallenges.createdAt), desc(authChallenges.id)).limit(1))[0];
+    if (!challenge || challenge.attempts >= challenge.maxAttempts) throw new Error("STAGED_CONTACT_CHANGE_INVALID_OR_EXPIRED");
+
+    const credentialConflict = (await tx.select({ userId: userCredentials.userId }).from(userCredentials).where(
+      data.contactType === "email" ? eq(userCredentials.emailNormalized, pendingValue) : eq(userCredentials.phoneE164, pendingValue),
+    ).limit(1))[0];
+    if (credentialConflict && credentialConflict.userId !== data.userId) throw new Error(data.contactType === "email" ? "PROFILE_EMAIL_IN_USE" : "PROFILE_PHONE_IN_USE");
+    const promoted = await tx.update(users).set(data.contactType === "email"
+      ? { email: pendingValue, emailVerifiedAt: now, pendingEmailChange: null, pendingEmailToken: null, pendingEmailTokenExpiry: null }
+      : { phone: pendingValue, phoneVerifiedAt: now, pendingPhoneChange: null, pendingPhoneToken: null, pendingPhoneTokenExpiry: null },
+    ).where(and(eq(users.id, data.userId), data.contactType === "email" ? eq(users.pendingEmailToken, data.codeHash) : eq(users.pendingPhoneToken, data.codeHash)));
+    if ((promoted[0]?.affectedRows ?? 0) !== 1) throw new Error("STAGED_CONTACT_CHANGE_ALREADY_CONSUMED");
+    await tx.update(userCredentials).set(data.contactType === "email" ? { emailNormalized: pendingValue } : { phoneE164: pendingValue }).where(eq(userCredentials.userId, data.userId));
+    const consumed = await tx.update(authChallenges).set({ consumedAt: now }).where(and(eq(authChallenges.id, challenge.id), isNull(authChallenges.consumedAt)));
+    if ((consumed[0]?.affectedRows ?? 0) !== 1) throw new Error("STAGED_CONTACT_CHANGE_ALREADY_CONSUMED");
+    await tx.insert(contactVerificationStates).values({
+      userId: data.userId,
+      contactType: data.contactType,
+      contactValue: pendingValue,
+      status: "verified",
+      challengeId: challenge.id,
+      initiatedAt: challenge.createdAt,
+      verifiedAt: now,
+    }).onDuplicateKeyUpdate({ set: { contactValue: pendingValue, status: "verified", challengeId: challenge.id, initiatedAt: challenge.createdAt, verifiedAt: now } });
+    await tx.insert(contactChangeEvents).values({ userId: data.userId, contactType: data.contactType, eventType: "confirmed", contactValueHash: contactChangeValueHash(data.contactType, pendingValue), challengeId: challenge.id, metadata: null });
+    return { contactType: data.contactType, promotedAt: now };
+  });
+}
+
+export async function getStagedContactChangeStatus(userId: number) {
+  const database = await getDb();
+  if (!database) return null;
+  const current = (await database.select({
+    pendingEmailChange: users.pendingEmailChange,
+    pendingEmailTokenExpiry: users.pendingEmailTokenExpiry,
+    pendingPhoneChange: users.pendingPhoneChange,
+    pendingPhoneTokenExpiry: users.pendingPhoneTokenExpiry,
+  }).from(users).where(eq(users.id, userId)).limit(1))[0];
+  if (!current) return null;
+  const now = Date.now();
+  return {
+    email: { pending: Boolean(current.pendingEmailChange && current.pendingEmailTokenExpiry && current.pendingEmailTokenExpiry.getTime() >= now), expiresAt: current.pendingEmailTokenExpiry ?? null },
+    phone: { pending: Boolean(current.pendingPhoneChange && current.pendingPhoneTokenExpiry && current.pendingPhoneTokenExpiry.getTime() >= now), expiresAt: current.pendingPhoneTokenExpiry ?? null },
+  };
+}
+
+export async function getPendingStagedContactDestination(userId: number, contactType: StagedContactType) {
+  const database = await getDb();
+  if (!database) return null;
+  const row = (await database.select({
+    destination: contactType === "email" ? users.pendingEmailChange : users.pendingPhoneChange,
+    expiresAt: contactType === "email" ? users.pendingEmailTokenExpiry : users.pendingPhoneTokenExpiry,
+  }).from(users).where(eq(users.id, userId)).limit(1))[0];
+  if (!row?.destination || !row.expiresAt || row.expiresAt.getTime() < Date.now()) return null;
+  return row.destination;
 }
 
 export async function createLocalCredential(data: {
@@ -966,6 +1093,65 @@ export async function revokeProviderDocumentReviewerPermission(input: {
   return revoked;
 }
 
+export async function hasActiveCompletionDisputeReviewerPermission(userId: number): Promise<boolean> {
+  const database = await getDb();
+  if (!database) return false;
+  const rows = await database
+    .select({ id: completionDisputeReviewerPermissions.id })
+    .from(completionDisputeReviewerPermissions)
+    .where(and(
+      eq(completionDisputeReviewerPermissions.userId, userId),
+      isNull(completionDisputeReviewerPermissions.revokedAt),
+    ))
+    .limit(1);
+  return rows.length === 1;
+}
+
+export async function grantCompletionDisputeReviewerPermission(input: {
+  userId: number;
+  grantedByUserId: number;
+}): Promise<void> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_UNAVAILABLE");
+  await database
+    .insert(completionDisputeReviewerPermissions)
+    .values({ userId: input.userId, grantedByUserId: input.grantedByUserId, revokedAt: null })
+    .onDuplicateKeyUpdate({
+      set: { grantedByUserId: input.grantedByUserId, grantedAt: new Date(), revokedAt: null },
+    });
+  await logOperationEvent({
+    eventType: "completion_dispute_reviewer_permission_granted",
+    subjectId: input.userId,
+    actorId: input.grantedByUserId,
+    payload: { permission: "completion_dispute_reviewer" },
+  });
+}
+
+export async function revokeCompletionDisputeReviewerPermission(input: {
+  userId: number;
+  revokedByUserId: number;
+}): Promise<boolean> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_UNAVAILABLE");
+  const result = await database
+    .update(completionDisputeReviewerPermissions)
+    .set({ revokedAt: new Date() })
+    .where(and(
+      eq(completionDisputeReviewerPermissions.userId, input.userId),
+      isNull(completionDisputeReviewerPermissions.revokedAt),
+    ));
+  const revoked = (result[0]?.affectedRows ?? 0) === 1;
+  if (revoked) {
+    await logOperationEvent({
+      eventType: "completion_dispute_reviewer_permission_revoked",
+      subjectId: input.userId,
+      actorId: input.revokedByUserId,
+      payload: { permission: "completion_dispute_reviewer" },
+    });
+  }
+  return revoked;
+}
+
 export async function listProviderCapabilityStatuses(providerId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -1119,7 +1305,7 @@ export async function refreshProviderVerificationStatus(providerId: number) {
   if (!db) throw new Error("Database not available");
   const documents = await getProviderDocuments(providerId);
   const providerRows = await db
-    .select({ categoryId: providers.categoryId, userId: providers.userId })
+    .select({ id: providers.id, categoryId: providers.categoryId, userId: providers.userId })
     .from(providers)
     .where(eq(providers.id, providerId))
     .limit(1);
@@ -1166,9 +1352,11 @@ export async function refreshProviderVerificationStatus(providerId: number) {
       }
     }
   }
+  const credentialRequirements = await resolveProviderCredentialRequirementsForProvider(db, provider);
   const onboarding = await getProviderOnboardingStatus(provider.userId);
   const activationEligible = onboarding?.activation === "eligible";
-  const verificationStatus = status === "approved" && !activationGateBlocked && activationEligible
+  const verificationStatus = status === "approved" && !activationGateBlocked &&
+    credentialRequirements.status === "RESOLVED" && activationEligible
     ? "approved"
     : status === "rejected"
       ? "rejected"
@@ -1266,6 +1454,7 @@ import {
   mediaScannerCallbackReceipts,
   mediaScannerManualReviews,
   contactVerificationStates,
+  contactChangeEvents,
 } from "../drizzle/schema";
 import {
   type MaskedCommunicationChannel,
@@ -1530,8 +1719,6 @@ export async function assertProviderP11PolicyEligibility(input: {
     categoryId: request.categoryId,
     serviceKey: request.serviceKey ?? undefined,
   });
-  if (rules.length === 0) return;
-
   // Prefer service-specific rules, then category-specific rules, then the
   // jurisdiction fallback. The decision engine receives one deterministic,
   // server-owned active rule instead of client-controlled rule selection.
@@ -1569,7 +1756,7 @@ export async function upsertJobSafetyRule(input: {
   jurisdictionCode: string;
   categoryId?: number | null;
   serviceKey?: string | null;
-  activityStatus: "allowed" | "restricted" | "high_risk" | "prohibited" | "emergency_only";
+  activityStatus: "allowed" | "restricted" | "high_risk" | "prohibited" | "emergency_only" | "not_required" | "unknown";
   riskAttributesJson: Record<string, unknown>;
   prerequisitesJson: Record<string, unknown>;
   version: string;
@@ -2632,6 +2819,20 @@ async function loadServiceCatalogSnapshot(database: CatalogDatabaseReader): Prom
     }).from(serviceCatalogAliases),
   ]);
   return { categories, subcategories, aliases };
+}
+
+/**
+ * MoveAI may propose only an explicitly registered external-service alias.
+ * Display names, numeric category IDs and best-effort text inference are not
+ * canonical catalog inputs and therefore never create a draft.
+ */
+export async function resolveMoveAiCatalogCategory(category: string) {
+  const database = await getDb();
+  if (!database) throw new Error("SERVICE_CATALOG_NOT_CONFIGURED");
+  return resolveServiceCatalogAlias(await loadServiceCatalogSnapshot(database), {
+    namespace: "external_service",
+    alias: category,
+  });
 }
 
 async function getProviderRequirementsForCatalog(
@@ -4179,6 +4380,8 @@ export async function recordMediaScannerDispatchResult(input: {
   scannerReference?: string;
   reason?: string;
   now?: Date;
+  /** Internal watchdog guard: a dispatched job may be recovered only after its callback deadline. */
+  timeoutOnly?: boolean;
 }): Promise<{ status: Extract<MediaScannerJobStatus, "dispatched" | "retry_scheduled" | "scan_failed"> }> {
   if (!Number.isInteger(input.jobId) || input.jobId <= 0) throw new Error("MEDIA_SCANNER_JOB_ID_INVALID");
   const database = await getDb();
@@ -4187,6 +4390,9 @@ export async function recordMediaScannerDispatchResult(input: {
   const result = await database.transaction(async (tx) => {
     const job = (await tx.select().from(mediaScannerJobs).where(eq(mediaScannerJobs.id, input.jobId)).limit(1))[0] ?? null;
     if (!job || job.status !== "dispatched") throw new Error("MEDIA_SCANNER_JOB_NOT_DISPATCHED");
+    if (input.timeoutOnly && job.nextAttemptAt.getTime() > now.getTime()) {
+      throw new Error("MEDIA_SCANNER_JOB_NOT_TIMED_OUT");
+    }
     if (input.accepted) {
       const scannerReference = input.scannerReference?.trim().slice(0, 191) || null;
       const updated = await tx.update(mediaScannerJobs).set({ scannerReference }).where(and(
@@ -4235,6 +4441,9 @@ export async function recordMediaScannerDispatchResult(input: {
       mediaUpdated = Number(result[0].affectedRows);
     }
     if (mediaUpdated !== 1) throw new Error("MEDIA_SCAN_FAILURE_MEDIA_STATE_CONFLICT");
+    const updateConditions = input.timeoutOnly
+      ? and(eq(mediaScannerJobs.id, job.id), eq(mediaScannerJobs.status, "dispatched"), lte(mediaScannerJobs.nextAttemptAt, now))
+      : and(eq(mediaScannerJobs.id, job.id), eq(mediaScannerJobs.status, "dispatched"));
     const updated = await tx.update(mediaScannerJobs).set({
       status: failure.nextStatus,
       nextAttemptAt: failure.nextAttemptAt ?? now,
@@ -4245,10 +4454,7 @@ export async function recordMediaScannerDispatchResult(input: {
       retryCount: failure.retryCount,
       scanFailureReason: failureReason,
       operationalReviewRequired: failure.operationalReviewRequired ? 1 : 0,
-    }).where(and(
-      eq(mediaScannerJobs.id, job.id),
-      eq(mediaScannerJobs.status, "dispatched"),
-    ));
+    }).where(updateConditions);
     if (Number(updated[0].affectedRows) !== 1) throw new Error("MEDIA_SCANNER_JOB_UPDATE_CONFLICT");
     return { status: failure.nextStatus, mediaClass: job.mediaClass, mediaId: job.mediaId };
   });
@@ -4260,6 +4466,64 @@ export async function recordMediaScannerDispatchResult(input: {
     });
   }
   return { status: result.status };
+}
+
+export type MediaScannerWatchdogResult = {
+  examined: number;
+  recovered: number;
+  retryScheduled: number;
+  deadLettered: number;
+  racesIgnored: number;
+};
+
+/**
+ * Recovers only jobs whose external-scanner callback deadline has elapsed.
+ * Each recovery goes through the same failure policy as a rejected submission:
+ * media remains quarantined, retry is bounded, and exhaustion becomes an
+ * operational-review-only dead letter. Concurrent callback/watchdog races are
+ * deliberately no-ops instead of releasing or reclassifying media.
+ */
+export async function recoverTimedOutMediaScannerJobs(input: { now?: Date; limit?: number } = {}): Promise<MediaScannerWatchdogResult> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const now = input.now ?? new Date();
+  const limit = input.limit ?? 25;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("MEDIA_SCANNER_WATCHDOG_LIMIT_INVALID");
+  const candidates = await database
+    .select({ id: mediaScannerJobs.id })
+    .from(mediaScannerJobs)
+    .where(and(eq(mediaScannerJobs.status, "dispatched"), lte(mediaScannerJobs.nextAttemptAt, now)))
+    .orderBy(mediaScannerJobs.nextAttemptAt, mediaScannerJobs.id)
+    .limit(limit);
+  const result: MediaScannerWatchdogResult = {
+    examined: candidates.length,
+    recovered: 0,
+    retryScheduled: 0,
+    deadLettered: 0,
+    racesIgnored: 0,
+  };
+  for (const candidate of candidates) {
+    try {
+      const persisted = await recordMediaScannerDispatchResult({
+        jobId: candidate.id,
+        accepted: false,
+        reason: "MEDIA_SCANNER_CALLBACK_TIMEOUT",
+        now,
+        timeoutOnly: true,
+      });
+      result.recovered += 1;
+      if (persisted.status === "scan_failed") result.deadLettered += 1;
+      else result.retryScheduled += 1;
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      if (code === "MEDIA_SCANNER_JOB_NOT_DISPATCHED" || code === "MEDIA_SCANNER_JOB_NOT_TIMED_OUT" || code === "MEDIA_SCANNER_JOB_UPDATE_CONFLICT" || code === "MEDIA_SCAN_FAILURE_MEDIA_STATE_CONFLICT") {
+        result.racesIgnored += 1;
+        continue;
+      }
+      throw error;
+    }
+  }
+  return result;
 }
 
 /** Returns source text only after proving that the requesting actor is a conversation participant. */
@@ -4933,9 +5197,15 @@ export async function configureProviderOnboarding(input: {
   categoryId: number;
   subcategoryId: number | null;
   capabilityId: number;
+  jurisdictionCode: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const jurisdictionCode = input.jurisdictionCode.trim().toUpperCase();
+  await assertCountryMarketplaceTransition({
+    countryCode: jurisdictionCode,
+    transition: "PROVIDER_ACTIVATION",
+  });
   return db.transaction(async (tx) => {
     const providerRows = await tx.select({ id: providers.id }).from(providers)
       .where(eq(providers.userId, input.userId)).limit(1);
@@ -4966,7 +5236,12 @@ export async function configureProviderOnboarding(input: {
         eq(providerOperatingModels.jurisdictionCode, jurisdictions.countryCode),
         eq(providerOperatingModels.providerId, provider.id),
       ))
-      .where(and(eq(jurisdictions.status, "active"), eq(providerOperatingModels.reviewStatus, "verified")));
+      .where(and(
+        eq(jurisdictions.status, "active"),
+        eq(jurisdictions.countryCode, jurisdictionCode),
+        eq(providerOperatingModels.reviewStatus, "verified"),
+      ));
+    if (jurisdictionRows.length !== 1) throw new Error("PROVIDER_JURISDICTION_BINDING_UNRESOLVED");
     for (const jurisdiction of jurisdictionRows) {
       await tx.insert(providerCapabilityStatuses).values({
         providerId: provider.id,
@@ -4984,8 +5259,172 @@ export async function configureProviderOnboarding(input: {
       capabilityId: capability.id,
       capabilityReviewState: "LEGAL_REVIEW_REQUIRED" as const,
       jurisdictionBindingCount: jurisdictionRows.length,
+      jurisdictionCode,
     };
   });
+}
+
+/**
+ * Read-only catalog for provider onboarding. The client may display these
+ * canonical IDs, but `configureProviderOnboarding` repeats the full scope
+ * validation inside its transaction before it persists anything.
+ */
+export async function getProviderOnboardingCatalog(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const providerRows = await db.select({ id: providers.id }).from(providers)
+    .where(eq(providers.userId, userId)).limit(1);
+  if (!providerRows[0]) return null;
+
+  const [categories, subcategories, capabilities] = await Promise.all([
+    db.select({
+      id: serviceCategories.id,
+      name: serviceCategories.name,
+      slug: serviceCategories.slug,
+    }).from(serviceCategories).where(eq(serviceCategories.isActive, 1)),
+    db.select({
+      id: serviceSubcategories.id,
+      categoryId: serviceSubcategories.categoryId,
+      name: serviceSubcategories.name,
+      slug: serviceSubcategories.slug,
+    }).from(serviceSubcategories).where(eq(serviceSubcategories.isActive, 1)),
+    db.select({
+      id: serviceCapabilities.id,
+      key: serviceCapabilities.key,
+      displayName: serviceCapabilities.displayName,
+      categoryId: serviceCapabilities.categoryId,
+      subcategoryId: serviceCapabilities.subcategoryId,
+    }).from(serviceCapabilities).where(eq(serviceCapabilities.status, "active")),
+  ]);
+
+  return {
+    categories,
+    subcategories,
+    // A category-wide capability has `subcategoryId = null` and remains a
+    // canonical scope. Capabilities without a category are not selectable.
+    capabilities: capabilities.filter((capability) => capability.categoryId != null),
+  };
+}
+
+type ProviderCredentialScope = {
+  jurisdictionId: number;
+  countryCode: string;
+  capabilityId: number;
+  capabilityKey: string;
+  capabilityName: string;
+  providerType: ProviderRequirementType;
+  requirements: Array<{
+    requirementId: number;
+    credentialType: string;
+    requirementState: "required" | "conditional" | "not_required" | "prohibited" | "unknown";
+    minimumAssurance: CredentialAssurance;
+    requiresHumanReview: boolean;
+    sourceVersion: string;
+    ruleVersion: string;
+    sourceReferenceIds: string[];
+  }>;
+};
+
+/**
+ * Resolves only exact, independently reviewed provider scopes.  A category
+ * rule is never used as a fallback for a capability: no active source row for
+ * the selected capability/jurisdiction/provider-type tuple means BLOCKED.
+ */
+async function resolveProviderCredentialRequirementsForProvider(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  provider: { id: number; categoryId: number | null },
+) {
+  if (provider.categoryId == null) {
+    return { status: "REVIEW_REQUIRED" as const, scopes: [] as ProviderCredentialScope[] };
+  }
+  const [models, capabilities] = await Promise.all([
+    db.select({
+      countryCode: providerOperatingModels.jurisdictionCode,
+      providerType: providerOperatingModels.operatingModel,
+      jurisdictionId: jurisdictions.id,
+    }).from(providerOperatingModels).innerJoin(jurisdictions,
+      eq(jurisdictions.countryCode, providerOperatingModels.jurisdictionCode),
+    ).where(and(
+      eq(providerOperatingModels.providerId, provider.id),
+      eq(providerOperatingModels.reviewStatus, "verified"),
+      eq(jurisdictions.status, "active"),
+    )),
+    db.select({
+      capabilityId: providerCapabilityStatuses.capabilityId,
+      jurisdictionId: providerCapabilityStatuses.jurisdictionId,
+      decision: providerCapabilityStatuses.status,
+      categoryId: serviceCapabilities.categoryId,
+      capabilityKey: serviceCapabilities.key,
+      capabilityName: serviceCapabilities.displayName,
+      capabilityStatus: serviceCapabilities.status,
+    }).from(providerCapabilityStatuses).innerJoin(serviceCapabilities,
+      eq(serviceCapabilities.id, providerCapabilityStatuses.capabilityId),
+    ).where(eq(providerCapabilityStatuses.providerId, provider.id)),
+  ]);
+  const verifiedModels = models.filter((model) => model.providerType !== "unresolved") as Array<{
+    countryCode: string;
+    providerType: ProviderRequirementType;
+    jurisdictionId: number;
+  }>;
+  const providerCategoryId = provider.categoryId;
+  if (providerCategoryId == null) {
+    return { status: "REVIEW_REQUIRED" as const, scopes: [] as ProviderCredentialScope[] };
+  }
+  const verifiedCapabilities = capabilities.filter((capability) =>
+    capability.capabilityStatus === "active" && capability.categoryId === providerCategoryId &&
+    (capability.decision === "VERIFIED" || capability.decision === "VERIFIED_LIMITED_SCOPE"),
+  );
+  if (verifiedModels.length === 0 || verifiedCapabilities.length === 0) {
+    return { status: "REVIEW_REQUIRED" as const, scopes: [] as ProviderCredentialScope[] };
+  }
+
+  const scopes = await Promise.all(verifiedCapabilities.map(async (capability) => {
+    const model = verifiedModels.find((candidate) => candidate.jurisdictionId === capability.jurisdictionId);
+    if (!model) return null;
+    const rows = await db.select({
+      requirementId: credentialRequirementCatalog.id,
+      credentialType: credentialRequirementCatalog.credentialType,
+      requirementState: credentialRequirementCatalog.requirementState,
+      minimumAssurance: credentialRequirementCatalog.minimumAssurance,
+      requiresHumanReview: credentialRequirementCatalog.requiresHumanReview,
+      sourceVersion: credentialRequirementCatalog.sourceVersion,
+      ruleVersion: credentialRequirementCatalog.ruleVersion,
+      sourceReferenceIds: credentialRequirementCatalog.sourceReferenceIdsJson,
+    }).from(credentialRequirementCatalog).where(and(
+      eq(credentialRequirementCatalog.jurisdictionId, capability.jurisdictionId),
+      eq(credentialRequirementCatalog.categoryId, providerCategoryId),
+      eq(credentialRequirementCatalog.capabilityId, capability.capabilityId),
+      eq(credentialRequirementCatalog.providerType, model.providerType),
+      eq(credentialRequirementCatalog.isActive, 1),
+    ));
+    if (rows.length === 0) return null;
+    return {
+      jurisdictionId: model.jurisdictionId,
+      countryCode: model.countryCode,
+      capabilityId: capability.capabilityId,
+      capabilityKey: capability.capabilityKey,
+      capabilityName: capability.capabilityName,
+      providerType: model.providerType,
+      requirements: rows.map((row) => ({
+        ...row,
+        requiresHumanReview: row.requiresHumanReview === 1,
+      })),
+    } satisfies ProviderCredentialScope;
+  }));
+  if (scopes.some((scope) => scope === null)) {
+    return { status: "BLOCKED_UNKNOWN" as const, scopes: [] as ProviderCredentialScope[] };
+  }
+  return { status: "RESOLVED" as const, scopes: scopes as ProviderCredentialScope[] };
+}
+
+export async function getProviderCredentialRequirements(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select({ id: providers.id, categoryId: providers.categoryId })
+    .from(providers).where(eq(providers.userId, userId)).limit(1);
+  const provider = rows[0];
+  if (!provider) return null;
+  return resolveProviderCredentialRequirementsForProvider(db, provider);
 }
 
 /** Read-only lifecycle projection. It deliberately treats every missing or
@@ -5056,44 +5495,26 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
       await assertCountryMarketplaceTransition({ countryCode: model.countryCode, transition: "PROVIDER_ACTIVATION" });
     }
     launchGate = "eligible";
-    for (const capability of verifiedCapabilities) {
-      const model = verifiedModels.find((candidate) => candidate.jurisdictionId === capability.jurisdictionId);
-      if (!model) throw new Error("PROVIDER_TYPE_UNRESOLVED");
-      const requirementRows = await db.select({
-        requirementId: credentialRequirementCatalog.id,
-        jurisdictionId: credentialRequirementCatalog.jurisdictionId,
-        categoryId: credentialRequirementCatalog.categoryId,
-        subcategoryId: credentialRequirementCatalog.subcategoryId,
-        capabilityId: credentialRequirementCatalog.capabilityId,
-        providerType: credentialRequirementCatalog.providerType,
-        credentialType: credentialRequirementCatalog.credentialType,
-        requirementState: credentialRequirementCatalog.requirementState,
-        minimumAssurance: credentialRequirementCatalog.minimumAssurance,
-        requiresHumanReview: credentialRequirementCatalog.requiresHumanReview,
-        officialSourceId: credentialRequirementCatalog.officialSourceId,
-        sourceReferenceIds: credentialRequirementCatalog.sourceReferenceIdsJson,
-        sourceVersion: credentialRequirementCatalog.sourceVersion,
-        ruleVersion: credentialRequirementCatalog.ruleVersion,
-        provenance: credentialRequirementCatalog.provenanceJson,
-      }).from(credentialRequirementCatalog).where(and(
-        eq(credentialRequirementCatalog.jurisdictionId, capability.jurisdictionId),
-        eq(credentialRequirementCatalog.capabilityId, capability.capabilityId),
-        eq(credentialRequirementCatalog.providerType, model.providerType as ProviderRequirementType),
-        eq(credentialRequirementCatalog.isActive, 1),
-      ));
+    const credentialResolution = await resolveProviderCredentialRequirementsForProvider(db, provider);
+    if (credentialResolution.status !== "RESOLVED") throw new Error(credentialResolution.status);
+    for (const scope of credentialResolution.scopes) {
       assertProviderCredentialForRequest({
         request: {
-          jurisdictionId: capability.jurisdictionId,
+          jurisdictionId: scope.jurisdictionId,
           requiredCredentialType: null,
           requiredCredentialAssurance: null,
           requiresCredentialHumanReview: null,
-          credentialRequirementsJson: requirementRows.map((requirement) => ({
-            ...requirement,
-            requiresHumanReview: requirement.requiresHumanReview === 1,
+          credentialRequirementsJson: scope.requirements.map((requirement) => ({
+            credentialType: requirement.credentialType,
+            providerType: scope.providerType,
+            requirementState: requirement.requirementState,
+            minimumAssurance: requirement.minimumAssurance,
+            requiresHumanReview: requirement.requiresHumanReview,
+            ruleVersion: requirement.ruleVersion,
           })),
-          compliancePackageVersion: requirementRows[0]?.ruleVersion ?? "unknown",
+          compliancePackageVersion: scope.requirements[0]?.ruleVersion ?? "unknown",
         },
-        providerType: model.providerType as ProviderRequirementType,
+        providerType: scope.providerType,
         providerCredentials: credentialRows,
       });
     }
@@ -5142,9 +5563,14 @@ export async function getProviderDocumentRequirements(userId: number) {
   const provider = rows[0];
   if (!provider) return null;
 
+  const [documentRequirements, credentialRequirements] = await Promise.all([
+    getProviderRequirementsForCatalog(db, { categoryId: provider.categoryId ?? null }),
+    resolveProviderCredentialRequirementsForProvider(db, { id: provider.providerId, categoryId: provider.categoryId }),
+  ]);
   return {
     providerId: provider.providerId,
-    ...await getProviderRequirementsForCatalog(db, { categoryId: provider.categoryId ?? null }),
+    ...documentRequirements,
+    credentialRequirements,
   };
 }
 
@@ -6165,6 +6591,137 @@ export async function resolveCompletionDispute(data: {
   return outcome;
 }
 
+/** MoveOS financial reviewers see only operational settlement fields, never dispute descriptions or party PII. */
+export async function listCompletionDisputesForAdmin(input: {
+  limit: number;
+  offset: number;
+  status?: "open" | "under_review" | "resolved_customer" | "resolved_provider" | "resolved_partial";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db
+    .select({
+      id: completionDisputes.id,
+      requestId: completionDisputes.requestId,
+      reasonCode: completionDisputes.reasonCode,
+      status: completionDisputes.status,
+      reviewedByUserId: completionDisputes.reviewedByUserId,
+      resolutionNote: completionDisputes.resolutionNote,
+      partialCustomerRefundAmount: completionDisputes.partialCustomerRefundAmount,
+      partialProviderGrossAmount: completionDisputes.partialProviderGrossAmount,
+      partialCommissionAmount: completionDisputes.partialCommissionAmount,
+      partialProviderPayoutAmount: completionDisputes.partialProviderPayoutAmount,
+      partialGatewayReference: completionDisputes.partialGatewayReference,
+      partialSettledAt: completionDisputes.partialSettledAt,
+      createdAt: completionDisputes.createdAt,
+      paymentAmount: payments.amount,
+      paymentStatus: payments.status,
+      // Escrow payment records are intentionally TRY-only; cross-currency checkout remains fail-closed.
+      paymentCurrency: sql<string>`'TRY'`.as("paymentCurrency"),
+    })
+    .from(completionDisputes)
+    .innerJoin(payments, eq(payments.requestId, completionDisputes.requestId))
+    .where(input.status ? eq(completionDisputes.status, input.status) : undefined)
+    .orderBy(desc(completionDisputes.createdAt))
+    .limit(input.limit)
+    .offset(input.offset);
+}
+
+/**
+ * Bir inceleyici yalnızca kısmi uzlaşma planı oluşturabilir; para hareketi
+ * imzalı ve tutarı doğrulanmış gateway callback’ine kadar gerçekleşmez.
+ */
+export async function planPartialCompletionDisputeSettlement(data: {
+  requestId: number;
+  adminUserId: number;
+  customerRefundAmount: number;
+  resolutionNote: string;
+}) {
+  const { db } = await getTrackingAccessContext(data.requestId);
+  const outcome = await db.transaction(async (tx) => {
+    const [proofRows, disputeRows, paymentRows] = await Promise.all([
+      tx.select().from(jobCompletionProofs).where(eq(jobCompletionProofs.requestId, data.requestId)).limit(1),
+      tx.select().from(completionDisputes).where(eq(completionDisputes.requestId, data.requestId)).limit(1),
+      tx.select().from(payments).where(eq(payments.requestId, data.requestId)).limit(1),
+    ]);
+    const proof = proofRows[0];
+    const dispute = disputeRows[0];
+    const payment = paymentRows[0];
+    if (!proof || !dispute) throw new Error("COMPLETION_DISPUTE_NOT_FOUND");
+    if (proof.status !== "disputed" || !["open", "under_review"].includes(dispute.status)) {
+      throw new Error("COMPLETION_DISPUTE_INVALID_STATUS");
+    }
+    if (!payment || payment.status !== "held") throw new Error("ESCROW_NOT_HELD");
+    if (!Number.isSafeInteger(data.customerRefundAmount)) {
+      throw new Error("COMPLETION_DISPUTE_PARTIAL_AMOUNT_INVALID");
+    }
+
+    const providerRows = await tx
+      .select({ isPremium: providers.isPremium })
+      .from(providers)
+      .where(eq(providers.id, payment.providerId))
+      .limit(1);
+    const provider = providerRows[0];
+    if (!provider) throw new Error("COMPLETION_RESOLUTION_PROVIDER_MISSING");
+    const providerGrossAmount = payment.amount - data.customerRefundAmount;
+    const breakdown = calculatePaymentBreakdown(
+      providerGrossAmount,
+      commissionRateForProvider(Boolean(provider.isPremium)),
+    );
+    const decision = evaluateCompletionDisputeResolution({
+      resolution: "partial",
+      disputeStatus: dispute.status,
+      proofStatus: proof.status,
+      paymentStatus: payment.status,
+      reviewerUserId: data.adminUserId,
+      resolutionNote: data.resolutionNote,
+      providerPayout: payment.providerPayout,
+      paymentAmount: payment.amount,
+      customerRefundAmount: data.customerRefundAmount,
+      providerGrossAmount,
+      commissionAmount: breakdown.commissionAmount,
+      providerPayoutAmount: breakdown.providerPayout,
+    });
+    if (!decision.allowed || decision.action !== "partial_settlement") {
+      throw new Error(decision.reason || "COMPLETION_DISPUTE_PARTIAL_POLICY_REJECTED");
+    }
+
+    const result = await tx
+      .update(completionDisputes)
+      .set({
+        status: "under_review",
+        reviewedByUserId: data.adminUserId,
+        resolutionNote: data.resolutionNote.trim(),
+        resolvedAt: null,
+        partialCustomerRefundAmount: data.customerRefundAmount,
+        partialProviderGrossAmount: providerGrossAmount,
+        partialCommissionAmount: breakdown.commissionAmount,
+        partialProviderPayoutAmount: breakdown.providerPayout,
+        partialGatewayReference: null,
+        partialSettledAt: null,
+      })
+      .where(and(eq(completionDisputes.id, dispute.id), inArray(completionDisputes.status, ["open", "under_review"])));
+    if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("COMPLETION_DISPUTE_PARTIAL_PLAN_CONFLICT");
+    return {
+      disputeId: dispute.id,
+      paymentId: payment.id,
+      customerRefundAmount: data.customerRefundAmount,
+      providerGrossAmount,
+      commissionAmount: breakdown.commissionAmount,
+      providerPayoutAmount: breakdown.providerPayout,
+      settlementPending: true,
+    };
+  });
+  await logOperationEvent({
+    eventType: "completion_dispute.partial_settlement_planned",
+    subjectId: data.requestId,
+    actorId: data.adminUserId,
+    severity: "warning",
+    payload: outcome,
+  });
+  return outcome;
+}
+
 /**
  * Finalizes a customer-favoring completion-dispute decision only after a
  * verified full-refund gateway callback changed the payment from held to
@@ -6236,6 +6793,159 @@ async function resolveCompletionDisputeRefundInTransaction(
       paymentId: payment.id,
       gatewayReference,
       resolution: "customer",
+    },
+  });
+  return true;
+}
+
+async function finalizePartialCompletionDisputeSettlementInTransaction(
+  tx: DatabaseTransaction,
+  payment: typeof payments.$inferSelect,
+  verifiedRefund: { refundAmount: number; gatewayReference: string },
+) {
+  const disputeRows = await tx
+    .select()
+    .from(completionDisputes)
+    .where(eq(completionDisputes.requestId, payment.requestId))
+    .limit(1);
+  const dispute = disputeRows[0];
+  if (!dispute) return false;
+  if (dispute.status !== "under_review" || !dispute.reviewedByUserId) {
+    throw new Error("COMPLETION_DISPUTE_PARTIAL_PLAN_NOT_ACTIVE");
+  }
+  const plan = {
+    customerRefundAmount: dispute.partialCustomerRefundAmount,
+    providerGrossAmount: dispute.partialProviderGrossAmount,
+    commissionAmount: dispute.partialCommissionAmount,
+    providerPayoutAmount: dispute.partialProviderPayoutAmount,
+  };
+  if (!Object.values(plan).every((value) => Number.isSafeInteger(value))) {
+    throw new Error("COMPLETION_DISPUTE_PARTIAL_PLAN_MISSING");
+  }
+  if (verifiedRefund.refundAmount !== plan.customerRefundAmount) {
+    throw new Error("COMPLETION_DISPUTE_PARTIAL_GATEWAY_AMOUNT_MISMATCH");
+  }
+  const proofRows = await tx
+    .select()
+    .from(jobCompletionProofs)
+    .where(eq(jobCompletionProofs.id, dispute.completionProofId))
+    .limit(1);
+  const proof = proofRows[0];
+  if (!proof || proof.requestId !== payment.requestId || proof.status !== "disputed") {
+    throw new Error("COMPLETION_DISPUTE_PARTIAL_PROOF_STATE_MISMATCH");
+  }
+  const decision = evaluateCompletionDisputeResolution({
+    resolution: "partial",
+    disputeStatus: dispute.status,
+    proofStatus: proof.status,
+    paymentStatus: payment.status,
+    reviewerUserId: dispute.reviewedByUserId,
+    resolutionNote: dispute.resolutionNote ?? "",
+    providerPayout: payment.providerPayout,
+    paymentAmount: payment.amount,
+    customerRefundAmount: plan.customerRefundAmount!,
+    providerGrossAmount: plan.providerGrossAmount!,
+    commissionAmount: plan.commissionAmount!,
+    providerPayoutAmount: plan.providerPayoutAmount!,
+  });
+  if (!decision.allowed || decision.action !== "partial_settlement") {
+    throw new Error(decision.reason || "COMPLETION_DISPUTE_PARTIAL_POLICY_REJECTED");
+  }
+  if (payment.status !== "held") throw new Error("COMPLETION_DISPUTE_PARTIAL_ESCROW_NOT_HELD");
+
+  const providerRows = await tx
+    .select({ userId: providers.userId })
+    .from(providers)
+    .where(eq(providers.id, payment.providerId))
+    .limit(1);
+  const providerUserId = providerRows[0]?.userId;
+  if (!providerUserId) throw new Error("COMPLETION_RESOLUTION_PROVIDER_MISSING");
+
+  const paymentUpdate = await tx
+    .update(payments)
+    .set({ status: "released" })
+    .where(and(eq(payments.id, payment.id), eq(payments.status, "held")));
+  if ((paymentUpdate[0]?.affectedRows ?? 0) !== 1) throw new Error("COMPLETION_DISPUTE_PARTIAL_PAYMENT_CONFLICT");
+
+  await postFinancialLedgerEntry(
+    tx,
+    buildCompletionDisputePartialRefundLedgerEntry(payment, {
+      disputeId: dispute.id,
+      refundAmount: plan.customerRefundAmount!,
+      gatewayReference: verifiedRefund.gatewayReference,
+    }),
+  );
+  await postFinancialLedgerEntry(
+    tx,
+    buildCompletionDisputeProviderSettlementLedgerEntry(payment, {
+      disputeId: dispute.id,
+      providerGrossAmount: plan.providerGrossAmount!,
+      commissionAmount: plan.commissionAmount!,
+      providerPayoutAmount: plan.providerPayoutAmount!,
+      gatewayReference: verifiedRefund.gatewayReference,
+    }),
+  );
+
+  if (plan.providerPayoutAmount! > 0) {
+    await tx
+      .insert(walletAccounts)
+      .values({ userId: providerUserId, currency: "TRY" })
+      .onDuplicateKeyUpdate({ set: { userId: providerUserId } });
+    await tx
+      .update(walletAccounts)
+      .set({ availableBalance: sql`${walletAccounts.availableBalance} + ${plan.providerPayoutAmount!}` })
+      .where(eq(walletAccounts.userId, providerUserId));
+    await tx.insert(walletTransactions).values({
+      userId: providerUserId,
+      type: "provider_payout",
+      status: "completed",
+      amount: plan.providerPayoutAmount!,
+      description: "Kısmi completion dispute sonrası sağlayıcı ödemesi",
+      reference: `payment:${payment.id}`,
+      idempotencyKey: `completion-dispute-settlement:${dispute.id}`,
+      metadata: JSON.stringify({
+        requestId: payment.requestId,
+        disputeId: dispute.id,
+        gatewayReference: verifiedRefund.gatewayReference,
+        customerRefundAmount: plan.customerRefundAmount,
+      }),
+    });
+  }
+
+  const now = new Date();
+  const disputeUpdate = await tx
+    .update(completionDisputes)
+    .set({
+      status: "resolved_partial",
+      partialGatewayReference: verifiedRefund.gatewayReference,
+      partialSettledAt: now,
+      resolvedAt: now,
+    })
+    .where(and(eq(completionDisputes.id, dispute.id), eq(completionDisputes.status, "under_review")));
+  if ((disputeUpdate[0]?.affectedRows ?? 0) !== 1) {
+    throw new Error("COMPLETION_DISPUTE_PARTIAL_RESOLUTION_CONFLICT");
+  }
+  const proofUpdate = await tx
+    .update(jobCompletionProofs)
+    .set({ status: "resolved" })
+    .where(and(eq(jobCompletionProofs.id, proof.id), eq(jobCompletionProofs.status, "disputed")));
+  if ((proofUpdate[0]?.affectedRows ?? 0) !== 1) {
+    throw new Error("COMPLETION_DISPUTE_PARTIAL_PROOF_RESOLUTION_CONFLICT");
+  }
+  await tx.insert(jobTimelineEvents).values({
+    requestId: payment.requestId,
+    eventType: "completion_dispute.partial_settlement_verified",
+    actorUserId: dispute.reviewedByUserId,
+    referenceType: "completion_dispute_partial_settlement",
+    referenceId: dispute.id,
+    metadataJson: {
+      disputeId: dispute.id,
+      paymentId: payment.id,
+      gatewayReference: verifiedRefund.gatewayReference,
+      customerRefundAmount: plan.customerRefundAmount,
+      providerGrossAmount: plan.providerGrossAmount,
+      commissionAmount: plan.commissionAmount,
+      providerPayoutAmount: plan.providerPayoutAmount,
     },
   });
   return true;
@@ -8112,7 +8822,14 @@ export async function transitionPaymentFromVerifiedWebhook(data: {
       if (data.nextStatus !== "refunded") throw new Error("PAYMENT_PARTIAL_REFUND_STATUS_INVALID");
       if (payment.status === "released") return { payment, duplicated: true };
       await getAgreementForPaymentInTransaction(tx, payment);
-      await resolvePartialRefundCancellationInTransaction(tx, payment, data.partialRefund);
+      const completionDisputeSettled = await finalizePartialCompletionDisputeSettlementInTransaction(
+        tx,
+        payment,
+        data.partialRefund,
+      );
+      if (!completionDisputeSettled) {
+        await resolvePartialRefundCancellationInTransaction(tx, payment, data.partialRefund);
+      }
       const settledRows = await tx
         .select()
         .from(payments)
@@ -8480,6 +9197,8 @@ export async function creditWalletBalance(data: {
 }
 
 type JobExpenseCategory = "fuel" | "toll" | "parking" | "material" | "part" | "paint" | "equipment" | "transport" | "packaging" | "other";
+type JobExpenseMediaRole = "receipt" | "invoice" | "product" | "material" | "video" | "other";
+const JOB_EXPENSE_MEDIA_ROLES = new Set<JobExpenseMediaRole>(["receipt", "invoice", "product", "material", "video", "other"]);
 
 async function getExpenseJobContext(requestId: number, userId: number) {
   const database = await getDb();
@@ -8500,19 +9219,27 @@ export async function assertExpenseMediaUpload(requestId: number, userId: number
   return { agreementId: context.agreement.id };
 }
 
-export async function createJobExpense(input: { requestId: number; providerUserId: number; category: JobExpenseCategory; amount: number; description: string; purchasedAt: Date; vendorName?: string; brand?: string; model?: string; quantity?: number; locationUrl?: string; mediaIds: number[] }) {
+export async function createJobExpense(input: { requestId: number; providerUserId: number; category: JobExpenseCategory; amount: number; description: string; purchasedAt: Date; vendorName?: string; brand?: string; model?: string; quantity?: number; locationUrl?: string; mediaIds?: number[]; media?: Array<{ mediaId: number; mediaRole: JobExpenseMediaRole }> }) {
   if (!Number.isInteger(input.amount) || input.amount <= 0) throw new Error("EXPENSE_AMOUNT_INVALID");
   const context = await getExpenseJobContext(input.requestId, input.providerUserId);
   if (!context.isProvider) throw new Error("EXPENSE_PROVIDER_ONLY");
-  const mediaIds = [...new Set(input.mediaIds)];
+  const evidence = input.media?.length
+    ? input.media
+    : (input.mediaIds ?? []).map((mediaId) => ({ mediaId, mediaRole: "receipt" as const }));
+  const mediaIds = evidence.map(({ mediaId }) => mediaId);
+  if (mediaIds.length > 8 || new Set(mediaIds).size !== mediaIds.length || evidence.some(({ mediaId, mediaRole }) => !Number.isInteger(mediaId) || mediaId <= 0 || !JOB_EXPENSE_MEDIA_ROLES.has(mediaRole))) {
+    throw new Error("EXPENSE_EVIDENCE_INVALID");
+  }
   return context.database.transaction(async (tx) => {
     if (mediaIds.length) {
-      const media = await tx.select({ id: serviceRequestMedia.id }).from(serviceRequestMedia).where(and(eq(serviceRequestMedia.requestId, input.requestId), eq(serviceRequestMedia.ownerUserId, input.providerUserId), eq(serviceRequestMedia.purpose, "expense"), inArray(serviceRequestMedia.id, mediaIds)));
+      const media = await tx.select({ id: serviceRequestMedia.id, kind: serviceRequestMedia.kind }).from(serviceRequestMedia).where(and(eq(serviceRequestMedia.requestId, input.requestId), eq(serviceRequestMedia.ownerUserId, input.providerUserId), eq(serviceRequestMedia.purpose, "expense"), inArray(serviceRequestMedia.id, mediaIds)));
       if (media.length !== mediaIds.length) throw new Error("EXPENSE_MEDIA_NOT_OWNED");
+      if (evidence.some(({ mediaId, mediaRole }) => mediaRole === "video" && media.find((item) => item.id === mediaId)?.kind !== "video")) throw new Error("EXPENSE_EVIDENCE_ROLE_KIND_INVALID");
+      if (evidence.some(({ mediaId, mediaRole }) => mediaRole !== "video" && media.find((item) => item.id === mediaId)?.kind === "video")) throw new Error("EXPENSE_EVIDENCE_ROLE_KIND_INVALID");
     }
     const result = await tx.insert(jobExpenses).values({ requestId: input.requestId, agreementId: context.agreement.id, providerId: context.agreement.providerId, category: input.category, amount: input.amount, description: input.description, purchasedAt: input.purchasedAt, vendorName: input.vendorName, brand: input.brand, model: input.model, quantity: input.quantity, locationUrl: input.locationUrl });
     const expenseId = Number(result[0].insertId);
-    if (mediaIds.length) await tx.insert(jobExpenseMedia).values(mediaIds.map((mediaId) => ({ expenseId, mediaId })));
+    if (evidence.length) await tx.insert(jobExpenseMedia).values(evidence.map(({ mediaId, mediaRole }) => ({ expenseId, mediaId, mediaRole })));
     return expenseId;
   });
 }
@@ -8520,7 +9247,19 @@ export async function createJobExpense(input: { requestId: number; providerUserI
 export async function listJobExpensesForParticipant(requestId: number, userId: number) {
   const context = await getExpenseJobContext(requestId, userId);
   const expenses = await context.database.select().from(jobExpenses).where(eq(jobExpenses.requestId, requestId)).orderBy(jobExpenses.createdAt, jobExpenses.id);
-  return Promise.all(expenses.map(async (expense) => ({ ...expense, media: await context.database.select({ id: serviceRequestMedia.id, kind: serviceRequestMedia.kind, originalName: serviceRequestMedia.originalName, mimeType: serviceRequestMedia.mimeType, sizeBytes: serviceRequestMedia.sizeBytes }).from(jobExpenseMedia).innerJoin(serviceRequestMedia, eq(jobExpenseMedia.mediaId, serviceRequestMedia.id)).where(eq(jobExpenseMedia.expenseId, expense.id)) })));
+  return Promise.all(expenses.map(async (expense) => {
+    const links = await context.database.select({ mediaRole: jobExpenseMedia.mediaRole, id: serviceRequestMedia.id, kind: serviceRequestMedia.kind, originalName: serviceRequestMedia.originalName, mimeType: serviceRequestMedia.mimeType, sizeBytes: serviceRequestMedia.sizeBytes, quarantineStatus: serviceRequestMedia.quarantineStatus }).from(jobExpenseMedia).innerJoin(serviceRequestMedia, eq(jobExpenseMedia.mediaId, serviceRequestMedia.id)).where(eq(jobExpenseMedia.expenseId, expense.id));
+    return {
+      ...expense,
+      media: links.map((item) => ({
+        id: item.id,
+        mediaRole: item.mediaRole,
+        kind: item.kind,
+        available: item.quarantineStatus === "clean",
+        ...(item.quarantineStatus === "clean" ? { originalName: item.originalName, mimeType: item.mimeType, sizeBytes: item.sizeBytes } : {}),
+      })),
+    };
+  }));
 }
 
 export async function submitExpenseRefundRequest(input: { expenseId: number; providerUserId: number; requestedAmount: number; materialAssessmentJson: string }) {
@@ -8767,9 +9506,30 @@ export async function getMoveAiDraftForUser(draftId: number, userId: number) {
 }
 
 /** Confirmation conditionally claims a draft and inserts the service request in the same transaction. */
-export async function confirmMoveAiDraft(input: { draftId: number; userId: number }) {
+export async function confirmMoveAiDraft(input: { draftId: number; userId: number; countryCode: string }) {
   const database = await getDb();
   if (!database) throw new Error("Database not available");
+  const countryCode = input.countryCode.trim().toUpperCase();
+  const draftForContext = await getMoveAiDraftForUser(input.draftId, input.userId);
+  if (draftForContext.status !== "draft" || draftForContext.expiresAt.getTime() <= Date.now()) {
+    throw new Error("MOVE_AI_DRAFT_NOT_CONFIRMABLE");
+  }
+  const complianceContext = await resolveServiceRequestComplianceContext({
+    categoryId: draftForContext.payload.categoryId,
+    countryCode,
+  });
+  assertServiceRequestCapabilityContext({
+    enforcementEnabled: complianceContext.requirementState === "REQUIRED",
+    requirementState: complianceContext.requirementState,
+    complianceRequirementState: complianceContext.complianceRequirementState,
+    requiredCapabilityId: complianceContext.requiredCapabilityId,
+    jurisdictionId: complianceContext.jurisdictionId,
+  });
+  await assertCountryMarketplaceTransition({
+    countryCode: complianceContext.serviceCountryCode,
+    jurisdictionId: complianceContext.jurisdictionId,
+    transition: "REQUEST_CREATION",
+  });
   return database.transaction(async (tx) => {
     const rows = await tx
       .select()
@@ -8793,6 +9553,7 @@ export async function confirmMoveAiDraft(input: { draftId: number; userId: numbe
       categoryId: payload.categoryId,
       title: payload.title,
       description: payload.description,
+      ...complianceContext,
     });
     const requestId = Number(requestResult[0].insertId);
     const attachedMediaOpaqueIds = Array.isArray(draft.attachedMediaOpaqueIds)

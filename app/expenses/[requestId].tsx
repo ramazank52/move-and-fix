@@ -19,7 +19,9 @@ const CATEGORIES = [
 
 type ExpenseCategory = (typeof CATEGORIES)[number][0];
 type ExpenseMediaMime = "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif";
+type ExpenseMediaRole = "receipt" | "invoice" | "product" | "material" | "video" | "other";
 const ALLOWED_EXPENSE_MIME_TYPES = new Set<ExpenseMediaMime>(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+const EVIDENCE_ROLES: readonly ExpenseMediaRole[] = ["receipt", "invoice", "product", "material", "other"];
 
 export default function JobExpensesScreen() {
   const router = useRouter();
@@ -35,6 +37,11 @@ export default function JobExpensesScreen() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [vendorName, setVendorName] = useState("");
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [locationUrl, setLocationUrl] = useState("");
+  const [evidenceRole, setEvidenceRole] = useState<ExpenseMediaRole>("receipt");
   const [receipt, setReceipt] = useState<{ uri: string; originalName: string; mimeType: ExpenseMediaMime } | null>(null);
   const [expanded, setExpanded] = useState(false);
 
@@ -44,7 +51,7 @@ export default function JobExpensesScreen() {
   const createExpense = trpc.agreements.createExpense.useMutation({
     onSuccess: async () => {
       await utils.agreements.expenses.invalidate({ requestId });
-      setAmount(""); setDescription(""); setVendorName(""); setReceipt(null); setExpanded(false);
+      setAmount(""); setDescription(""); setVendorName(""); setBrand(""); setModel(""); setQuantity(""); setLocationUrl(""); setEvidenceRole("receipt"); setReceipt(null); setExpanded(false);
       Alert.alert(t("expense.alert.savedTitle"), t("expense.alert.savedBody"));
     },
   });
@@ -115,6 +122,16 @@ export default function JobExpensesScreen() {
       Alert.alert(t("expense.alert.descriptionRequiredTitle"), t("expense.alert.descriptionRequiredBody"));
       return;
     }
+    const normalizedQuantity = quantity.trim() ? Number(quantity.replace(/[^0-9]/g, "")) : undefined;
+    if (normalizedQuantity !== undefined && (!Number.isInteger(normalizedQuantity) || normalizedQuantity <= 0)) {
+      Alert.alert(t("expense.alert.amountRequiredTitle"), t("expense.alert.amountRequiredBody"));
+      return;
+    }
+    const normalizedLocationUrl = locationUrl.trim() || undefined;
+    if (normalizedLocationUrl && !/^https:\/\/.+/i.test(normalizedLocationUrl)) {
+      Alert.alert(t("expense.alert.saveFailedTitle"), t("expense.locationHint"));
+      return;
+    }
     try {
       const mediaIds: number[] = [];
       if (receipt) {
@@ -134,7 +151,11 @@ export default function JobExpensesScreen() {
         description: description.trim(),
         purchasedAt: new Date(),
         vendorName: vendorName.trim() || undefined,
-        mediaIds,
+        brand: brand.trim() || undefined,
+        model: model.trim() || undefined,
+        quantity: normalizedQuantity,
+        locationUrl: normalizedLocationUrl,
+        media: mediaIds.map((mediaId) => ({ mediaId, mediaRole: evidenceRole })),
       });
     } catch (error) {
       Alert.alert(t("expense.alert.saveFailedTitle"), error instanceof Error ? error.message : t("expense.alert.safeFailure"));
@@ -176,7 +197,16 @@ export default function JobExpensesScreen() {
               <TextInput accessibilityLabel={t("expense.amountAccessibility")} accessibilityHint={t("expense.amountHint")} value={amount} onChangeText={setAmount} keyboardType="number-pad" placeholder={t("expense.amountPlaceholder")} placeholderTextColor={colors.muted} style={{ marginTop: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.foreground, minHeight: 48, paddingHorizontal: 12, textAlign: isRTL ? "right" : "left" }} />
               <TextInput accessibilityLabel={t("expense.descriptionAccessibility")} value={description} onChangeText={setDescription} placeholder={t("expense.descriptionPlaceholder")} placeholderTextColor={colors.muted} multiline style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.foreground, minHeight: 72, padding: 12, textAlignVertical: "top", textAlign: isRTL ? "right" : "left" }} />
               <TextInput accessibilityLabel={t("expense.vendorAccessibility")} accessibilityHint={t("expense.vendorHint")} value={vendorName} onChangeText={setVendorName} placeholder={t("expense.vendorPlaceholder")} placeholderTextColor={colors.muted} style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.foreground, minHeight: 48, paddingHorizontal: 12, textAlign: isRTL ? "right" : "left" }} />
+              <TextInput accessibilityLabel={t("expense.brandAccessibility")} value={brand} onChangeText={setBrand} placeholder={t("expense.brandPlaceholder")} placeholderTextColor={colors.muted} style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.foreground, minHeight: 48, paddingHorizontal: 12, textAlign: isRTL ? "right" : "left" }} />
+              <TextInput accessibilityLabel={t("expense.modelAccessibility")} value={model} onChangeText={setModel} placeholder={t("expense.modelPlaceholder")} placeholderTextColor={colors.muted} style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.foreground, minHeight: 48, paddingHorizontal: 12, textAlign: isRTL ? "right" : "left" }} />
+              <TextInput accessibilityLabel={t("expense.quantityAccessibility")} value={quantity} onChangeText={setQuantity} keyboardType="number-pad" placeholder={t("expense.quantityPlaceholder")} placeholderTextColor={colors.muted} style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.foreground, minHeight: 48, paddingHorizontal: 12, textAlign: isRTL ? "right" : "left" }} />
+              <TextInput accessibilityLabel={t("expense.locationAccessibility")} accessibilityHint={t("expense.locationHint")} value={locationUrl} onChangeText={setLocationUrl} keyboardType="url" autoCapitalize="none" placeholder={t("expense.locationPlaceholder")} placeholderTextColor={colors.muted} style={{ marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.foreground, minHeight: 48, paddingHorizontal: 12, textAlign: isRTL ? "right" : "left" }} />
+              <Text className="mt-4 text-xs font-bold text-muted">{t("expense.evidenceRole")}</Text>
+              <View style={{ marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {EVIDENCE_ROLES.map((role) => <Pressable key={role} accessibilityRole="radio" accessibilityLabel={t(`expense.evidenceRole.${role}`)} accessibilityState={{ selected: evidenceRole === role }} onPress={() => setEvidenceRole(role)} style={({ pressed }) => ({ borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: evidenceRole === role ? colors.primary : colors.background, opacity: pressed ? 0.7 : 1 })}><Text style={{ color: evidenceRole === role ? "#fff" : colors.foreground, fontSize: 12, fontWeight: "700" }}>{t(`expense.evidenceRole.${role}`)}</Text></Pressable>)}
+              </View>
               <Pressable accessibilityRole="button" accessibilityLabel={receipt ? t("expense.receiptSelectedAccessibility") : t("expense.receiptAddAccessibility")} accessibilityHint={t("expense.receiptHint")} onPress={pickReceipt} style={({ pressed }) => ({ marginTop: 12, minHeight: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary, opacity: pressed ? 0.7 : 1 })}><Text style={{ color: colors.primary, fontWeight: "800" }}>{receipt ? t("expense.receiptSelected") : t("expense.receiptAdd")}</Text></Pressable>
+              <Text className="mt-2 text-xs leading-5 text-muted" style={{ textAlign: isRTL ? "right" : "left" }}>{t("expense.evidenceScanNotice")}</Text>
               <Pressable accessibilityRole="button" accessibilityLabel={t("expense.saveAccessibility")} accessibilityHint={t("expense.saveHint")} disabled={createExpense.isPending || uploadMedia.isPending} onPress={saveExpense} style={({ pressed }) => ({ marginTop: 12, minHeight: 48, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", opacity: pressed || createExpense.isPending || uploadMedia.isPending ? 0.7 : 1 })}><Text className="font-bold text-white">{createExpense.isPending || uploadMedia.isPending ? t("expense.saving") : t("expense.save")}</Text></Pressable>
             </View> : null}
           </View>

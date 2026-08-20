@@ -74,6 +74,52 @@ describe("P11 global payment and completion dispute resolution", () => {
     })).toMatchObject({ allowed: true, action: "finalize_customer_refund" });
   });
 
+  it("approves only a whole-TRY, balanced partial settlement while escrow is held", () => {
+    expect(evaluateCompletionDisputeResolution({
+      resolution: "partial",
+      disputeStatus: "under_review",
+      proofStatus: "disputed",
+      paymentStatus: "held",
+      reviewerUserId: 45,
+      resolutionNote: "Kanıtlar kısmi müşteri iadesi ve kısmi sağlayıcı ödemesi gerektiriyor.",
+      providerPayout: 9_000,
+      paymentAmount: 10_000,
+      customerRefundAmount: 3_000,
+      providerGrossAmount: 7_000,
+      commissionAmount: 700,
+      providerPayoutAmount: 6_300,
+    })).toMatchObject({
+      allowed: true,
+      action: "partial_settlement",
+      reason: "COMPLETION_DISPUTE_PARTIAL_SETTLEMENT_APPROVED",
+    });
+  });
+
+  it("rejects partial settlement when the amount is fractional, negative, over-split or escrow is not held", () => {
+    const input = {
+      resolution: "partial" as const,
+      disputeStatus: "under_review" as const,
+      proofStatus: "disputed" as const,
+      paymentStatus: "held" as const,
+      reviewerUserId: 45,
+      resolutionNote: "Kanıtlar kısmi müşteri iadesi ve kısmi sağlayıcı ödemesi gerektiriyor.",
+      providerPayout: 9_000,
+      paymentAmount: 10_000,
+      customerRefundAmount: 3_000,
+      providerGrossAmount: 7_000,
+      commissionAmount: 700,
+      providerPayoutAmount: 6_300,
+    };
+    expect(evaluateCompletionDisputeResolution({ ...input, customerRefundAmount: 3_000.5 }))
+      .toMatchObject({ allowed: false, reason: "COMPLETION_DISPUTE_PARTIAL_AMOUNT_INVALID" });
+    expect(evaluateCompletionDisputeResolution({ ...input, customerRefundAmount: -1, providerGrossAmount: 10_001 }))
+      .toMatchObject({ allowed: false, reason: "COMPLETION_DISPUTE_PARTIAL_SPLIT_INVALID" });
+    expect(evaluateCompletionDisputeResolution({ ...input, customerRefundAmount: 3_001, providerGrossAmount: 7_000 }))
+      .toMatchObject({ allowed: false, reason: "COMPLETION_DISPUTE_PARTIAL_SPLIT_INVALID" });
+    expect(evaluateCompletionDisputeResolution({ ...input, paymentStatus: "released" }))
+      .toMatchObject({ allowed: false, reason: "COMPLETION_DISPUTE_PARTIAL_SETTLEMENT_REQUIRES_HELD_ESCROW" });
+  });
+
   it("rejects unresolved financial state and insufficient rationale", () => {
     expect(evaluateCompletionDisputeResolution({
       resolution: "customer",

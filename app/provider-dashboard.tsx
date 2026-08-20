@@ -41,6 +41,7 @@ export default function ProviderDashboardScreen() {
   const earningsQuery = trpc.provider.myEarnings.useQuery(undefined, { refetchOnMount: true });
   const opportunitiesQuery = trpc.provider.newJobs.useQuery(undefined, { refetchOnMount: true });
   const cockpitQuery = trpc.provider.businessCockpit.useQuery(undefined, { refetchOnMount: true });
+  const onboardingQuery = trpc.provider.getOnboardingStatus.useQuery(undefined, { refetchOnMount: true });
   const availabilityMutation = trpc.provider.updateAvailability.useMutation();
 
   const profile = profileQuery.data;
@@ -61,10 +62,11 @@ export default function ProviderDashboardScreen() {
       earningsQuery.refetch(),
       opportunitiesQuery.refetch(),
       cockpitQuery.refetch(),
+      onboardingQuery.refetch(),
     ]);
     setAvailabilityOverride(null);
     setRefreshing(false);
-  }, [cockpitQuery, earningsQuery, jobsQuery, opportunitiesQuery, profileQuery]);
+  }, [cockpitQuery, earningsQuery, jobsQuery, onboardingQuery, opportunitiesQuery, profileQuery]);
 
   const toggleAvailability = useCallback(async () => {
     if (availabilityMutation.isPending) return;
@@ -135,6 +137,25 @@ export default function ProviderDashboardScreen() {
             <Text style={{ color: colors.foreground, fontSize: 25, lineHeight: 31, fontWeight: "800", marginBottom: 12 }}>
               {t("provider.today")}
             </Text>
+
+            {onboardingQuery.data?.activation !== "eligible" && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/provider-onboarding" as never)}
+                style={({ pressed }) => ({
+                  borderRadius: 11,
+                  padding: 14,
+                  backgroundColor: "#FFF4E8",
+                  borderWidth: 1,
+                  borderColor: "#FFB77A",
+                  marginBottom: 12,
+                  opacity: pressed ? 0.72 : 1,
+                })}
+              >
+                <Text style={{ color: "#9A4D00", fontSize: 15, fontWeight: "800" }}>{t("provider.onboarding.dashboardCtaTitle")}</Text>
+                <Text style={{ color: "#9A4D00", fontSize: 12, lineHeight: 18, marginTop: 3 }}>{t("provider.onboarding.dashboardCtaBody")}</Text>
+              </Pressable>
+            )}
 
             <LinearGradient
               colors={["#7A42F4", "#5526D5"]}

@@ -32,7 +32,7 @@ function getConfiguredOrigins(environment: SecurityEnvironment): string[] {
 }
 
 /** Production accepts only explicitly configured browser origins. */
-export function resolveAllowedOrigins(environment: SecurityEnvironment = process.env): string[] {
+export function resolveAllowedOrigins(environment: SecurityEnvironment = process.env as SecurityEnvironment): string[] {
   const configuredOrigins = getConfiguredOrigins(environment);
   if (configuredOrigins.length > 0) return configuredOrigins;
   return environment.NODE_ENV === 'production' ? [] : [...DEFAULT_DEVELOPMENT_ORIGINS];
@@ -48,7 +48,7 @@ function isTrustedDevelopmentPreviewOrigin(origin: string): boolean {
 }
 
 /** Hosted preview is development-only; production still requires ALLOWED_ORIGINS. */
-export function isAllowedCorsOrigin(origin: string, environment: SecurityEnvironment = process.env): boolean {
+export function isAllowedCorsOrigin(origin: string, environment: SecurityEnvironment = process.env as SecurityEnvironment): boolean {
   return (
     resolveAllowedOrigins(environment).includes(origin) ||
     (environment.NODE_ENV !== 'production' && isTrustedDevelopmentPreviewOrigin(origin))
@@ -79,7 +79,7 @@ export function isTrustedHttpsRequest(request: Pick<Request, "secure" | "headers
 }
 
 /** Missing production material is fatal; development never uses a static fallback key. */
-export function resolveEncryptionKey(environment: SecurityEnvironment = process.env): string {
+export function resolveEncryptionKey(environment: SecurityEnvironment = process.env as SecurityEnvironment): string {
   const configuredKey = environment.ENCRYPTION_KEY?.trim();
   if (configuredKey) return configuredKey;
   if (environment.NODE_ENV === 'production') {

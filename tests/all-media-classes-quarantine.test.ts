@@ -94,12 +94,19 @@ describe("media scanner HTTP callback fail-closed contract", () => {
     await expect(response.json()).resolves.toEqual({ error: "MEDIA_SCANNER_NOT_CONFIGURED" });
   });
 
-  it("does not expose durable scanner dispatch while scanner scheduling is not configured", async () => {
+  it("does not expose scanner dispatch or watchdog while the separate scanner cron secret is not configured", async () => {
     const response = await fetch(`${baseUrl}/api/scheduled/media-scanner-dispatch`, {
       method: "POST",
       headers: { Authorization: "Bearer fabricated-value" },
     });
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({ error: "MEDIA_SCANNER_NOT_CONFIGURED" });
+    await expect(response.json()).resolves.toEqual({ error: "MEDIA_SCANNER_CRON_NOT_CONFIGURED" });
+
+    const watchdog = await fetch(`${baseUrl}/api/scheduled/media-scanner-watchdog`, {
+      method: "POST",
+      headers: { Authorization: "Bearer fabricated-value" },
+    });
+    expect(watchdog.status).toBe(503);
+    await expect(watchdog.json()).resolves.toEqual({ error: "MEDIA_SCANNER_CRON_NOT_CONFIGURED" });
   });
 });

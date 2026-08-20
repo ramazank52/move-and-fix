@@ -18,7 +18,7 @@ export default function VerifyPhoneScreen() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const verificationStatus = trpc.auth.getContactVerificationStatus.useQuery(undefined, { enabled: Boolean(user) });
   const requestCode = trpc.auth.requestVerification.useMutation({ onSuccess: () => setFeedback(t("verification.phoneResent")), onError: (error) => setFeedback(error.message) });
-  const verifyCode = trpc.auth.verifyCode.useMutation({ onSuccess: async () => { await refresh(); router.replace("/" as never); }, onError: (error) => setFeedback(error.message) });
+  const verifyCode = trpc.auth.verifyCode.useMutation({ onSuccess: async () => { await refresh(); router.replace("/settings/profile-edit" as never); }, onError: (error) => setFeedback(error.message) });
 
   return (
     <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-6">

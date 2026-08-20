@@ -1,5 +1,5 @@
 {
-  "name": "app-template",
+  "name": "move-and-fix",
   "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",
@@ -17,6 +17,8 @@
     "supply:licenses": "node scripts/check-licenses.mjs",
     "supply:sbom": "node scripts/generate-sbom.mjs",
     "supply:verify": "pnpm supply:licenses && pnpm supply:sbom",
+    "seed:dev": "tsx scripts/seed.ts",
+    "seed:catalog:tr": "tsx scripts/seed-tr-gold-master.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "android": "expo start --android",
     "ios": "expo start --ios",

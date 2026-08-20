@@ -29,6 +29,9 @@ const db = vi.hoisted(() => ({
   listJobChangeOrdersForAdmin: vi.fn(),
   listJobCancellationCasesForAdmin: vi.fn(),
   reviewJobCancellationForAdmin: vi.fn(),
+  listCompletionDisputesForAdmin: vi.fn(),
+  hasActiveCompletionDisputeReviewerPermission: vi.fn(),
+  planPartialCompletionDisputeSettlement: vi.fn(),
   listFeatureFlags: vi.fn(),
   setFeatureFlag: vi.fn(),
   listPrivacyRightsRequestsForReview: vi.fn(),
@@ -88,6 +91,7 @@ describe("MoveOS ortak API sözleşmesi", () => {
     vi.clearAllMocks();
     db.getMoveOsDashboardMetrics.mockResolvedValue(metrics);
     db.hasValidAdminMfaGrant.mockResolvedValue(true);
+    db.hasActiveCompletionDisputeReviewerPermission.mockResolvedValue(false);
     db.hasActiveSuperAdminRole.mockResolvedValue(false);
     db.createAuthChallenge.mockResolvedValue(71);
     notifications.sendVerificationCode.mockResolvedValue({ deliveryStatus: "delivered" });
@@ -112,6 +116,55 @@ describe("MoveOS ortak API sözleşmesi", () => {
       }),
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(db.setFeatureFlag).not.toHaveBeenCalled();
+  });
+
+  it("MFA olmadan completion dispute kuyruğu ve kısmi uzlaşma planını fail-closed reddeder", async () => {
+    db.hasValidAdminMfaGrant.mockResolvedValue(false);
+
+    await expect(adminCaller().completionDisputes({ limit: 20 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(adminCaller().planPartialCompletionDisputeSettlement({
+      requestId: 44,
+      customerRefundAmount: 210,
+      resolutionNote: "Eksik hizmet kanıtı nedeniyle dengeli kısmi çözüm",
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(db.listCompletionDisputesForAdmin).not.toHaveBeenCalled();
+    expect(db.planPartialCompletionDisputeSettlement).not.toHaveBeenCalled();
+  });
+
+  it("MFA olsa dahi ayrı financial reviewer grant olmadan kısmi uzlaşma planını reddeder", async () => {
+    await expect(adminCaller().planPartialCompletionDisputeSettlement({
+      requestId: 44,
+      customerRefundAmount: 210,
+      resolutionNote: "Eksik hizmet kanıtı nedeniyle dengeli kısmi çözüm",
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.planPartialCompletionDisputeSettlement).not.toHaveBeenCalled();
+  });
+
+  it("MFA ve reviewer grant doğrulandığında MoveOS planını oturumdaki inceleyiciye bağlar", async () => {
+    db.hasActiveCompletionDisputeReviewerPermission.mockResolvedValue(true);
+    db.listCompletionDisputesForAdmin.mockResolvedValue([{ id: 8, requestId: 44, status: "under_review" }]);
+    db.planPartialCompletionDisputeSettlement.mockResolvedValue({
+      disputeId: 8,
+      requestId: 44,
+      customerRefundAmount: 210,
+      gatewayFinalizationRequired: true,
+    });
+
+    await expect(adminCaller().completionDisputes({ limit: 20, offset: 0, status: "under_review" }))
+      .resolves.toEqual([{ id: 8, requestId: 44, status: "under_review" }]);
+    await expect(adminCaller().planPartialCompletionDisputeSettlement({
+      requestId: 44,
+      customerRefundAmount: 210,
+      resolutionNote: "Eksik hizmet kanıtı nedeniyle dengeli kısmi çözüm",
+    })).resolves.toMatchObject({ disputeId: 8, gatewayFinalizationRequired: true });
+
+    expect(db.listCompletionDisputesForAdmin).toHaveBeenCalledWith({ limit: 20, offset: 0, status: "under_review" });
+    expect(db.planPartialCompletionDisputeSettlement).toHaveBeenCalledWith({
+      requestId: 44,
+      customerRefundAmount: 210,
+      resolutionNote: "Eksik hizmet kanıtı nedeniyle dengeli kısmi çözüm",
+      adminUserId: 7,
+    });
   });
 
   it("MFA doğrulanmış sıradan yöneticinin Super Admin yönetim yüzeyine erişimini reddeder", async () => {

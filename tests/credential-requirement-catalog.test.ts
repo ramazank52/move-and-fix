@@ -58,6 +58,29 @@ describe("CredentialRequirementCatalog", () => {
     });
   });
 
+  it("never reuses a same-category or same-provider-type record when the authoritative capability or jurisdiction differs", () => {
+    const result = resolveCredentialRequirements({
+      providerType: "sole_trader",
+      scope: { jurisdictionId: 34, categoryId: 2, capabilityId: 71 },
+      requirements: [
+        requirement({ capabilityId: 70 }),
+        requirement({ jurisdictionId: 35 }),
+        requirement({ categoryId: 3 }),
+      ],
+    });
+    expect(result).toEqual({ status: "MISSING_CREDENTIAL_REQUIREMENT_CATALOG", requirements: [] });
+  });
+
+  it("accepts only the exact capability-and-jurisdiction source row for the active provider model", () => {
+    const exact = requirement();
+    const result = resolveCredentialRequirements({
+      providerType: "sole_trader",
+      scope: { jurisdictionId: 34, categoryId: 2, capabilityId: 71 },
+      requirements: [requirement({ capabilityId: 72 }), exact],
+    });
+    expect(result).toEqual({ status: "RESOLVED", requirements: [exact] });
+  });
+
   it("blocks conditional, prohibited and unknown catalog rules instead of reducing them to a document checklist", () => {
     for (const requirementState of ["conditional", "prohibited", "unknown"] as const) {
       const result = resolveCredentialRequirements({

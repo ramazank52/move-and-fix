@@ -43,6 +43,7 @@ import { translateMessageOnDemand } from "./ai/OnDemandMessageTranslation";
 import { evaluateProfessionalAiBoundary } from "./ai/ProfessionalAiBoundary";
 import { evaluateMoveAiMediaConsent } from "./ai/MoveAiMediaPolicy";
 import { MEDIA_UPLOAD_LIMIT_BYTES, isWithinDecodedByteLimit } from "./security/MediaUploadLimits";
+import { listPublicCountryLaunchOptions, resolveCountryPaymentContext } from "./compliance/CountryComplianceRepository";
 
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
 // Döngüsel import'u önlemek için servisler burada birbirine bağlanır.
@@ -275,14 +276,24 @@ async function issueVerificationCode(data: {
   userId: number;
   purpose: db.AuthChallengePurpose;
   destination: string;
+  stagedContactChange?: boolean;
 }) {
   const channel = data.purpose === "verify_phone" ? NotificationChannel.SMS : NotificationChannel.EMAIL;
   const code = randomInt(100_000, 1_000_000).toString();
-  const challengeId = await db.createAuthChallenge({
-    ...data,
+  const codeHash = hashVerificationCode(data.userId, data.purpose, code);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const stagedContactType = data.purpose === "verify_email" ? "email" : data.purpose === "verify_phone" ? "phone" : null;
+  const staged = data.stagedContactChange && stagedContactType
+    ? await db.initiateStagedContactChange({ userId: data.userId, contactType: stagedContactType, destination: data.destination, codeHash, expiresAt })
+    : null;
+  if (staged && !staged.changed) return { deliveryStatus: "not_required" as const };
+  const challengeId = staged?.challengeId ?? await db.createAuthChallenge({
+    userId: data.userId,
+    purpose: data.purpose,
+    destination: data.destination,
     channel: channel === NotificationChannel.SMS ? "sms" : "email",
-    codeHash: hashVerificationCode(data.userId, data.purpose, code),
-    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    codeHash,
+    expiresAt,
   });
   const delivery = await notificationServiceV2.sendVerificationCode({
     channel,
@@ -291,12 +302,13 @@ async function issueVerificationCode(data: {
     purpose: data.purpose,
   });
   if (delivery.deliveryStatus !== "delivered") {
+    if (staged && stagedContactType) await db.cancelStagedContactChange({ userId: data.userId, contactType: stagedContactType, codeHash });
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
       message: "Doğrulama mesajı gönderilemedi. Bildirim sağlayıcısı yapılandırılmalıdır.",
     });
   }
-  if (data.purpose === "verify_email" || data.purpose === "verify_phone") {
+  if (!staged && (data.purpose === "verify_email" || data.purpose === "verify_phone")) {
     await db.initContactVerification({
       userId: data.userId,
       contactType: data.purpose === "verify_email" ? "email" : "phone",
@@ -537,16 +549,25 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         try {
           const phone = input.phone === null ? null : normalizeTurkishPhone(input.phone);
+          const email = input.email.trim().toLowerCase();
+          const emailChanged = (ctx.user.email ?? "").trim().toLowerCase() !== email;
+          const phoneChanged = (ctx.user.phone ?? null) !== phone;
           const result = await db.updateOwnUserProfile({
             userId: ctx.user.id,
             name: input.name,
-            email: input.email.trim().toLowerCase(),
-            phone,
           });
+          const emailVerificationDelivery = emailChanged
+            ? await issueVerificationCode({ userId: ctx.user.id, purpose: "verify_email", destination: email, stagedContactChange: true })
+            : null;
+          const phoneVerificationDelivery = phoneChanged && phone
+            ? await issueVerificationCode({ userId: ctx.user.id, purpose: "verify_phone", destination: phone, stagedContactChange: true })
+            : null;
           return {
             user: result.user,
-            emailVerificationRequired: result.emailChanged,
-            phoneVerificationRequired: result.phoneChanged,
+            emailVerificationRequired: emailChanged,
+            phoneVerificationRequired: Boolean(phoneChanged && phone),
+            emailVerificationDelivery,
+            phoneVerificationDelivery,
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : "PROFILE_UPDATE_FAILED";
@@ -556,6 +577,10 @@ export const appRouter = router({
           if (message === "PROFILE_USER_NOT_FOUND") {
             throw new TRPCError({ code: "NOT_FOUND", message: "Hesap bulunamadı" });
           }
+          if (message === "PROFILE_PHONE_IN_USE") {
+            throw new TRPCError({ code: "CONFLICT", message: "Bu telefon başka bir hesap tarafından kullanılıyor" });
+          }
+          if (error instanceof TRPCError) throw error;
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Profil güncellenemedi" });
         }
       }),
@@ -655,15 +680,27 @@ export const appRouter = router({
     requestVerification: protectedProcedure
       .input(z.object({ purpose: verificationPurposeSchema }))
       .mutation(async ({ ctx, input }) => {
-        const destination = input.purpose === "verify_phone"
+        const contactType = input.purpose === "verify_phone" ? "phone" : input.purpose === "verify_email" ? "email" : null;
+        const pendingDestination = contactType ? await db.getPendingStagedContactDestination(ctx.user.id, contactType) : null;
+        const destination = pendingDestination ?? (input.purpose === "verify_phone"
           ? ctx.user.phone
-          : ctx.user.email;
+          : ctx.user.email);
         if (!destination) throw new TRPCError({ code: "BAD_REQUEST", message: "Bu doğrulama için kayıtlı iletişim bilgisi yok" });
-        const verification = await issueVerificationCode({ userId: ctx.user.id, purpose: input.purpose, destination });
+        const verification = await issueVerificationCode({
+          userId: ctx.user.id,
+          purpose: input.purpose,
+          destination,
+          stagedContactChange: Boolean(pendingDestination && contactType),
+        });
         return { verificationDelivery: verification };
       }),
     getContactVerificationStatus: protectedProcedure.query(async ({ ctx }) => {
       const status = await db.getContactVerificationStatus(ctx.user.id);
+      if (!status) throw new TRPCError({ code: "NOT_FOUND", message: "Hesap bulunamadı" });
+      return status;
+    }),
+    getStagedContactChangeStatus: protectedProcedure.query(async ({ ctx }) => {
+      const status = await db.getStagedContactChangeStatus(ctx.user.id);
       if (!status) throw new TRPCError({ code: "NOT_FOUND", message: "Hesap bulunamadı" });
       return status;
     }),
@@ -698,14 +735,27 @@ export const appRouter = router({
           if (activeChallenge) await db.incrementAuthChallengeAttempts(activeChallenge.id);
           throw new TRPCError({ code: "BAD_REQUEST", message: "Kod geçersiz, süresi dolmuş veya deneme sınırına ulaşmış" });
         }
-        await db.markAuthChallengeUsed(validChallenge.id);
-        await db.updateUserVerification({
-          userId: ctx.user.id,
-          emailVerified: input.purpose === "verify_email",
-          phoneVerified: input.purpose === "verify_phone",
-        });
         if (input.purpose === "verify_email" || input.purpose === "verify_phone") {
-          await db.markContactVerified(ctx.user.id, input.purpose === "verify_email" ? "email" : "phone");
+          try {
+            await db.confirmStagedContactChange({
+              userId: ctx.user.id,
+              contactType: input.purpose === "verify_email" ? "email" : "phone",
+              codeHash,
+            });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "STAGED_CONTACT_CHANGE_INVALID_OR_EXPIRED";
+            if (message === "STAGED_CONTACT_CHANGE_INVALID_OR_EXPIRED" || message === "STAGED_CONTACT_CHANGE_ALREADY_CONSUMED") {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Kod geçersiz, süresi dolmuş veya daha önce kullanılmış" });
+            }
+            throw error;
+          }
+        } else {
+          await db.markAuthChallengeUsed(validChallenge.id);
+          await db.updateUserVerification({
+            userId: ctx.user.id,
+            emailVerified: false,
+            phoneVerified: false,
+          });
         }
         return { verified: input.purpose };
       }),
@@ -1341,7 +1391,13 @@ export const appRouter = router({
         locationUrl: z.string().url().max(500).optional(),
         mediaIds: z.array(z.number().int().positive()).max(8).superRefine((items, ctx) => {
           if (new Set(items).size !== items.length) ctx.addIssue({ code: "custom", message: "Tekrarlayan medya kaydı gönderilemez" });
-        }).default([]),
+        }).optional(),
+        media: z.array(z.object({
+          mediaId: z.number().int().positive(),
+          mediaRole: z.enum(["receipt", "invoice", "product", "material", "video", "other"]),
+        })).max(8).superRefine((items, ctx) => {
+          if (new Set(items.map((item) => item.mediaId)).size !== items.length) ctx.addIssue({ code: "custom", message: "Tekrarlayan medya kaydı gönderilemez" });
+        }).optional(),
       }))
       .mutation(({ ctx, input }) =>
         runAgreementOperation(() => db.createJobExpense({ ...input, providerUserId: ctx.user.id })),
@@ -2074,11 +2130,19 @@ export const appRouter = router({
       }
       return status;
     }),
+    getOnboardingCatalog: protectedProcedure.query(async ({ ctx }) => {
+      const catalog = await db.getProviderOnboardingCatalog(ctx.user.id);
+      if (!catalog) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+      }
+      return catalog;
+    }),
     configureOnboarding: protectedProcedure
       .input(z.object({
         categoryId: z.number().int().positive(),
         subcategoryId: z.number().int().positive().nullable(),
         capabilityId: z.number().int().positive(),
+        jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2}$/),
       }))
       .mutation(async ({ ctx, input }) => {
         try {
@@ -2128,7 +2192,7 @@ export const appRouter = router({
         });
       }),
     getOperatingModel: protectedProcedure
-      .input(z.object({ jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})?$/).max(16).default("TR") }))
+      .input(z.object({ jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})?$/).max(16) }))
       .query(async ({ ctx, input }) => {
         const provider = await db.getProviderProfile(ctx.user.id);
         if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
@@ -2172,6 +2236,20 @@ export const appRouter = router({
   }),
 
   // MoveAI — Customer-facing AI assistant
+  countryRegistry: router({
+    list: protectedProcedure.query(async () => {
+      try {
+        return await listPublicCountryLaunchOptions();
+      } catch (error) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Ülke kullanılabilirlik kaydı şu anda doğrulanamadı",
+          cause: error,
+        });
+      }
+    }),
+  }),
+
   ai: router({
     professionalPreflight: protectedProcedure
       .input(z.object({
@@ -2299,12 +2377,16 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           const category = resolveMoveAiCategory(parsed.category);
           let riskBlocked = false;
           if (parsed.shouldCreateRequest && category !== "general") {
-            const categoryMap: Record<string, number> = {
-              plumbing: 1, electrical: 2, cleaning: 3, hvac: 4,
-              towing: 13, courier: 14, roadside: 15, locksmith: 5,
-              painting: 6, gardening: 7, moving: 8, appliance: 9,
-            };
-            const categoryId = categoryMap[category] ?? 1;
+            const catalogResolution = await db.resolveMoveAiCatalogCategory(category);
+            if (catalogResolution.status !== "RESOLVED") {
+              return {
+                ...createPolicyBoundMoveAiResponse({ category: "general", draftCreated: false }),
+                requestId: undefined,
+                draftId: undefined,
+                draftStatus: undefined,
+                catalogResolution: catalogResolution.status,
+              };
+            }
             const lowerMessage = input.message.toLocaleLowerCase("tr-TR");
             const riskLevel = /(silah|uyuşturucu|dolandır|kimlik sahte|şiddet)/.test(lowerMessage)
               ? "high" as const
@@ -2315,7 +2397,7 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
               userId: ctx.user.id,
               sourceMessage: input.message,
               assistantSummary: parsed.response ?? "Hizmet taslağı hazırlandı.",
-              categoryId,
+              categoryId: catalogResolution.value.categoryId,
               suggestions: parsed.suggestions ?? [],
               riskLevel,
               attachedMediaOpaqueIds: input.attachedMediaOpaqueIds,
@@ -2380,15 +2462,18 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       .input(z.object({ draftId: z.number().int().positive() }))
       .query(({ ctx, input }) => db.getMoveAiDraftForUser(input.draftId, ctx.user.id)),
     confirmDraft: protectedProcedure
-      .input(z.object({ draftId: z.number().int().positive() }))
+      .input(z.object({ draftId: z.number().int().positive(), countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/) }))
       .mutation(async ({ ctx, input }) => {
         try {
-          return await db.confirmMoveAiDraft({ draftId: input.draftId, userId: ctx.user.id });
+          return await db.confirmMoveAiDraft({ draftId: input.draftId, userId: ctx.user.id, countryCode: input.countryCode });
         } catch (error) {
           const message = error instanceof Error ? error.message : "MOVE_AI_DRAFT_CONFIRM_FAILED";
           if (message === "MOVE_AI_DRAFT_NOT_FOUND") throw new TRPCError({ code: "NOT_FOUND", message: "MoveAI taslağı bulunamadı" });
           if (message.includes("NOT_CONFIRMABLE")) throw new TRPCError({ code: "CONFLICT", message: "Bu taslak süresi dolmuş veya daha önce işlenmiş" });
           if (message.includes("RISK_BLOCKED") || message.includes("TRUST_RESTRICTED")) throw new TRPCError({ code: "FORBIDDEN", message: "Bu taslak güvenlik incelemesi nedeniyle onaylanamaz" });
+          if (message.startsWith("COUNTRY_LAUNCH_GATE_BLOCKED") || message.includes("JURISDICTION_") || message.includes("CAPABILITY_")) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Seçilen ülkede bu hizmet henüz kullanıma açık değil" });
+          }
           throw error;
         }
       }),
@@ -2675,6 +2760,29 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       }),
   }),
 
+  completionDisputeReviewers: router({
+    grantPermission: superAdminMfaProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const actorId = ctx.user?.id;
+        if (!actorId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        await db.grantCompletionDisputeReviewerPermission({ userId: input.userId, grantedByUserId: actorId });
+        return { granted: true };
+      }),
+    revokePermission: superAdminMfaProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const actorId = ctx.user?.id;
+        if (!actorId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return {
+          revoked: await db.revokeCompletionDisputeReviewerPermission({
+            userId: input.userId,
+            revokedByUserId: actorId,
+          }),
+        };
+      }),
+  }),
+
   featureFlags: router({
     resolve: protectedProcedure
       .input(
@@ -2812,6 +2920,28 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
           }),
         );
       }),
+    planPartialCompletionDisputeSettlement: adminMfaProcedure
+      .input(z.object({
+        requestId: z.number().int().positive(),
+        customerRefundAmount: z.number().int().positive(),
+        resolutionNote: z.string().trim().min(10).max(2_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const reviewerId = ctx.user?.id;
+        if (!reviewerId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        if (!(await db.hasActiveCompletionDisputeReviewerPermission(reviewerId))) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Kısmi uzlaşma için ayrı completion dispute reviewer yetkisi gerekli",
+          });
+        }
+        return runCompletionOperation(() =>
+          db.planPartialCompletionDisputeSettlement({
+            ...input,
+            adminUserId: reviewerId,
+          }),
+        );
+      }),
   }),
   moveTrust: router({
     passport: protectedProcedure
@@ -2849,17 +2979,20 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
       .input(z.object({
         categoryId: z.number().int().positive(),
         requestId: z.number().int().positive().optional(),
-        countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/).optional(),
-        currency: z.string().trim().regex(/^[A-Za-z]{3}$/).optional(),
+        countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/),
         locale: z.enum(["tr", "en", "ru"]).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         try {
+          const countryContext = await resolveCountryPaymentContext({
+            countryCode: input.countryCode,
+            transition: "REQUEST_CREATION",
+          });
           const assessment = await db.createPriceIntelligenceAssessment({
             categoryId: input.categoryId,
             requestId: input.requestId,
-            countryCode: input.countryCode,
-            currency: input.currency,
+            countryCode: countryContext.countryCode,
+            currency: countryContext.currency,
             requestedByUserId: ctx.user.id,
           });
           const narrative =
@@ -2870,7 +3003,7 @@ Acil durumları önceliklendir. Güven verici, kısa ve net ol.`;
               ? await createPriceIntelligenceNarrative({
                   userId: ctx.user.id,
                   locale: input.locale,
-                  currency: "TRY",
+                  currency: countryContext.currency,
                   sampleSize: assessment.sampleSize,
                   lowAmount: assessment.lowAmount,
                   medianAmount: assessment.medianAmount,

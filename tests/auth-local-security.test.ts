@@ -18,6 +18,9 @@ vi.mock("../server/db", async () => {
     updateUserVerification: vi.fn(),
     markContactVerified: vi.fn(),
     getContactVerificationStatus: vi.fn(),
+    getStagedContactChangeStatus: vi.fn(),
+    getPendingStagedContactDestination: vi.fn(),
+    confirmStagedContactChange: vi.fn(),
     getOutstandingRequiredLegalConsents: vi.fn(),
     recordConsentEvents: vi.fn(),
   };
@@ -146,19 +149,43 @@ describe("local authentication security", () => {
       .rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("marks only the successfully verified staged contact channel as verified", async () => {
+  it("returns pending staged contact change status only for the authenticated owner", async () => {
+    vi.mocked(authDb.getStagedContactChangeStatus).mockResolvedValue({
+      email: { pending: true, expiresAt: new Date("2026-08-20T10:00:00Z") },
+      phone: { pending: false, expiresAt: null },
+    } as never);
+
+    await expect(appRouter.createCaller(createContext({ id: 71 })).auth.getStagedContactChangeStatus())
+      .resolves.toMatchObject({ email: { pending: true }, phone: { pending: false } });
+    expect(authDb.getStagedContactChangeStatus).toHaveBeenCalledWith(71);
+    await expect(appRouter.createCaller(createContext({ user: null })).auth.getStagedContactChangeStatus())
+      .rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("promotes only the successfully verified owner-bound staged contact channel", async () => {
     vi.mocked(authDb.getActiveAuthChallenge).mockResolvedValue({ id: 801 } as never);
-    vi.mocked(authDb.markAuthChallengeUsed).mockResolvedValue(undefined);
-    vi.mocked(authDb.updateUserVerification).mockResolvedValue(undefined);
-    vi.mocked(authDb.markContactVerified).mockResolvedValue(1);
+    vi.mocked(authDb.confirmStagedContactChange).mockResolvedValue({ contactType: "email", promotedAt: new Date() } as never);
 
     await expect(appRouter.createCaller(createContext()).auth.verifyCode({ purpose: "verify_email", code: "123456" }))
       .resolves.toEqual({ verified: "verify_email" });
 
-    expect(authDb.updateUserVerification).toHaveBeenCalledWith({ userId: 71, emailVerified: true, phoneVerified: false });
-    expect(authDb.markContactVerified).toHaveBeenCalledWith(71, "email");
-    expect(authDb.markContactVerified).not.toHaveBeenCalledWith(71, "phone");
+    expect(authDb.confirmStagedContactChange).toHaveBeenCalledWith(expect.objectContaining({ userId: 71, contactType: "email" }));
+    expect(authDb.markAuthChallengeUsed).not.toHaveBeenCalled();
+    expect(authDb.markContactVerified).not.toHaveBeenCalled();
   });
+
+  it.each(["STAGED_CONTACT_CHANGE_INVALID_OR_EXPIRED", "STAGED_CONTACT_CHANGE_ALREADY_CONSUMED"])(
+    "rejects %s staged-contact OTP promotion without falling back to direct verification",
+    async (reason) => {
+      vi.mocked(authDb.getActiveAuthChallenge).mockResolvedValue({ id: 802 } as never);
+      vi.mocked(authDb.confirmStagedContactChange).mockRejectedValue(new Error(reason));
+
+      await expect(appRouter.createCaller(createContext()).auth.verifyCode({ purpose: "verify_phone", code: "123456" }))
+        .rejects.toMatchObject({ code: "BAD_REQUEST", message: "Kod geçersiz, süresi dolmuş veya daha önce kullanılmış" });
+      expect(authDb.markAuthChallengeUsed).not.toHaveBeenCalled();
+      expect(authDb.updateUserVerification).not.toHaveBeenCalled();
+    },
+  );
 
   it("returns only the authenticated user's server-derived outstanding legal consent versions", async () => {
     vi.mocked(authDb.getOutstandingRequiredLegalConsents).mockResolvedValue([

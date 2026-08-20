@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertBalancedLedgerLines,
+  buildCompletionDisputePartialRefundLedgerEntry,
+  buildCompletionDisputeProviderSettlementLedgerEntry,
   buildEscrowReleasedLedgerEntry,
   buildPaymentHeldLedgerEntry,
   buildRefundLedgerEntry,
@@ -51,6 +53,44 @@ describe("immutable financial ledger contract", () => {
       expect.objectContaining({ accountCode: "asset:gateway_clearing", direction: "credit", amount: 1_001 }),
     ]);
     expect(() => assertBalancedLedgerLines(entry.lines)).not.toThrow();
+  });
+
+  it("records partial completion-dispute refund and provider settlement with distinct balanced references", () => {
+    const refund = buildCompletionDisputePartialRefundLedgerEntry(payment, {
+      disputeId: 91,
+      refundAmount: 401,
+      gatewayReference: "gateway-refund-91",
+    });
+    const providerSettlement = buildCompletionDisputeProviderSettlementLedgerEntry(payment, {
+      disputeId: 91,
+      providerGrossAmount: 600,
+      commissionAmount: 60,
+      providerPayoutAmount: 540,
+      gatewayReference: "gateway-refund-91",
+    });
+
+    expect(refund.referenceType).toBe("completion_dispute_partial_refund");
+    expect(refund.idempotencyKey).toBe("ledger:payment:41:completion-dispute:91:partial-refund");
+    expect(providerSettlement.referenceType).toBe("completion_dispute_partial_settlement");
+    expect(providerSettlement.idempotencyKey).toBe("ledger:payment:41:completion-dispute:91:provider-settlement");
+    expect(() => assertBalancedLedgerLines(refund.lines)).not.toThrow();
+    expect(() => assertBalancedLedgerLines(providerSettlement.lines)).not.toThrow();
+    expect(refund.lines[0]?.amount + providerSettlement.lines[0]?.amount).toBe(payment.amount);
+  });
+
+  it("rejects partial completion-dispute amounts that are non-whole, non-positive or cannot reconcile", () => {
+    expect(() => buildCompletionDisputePartialRefundLedgerEntry(payment, {
+      disputeId: 91,
+      refundAmount: 1_001,
+      gatewayReference: "gateway-refund-91",
+    })).toThrow("FINANCIAL_LEDGER_COMPLETION_DISPUTE_PARTIAL_REFUND_INVALID");
+    expect(() => buildCompletionDisputeProviderSettlementLedgerEntry(payment, {
+      disputeId: 91,
+      providerGrossAmount: 600,
+      commissionAmount: 61,
+      providerPayoutAmount: 540,
+      gatewayReference: "gateway-refund-91",
+    })).toThrow("FINANCIAL_LEDGER_COMPLETION_DISPUTE_SETTLEMENT_INVALID");
   });
 
   it("rejects unbalanced, non-positive and malformed financial lines before storage", () => {

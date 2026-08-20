@@ -210,6 +210,46 @@ function renderCancellationCases(result) {
   }));
 }
 
+function renderCompletionDisputes(result) {
+  const disputes = Array.isArray(result) ? result : result.items || result.completionDisputes || [];
+  $("#completion-disputes-list").innerHTML = disputes.map((dispute) => {
+    const currency = dispute.paymentCurrency || "TRY";
+    const heldAmount = `${Number(dispute.paymentAmount || 0).toLocaleString("tr-TR")} ${currency === "TRY" ? "₺" : escapeHtml(currency)}`;
+    const hasPlan = Number.isSafeInteger(Number(dispute.partialCustomerRefundAmount));
+    const plan = hasPlan
+      ? `İade: ${Number(dispute.partialCustomerRefundAmount).toLocaleString("tr-TR")} ₺<br><small>Usta net: ${Number(dispute.partialProviderPayoutAmount || 0).toLocaleString("tr-TR")} ₺ · Komisyon: ${Number(dispute.partialCommissionAmount || 0).toLocaleString("tr-TR")} ₺</small>`
+      : "Plan yok";
+    const gateway = dispute.partialGatewayReference
+      ? `Doğrulandı<br><small>${escapeHtml(dispute.partialGatewayReference)}</small>`
+      : "Bekleniyor";
+    const reviewable = ["open", "under_review"].includes(dispute.status) && dispute.paymentStatus === "held";
+    return `<tr><td>#${escapeHtml(dispute.requestId)}</td><td>${escapeHtml(dispute.reasonCode)}</td><td>${heldAmount}<br><small>${escapeHtml(dispute.paymentStatus)}</small></td><td>${status(dispute.status)}</td><td>${plan}</td><td>${gateway}</td><td>${reviewable ? `<button class="row-action" type="button" data-plan-partial-dispute="${escapeHtml(dispute.requestId)}">Kısmi plan</button>` : "—"}</td></tr>`;
+  }).join("") || "<tr><td colspan=\"7\">İncelenecek completion dispute kaydı bulunamadı.</td></tr>";
+  document.querySelectorAll("[data-plan-partial-dispute]").forEach((button) => button.addEventListener("click", async () => {
+    const customerRefundInput = window.prompt("Müşteriye iade edilecek tam TL tutarı (0’dan büyük ve emanet tutarını aşamaz)");
+    if (customerRefundInput === null) return;
+    const customerRefundAmount = Number(customerRefundInput.trim());
+    if (!Number.isSafeInteger(customerRefundAmount) || customerRefundAmount <= 0) {
+      notice("Kısmi uzlaşma iade tutarı pozitif bir tam TL değeri olmalıdır.", true);
+      return;
+    }
+    const resolutionNote = window.prompt("İnsan incelemesi gerekçesi (en az 10 karakter)");
+    if (!resolutionNote || resolutionNote.trim().length < 10) {
+      notice("Denetim gerekçesi en az 10 karakter olmalıdır.", true);
+      return;
+    }
+    if (!window.confirm("Bu işlem yalnız immutable kısmi uzlaşma planını kaydeder. Para hareketi başlatmaz; imzalı gateway callback’i ve tutar eşleşmesi zorunludur. Devam edilsin mi?")) return;
+    try {
+      await api(`/api/owner/completion-disputes/${button.dataset.planPartialDispute}/partial-settlement`, {
+        method: "POST",
+        body: JSON.stringify({ customerRefundAmount, resolutionNote: resolutionNote.trim() }),
+      });
+      await loadData();
+      notice("Kısmi uzlaşma planı kaydedildi; gateway tarafından doğrulanmış iade callback’i bekleniyor.");
+    } catch (error) { notice(error.message, true); }
+  }));
+}
+
 function renderChangeOrders(result) {
   const orders = Array.isArray(result) ? result : result.items || result.changeOrders || [];
   $("#change-orders-list").innerHTML = orders.map((order) => {
@@ -295,14 +335,14 @@ function renderFeatureFlags(result) {
 
 async function loadData() {
   notice("Veriler yenileniyor…");
-  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, changeOrders, riskFlags, featureFlags, operationsControl] = await Promise.all([
-    api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/change-orders?limit=20"), api("/api/owner/risk-flags?limit=50"), api("/api/owner/feature-flags?limit=100"),
+  const [metrics, categories, users, countryCompliance, settlementPolicies, cancellationCases, completionDisputes, changeOrders, riskFlags, featureFlags, operationsControl] = await Promise.all([
+    api("/api/owner/dashboard"), api("/api/owner/categories"), api("/api/owner/users?limit=10"), api("/api/owner/compliance/countries"), api("/api/owner/settlement-policies?limit=20"), api("/api/owner/cancellation-cases?limit=20"), api("/api/owner/completion-disputes?limit=20"), api("/api/owner/change-orders?limit=20"), api("/api/owner/risk-flags?limit=50"), api("/api/owner/feature-flags?limit=100"),
     api("/api/owner/operations-control?eventLimit=25&caseLimit=25").catch((error) => {
       if (error instanceof ApiError && error.status === 403) return { unavailableReason: "Operations Control görünümü yalnız Super Admin rolüne açıktır." };
       throw error;
     }),
   ]);
-  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderChangeOrders(changeOrders); renderRiskFlags(riskFlags); renderFeatureFlags(featureFlags); renderOperationsControl(operationsControl);
+  renderDashboard(metrics); renderCategories(categories); renderUsers(users); renderCountryCompliance(countryCompliance); renderSettlementPolicies(settlementPolicies); renderCancellationCases(cancellationCases); renderCompletionDisputes(completionDisputes); renderChangeOrders(changeOrders); renderRiskFlags(riskFlags); renderFeatureFlags(featureFlags); renderOperationsControl(operationsControl);
   setMfaVisible(false);
   $("#dashboard").hidden = false;
   notice("Gerçek ortak API verileri güncellendi.");

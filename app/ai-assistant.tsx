@@ -26,7 +26,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
 import { trpc } from "@/lib/trpc";
 import { useTranslation } from "@/lib/i18n";
-import { getMoveAiClientFallbackResponse } from "@/lib/ai/client-fallback";
 
 interface Message {
   id: string;
@@ -69,6 +68,7 @@ export default function AIAssistantScreen() {
   const [mediaConsentGranted, setMediaConsentGranted] = useState(false);
   const [attachments, setAttachments] = useState<MoveAiAttachment[]>([]);
   const [mediaBusy, setMediaBusy] = useState(false);
+  const [countrySelectionDraftId, setCountrySelectionDraftId] = useState<number | null>(null);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -97,18 +97,17 @@ export default function AIAssistantScreen() {
       setAttachments([]);
 
     },
-    onError: (_error, variables) => {
+    onError: () => {
       setLoading(false);
-      const fallback = getMoveAiClientFallbackResponse(variables.message);
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString() + "-ai",
-          text: fallback.text,
+          text: t("ai.fallback"),
           isUser: false,
           timestamp: new Date().toISOString(),
-          suggestions: fallback.suggestions,
-          category: fallback.category,
+          suggestions: undefined,
+          category: undefined,
         },
       ]);
     },
@@ -121,12 +120,33 @@ export default function AIAssistantScreen() {
         t("ai.requestCreatedBody"),
         [{ text: t("ai.viewProviders"), onPress: () => router.push(`/job/${data.requestId}` as any) }],
       );
+      setCountrySelectionDraftId(null);
       setMessages((current) => current.map((message) => message.draftId === data.draftId
         ? { ...message, draftStatus: undefined, requestId: data.requestId }
         : message));
     },
     onError: (error) => Alert.alert("Taslak onaylanamadı", error.message || "Lütfen taslağı yeniden oluşturun."),
   });
+  const countryOptionsQuery = trpc.countryRegistry.list.useQuery();
+  const selectableCountries = useMemo(
+    () => countryOptionsQuery.data?.filter((option) => option.selectable) ?? [],
+    [countryOptionsQuery.data],
+  );
+  const requestDraftConfirmation = useCallback((draftId: number) => {
+    if (countryOptionsQuery.isLoading) {
+      Alert.alert(t("ai.countryLoading"));
+      return;
+    }
+    if (selectableCountries.length === 0) {
+      Alert.alert(t("ai.countryUnavailable"));
+      return;
+    }
+    if (selectableCountries.length === 1) {
+      confirmDraftMutation.mutate({ draftId, countryCode: selectableCountries[0]!.countryCode });
+      return;
+    }
+    setCountrySelectionDraftId(draftId);
+  }, [confirmDraftMutation, countryOptionsQuery.isLoading, selectableCountries, t]);
 
   const stageMediaMutation = trpc.ai.stageMedia.useMutation();
 
@@ -408,14 +428,30 @@ export default function AIAssistantScreen() {
               {msg.draftId && msg.draftStatus === "draft" && (
                 <View style={{ marginTop: 8, marginLeft: 36 }}>
                   <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 6 }}>
-                    Taslak hazır. Hizmet talebi yalnızca onayınızla oluşturulur.
+                    {t("ai.draftReady")}
                   </Text>
+                  {countrySelectionDraftId === msg.draftId && (
+                    <View style={{ gap: 6, marginBottom: 8 }}>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>{t("ai.chooseCountry")}</Text>
+                      {selectableCountries.map((country) => (
+                        <Pressable
+                          key={country.countryCode}
+                          accessibilityRole="button"
+                          accessibilityLabel={country.displayName}
+                          onPress={() => confirmDraftMutation.mutate({ draftId: msg.draftId!, countryCode: country.countryCode })}
+                          style={({ pressed }) => ({ borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}
+                        >
+                          <Text style={{ color: colors.text, fontWeight: "600" }}>{country.displayName}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="MoveAI hizmet taslağını onayla"
                     accessibilityHint="Taslağı onayladıktan sonra gerçek hizmet talebi oluşturulur."
                     disabled={confirmDraftMutation.isPending}
-                    onPress={() => confirmDraftMutation.mutate({ draftId: msg.draftId! })}
+                    onPress={() => requestDraftConfirmation(msg.draftId!)}
                     style={({ pressed }) => ({
                       alignSelf: "flex-start",
                       backgroundColor: colors.accentPurple,
@@ -426,7 +462,7 @@ export default function AIAssistantScreen() {
                     })}
                   >
                     <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>
-                      {confirmDraftMutation.isPending ? "Onaylanıyor…" : "Taslağı onayla"}
+                      {confirmDraftMutation.isPending ? t("ai.confirmingDraft") : t("ai.confirmDraft")}
                     </Text>
                   </Pressable>
                 </View>

@@ -26,6 +26,32 @@ export const SUPPORTED_CURRENCIES: { code: SupportedCurrency; label: string; loc
   { code: "EUR", label: "Euro (EUR)", locale: "de-DE" },
 ];
 
+type ProviderOnboardingTranslationKey =
+  | "provider.onboarding.backAccessibility" | "provider.onboarding.title" | "provider.onboarding.subtitle"
+  | "provider.onboarding.loadErrorTitle" | "provider.onboarding.retry" | "provider.onboarding.setupSavedTitle"
+  | "provider.onboarding.setupSavedBody" | "provider.onboarding.setupFailedTitle" | "provider.onboarding.setupFailedBody"
+  | "provider.onboarding.activationStatus" | "provider.onboarding.activationEligible" | "provider.onboarding.activationBlocked"
+  | "provider.onboarding.step.profile" | "provider.onboarding.step.serviceScope" | "provider.onboarding.step.jurisdiction"
+  | "provider.onboarding.step.capability" | "provider.onboarding.step.credentials" | "provider.onboarding.step.documents"
+  | "provider.onboarding.step.launchGate" | "provider.onboarding.scope.title" | "provider.onboarding.scope.help"
+  | "provider.onboarding.category" | "provider.onboarding.subcategory" | "provider.onboarding.selectCategoryScope"
+  | "provider.onboarding.categoryScopeHelp" | "provider.onboarding.capabilityScope" | "provider.onboarding.noCapability"
+  | "provider.onboarding.saveScope" | "provider.onboarding.openDocuments" | "provider.onboarding.openDocumentsHint"
+  | "provider.onboarding.emptyOptions" | "provider.onboarding.status.complete" | "provider.onboarding.status.selected"
+  | "provider.onboarding.status.verified" | "provider.onboarding.status.approved" | "provider.onboarding.status.eligible"
+  | "provider.onboarding.status.blocked" | "provider.onboarding.status.pending" | "provider.onboarding.status.missing"
+  | "provider.onboarding.status.unknown" | "provider.onboarding.dashboardCtaTitle" | "provider.onboarding.dashboardCtaBody"
+  | "provider.onboarding.country" | "provider.onboarding.countryLoading" | "provider.onboarding.countryUnavailable"
+  | "provider.onboarding.countryAvailable" | "provider.onboarding.countryComingSoon" | "provider.onboarding.countryBlocked";
+
+type ProfileEditTranslationKey =
+  | "profile.edit.backAccessibility" | "profile.edit.title" | "profile.edit.name" | "profile.edit.email"
+  | "profile.edit.phone" | "profile.edit.saveAccessibility" | "profile.edit.save" | "profile.edit.verificationRequiredTitle"
+  | "profile.edit.verificationRequiredBody" | "profile.edit.verifyNow" | "profile.edit.updatedTitle"
+  | "profile.edit.updatedBody" | "profile.edit.done" | "profile.edit.updateFailedTitle" | "profile.edit.updateFailedBody"
+  | "profile.edit.phoneVerificationRequiredTitle" | "profile.edit.phoneVerificationRequiredBody"
+  | "profile.edit.pendingEmail" | "profile.edit.pendingPhone" | "profile.edit.pendingVerifyNow";
+
 export type TranslationKey =
   | "home" | "explore" | "myJobs" | "messages" | "profile" | "search" | "categories" | "topRated" | "viewAll"
   | "serviceRequest" | "findProvider" | "login" | "register" | "logout" | "settings" | "premium" | "notifications"
@@ -43,7 +69,7 @@ export type TranslationKey =
   | "explore.categoriesFailed" | "explore.retry" | "explore.noServices" | "explore.recommendedProviders"
   | "explore.loadingProvidersFailed" | "explore.noProviders" | "explore.providerCount" | "explore.moveScore"
   | "ai.welcome" | "ai.online" | "ai.thinking" | "ai.inputPlaceholder" | "ai.fallback"
-  | "ai.requestCreatedTitle" | "ai.requestCreatedBody" | "ai.later" | "ai.viewProviders"
+  | "ai.requestCreatedTitle" | "ai.requestCreatedBody" | "ai.later" | "ai.viewProviders" | "ai.draftReady" | "ai.confirmDraft" | "ai.confirmingDraft" | "ai.chooseCountry" | "ai.countryUnavailable" | "ai.countryLoading"
   | "ai.prompt.plumbing" | "ai.prompt.roadside" | "ai.prompt.airConditioning" | "ai.prompt.towTruck"
   | "ai.prompt.courier" | "ai.prompt.priceEstimate"
   | "wallet.loading" | "wallet.loadFailedTitle" | "wallet.loadFailedBody" | "wallet.retry" | "wallet.retryAccessibility"
@@ -77,10 +103,11 @@ export type TranslationKey =
   | "jobs.status.offers" | "jobs.status.scheduled" | "jobs.status.onTheWay" | "jobs.status.arrived" | "jobs.status.inProgress" | "jobs.status.completed" | "jobs.status.cancelled"
   | "jobs.action.viewOffers" | "jobs.action.track" | "jobs.action.viewDetail" | "jobs.serviceFallback" | "jobs.provider" | "jobs.minuteShort" | "jobs.chatAccessibility"
   | "jobs.acceptedOffer" | "jobs.budget" | "jobs.waitingOffer" | "jobs.title" | "jobs.subtitle" | "jobs.loading" | "jobs.errorTitle" | "jobs.retry" | "jobs.emptyTitle" | "jobs.emptyBody" | "jobs.newRequest"
-  | "chat.providerFallback" | "chat.providerMeta" | "chat.userMeta" | "chat.invalidContext" | "chat.loading" | "chat.loadError" | "chat.emptyTitle" | "chat.emptyBody" | "chat.sendError" | "chat.voiceSendError" | "chat.placeholder" | "chat.stopRecordAndSend" | "chat.recordVoice" | "chat.translate" | "chat.showOriginal" | "chat.showTranslation" | "chat.hideForMe" | "chat.translationUnavailable" | "chat.hidden" | "chat.autoTranslateTitle" | "chat.autoTranslateBody" | "chat.autoTranslateEnabled" | "chat.autoTranslateDisabled" | "chat.autoTranslateSaveError" | "chat.backAccessibility" | "chat.inputHint"
+  | "chat.providerFallback" | "chat.providerMeta" | "chat.userMeta" | "chat.invalidContext" | "chat.loading" | "chat.loadError" | "chat.emptyTitle" | "chat.emptyBody" | "chat.sendError" | "chat.voiceSendError" | "chat.placeholder" | "chat.stopRecordAndSend" | "chat.recordVoice" | "chat.translate" | "chat.showOriginal" | "chat.showTranslation" | "chat.hideForMe" | "chat.translationUnavailable" | "chat.hidden" | "chat.autoTranslateTitle" | "chat.autoTranslateBody" | "chat.autoTranslateEnabled" | "chat.autoTranslateDisabled" | "chat.autoTranslateSaveError" | "chat.backAccessibility" | "chat.inputHint" | "chat.expenseFile" | "chat.expenseFileAccessibility" | "chat.expenseFileHint"
   | "opportunities.offerSentTitle" | "opportunities.offerSentBody" | "opportunities.offerFailedTitle" | "opportunities.retry" | "opportunities.profileRequiredTitle" | "opportunities.profileRequiredBody" | "opportunities.invalidAmountTitle" | "opportunities.invalidAmountBody" | "opportunities.durationRequiredTitle" | "opportunities.durationRequiredBody"
   | "opportunities.loading" | "opportunities.errorTitle" | "opportunities.errorBody" | "opportunities.title" | "opportunities.emptyTitle" | "opportunities.emptyBody" | "opportunities.serviceFallback" | "opportunities.locationMissing" | "opportunities.customerBudget" | "opportunities.openForOffer" | "opportunities.close" | "opportunities.makeOffer" | "opportunities.pricePlaceholder" | "opportunities.estimatedTimePlaceholder" | "opportunities.messagePlaceholder" | "opportunities.sendOffer"
   | "security.revokeFailed" | "security.sessionsRevokeFailed" | "security.sessionsRevoked" | "security.sessionsRevokedBody" | "security.revokeCurrentTitle" | "security.revokeDeviceTitle" | "security.revokeCurrentBody" | "security.revokeDeviceBody" | "security.cancel" | "security.revoke" | "security.revokeOthersTitle" | "security.revokeOthersBody" | "security.revokeOthers" | "security.back" | "security.title" | "security.noticeTitle" | "security.noticeBody" | "security.activeDevices" | "security.loadFailed" | "security.retry" | "security.currentDevice" | "security.signedInDevice" | "security.active" | "security.deviceMissing" | "security.closed" | "security.lastActivity" | "security.signOut" | "security.close" | "security.noSessions" | "security.noSessionsBody"
+  | ProviderOnboardingTranslationKey | ProfileEditTranslationKey
   | `request.${string}` | `expense.${string}` | `verification.${string}` | `privacy.center.${string}`;
 
 type Dictionary = Partial<Record<TranslationKey, string>>;
@@ -133,6 +160,11 @@ const requestFallbackTranslations: Record<`request.${string}`, string> = {
   "request.time.title": "When do you need it?",
   "request.route.title": "Enter route information",
   "request.country": "Service country",
+  "request.countryAvailable": "Available",
+  "request.countryComingSoon": "Coming soon",
+  "request.countryBlocked": "Unavailable",
+  "request.countryLoading": "Checking available countries…",
+  "request.countryUnavailable": "No country is currently available for new marketplace requests.",
   "request.countryTurkeyAccessibility": "Türkiye service country",
   "request.countryTurkey": "Türkiye (TR)",
   "request.route.pickup": "Where will it be collected?",
@@ -273,6 +305,11 @@ const requestTurkishTranslations: Partial<Record<`request.${string}`, string>> =
   "request.time.title": "Ne zaman ihtiyacınız var?",
   "request.route.title": "Rota bilgilerini girin",
   "request.country": "Hizmet ülkesi",
+  "request.countryAvailable": "Kullanılabilir",
+  "request.countryComingSoon": "Yakında",
+  "request.countryBlocked": "Kullanılamıyor",
+  "request.countryLoading": "Kullanılabilir ülkeler doğrulanıyor…",
+  "request.countryUnavailable": "Yeni pazar yeri talepleri için şu anda kullanılabilir ülke bulunmuyor.",
   "request.countryTurkeyAccessibility": "Türkiye hizmet ülkesi",
   "request.countryTurkey": "Türkiye (TR)",
   "request.route.pickup": "Nereden alınacak?",
@@ -377,7 +414,7 @@ const expenseFallbackTranslations: Record<`expense.${string}`, string> = {
   "expense.invalidRequest": "No valid job was selected.", "expense.backAccessibility": "Go back", "expense.backHint": "Returns to the previous screen", "expense.title": "Job expenses", "expense.totalLabel": "TOTAL RECORDED EXPENSES", "expense.totalNotice": "Recorded expenses do not automatically create a charge for the customer. A refund request follows a separate approval process.", "expense.add": "Add expense", "expense.open": "Open", "expense.close": "Close", "expense.category": "CATEGORY",
   "expense.category.fuel": "Fuel", "expense.category.toll": "Toll / bridge", "expense.category.parking": "Parking", "expense.category.material": "Material", "expense.category.part": "Spare part", "expense.category.paint": "Paint", "expense.category.equipment": "Equipment", "expense.category.transport": "Transport", "expense.category.packaging": "Packaging", "expense.category.other": "Other",
   "expense.amountAccessibility": "Expense amount", "expense.amountHint": "Enter the expense amount in Turkish lira", "expense.amountPlaceholder": "Amount (TRY)", "expense.descriptionAccessibility": "Expense description", "expense.descriptionPlaceholder": "Expense description", "expense.vendorAccessibility": "Seller or store name", "expense.vendorHint": "Optional", "expense.vendorPlaceholder": "Seller / store (optional)",
-  "expense.receiptSelectedAccessibility": "Expense receipt selected", "expense.receiptAddAccessibility": "Add receipt or document image", "expense.receiptHint": "Selects an image as expense proof", "expense.receiptSelected": "Document selected", "expense.receiptAdd": "Add receipt / document image", "expense.saveAccessibility": "Save expense", "expense.saveHint": "Creates the expense record securely", "expense.saving": "Saving…", "expense.save": "Save expense",
+  "expense.brandAccessibility": "Product brand", "expense.brandPlaceholder": "Brand (optional)", "expense.modelAccessibility": "Product model", "expense.modelPlaceholder": "Model (optional)", "expense.quantityAccessibility": "Product quantity", "expense.quantityPlaceholder": "Quantity (optional)", "expense.locationAccessibility": "Purchase location link", "expense.locationPlaceholder": "Location link (optional)", "expense.locationHint": "Use a valid HTTPS location link when available", "expense.evidenceRole": "EVIDENCE TYPE", "expense.evidenceRole.receipt": "Receipt", "expense.evidenceRole.invoice": "Invoice", "expense.evidenceRole.product": "Product", "expense.evidenceRole.material": "Material", "expense.evidenceRole.video": "Video", "expense.evidenceRole.other": "Other", "expense.receiptSelectedAccessibility": "Expense evidence selected", "expense.receiptAddAccessibility": "Add expense evidence image", "expense.receiptHint": "Selects an image; it remains unavailable until the security scan is clean", "expense.receiptSelected": "Evidence selected", "expense.receiptAdd": "Add evidence image", "expense.evidenceScanNotice": "Evidence is available only after the security scan is clean.", "expense.saveAccessibility": "Save expense", "expense.saveHint": "Creates the expense record securely", "expense.saving": "Saving…", "expense.save": "Save expense",
   "expense.records": "Records", "expense.loadFailed": "Expenses could not be loaded. Please try again.", "expense.empty": "There are no recorded expenses for this job yet.", "expense.defaultCategory": "Expense", "expense.refund.approved": "Refund request approved", "expense.refund.rejected": "Refund request rejected", "expense.refund.pending": "Refund request awaiting customer approval", "expense.refund.requestAccessibility": "Request a refund for this expense", "expense.refund.requestHint": "Creates a refund request for customer approval", "expense.refund.request": "Request a refund for this expense", "expense.refund.approveAccessibility": "Approve refund request", "expense.refund.approveHint": "Approves the request; does not start automatic collection", "expense.refund.approve": "Approve", "expense.refund.rejectAccessibility": "Reject refund request", "expense.refund.reject": "Reject",
   "expense.alert.savedTitle": "Expense saved", "expense.alert.savedBody": "The expense did not automatically charge the customer. You may create a separate refund request if needed.", "expense.alert.refundSubmittedTitle": "Refund request submitted", "expense.alert.refundSubmittedBody": "The request was recorded; no collection occurs without separate customer approval.", "expense.alert.refundApprovedTitle": "Request approved", "expense.alert.refundRejectedTitle": "Request rejected", "expense.alert.refundResolvedBody": "This decision only records the expense request; it does not automatically charge your account.", "expense.alert.confirmApproveTitle": "Approve refund request", "expense.alert.confirmRejectTitle": "Reject refund request", "expense.alert.confirmApproveBody": "This action does not create automatic collection; it only records the approval decision.", "expense.alert.confirmRejectBody": "The request is rejected and a new request for this expense is not created automatically.", "expense.cancel": "Cancel", "expense.alert.galleryPermissionTitle": "Gallery permission required", "expense.alert.galleryPermissionBody": "Allow access to your photo library to add an expense document.", "expense.alert.receiptRejectedTitle": "Document could not be added", "expense.alert.receiptRejectedBody": "You can add image proof of up to 10 MB only.", "expense.alert.amountRequiredTitle": "Amount required", "expense.alert.amountRequiredBody": "Enter the expense amount as a whole Turkish lira amount.", "expense.alert.descriptionRequiredTitle": "Description required", "expense.alert.descriptionRequiredBody": "Enter a description of at least 3 characters for the expense.", "expense.alert.saveFailedTitle": "Expense could not be saved", "expense.alert.safeFailure": "The action could not be completed safely.",
 };
@@ -386,7 +423,7 @@ const expenseTurkishTranslations: Partial<Record<`expense.${string}`, string>> =
   "expense.invalidRequest": "Geçerli bir iş seçilmedi.", "expense.backAccessibility": "Geri", "expense.backHint": "Önceki ekrana döner", "expense.title": "İş masrafları", "expense.totalLabel": "TOPLAM KAYITLI MASRAF", "expense.totalNotice": "Kayıtlı masraf, müşteri hesabına otomatik borç oluşturmaz. İade talebi ayrı onay sürecidir.", "expense.add": "Masraf ekle", "expense.open": "Aç", "expense.close": "Kapat", "expense.category": "KATEGORİ",
   "expense.category.fuel": "Yakıt", "expense.category.toll": "Otoyol / köprü", "expense.category.parking": "Otopark", "expense.category.material": "Malzeme", "expense.category.part": "Yedek parça", "expense.category.paint": "Boya", "expense.category.equipment": "Ekipman", "expense.category.transport": "Taşıma", "expense.category.packaging": "Ambalaj", "expense.category.other": "Diğer",
   "expense.amountAccessibility": "Masraf tutarı", "expense.amountHint": "Türk lirası cinsinden masraf tutarını girin", "expense.amountPlaceholder": "Tutar (TL)", "expense.descriptionAccessibility": "Masraf açıklaması", "expense.descriptionPlaceholder": "Masraf açıklaması", "expense.vendorAccessibility": "Satıcı veya mağaza adı", "expense.vendorHint": "İsteğe bağlı", "expense.vendorPlaceholder": "Satıcı / mağaza (opsiyonel)",
-  "expense.receiptSelectedAccessibility": "Masraf belgesi seçildi", "expense.receiptAddAccessibility": "Fiş veya belge görseli ekle", "expense.receiptHint": "Masraf kanıtı olarak bir görsel seçer", "expense.receiptSelected": "Belge seçildi", "expense.receiptAdd": "Fiş / belge görseli ekle", "expense.saveAccessibility": "Masrafı kaydet", "expense.saveHint": "Masraf kaydını güvenli olarak oluşturur", "expense.saving": "Kaydediliyor…", "expense.save": "Masrafı kaydet",
+  "expense.brandAccessibility": "Ürün markası", "expense.brandPlaceholder": "Marka (opsiyonel)", "expense.modelAccessibility": "Ürün modeli", "expense.modelPlaceholder": "Model (opsiyonel)", "expense.quantityAccessibility": "Ürün miktarı", "expense.quantityPlaceholder": "Miktar (opsiyonel)", "expense.locationAccessibility": "Satın alma konumu bağlantısı", "expense.locationPlaceholder": "Konum bağlantısı (opsiyonel)", "expense.locationHint": "Varsa geçerli bir HTTPS konum bağlantısı kullanın", "expense.evidenceRole": "KANIT TÜRÜ", "expense.evidenceRole.receipt": "Fiş", "expense.evidenceRole.invoice": "Fatura", "expense.evidenceRole.product": "Ürün", "expense.evidenceRole.material": "Malzeme", "expense.evidenceRole.video": "Video", "expense.evidenceRole.other": "Diğer", "expense.receiptSelectedAccessibility": "Masraf kanıtı seçildi", "expense.receiptAddAccessibility": "Masraf kanıtı görseli ekle", "expense.receiptHint": "Bir görsel seçer; güvenlik taraması temizlenene kadar erişilemez", "expense.receiptSelected": "Kanıt seçildi", "expense.receiptAdd": "Kanıt görseli ekle", "expense.evidenceScanNotice": "Kanıt, yalnız güvenlik taraması temizlendikten sonra erişilebilir olur.", "expense.saveAccessibility": "Masrafı kaydet", "expense.saveHint": "Masraf kaydını güvenli olarak oluşturur", "expense.saving": "Kaydediliyor…", "expense.save": "Masrafı kaydet",
   "expense.records": "Kayıtlar", "expense.loadFailed": "Masraflar yüklenemedi. Lütfen tekrar deneyin.", "expense.empty": "Bu iş için henüz masraf kaydı bulunmuyor.", "expense.defaultCategory": "Masraf", "expense.refund.approved": "İade talebi onaylandı", "expense.refund.rejected": "İade talebi reddedildi", "expense.refund.pending": "İade talebi müşteri onayında", "expense.refund.requestAccessibility": "Bu masraf için iade talep et", "expense.refund.requestHint": "Müşteri onayına sunulan geri ödeme talebi oluşturur", "expense.refund.request": "Bu masraf için iade talep et", "expense.refund.approveAccessibility": "İade talebini onayla", "expense.refund.approveHint": "Talebi onaylar; otomatik tahsilat başlatmaz", "expense.refund.approve": "Onayla", "expense.refund.rejectAccessibility": "İade talebini reddet", "expense.refund.reject": "Reddet",
   "expense.alert.savedTitle": "Masraf kaydedildi", "expense.alert.savedBody": "Masraf otomatik olarak müşteriye borçlandırılmadı. Gerekirse ayrı iade talebi oluşturabilirsiniz.", "expense.alert.refundSubmittedTitle": "İade talebi gönderildi", "expense.alert.refundSubmittedBody": "Talep kayıt altına alındı; müşteriden ayrıca onay alınmadan tahsilat yapılmaz.", "expense.alert.refundApprovedTitle": "Talep onaylandı", "expense.alert.refundRejectedTitle": "Talep reddedildi", "expense.alert.refundResolvedBody": "Bu karar yalnız masraf talebini kaydeder; hesabınızdan otomatik tahsilat yapılmaz.", "expense.alert.confirmApproveTitle": "İade talebini onayla", "expense.alert.confirmRejectTitle": "İade talebini reddet", "expense.alert.confirmApproveBody": "Bu işlem otomatik tahsilat oluşturmaz; yalnız talebin onay kaydını tutar.", "expense.alert.confirmRejectBody": "Talep reddedilir ve bu masraf için yeni bir talep otomatik oluşturulmaz.", "expense.cancel": "Vazgeç", "expense.alert.galleryPermissionTitle": "Galeri izni gerekli", "expense.alert.galleryPermissionBody": "Masraf belgesi eklemek için fotoğraf arşivinize erişim izni vermelisiniz.", "expense.alert.receiptRejectedTitle": "Belge eklenemedi", "expense.alert.receiptRejectedBody": "Yalnız en fazla 10 MB boyutunda görsel kanıt ekleyebilirsiniz.", "expense.alert.amountRequiredTitle": "Tutar gerekli", "expense.alert.amountRequiredBody": "Masraf tutarını tam Türk lirası olarak girin.", "expense.alert.descriptionRequiredTitle": "Açıklama gerekli", "expense.alert.descriptionRequiredBody": "Masraf için en az 3 karakter açıklama girin.", "expense.alert.saveFailedTitle": "Masraf kaydedilemedi", "expense.alert.safeFailure": "İşlem güvenli biçimde tamamlanamadı.",
 };
@@ -462,8 +499,14 @@ const privacyCenterFallbackTranslations: Record<`privacy.center.${string}`, stri
   "privacy.center.history": "Your requests",
   "privacy.center.empty": "You do not have any privacy requests yet.",
   "privacy.center.type.export": "Data export",
+  "privacy.center.type.rectification": "Correct personal data",
   "privacy.center.type.erasure": "Account deletion",
-  "privacy.center.status": "Status: {status}",
+  "privacy.center.status.open": "Status: received",
+  "privacy.center.status.in_review": "Status: under review",
+  "privacy.center.status.blocked_legal_hold": "Status: paused by legal hold",
+  "privacy.center.status.approved": "Status: approved",
+  "privacy.center.status.rejected": "Status: not approved",
+  "privacy.center.status.completed": "Status: completed",
   "privacy.center.back": "Go back",
 };
 
@@ -488,9 +531,31 @@ const privacyCenterTurkishTranslations: Partial<Record<`privacy.center.${string}
   "privacy.center.history": "Talepleriniz",
   "privacy.center.empty": "Henüz gizlilik talebiniz bulunmuyor.",
   "privacy.center.type.export": "Veri dışa aktarma",
+  "privacy.center.type.rectification": "Kişisel verileri düzeltme",
   "privacy.center.type.erasure": "Hesap silme",
-  "privacy.center.status": "Durum: {status}",
+  "privacy.center.status.open": "Durum: alındı",
+  "privacy.center.status.in_review": "Durum: incelemede",
+  "privacy.center.status.blocked_legal_hold": "Durum: yasal bekletmede",
+  "privacy.center.status.approved": "Durum: onaylandı",
+  "privacy.center.status.rejected": "Durum: onaylanmadı",
+  "privacy.center.status.completed": "Durum: tamamlandı",
   "privacy.center.back": "Geri dön",
+};
+
+const providerOnboardingFallbackTranslations: Record<ProviderOnboardingTranslationKey, string> = {
+  "provider.onboarding.backAccessibility": "Go back", "provider.onboarding.title": "Professional setup", "provider.onboarding.subtitle": "Activation opens only after the server has verified your service scope, jurisdiction, documents, and security decisions.", "provider.onboarding.loadErrorTitle": "Setup information could not be loaded", "provider.onboarding.retry": "Try again", "provider.onboarding.setupSavedTitle": "Setup saved", "provider.onboarding.setupSavedBody": "Your service scope is under review. Activation remains blocked until documents and authorization checks are complete.", "provider.onboarding.setupFailedTitle": "Setup could not be saved", "provider.onboarding.setupFailedBody": "Please try again.", "provider.onboarding.activationStatus": "Activation status: {status}", "provider.onboarding.activationEligible": "Eligible", "provider.onboarding.activationBlocked": "Blocked", "provider.onboarding.step.profile": "Profile", "provider.onboarding.step.serviceScope": "Service scope", "provider.onboarding.step.jurisdiction": "Work model and jurisdiction", "provider.onboarding.step.capability": "Capability review", "provider.onboarding.step.credentials": "Dynamic credentials", "provider.onboarding.step.documents": "Uploaded documents", "provider.onboarding.step.launchGate": "Country Launch Gate", "provider.onboarding.scope.title": "Choose your service scope", "provider.onboarding.scope.help": "Selections come only from the active canonical catalog. The server validates scope compatibility again when you save.", "provider.onboarding.country": "Country of operation", "provider.onboarding.countryLoading": "Checking available countries…", "provider.onboarding.countryUnavailable": "No country is currently available for professional activation.", "provider.onboarding.countryAvailable": "Available", "provider.onboarding.countryComingSoon": "Coming soon", "provider.onboarding.countryBlocked": "Unavailable", "provider.onboarding.category": "Category", "provider.onboarding.subcategory": "Subcategory", "provider.onboarding.selectCategoryScope": "Select the category-level service", "provider.onboarding.categoryScopeHelp": "This category is evaluated at category scope.", "provider.onboarding.capabilityScope": "Capability scope", "provider.onboarding.noCapability": "No active capability exists for this scope.", "provider.onboarding.saveScope": "Save service scope", "provider.onboarding.openDocuments": "Open document requirements", "provider.onboarding.openDocumentsHint": "Requirements come from the approved source on the server.", "provider.onboarding.emptyOptions": "No options are available.", "provider.onboarding.status.complete": "Complete", "provider.onboarding.status.selected": "Selected", "provider.onboarding.status.verified": "Verified", "provider.onboarding.status.approved": "Approved", "provider.onboarding.status.eligible": "Eligible", "provider.onboarding.status.blocked": "Blocked", "provider.onboarding.status.pending": "Pending", "provider.onboarding.status.missing": "Missing", "provider.onboarding.status.unknown": "Unknown", "provider.onboarding.dashboardCtaTitle": "Complete your professional setup", "provider.onboarding.dashboardCtaBody": "Documents, authorization, and country eligibility are verified by the server.",
+};
+
+const providerOnboardingTurkishTranslations: Record<ProviderOnboardingTranslationKey, string> = {
+  "provider.onboarding.backAccessibility": "Geri", "provider.onboarding.title": "Profesyonel kurulumu", "provider.onboarding.subtitle": "Aktivasyon yalnız sunucu tarafından doğrulanmış hizmet kapsamı, bölge, belge ve güvenlik kararları tamamlandığında açılır.", "provider.onboarding.loadErrorTitle": "Kurulum bilgileri yüklenemedi", "provider.onboarding.retry": "Tekrar dene", "provider.onboarding.setupSavedTitle": "Kurulum kaydedildi", "provider.onboarding.setupSavedBody": "Hizmet kapsamınız incelemeye alındı. Belgeler ve yetki kontrolleri tamamlanmadan aktifleşme yapılmaz.", "provider.onboarding.setupFailedTitle": "Kurulum kaydedilemedi", "provider.onboarding.setupFailedBody": "Lütfen tekrar deneyin.", "provider.onboarding.activationStatus": "Aktivasyon durumu: {status}", "provider.onboarding.activationEligible": "Uygun", "provider.onboarding.activationBlocked": "Bloklu", "provider.onboarding.step.profile": "Profil", "provider.onboarding.step.serviceScope": "Hizmet kapsamı", "provider.onboarding.step.jurisdiction": "Çalışma modeli ve bölge", "provider.onboarding.step.capability": "Capability incelemesi", "provider.onboarding.step.credentials": "Dinamik yetki belgeleri", "provider.onboarding.step.documents": "Yüklenen belgeler", "provider.onboarding.step.launchGate": "Country Launch Gate", "provider.onboarding.scope.title": "Hizmet kapsamını seçin", "provider.onboarding.scope.help": "Seçimler yalnız aktif kanonik katalogdan gelir. Kaydetme sırasında sunucu kapsam uyumunu tekrar doğrular.", "provider.onboarding.country": "Çalışma ülkesi", "provider.onboarding.countryLoading": "Kullanılabilir ülkeler doğrulanıyor…", "provider.onboarding.countryUnavailable": "Profesyonel aktivasyonu için şu anda kullanılabilir ülke bulunmuyor.", "provider.onboarding.countryAvailable": "Kullanılabilir", "provider.onboarding.countryComingSoon": "Yakında", "provider.onboarding.countryBlocked": "Kullanılamıyor", "provider.onboarding.category": "Kategori", "provider.onboarding.subcategory": "Alt kategori", "provider.onboarding.selectCategoryScope": "Kategori düzeyindeki hizmeti seç", "provider.onboarding.categoryScopeHelp": "Bu kategori kategori düzeyi kapsamla değerlendirilir.", "provider.onboarding.capabilityScope": "Yetenek kapsamı", "provider.onboarding.noCapability": "Bu kapsam için etkin capability yok.", "provider.onboarding.saveScope": "Hizmet kapsamını kaydet", "provider.onboarding.openDocuments": "Belge gereksinimlerini aç", "provider.onboarding.openDocumentsHint": "Gereksinimler sunucudaki onaylı kaynaktan gelir.", "provider.onboarding.emptyOptions": "Seçenek bulunamadı.", "provider.onboarding.status.complete": "Tamam", "provider.onboarding.status.selected": "Seçildi", "provider.onboarding.status.verified": "Doğrulandı", "provider.onboarding.status.approved": "Onaylandı", "provider.onboarding.status.eligible": "Uygun", "provider.onboarding.status.blocked": "Bloklu", "provider.onboarding.status.pending": "Bekliyor", "provider.onboarding.status.missing": "Eksik", "provider.onboarding.status.unknown": "Bilinmiyor", "provider.onboarding.dashboardCtaTitle": "Profesyonel kurulumunu tamamla", "provider.onboarding.dashboardCtaBody": "Belge, yetki ve ülke uygunluğu sunucu tarafından kontrol edilir.",
+};
+
+const profileEditFallbackTranslations: Record<ProfileEditTranslationKey, string> = {
+  "profile.edit.backAccessibility": "Go back", "profile.edit.title": "Profile information", "profile.edit.name": "Full name", "profile.edit.email": "Email", "profile.edit.phone": "Phone", "profile.edit.saveAccessibility": "Save profile information", "profile.edit.save": "Save", "profile.edit.verificationRequiredTitle": "Email verification required", "profile.edit.verificationRequiredBody": "Enter the code sent to your new email address to confirm this change.", "profile.edit.verifyNow": "Verify now", "profile.edit.updatedTitle": "Profile updated", "profile.edit.updatedBody": "Your information was saved securely.", "profile.edit.done": "Done", "profile.edit.updateFailedTitle": "Profile could not be updated", "profile.edit.updateFailedBody": "Please check your information and try again.", "profile.edit.phoneVerificationRequiredTitle": "Phone verification required", "profile.edit.phoneVerificationRequiredBody": "Enter the code sent to your new phone number to confirm this change.", "profile.edit.pendingEmail": "Email change is waiting for verification.", "profile.edit.pendingPhone": "Phone change is waiting for verification.", "profile.edit.pendingVerifyNow": "Verify pending change",
+};
+
+const profileEditTurkishTranslations: Record<ProfileEditTranslationKey, string> = {
+  "profile.edit.backAccessibility": "Geri", "profile.edit.title": "Profil Bilgileri", "profile.edit.name": "Ad Soyad", "profile.edit.email": "E-posta", "profile.edit.phone": "Telefon", "profile.edit.saveAccessibility": "Profil bilgilerini kaydet", "profile.edit.save": "Kaydet", "profile.edit.verificationRequiredTitle": "E-posta doğrulaması gerekli", "profile.edit.verificationRequiredBody": "Yeni e-posta adresinizi doğrulamak için size gönderilen kodu girin.", "profile.edit.verifyNow": "Şimdi doğrula", "profile.edit.updatedTitle": "Profil güncellendi", "profile.edit.updatedBody": "Bilgileriniz güvenli biçimde kaydedildi.", "profile.edit.done": "Tamam", "profile.edit.updateFailedTitle": "Profil güncellenemedi", "profile.edit.updateFailedBody": "Lütfen bilgilerinizi kontrol edip yeniden deneyin.", "profile.edit.phoneVerificationRequiredTitle": "Telefon doğrulaması gerekli", "profile.edit.phoneVerificationRequiredBody": "Yeni telefon numaranızı doğrulamak için size gönderilen kodu girin.", "profile.edit.pendingEmail": "E-posta değişikliği doğrulama bekliyor.", "profile.edit.pendingPhone": "Telefon değişikliği doğrulama bekliyor.", "profile.edit.pendingVerifyNow": "Bekleyen değişikliği doğrula",
 };
 
 const translations: Partial<Record<Language, Dictionary>> = {
@@ -522,6 +587,9 @@ const chatPreferenceFallbackTranslations: Record<`chat.${string}`, string> = {
   "chat.autoTranslateSaveError": "Your translation preference could not be saved. Please try again.",
   "chat.backAccessibility": "Go back",
   "chat.inputHint": "Write your message and press the send button",
+  "chat.expenseFile": "Expense file",
+  "chat.expenseFileAccessibility": "View the expense file for this job",
+  "chat.expenseFileHint": "Opens expenses connected only to this conversation’s service request",
 };
 
 const chatPreferenceTurkishTranslations: Record<`chat.${string}`, string> = {
@@ -532,6 +600,9 @@ const chatPreferenceTurkishTranslations: Record<`chat.${string}`, string> = {
   "chat.autoTranslateSaveError": "Çeviri tercihiniz kaydedilemedi. Lütfen tekrar deneyin.",
   "chat.backAccessibility": "Geri dön",
   "chat.inputHint": "Mesajınızı yazın ve gönder düğmesine basın",
+  "chat.expenseFile": "Masraf Dosyası",
+  "chat.expenseFileAccessibility": "Bu işin Masraf Dosyası’nı görüntüle",
+  "chat.expenseFileHint": "Yalnız bu sohbetteki hizmet talebine bağlı masrafları açar",
 };
 
 const extraTranslations: Partial<Record<Language, Dictionary>> = {
@@ -559,7 +630,7 @@ const extraTranslations: Partial<Record<Language, Dictionary>> = {
     "ai.online": "Çevrimiçi", "ai.thinking": "MoveAI düşünüyor...", "ai.inputPlaceholder": "Sorunuzu yazın...",
     "ai.fallback": "Size yardımcı olmaya çalışıyorum. Lütfen biraz daha açıklayıcı olur musunuz?",
     "ai.requestCreatedTitle": "Hizmet Talebi Oluşturuldu", "ai.requestCreatedBody": "MoveAI talebinizi oluşturdu. Şimdi uygun ustaları görüntülemek ister misiniz?",
-    "ai.later": "Sonra", "ai.viewProviders": "Ustaları Gör", "ai.prompt.plumbing": "Evimin suyu akıyor",
+    "ai.later": "Sonra", "ai.viewProviders": "Ustaları Gör", "ai.draftReady": "Taslak hazır. Hizmet talebi yalnızca onayınızla oluşturulur.", "ai.confirmDraft": "Taslağı onayla", "ai.confirmingDraft": "Onaylanıyor…", "ai.chooseCountry": "Hizmetin sunulacağı ülkeyi seçin", "ai.countryUnavailable": "Şu anda kullanılabilir bir ülke bulunmuyor.", "ai.countryLoading": "Ülke kullanılabilirliği doğrulanıyor…", "ai.prompt.plumbing": "Evimin suyu akıyor",
     "ai.prompt.roadside": "Arabam yolda kaldı", "ai.prompt.airConditioning": "Klima soğutmuyor", "ai.prompt.towTruck": "Çekici lazım",
     "ai.prompt.courier": "Kurye lazım", "ai.prompt.priceEstimate": "Fiyat tahmini",
     "wallet.loading": "MoveWallet yükleniyor…", "wallet.loadFailedTitle": "Cüzdan bilgileri alınamadı", "wallet.loadFailedBody": "Güvenli bağlantınızı kontrol edip yeniden deneyin.",
@@ -625,7 +696,7 @@ const extraTranslations: Partial<Record<Language, Dictionary>> = {
     "ai.online": "Online", "ai.thinking": "MoveAI is thinking...", "ai.inputPlaceholder": "Type your question...",
     "ai.fallback": "I’m trying to help. Could you please give me a little more detail?",
     "ai.requestCreatedTitle": "Service Request Created", "ai.requestCreatedBody": "MoveAI created your request. Would you like to see suitable providers now?",
-    "ai.later": "Later", "ai.viewProviders": "View Providers", "ai.prompt.plumbing": "My home has a water leak",
+    "ai.later": "Later", "ai.viewProviders": "View Providers", "ai.draftReady": "Your draft is ready. A service request is created only after your confirmation.", "ai.confirmDraft": "Confirm draft", "ai.confirmingDraft": "Confirming…", "ai.chooseCountry": "Select the country where the service will be provided", "ai.countryUnavailable": "There is no available country at this time.", "ai.countryLoading": "Verifying country availability…", "ai.prompt.plumbing": "My home has a water leak",
     "ai.prompt.roadside": "My car broke down", "ai.prompt.airConditioning": "My air conditioner is not cooling", "ai.prompt.towTruck": "I need a tow truck",
     "ai.prompt.courier": "I need a courier", "ai.prompt.priceEstimate": "Get a price estimate",
     "wallet.loading": "Loading MoveWallet…", "wallet.loadFailedTitle": "Wallet details could not be loaded", "wallet.loadFailedBody": "Check your secure connection and try again.",
@@ -764,12 +835,22 @@ export function t(key: TranslationKey, languageOrValues: Language | TranslationV
       ? privacyCenterTurkishTranslations[key as `privacy.center.${string}`] ?? privacyCenterFallbackTranslations[key as `privacy.center.${string}`]
       : privacyCenterFallbackTranslations[key as `privacy.center.${string}`])
     : undefined;
+  const providerOnboardingFallback = key in providerOnboardingFallbackTranslations
+    ? (language === "tr"
+      ? providerOnboardingTurkishTranslations[key as ProviderOnboardingTranslationKey]
+      : providerOnboardingFallbackTranslations[key as ProviderOnboardingTranslationKey])
+    : undefined;
+  const profileEditFallback = key in profileEditFallbackTranslations
+    ? (language === "tr"
+      ? profileEditTurkishTranslations[key as ProfileEditTranslationKey]
+      : profileEditFallbackTranslations[key as ProfileEditTranslationKey])
+    : undefined;
   const chatPreferenceFallback = key in chatPreferenceFallbackTranslations
     ? (language === "tr"
       ? chatPreferenceTurkishTranslations[key as `chat.${string}`] ?? chatPreferenceFallbackTranslations[key as `chat.${string}`]
       : chatPreferenceFallbackTranslations[key as `chat.${string}`])
     : undefined;
-  const template = extraTranslations[language]?.[key] ?? translations[language]?.[key] ?? requestFallback ?? expenseFallback ?? verificationFallback ?? privacyCenterFallback ?? chatPreferenceFallback ?? extraTranslations.tr?.[key] ?? translations.tr?.[key] ?? key;
+  const template = extraTranslations[language]?.[key] ?? translations[language]?.[key] ?? requestFallback ?? expenseFallback ?? verificationFallback ?? privacyCenterFallback ?? providerOnboardingFallback ?? profileEditFallback ?? chatPreferenceFallback ?? extraTranslations.tr?.[key] ?? translations.tr?.[key] ?? key;
   return template.replace(/\{([A-Za-z0-9_]+)\}/g, (_, name: string) => String(values[name] ?? `{${name}}`));
 }
 export function localeForLanguage(language: Language) { return LANGUAGES.find((item) => item.code === language)?.locale ?? "tr-TR"; }

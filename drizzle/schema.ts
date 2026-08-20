@@ -16,6 +16,14 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 32 }),
+  // The active contact is never overwritten until the pending destination has
+  // passed a one-time owner verification challenge.
+  pendingEmailChange: varchar("pendingEmailChange", { length: 320 }),
+  pendingEmailToken: varchar("pendingEmailToken", { length: 128 }),
+  pendingEmailTokenExpiry: timestamp("pendingEmailTokenExpiry"),
+  pendingPhoneChange: varchar("pendingPhoneChange", { length: 32 }),
+  pendingPhoneToken: varchar("pendingPhoneToken", { length: 128 }),
+  pendingPhoneTokenExpiry: timestamp("pendingPhoneTokenExpiry"),
   emailVerifiedAt: timestamp("emailVerifiedAt"),
   phoneVerifiedAt: timestamp("phoneVerifiedAt"),
   loginMethod: varchar("loginMethod", { length: 64 }),
@@ -125,6 +133,23 @@ export const providerDocumentReviewerPermissions = mysqlTable(
   (table) => [
     uniqueIndex("provider_doc_reviewer_user_unique").on(table.userId),
     index("provider_doc_reviewer_active_idx").on(table.userId, table.revokedAt),
+  ],
+);
+
+// Financial completion-dispute settlement is distinct from document review.
+// This revocable scope is required in addition to admin MFA for settlement plans.
+export const completionDisputeReviewerPermissions = mysqlTable(
+  "completion_dispute_reviewer_permissions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    grantedByUserId: int("grantedByUserId").notNull(),
+    grantedAt: timestamp("grantedAt").defaultNow().notNull(),
+    revokedAt: timestamp("revokedAt"),
+  },
+  (table) => [
+    uniqueIndex("completion_dispute_reviewer_user_unique").on(table.userId),
+    index("completion_dispute_reviewer_active_idx").on(table.userId, table.revokedAt),
   ],
 );
 
@@ -642,6 +667,26 @@ export const authChallenges = mysqlTable(
   (table) => [
     index("auth_challenges_user_purpose_idx").on(table.userId, table.purpose),
     index("auth_challenges_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+/** Immutable, privacy-preserving evidence for staged contact-change events. */
+export const contactChangeEvents = mysqlTable(
+  "contact_change_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    contactType: mysqlEnum("contactType", ["email", "phone"]).notNull(),
+    eventType: mysqlEnum("eventType", ["initiated", "confirmed", "expired", "cancelled"]).notNull(),
+    // The mutable contact itself is never duplicated in immutable audit evidence.
+    contactValueHash: varchar("contactValueHash", { length: 128 }).notNull(),
+    challengeId: int("challengeId"),
+    metadata: json("metadata"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("contact_change_events_user_created_idx").on(table.userId, table.createdAt),
+    index("contact_change_events_challenge_idx").on(table.challengeId),
   ],
 );
 
@@ -1356,7 +1401,7 @@ export const completionDisputes = mysqlTable(
     reasonCode: mysqlEnum("reasonCode", ["incomplete_work", "quality_issue", "damage", "wrong_service", "other"])
       .notNull(),
     description: text("description").notNull(),
-    status: mysqlEnum("status", ["open", "under_review", "resolved_customer", "resolved_provider"])
+    status: mysqlEnum("status", ["open", "under_review", "resolved_customer", "resolved_provider", "resolved_partial"])
       .default("open")
       .notNull(),
     reviewedByUserId: int("reviewedByUserId"),
@@ -1365,6 +1410,14 @@ export const completionDisputes = mysqlTable(
     // gateway callback confirms that held escrow was actually refunded.
     refundGatewayReference: varchar("refundGatewayReference", { length: 191 }),
     refundVerifiedAt: timestamp("refundVerifiedAt"),
+    // A reviewer creates this immutable split plan while escrow is held. A
+    // verified gateway callback must match it exactly before settlement writes.
+    partialCustomerRefundAmount: int("partialCustomerRefundAmount"),
+    partialProviderGrossAmount: int("partialProviderGrossAmount"),
+    partialCommissionAmount: int("partialCommissionAmount"),
+    partialProviderPayoutAmount: int("partialProviderPayoutAmount"),
+    partialGatewayReference: varchar("partialGatewayReference", { length: 191 }),
+    partialSettledAt: timestamp("partialSettledAt"),
     resolvedAt: timestamp("resolvedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -1890,6 +1943,9 @@ export const jobExpenseMedia = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     expenseId: int("expenseId").notNull(),
     mediaId: int("mediaId").notNull(),
+    mediaRole: mysqlEnum("mediaRole", ["receipt", "invoice", "product", "material", "video", "other"])
+      .default("receipt")
+      .notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => [
@@ -2359,7 +2415,7 @@ export const jobSafetyRules = mysqlTable(
     jurisdictionCode: varchar("jurisdictionCode", { length: 16 }).notNull(),
     categoryId: int("categoryId"),
     serviceKey: varchar("serviceKey", { length: 120 }),
-    activityStatus: mysqlEnum("activityStatus", ["allowed", "restricted", "high_risk", "prohibited", "emergency_only"])
+    activityStatus: mysqlEnum("activityStatus", ["allowed", "restricted", "high_risk", "prohibited", "emergency_only", "not_required", "unknown"])
       .notNull(),
     riskAttributesJson: json("riskAttributesJson").$type<Record<string, unknown>>().notNull(),
     prerequisitesJson: json("prerequisitesJson").$type<Record<string, unknown>>().notNull(),

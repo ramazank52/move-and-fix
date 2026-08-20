@@ -594,3 +594,29 @@
 - [x] P15-10 — Dependency audit, source secret scan, SAST/SCA, SBOM/lisans, migration integrity ve production bundle hijyen kanıtını üret
 - [x] P15-10 — P15 final kalite sonuçlarını ham çıktı dosyalarına ve release gate matrisine kaydet
 - [x] P15-11 — Denetim amaçlı credential’sız kaynak ZIP/manifesti ve kanıta dayalı A/B/C closure raporunu hazırla; final checkpoint ile sürümü sabitle
+
+## P16 RESIDUAL CLAIM-RECONCILIATION
+- [x] P16-01 — Completion dispute için server-authoritative full release, full refund ve gateway-doğrulanmış partial resolution plan/finalization akışını uygula
+- [x] P16-01 — Kısmi dispute ledger reference/event type, safe whole-TRY invariant, callback amount eşleşmesi, idempotency ve concurrent settlement korumalarını ekle
+- [x] P16-01 — MoveOS dispute çözüm yüzeyini server quote/policy verisine bağla ve partial split UI’ını tamamla
+- [x] P16-01 — Partial completion dispute source, runtime, authorization, callback replay, ledger balance ve UI acceptance regresyonlarını ekle ve çalıştır
+- [x] P16-02 — Job Safety Engine’de missing, unknown veya malformed kuralı fail-closed yap; explicit activity status sözleşmesini additive migration ile uygula
+- [x] P16-02 — Safety kararını teklif, offer acceptance ve aktif iş başlatma/progress geçişlerinde server-authoritative zorunlu kontrol olarak doğrula
+- [x] P16-02 — Safety policy, runtime lifecycle ve negative-path regresyonlarını çalıştır; backend build ve lint ile doğrula
+- [x] P16-03 — Provider dashboard’dan gerçek server-authoritative onboarding akışına giriş ve ilerleme durumu ekle
+- [x] P16-03 — Canonical kategori/alt kategori/capability seçimlerini server catalog’a bağla; operating model, ülke ve inceleme bekleme adımlarını uygula
+- [x] P16-03 — Dinamik belge gereksinimleri, activation eligibility ve provider/customer yetki sınırı için acceptance regresyonlarını ekle ve çalıştır
+- [x] P16-04 — Provider credential requirement resolver’ını selected capability, jurisdiction, provider type ve requirement state ile category-only fallback olmadan bağla
+- [x] P16-04 — Onboarding checklist, provider verification refresh ve belge ekranını aynı server-authoritative capability-specific kaynakla eşitle
+- [x] P16-04 — Capability/jurisdiction/provider-type/unknown/expired/optional ve cross-provider authorization regresyonlarını ekle ve çalıştır
+- [x] P16-05 — Masraf Dosyası formuna ürün/tedarikçi/konum ve semantic evidence metadata alanlarını ekle; medya rollerini scanner koruması altında sakla
+- [x] P16-05 — İş ve sohbet ekranına yalnız ilgili request/job için authoritative Masraf Dosyası geçişini ekle; müşteri read-only ve no-debt anlamını koru
+- [x] P16-06 — P16’de değişen production ekranlardaki kullanıcı metinlerini 13 dilli type-safe registry’ye taşı; Arabic RTL ve hard-code guard’ını doğrula
+- [x] P16-07 — Privacy Center’a rectification talebini mevcut re-auth, owner-only, legal-hold ve geçmiş listesi semantiğini koruyarak ekle
+- [x] P16-08 — E-posta/telefon değişimini pending challenge ve atomik promotion ile staged lifecycle’a taşı; doğrulanmamış primary overwrite’i engelle
+- [x] P16-09 — MoveAI intentlerini server canonical ServiceCatalogResolver üzerinden çöz; hard-coded numeric category fallback’ini kaldır ve belirsiz/unknown isteği clarification ile blokla
+- [x] P16-10 — Country Launch Gate’in public-safe registry DTO’sunu customer ve provider country seçimlerine bağla; silent TR/currency fallback’lerini kaldır
+- [x] P16-11 — Scanner outbox’ta stuck job watchdog, bounded recovery/dead-letter ve scanner’a özel cron secret isolation uygula
+- [x] P16-11 — AES-256-GCM key-version rotasyonunda legacy payload decrypt uyumluluğunu gerçek key-ring sözleşmesiyle doğrula
+- [ ] P16-12 — Production’da demo/sample/test seed veya geliştirme route’larının erişilemediğini doğrula; fixture’ların canlı veri katmanına sızmasını engelle
+- [ ] P16-12 — Ödeme SCA/3DS sorumluluk kararını mevcut gateway adapter davranışı ve credential eksikliğiyle EXTERNAL BLOCKER olarak kanıt dosyasına kaydet

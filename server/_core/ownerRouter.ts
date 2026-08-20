@@ -22,6 +22,8 @@ import {
   createSettlementPolicyForAdmin,
   retireSettlementPolicyForAdmin,
   listSettlementPoliciesForAdmin,
+  listCompletionDisputesForAdmin,
+  planPartialCompletionDisputeSettlement,
   listJobChangeOrdersForAdmin,
   listJobCancellationCasesForAdmin,
   listRiskFlagsForAdmin,
@@ -56,6 +58,7 @@ import {
   reviewProviderInsurancePolicy,
   reviewProviderOperatingModel,
   upsertJobSafetyRule,
+  hasActiveCompletionDisputeReviewerPermission,
 } from "../db";
 import {
   createCountryCompliancePackage,
@@ -549,6 +552,28 @@ export const ownerRouter = router({
   cancellationCases: adminMfaProcedure
     .input(listInput.extend({ status: z.enum(["requested", "under_review", "resolved", "withdrawn"]).optional() }))
     .query(async ({ input }) => listJobCancellationCasesForAdmin(input)),
+
+  completionDisputes: adminMfaProcedure
+    .input(listInput.extend({ status: z.enum(["open", "under_review", "resolved_customer", "resolved_provider", "resolved_partial"]).optional() }))
+    .query(async ({ input }) => listCompletionDisputesForAdmin(input)),
+
+  planPartialCompletionDisputeSettlement: adminMfaProcedure
+    .input(z.object({
+      requestId: z.number().int().positive(),
+      customerRefundAmount: z.number().int().positive(),
+      resolutionNote: z.string().trim().min(10).max(2_000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const reviewerId = ctx.user?.id;
+      if (!reviewerId) throw new TRPCError({ code: "UNAUTHORIZED" });
+      if (!(await hasActiveCompletionDisputeReviewerPermission(reviewerId))) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Kısmi uzlaşma için ayrı completion dispute reviewer yetkisi gerekli",
+        });
+      }
+      return planPartialCompletionDisputeSettlement({ ...input, adminUserId: reviewerId });
+    }),
 
   changeOrders: adminMfaProcedure
     .input(listInput.extend({ status: z.enum(["requested", "accepted", "rejected", "withdrawn", "expired"]).optional() }))

@@ -57,6 +57,7 @@ export const ENV = {
   documentRetentionSecret: environmentContract.values.documentRetentionCronSecret,
   mediaScannerCallbackSecret: environmentContract.values.mediaScannerCallbackSecret,
   mediaScannerCallbackPreviousSecret: environmentContract.values.mediaScannerCallbackPreviousSecret,
+  mediaScannerCronSecret: environmentContract.values.mediaScannerCronSecret,
   mediaScannerSubmissionUrl: process.env.MEDIA_SCANNER_SUBMISSION_URL ?? "",
   mediaScannerSubmissionApiKey: environmentContract.values.mediaScannerSubmissionApiKey,
   encryptionKey: requiredInProduction("ENCRYPTION_KEY"),

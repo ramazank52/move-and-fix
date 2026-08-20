@@ -11,6 +11,9 @@ vi.mock("../server/db", async () => {
     approveCompletionProof: vi.fn(),
     openCompletionDispute: vi.fn(),
     resolveCompletionDispute: vi.fn(),
+    planPartialCompletionDisputeSettlement: vi.fn(),
+    hasActiveCompletionDisputeReviewerPermission: vi.fn(),
+    hasValidAdminMfaGrant: vi.fn(),
   };
 });
 
@@ -41,6 +44,7 @@ function createContext(id = 121, role: AuthenticatedUser["role"] = "user"): Trpc
     user,
     req: { protocol: "https", hostname: "localhost", headers: {} } as TrpcContext["req"],
     res: {} as TrpcContext["res"],
+    sessionFingerprint: `completion-session-${id}`,
   };
 }
 
@@ -60,7 +64,10 @@ function workflow(overrides: Record<string, unknown> = {}) {
 const validPngBase64 = "iVBORw0KGgo=";
 
 describe("completion proof and escrow security", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(completionDb.hasValidAdminMfaGrant).mockResolvedValue(true);
+  });
 
   it("rejects anonymous proof, approval and dispute mutations", async () => {
     const caller = appRouter.createCaller({ ...createContext(), user: null });
@@ -132,6 +139,57 @@ describe("completion proof and escrow security", () => {
       resolution: "customer",
       resolutionNote: "Gateway doğrulaması bekleyen müşteri lehine inceleme kararı",
       adminUserId: 126,
+    });
+  });
+
+  it("requires both an active MFA grant and a separate dispute reviewer grant before partial settlement planning", async () => {
+    const input = {
+      requestId: 91,
+      customerRefundAmount: 3_000,
+      resolutionNote: "Kanıtlar kısmi müşteri iadesi ve sağlayıcı ödemesi gerektiriyor.",
+    };
+    vi.mocked(completionDb.hasValidAdminMfaGrant).mockResolvedValue(false);
+    const noMfaCaller = appRouter.createCaller(createContext(127, "admin"));
+    await expect(noMfaCaller.admin.planPartialCompletionDisputeSettlement(input))
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(completionDb.hasActiveCompletionDisputeReviewerPermission).not.toHaveBeenCalled();
+
+    vi.mocked(completionDb.hasValidAdminMfaGrant).mockResolvedValue(true);
+    vi.mocked(completionDb.hasActiveCompletionDisputeReviewerPermission).mockResolvedValue(false);
+    const noReviewerCaller = appRouter.createCaller(createContext(127, "admin"));
+    await expect(noReviewerCaller.admin.planPartialCompletionDisputeSettlement(input))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(completionDb.planPartialCompletionDisputeSettlement).not.toHaveBeenCalled();
+  });
+
+  it("uses server-authoritative reviewer identity and rejects non-whole partial refund input", async () => {
+    vi.mocked(completionDb.hasActiveCompletionDisputeReviewerPermission).mockResolvedValue(true);
+    vi.mocked(completionDb.planPartialCompletionDisputeSettlement).mockResolvedValue({
+      disputeId: 11,
+      paymentId: 22,
+      customerRefundAmount: 3_000,
+      providerGrossAmount: 7_000,
+      commissionAmount: 700,
+      providerPayoutAmount: 6_300,
+      settlementPending: true,
+    });
+    const caller = appRouter.createCaller(createContext(128, "admin"));
+    await expect(caller.admin.planPartialCompletionDisputeSettlement({
+      requestId: 91,
+      customerRefundAmount: 3_000.5,
+      resolutionNote: "Kanıtlar kısmi müşteri iadesi ve sağlayıcı ödemesi gerektiriyor.",
+    })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    await expect(caller.admin.planPartialCompletionDisputeSettlement({
+      requestId: 91,
+      customerRefundAmount: 3_000,
+      resolutionNote: "Kanıtlar kısmi müşteri iadesi ve sağlayıcı ödemesi gerektiriyor.",
+    })).resolves.toMatchObject({ settlementPending: true, providerPayoutAmount: 6_300 });
+    expect(completionDb.planPartialCompletionDisputeSettlement).toHaveBeenCalledWith({
+      requestId: 91,
+      customerRefundAmount: 3_000,
+      resolutionNote: "Kanıtlar kısmi müşteri iadesi ve sağlayıcı ödemesi gerektiriyor.",
+      adminUserId: 128,
     });
   });
 });

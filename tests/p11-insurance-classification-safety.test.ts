@@ -42,9 +42,24 @@ describe("P11 insurance, classification and job-safety policies", () => {
     })).toMatchObject({ allowed: true, reason: "OPERATING_MODEL_VERIFIED" });
   });
 
-  it("keeps prohibited, emergency-only, prerequisite and restricted safety rules fail-closed", () => {
+  it("fails closed for missing, unknown and malformed safety rules", () => {
     expect(evaluateJobSafety({ rules: [], isEmergency: false, insuranceEligible: false, classificationEligible: false }))
-      .toMatchObject({ allowed: true, reason: "NO_ACTIVE_SAFETY_RULE" });
+      .toMatchObject({ allowed: false, reason: "JOB_SAFETY_RULE_UNKNOWN", matchedRuleId: null });
+    expect(evaluateJobSafety({
+      rules: [{ id: 6, activityStatus: "unknown", prerequisitesJson: {} }],
+      isEmergency: false,
+      insuranceEligible: true,
+      classificationEligible: true,
+    })).toMatchObject({ allowed: false, reason: "JOB_SAFETY_UNKNOWN", matchedRuleId: 6 });
+    expect(evaluateJobSafety({
+      rules: [{ id: 7, activityStatus: "allowed", prerequisitesJson: { unreviewedRequirement: true } }],
+      isEmergency: false,
+      insuranceEligible: true,
+      classificationEligible: true,
+    })).toMatchObject({ allowed: false, reason: "JOB_SAFETY_PREREQUISITES_UNKNOWN", matchedRuleId: 7 });
+  });
+
+  it("keeps prohibited, emergency-only, prerequisite and restricted safety rules fail-closed", () => {
     expect(evaluateJobSafety({
       rules: [{ id: 1, activityStatus: "prohibited", prerequisitesJson: {} }],
       isEmergency: true,
@@ -74,6 +89,21 @@ describe("P11 insurance, classification and job-safety policies", () => {
       isEmergency: false,
       insuranceEligible: true,
       classificationEligible: true,
-    })).toMatchObject({ allowed: false, reason: "JOB_SAFETY_RESTRICTED_REVIEW_REQUIRED" });
+    })).toMatchObject({ allowed: true, reason: "JOB_SAFETY_HIGH_RISK_PREREQUISITES_SATISFIED" });
+  });
+
+  it("allows an explicit not-required rule and a high-risk rule only after every known prerequisite is satisfied", () => {
+    expect(evaluateJobSafety({
+      rules: [{ id: 8, activityStatus: "not_required", prerequisitesJson: {} }],
+      isEmergency: false,
+      insuranceEligible: false,
+      classificationEligible: false,
+    })).toMatchObject({ allowed: true, reason: "JOB_SAFETY_NOT_REQUIRED" });
+    expect(evaluateJobSafety({
+      rules: [{ id: 9, activityStatus: "high_risk", prerequisitesJson: { requiresVerifiedInsurance: true, requiresVerifiedOperatingModel: true } }],
+      isEmergency: false,
+      insuranceEligible: true,
+      classificationEligible: false,
+    })).toMatchObject({ allowed: false, reason: "JOB_SAFETY_CLASSIFICATION_REQUIRED" });
   });
 });

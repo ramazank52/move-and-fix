@@ -22,6 +22,7 @@ const DEFINITIONS = {
   },
   mediaScannerCallbackPreviousSecret: { canonicalName: "MEDIA_SCANNER_CALLBACK_PREVIOUS_SECRET" },
   mediaScannerSubmissionApiKey: { canonicalName: "MEDIA_SCANNER_SUBMISSION_API_KEY" },
+  mediaScannerCronSecret: { canonicalName: "MEDIA_SCANNER_CRON_SECRET" },
   documentRetentionCronSecret: { canonicalName: "DOCUMENT_RETENTION_CRON_SECRET" },
   apmEndpoint: { canonicalName: "APM_ENDPOINT" },
   apmApiKey: { canonicalName: "APM_API_KEY" },

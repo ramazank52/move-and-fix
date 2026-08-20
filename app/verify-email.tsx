@@ -24,7 +24,7 @@ export default function VerifyEmailScreen() {
   const verifyCode = trpc.auth.verifyCode.useMutation({
     onSuccess: async () => {
       await refresh();
-      router.replace("/" as never);
+      router.replace("/settings/profile-edit" as never);
     },
     onError: (error) => setFeedback(error.message),
   });

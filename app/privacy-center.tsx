@@ -7,7 +7,8 @@ import { useColors } from "@/hooks/use-colors";
 import { useTranslation } from "@/lib/i18n";
 import { trpc } from "@/lib/trpc";
 
-type PrivacyRequestType = "export" | "erasure";
+type PrivacyRequestType = "export" | "erasure" | "rectification";
+type PrivacyRequestStatus = "open" | "in_review" | "blocked_legal_hold" | "approved" | "rejected" | "completed";
 
 export default function PrivacyCenterScreen() {
   const router = useRouter();
@@ -62,7 +63,7 @@ export default function PrivacyCenterScreen() {
         <Text style={styles.subtitle}>{t("privacy.center.subtitle")}</Text>
 
         <View style={styles.typeRow} accessibilityRole="radiogroup">
-          {(["export", "erasure"] as const).map((type) => {
+          {(["export", "rectification", "erasure"] as const).map((type) => {
             const selected = requestType === type;
             return (
               <Pressable
@@ -145,7 +146,9 @@ export default function PrivacyCenterScreen() {
         {requests.data?.map((request) => (
           <View key={request.id} style={styles.historyCard}>
             <Text style={styles.historyType}>{t(`privacy.center.type.${request.requestType}` as const)}</Text>
-            <Text style={styles.historyStatus}>{t("privacy.center.status", { status: request.status })}</Text>
+            <Text style={styles.historyStatus}>
+              {t(`privacy.center.status.${request.status as PrivacyRequestStatus}`)}
+            </Text>
           </View>
         ))}
       </ScrollView>

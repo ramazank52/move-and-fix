@@ -323,4 +323,93 @@ export function buildCancellationProviderSettlementLedgerEntry(
   };
 }
 
+/**
+ * Completion-dispute partial resolution has its own references and immutable
+ * idempotency keys. It intentionally never reuses cancellation reference types.
+ */
+export function buildCompletionDisputePartialRefundLedgerEntry(
+  payment: EscrowPayment,
+  input: { disputeId: number; refundAmount: number; gatewayReference: string },
+): LedgerEntryInput {
+  if (!Number.isSafeInteger(input.refundAmount) || input.refundAmount <= 0 || input.refundAmount >= payment.amount) {
+    throw new Error("FINANCIAL_LEDGER_COMPLETION_DISPUTE_PARTIAL_REFUND_INVALID");
+  }
+  return {
+    eventType: "partial_refund",
+    paymentId: payment.id,
+    requestId: payment.requestId,
+    referenceType: "completion_dispute_partial_refund",
+    referenceId: String(input.disputeId),
+    externalReference: input.gatewayReference,
+    idempotencyKey: `ledger:payment:${payment.id}:completion-dispute:${input.disputeId}:partial-refund`,
+    metadata: {
+      state: "completion_dispute_partial_refund",
+      currency: FINANCIAL_CURRENCY,
+      disputeId: input.disputeId,
+      refundAmount: input.refundAmount,
+    },
+    lines: [
+      { accountCode: ACCOUNT.escrow(payment.id), accountType: "liability", direction: "debit", amount: input.refundAmount },
+      { accountCode: ACCOUNT.gatewayClearing, accountType: "asset", direction: "credit", amount: input.refundAmount },
+    ],
+  };
+}
+
+export function buildCompletionDisputeProviderSettlementLedgerEntry(
+  payment: EscrowPayment,
+  input: {
+    disputeId: number;
+    providerGrossAmount: number;
+    commissionAmount: number;
+    providerPayoutAmount: number;
+    gatewayReference: string;
+  },
+): LedgerEntryInput {
+  const { providerGrossAmount, commissionAmount, providerPayoutAmount } = input;
+  if (
+    !Number.isSafeInteger(providerGrossAmount) ||
+    !Number.isSafeInteger(commissionAmount) ||
+    !Number.isSafeInteger(providerPayoutAmount) ||
+    providerGrossAmount <= 0 ||
+    commissionAmount < 0 ||
+    providerPayoutAmount < 0 ||
+    commissionAmount + providerPayoutAmount !== providerGrossAmount
+  ) {
+    throw new Error("FINANCIAL_LEDGER_COMPLETION_DISPUTE_SETTLEMENT_INVALID");
+  }
+  const lines: LedgerLineInput[] = [
+    { accountCode: ACCOUNT.escrow(payment.id), accountType: "liability", direction: "debit", amount: providerGrossAmount },
+  ];
+  if (commissionAmount > 0) {
+    lines.push({ accountCode: ACCOUNT.platformRevenue, accountType: "revenue", direction: "credit", amount: commissionAmount });
+  }
+  if (providerPayoutAmount > 0) {
+    lines.push({
+      accountCode: ACCOUNT.providerPayable(payment.providerId),
+      accountType: "liability",
+      ownerUserId: payment.providerId,
+      direction: "credit",
+      amount: providerPayoutAmount,
+    });
+  }
+  return {
+    eventType: "settlement",
+    paymentId: payment.id,
+    requestId: payment.requestId,
+    referenceType: "completion_dispute_partial_settlement",
+    referenceId: String(input.disputeId),
+    externalReference: input.gatewayReference,
+    idempotencyKey: `ledger:payment:${payment.id}:completion-dispute:${input.disputeId}:provider-settlement`,
+    metadata: {
+      state: "completion_dispute_partial_settlement",
+      currency: FINANCIAL_CURRENCY,
+      disputeId: input.disputeId,
+      providerGrossAmount,
+      commissionAmount,
+      providerPayoutAmount,
+    },
+    lines,
+  };
+}
+
 export { ACCOUNT as FINANCIAL_LEDGER_ACCOUNTS };
