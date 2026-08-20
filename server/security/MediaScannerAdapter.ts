@@ -2,6 +2,7 @@ import type { MediaScannerMediaClass } from "./MediaQuarantinePolicy";
 
 export type MediaScannerSubmission = {
   jobId: number;
+  dispatchAttemptToken: string;
   mediaClass: MediaScannerMediaClass;
   mediaId: string;
   sha256: string;
@@ -49,6 +50,7 @@ export function createHttpMediaScannerAdapter(
           },
           body: JSON.stringify({
             jobId: submission.jobId,
+            dispatchAttemptToken: submission.dispatchAttemptToken,
             mediaClass: submission.mediaClass,
             mediaId: submission.mediaId,
             sha256: submission.sha256,

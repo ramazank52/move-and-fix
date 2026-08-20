@@ -4009,6 +4009,7 @@ export async function applyMediaScannerOutcome(input: {
   mediaClass: MediaScannerMediaClass;
   mediaId: string;
   sha256: string;
+  dispatchAttemptToken: string;
   outcome: MediaScannerOutcome;
   reason?: string;
   callbackNonce?: string;
@@ -4026,12 +4027,14 @@ export async function applyMediaScannerOutcome(input: {
         mediaClass: mediaScannerCallbackReceipts.mediaClass,
         mediaId: mediaScannerCallbackReceipts.mediaId,
         sha256: mediaScannerCallbackReceipts.sha256,
+        dispatchAttemptToken: mediaScannerCallbackReceipts.dispatchAttemptToken,
         outcome: mediaScannerCallbackReceipts.outcome,
       }).from(mediaScannerCallbackReceipts).where(eq(mediaScannerCallbackReceipts.nonce, input.callbackNonce)).limit(1))[0] ?? null;
       if (priorReceipt) {
         const matches = priorReceipt.mediaClass === input.mediaClass
           && priorReceipt.mediaId === input.mediaId
           && priorReceipt.sha256.toLowerCase() === hash
+          && priorReceipt.dispatchAttemptToken === input.dispatchAttemptToken
           && priorReceipt.outcome === input.outcome;
         return {
           accepted: matches,
@@ -4064,12 +4067,15 @@ export async function applyMediaScannerOutcome(input: {
       return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_DIGEST_MISMATCH" };
     }
     const job = (await tx
-      .select({ sha256: mediaScannerJobs.sha256, status: mediaScannerJobs.status })
+      .select({ sha256: mediaScannerJobs.sha256, status: mediaScannerJobs.status, dispatchAttemptToken: mediaScannerJobs.dispatchAttemptToken })
       .from(mediaScannerJobs)
       .where(and(eq(mediaScannerJobs.mediaClass, input.mediaClass), eq(mediaScannerJobs.mediaId, input.mediaId)))
       .limit(1))[0] ?? null;
     if (!job) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_JOB_NOT_FOUND" };
     if (job.sha256.toLowerCase() !== hash) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_JOB_DIGEST_MISMATCH" };
+    if (!job.dispatchAttemptToken || job.dispatchAttemptToken !== input.dispatchAttemptToken) {
+      return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_STALE_DISPATCH_ATTEMPT" };
+    }
 
     const transition = decideMediaScannerTransition(record.quarantineStatus, input.outcome);
     const jobTransition = decideMediaScannerJobCompletion(job.status, input.outcome);
@@ -4121,6 +4127,7 @@ export async function applyMediaScannerOutcome(input: {
       eq(mediaScannerJobs.mediaId, input.mediaId),
       eq(mediaScannerJobs.sha256, hash),
       eq(mediaScannerJobs.status, job.status),
+      eq(mediaScannerJobs.dispatchAttemptToken, input.dispatchAttemptToken),
     ));
     if (Number(jobUpdated[0].affectedRows) !== 1) throw new Error("MEDIA_SCAN_JOB_UPDATE_CONFLICT");
     if (input.callbackNonce) {
@@ -4129,6 +4136,7 @@ export async function applyMediaScannerOutcome(input: {
         mediaClass: input.mediaClass,
         mediaId: input.mediaId,
         sha256: hash,
+        dispatchAttemptToken: input.dispatchAttemptToken,
         outcome: input.outcome,
       });
     }
@@ -4301,6 +4309,7 @@ export type ClaimedMediaScannerJob = {
   sha256: string;
   storageKey: string;
   deliveryAttempts: number;
+  dispatchAttemptToken: string;
 };
 
 /** Atomically claims one due outbox job. A lost race produces no dispatch. */
@@ -4383,8 +4392,10 @@ export async function claimNextMediaScannerJob(now = new Date()): Promise<Claime
       mediaAffectedRows = Number(result[0].affectedRows);
     }
     if (mediaAffectedRows !== 1) throw new Error("MEDIA_SCAN_START_MEDIA_STATE_CONFLICT");
+    const dispatchAttemptToken = randomUUID();
     const updated = await tx.update(mediaScannerJobs).set({
       status: "dispatched",
+      dispatchAttemptToken,
       deliveryAttempts: candidate.deliveryAttempts + 1,
       lastDispatchAt: now,
       nextAttemptAt: new Date(now.getTime() + 15 * 60 * 1_000),
@@ -4406,6 +4417,7 @@ export async function claimNextMediaScannerJob(now = new Date()): Promise<Claime
       sha256: candidate.sha256,
       storageKey: candidate.storageKey,
       deliveryAttempts: candidate.deliveryAttempts + 1,
+      dispatchAttemptToken,
     };
   });
 }
@@ -4413,6 +4425,7 @@ export async function claimNextMediaScannerJob(now = new Date()): Promise<Claime
 export async function recordMediaScannerDispatchResult(input: {
   jobId: number;
   accepted: boolean;
+  dispatchAttemptToken?: string;
   scannerReference?: string;
   reason?: string;
   now?: Date;
@@ -4420,12 +4433,18 @@ export async function recordMediaScannerDispatchResult(input: {
   timeoutOnly?: boolean;
 }): Promise<{ status: Extract<MediaScannerJobStatus, "dispatched" | "retry_scheduled" | "scan_failed"> }> {
   if (!Number.isInteger(input.jobId) || input.jobId <= 0) throw new Error("MEDIA_SCANNER_JOB_ID_INVALID");
+  if (!input.timeoutOnly && (!input.dispatchAttemptToken || !/^[A-Za-z0-9-]{16,64}$/.test(input.dispatchAttemptToken))) {
+    throw new Error("MEDIA_SCANNER_DISPATCH_ATTEMPT_INVALID");
+  }
   const database = await getDb();
   if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
   const now = input.now ?? new Date();
   const result = await database.transaction(async (tx) => {
     const job = (await tx.select().from(mediaScannerJobs).where(eq(mediaScannerJobs.id, input.jobId)).limit(1))[0] ?? null;
     if (!job || job.status !== "dispatched") throw new Error("MEDIA_SCANNER_JOB_NOT_DISPATCHED");
+    if (!input.timeoutOnly && job.dispatchAttemptToken !== input.dispatchAttemptToken) {
+      throw new Error("MEDIA_SCANNER_STALE_DISPATCH_ATTEMPT");
+    }
     if (input.timeoutOnly && job.nextAttemptAt.getTime() > now.getTime()) {
       throw new Error("MEDIA_SCANNER_JOB_NOT_TIMED_OUT");
     }
@@ -4434,6 +4453,7 @@ export async function recordMediaScannerDispatchResult(input: {
       const updated = await tx.update(mediaScannerJobs).set({ scannerReference }).where(and(
         eq(mediaScannerJobs.id, job.id),
         eq(mediaScannerJobs.status, "dispatched"),
+        eq(mediaScannerJobs.dispatchAttemptToken, input.dispatchAttemptToken!),
       ));
       if (Number(updated[0].affectedRows) !== 1) throw new Error("MEDIA_SCANNER_JOB_UPDATE_CONFLICT");
       return { status: "dispatched" as const, mediaClass: job.mediaClass, mediaId: job.mediaId };
@@ -4479,7 +4499,7 @@ export async function recordMediaScannerDispatchResult(input: {
     if (mediaUpdated !== 1) throw new Error("MEDIA_SCAN_FAILURE_MEDIA_STATE_CONFLICT");
     const updateConditions = input.timeoutOnly
       ? and(eq(mediaScannerJobs.id, job.id), eq(mediaScannerJobs.status, "dispatched"), lte(mediaScannerJobs.nextAttemptAt, now))
-      : and(eq(mediaScannerJobs.id, job.id), eq(mediaScannerJobs.status, "dispatched"));
+      : and(eq(mediaScannerJobs.id, job.id), eq(mediaScannerJobs.status, "dispatched"), eq(mediaScannerJobs.dispatchAttemptToken, input.dispatchAttemptToken!));
     const updated = await tx.update(mediaScannerJobs).set({
       status: failure.nextStatus,
       nextAttemptAt: failure.nextAttemptAt ?? now,

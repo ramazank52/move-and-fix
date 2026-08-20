@@ -11,6 +11,7 @@ describe("P15 media scanner callback secret rotation", () => {
     mediaClass: "provider_document" as const,
     mediaId: "media-rotation-1",
     sha256: "a".repeat(64),
+    dispatchAttemptToken: "attempt-rotation-0001",
     outcome: "clean" as const,
   };
   const context = { timestamp: 1_760_000_000_000, nonce: "rotation-nonce-0001" };

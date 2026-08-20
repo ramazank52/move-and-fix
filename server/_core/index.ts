@@ -152,6 +152,7 @@ export async function createApp() {
       mediaClass: body.mediaClass,
       mediaId: body.mediaId,
       sha256: body.sha256,
+      dispatchAttemptToken: body.dispatchAttemptToken,
       outcome: body.outcome,
       reason: typeof body.reason === "string" ? body.reason : undefined,
     };
@@ -159,8 +160,9 @@ export async function createApp() {
     const validOutcome = payload.outcome === "clean" || payload.outcome === "blocked" || payload.outcome === "scan_failed";
     const validId = typeof payload.mediaId === "string" && payload.mediaId.length > 0 && payload.mediaId.length <= 96;
     const validHash = typeof payload.sha256 === "string" && /^[a-f0-9]{64}$/i.test(payload.sha256);
+    const validAttempt = typeof payload.dispatchAttemptToken === "string" && /^[A-Za-z0-9-]{16,64}$/.test(payload.dispatchAttemptToken);
     const validReason = payload.reason === undefined || payload.reason.length <= 500;
-    if (!validClass || !validOutcome || !validId || !validHash || !validReason) {
+    if (!validClass || !validOutcome || !validId || !validHash || !validAttempt || !validReason) {
       res.status(400).json({ error: "INVALID_MEDIA_SCANNER_CALLBACK" });
       return;
     }
@@ -189,6 +191,7 @@ export async function createApp() {
         mediaClass: payload.mediaClass,
         mediaId: payload.mediaId,
         sha256: payload.sha256,
+        dispatchAttemptToken: payload.dispatchAttemptToken,
         outcome: payload.outcome,
         reason: payload.reason,
         callbackNonce: callbackContext.context.nonce,

@@ -32,11 +32,13 @@ export async function dispatchOneMediaScannerJob(
   const persisted = submission.accepted
     ? await recordMediaScannerDispatchResult({
       jobId: job.jobId,
+      dispatchAttemptToken: job.dispatchAttemptToken,
       accepted: true,
       scannerReference: submission.scannerReference,
     })
     : await recordMediaScannerDispatchResult({
       jobId: job.jobId,
+      dispatchAttemptToken: job.dispatchAttemptToken,
       accepted: false,
       reason: submission.reason,
     });

@@ -8,6 +8,7 @@ describe("media scanner outbound adapter", () => {
     mediaId: "opaque-media-1",
     sha256: "a".repeat(64),
     storageKey: "private/opaque-media-1",
+    dispatchAttemptToken: "attempt-adapter-0001",
   };
 
   it("is not configured until both scanner endpoint and credential are present", () => {
@@ -20,6 +21,9 @@ describe("media scanner outbound adapter", () => {
     const adapter = createHttpMediaScannerAdapter({ submissionUrl: "https://scanner.example/scan", apiKey: "secret", fetchImpl });
     await expect(adapter?.submitScan(submission)).resolves.toEqual({ accepted: true, scannerReference: "scan-42" });
     expect(fetchImpl).toHaveBeenCalledWith("https://scanner.example/scan", expect.objectContaining({ method: "POST" }));
+    expect(JSON.parse(fetchImpl.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+      dispatchAttemptToken: submission.dispatchAttemptToken,
+    });
   });
 
   it("keeps failed or unavailable submissions retryable and non-terminal", async () => {

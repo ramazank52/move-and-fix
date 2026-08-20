@@ -46,6 +46,7 @@ describe("all media classes quarantine contract", () => {
       mediaClass: "voice_message" as const,
       mediaId: "42",
       sha256: "a".repeat(64),
+      dispatchAttemptToken: "attempt-all-media-0001",
       outcome: "clean" as const,
       reason: "signature verified",
     };

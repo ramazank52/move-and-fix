@@ -1223,6 +1223,8 @@ export const mediaScannerJobs = mysqlTable(
     lastDispatchAt: timestamp("lastDispatchAt"),
     nextAttemptAt: timestamp("nextAttemptAt").defaultNow().notNull(),
     scannerReference: varchar("scannerReference", { length: 191 }),
+    // Regenerated for every dispatch. A callback is authoritative only for this exact attempt.
+    dispatchAttemptToken: varchar("dispatchAttemptToken", { length: 64 }),
     outcome: mysqlEnum("outcome", ["clean", "blocked", "scan_failed"]),
     outcomeReason: varchar("outcomeReason", { length: 500 }),
     completedAt: timestamp("completedAt"),
@@ -1281,6 +1283,7 @@ export const mediaScannerCallbackReceipts = mysqlTable(
     ]).notNull(),
     mediaId: varchar("mediaId", { length: 64 }).notNull(),
     sha256: varchar("sha256", { length: 64 }).notNull(),
+    dispatchAttemptToken: varchar("dispatchAttemptToken", { length: 64 }).notNull(),
     outcome: mysqlEnum("outcome", ["clean", "blocked", "scan_failed"]).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },

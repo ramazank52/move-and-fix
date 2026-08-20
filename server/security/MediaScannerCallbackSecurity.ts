@@ -7,6 +7,8 @@ export type MediaScannerCallbackPayload = {
   mediaClass: MediaScannerMediaClass;
   mediaId: string;
   sha256: string;
+  /** Opaque token generated when this exact scanner dispatch was claimed. */
+  dispatchAttemptToken: string;
   outcome: MediaScannerOutcome;
   reason?: string;
 };
@@ -21,7 +23,14 @@ export function mediaScannerCallbackCanonicalPayload(
   input: MediaScannerCallbackPayload,
   context?: MediaScannerCallbackSecurityContext,
 ) {
-  const body = [input.mediaClass, input.mediaId, input.sha256.toLowerCase(), input.outcome, input.reason?.trim() ?? ""];
+  const body = [
+    input.mediaClass,
+    input.mediaId,
+    input.sha256.toLowerCase(),
+    input.dispatchAttemptToken,
+    input.outcome,
+    input.reason?.trim() ?? "",
+  ];
   return context ? [String(context.timestamp), context.nonce, ...body].join("\n") : body.join("\n");
 }
 
