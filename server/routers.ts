@@ -1999,11 +1999,15 @@ export const appRouter = router({
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Hassas işlem kodu geçersiz, kullanılmış veya süresi dolmuş" });
         }
         await db.markAuthChallengeUsed(challenge.id);
-        return db.createPrivacyRightsRequest({
+        const request = await db.createPrivacyRightsRequest({
           requesterUserId: ctx.user.id,
           requestType: input.requestType,
           requestReason: input.requestReason,
         });
+        const dataScope = input.requestType === "export" || input.requestType === "erasure"
+          ? await db.getOwnPrivacyDataScope(ctx.user.id)
+          : null;
+        return { ...request, dataScope };
       }),
   }),
   // Providers

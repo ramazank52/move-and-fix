@@ -639,9 +639,14 @@
 - [x] P17-10 — Deterministik JSON tabanlı SCA parser/CI policy, advisory/path/disposition raporları ve approved toolchain exception kaydını uygula
 - [x] P17-11 — Partial settlement downstream analytics, reconciliation ve admin/payment semantic ayrımını authoritative realized amounts ile düzelt
 - [x] P17-12 — Canonical `MEDIA_SCANNER_CRON_SECRET` dokümantasyon/config sözleşmesini hizala ve config-contract testini ekle
-- [ ] P17-13 — Authoritative final-production-status belgesini current P17 durumu en üstte görünecek şekilde yeniden düzenle
-- [ ] P17-14 — Kritik P17 sözleşme smoke testlerinin yanına router/database behavioral test kanıtlarını tamamla
+- [x] P17-13 — Authoritative final-production-status belgesini current P17 durumu en üstte görünecek şekilde yeniden düzenle
+- [x] P17-14 — Kritik P17 sözleşme smoke testlerinin yanına router/database behavioral test kanıtlarını tamamla
 - [x] P17-15 — qs disposition’ını release classification ile açıkça bağla ve safe resolution yoksa BLOCKED_INTERNAL_DEPENDENCY olarak kaydet
-- [ ] P17-16 — Translation preference/provenance ile contact verification geçmişini Privacy Center export/delete lifecycle’ına bağla
+- [x] P17-16 — Translation preference/provenance ile contact verification geçmişini Privacy Center export/delete lifecycle’ına bağla
 - [x] P17-17 — Masraf evidence item sayısı/boyut/süre limitlerini config tabanlı ve server-authoritative olarak uygula
 - [ ] P17-FINAL — Final kalite kapıları, P17 closure raporu, production status, per-item checkpoint referansları ve immutable audit exportu tamamla
+
+## P17-16 Privacy Retention / Erasure Execution
+- [x] Privacy Center export çıktısına owner translation preference/provenance ve contact verification geçmişini dahil et
+- [x] Privacy Center silme akışını mevcut re-auth, legal-hold ve retention semantiğini koruyarak bu veri kümelerine bağla
+- [x] P17-16 owner/export/delete route-db behavioral, authorization ve edge-case testlerini ekle

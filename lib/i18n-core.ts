@@ -528,6 +528,13 @@ const privacyCenterFallbackTranslations: Record<`privacy.center.${string}`, stri
   "privacy.center.status.rejected": "Status: not approved",
   "privacy.center.status.completed": "Status: completed",
   "privacy.center.back": "Go back",
+  "privacy.center.scope.title": "Data currently covered by your request",
+  "privacy.center.scope.translationPreference": "Message translation preference: {language}",
+  "privacy.center.scope.translationProvenance": "Translation provenance records: {count}",
+  "privacy.center.scope.contactVerification": "Contact verification records: {count}",
+  "privacy.center.scope.contactChanges": "Contact-change audit records: {count}",
+  "privacy.center.scope.truncated": "Only the most recent records are shown here; the request remains subject to secure export review.",
+  "privacy.center.scope.erasureReview": "Deletion is not automatic. Retention and legal-hold review are required before protected records can be changed.",
 };
 
 const privacyCenterTurkishTranslations: Partial<Record<`privacy.center.${string}`, string>> = {
@@ -560,6 +567,13 @@ const privacyCenterTurkishTranslations: Partial<Record<`privacy.center.${string}
   "privacy.center.status.rejected": "Durum: onaylanmadı",
   "privacy.center.status.completed": "Durum: tamamlandı",
   "privacy.center.back": "Geri dön",
+  "privacy.center.scope.title": "Talebinizin kapsadığı mevcut veriler",
+  "privacy.center.scope.translationPreference": "Mesaj çeviri tercihi: {language}",
+  "privacy.center.scope.translationProvenance": "Çeviri kaynak kaydı: {count}",
+  "privacy.center.scope.contactVerification": "İletişim doğrulama kaydı: {count}",
+  "privacy.center.scope.contactChanges": "İletişim değişikliği denetim kaydı: {count}",
+  "privacy.center.scope.truncated": "Burada yalnız en güncel kayıtlar gösterilir; talep güvenli dışa aktarma incelemesine tabidir.",
+  "privacy.center.scope.erasureReview": "Silme otomatik değildir. Korunan kayıtlar değişmeden önce saklama ve yasal bekletme incelemesi gerekir.",
 };
 
 const providerOnboardingFallbackTranslations: Record<ProviderOnboardingTranslationKey, string> = {

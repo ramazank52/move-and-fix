@@ -9,6 +9,13 @@ import { trpc } from "@/lib/trpc";
 
 type PrivacyRequestType = "export" | "erasure" | "rectification";
 type PrivacyRequestStatus = "open" | "in_review" | "blocked_legal_hold" | "approved" | "rejected" | "completed";
+type PrivacyDataScope = {
+  translationPreference: { configured: boolean; autoTranslateMessages: boolean; preferredTranslationLanguage: string };
+  translationProvenance: { records: unknown[]; truncated: boolean };
+  contactVerificationHistory: { records: unknown[]; truncated: boolean };
+  contactChangeHistory: { records: unknown[]; truncated: boolean };
+  erasureHandling: { automaticErasure: boolean; status: "retention_review_required" };
+};
 
 export default function PrivacyCenterScreen() {
   const router = useRouter();
@@ -21,16 +28,18 @@ export default function PrivacyCenterScreen() {
   const [password, setPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [dataScope, setDataScope] = useState<PrivacyDataScope | null>(null);
   const requests = trpc.privacyRights.list.useQuery();
   const requestCode = trpc.auth.requestVerification.useMutation({
     onSuccess: () => setFeedback(t("privacy.center.requestCode")),
     onError: () => setFeedback(t("privacy.center.error")),
   });
   const submitRequest = trpc.privacyRights.submit.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       setPassword("");
       setVerificationCode("");
       setReason("");
+      setDataScope(result.dataScope as PrivacyDataScope | null);
       setFeedback(t("privacy.center.success"));
       await utils.privacyRights.list.invalidate();
     },
@@ -140,6 +149,18 @@ export default function PrivacyCenterScreen() {
           </Pressable>
         </View>
 
+        {dataScope ? (
+          <View style={styles.scopeCard} accessibilityLabel={t("privacy.center.scope.title")}>
+            <Text style={styles.scopeTitle}>{t("privacy.center.scope.title")}</Text>
+            <Text style={styles.scopeRow}>{t("privacy.center.scope.translationPreference", { language: dataScope.translationPreference.preferredTranslationLanguage })}</Text>
+            <Text style={styles.scopeRow}>{t("privacy.center.scope.translationProvenance", { count: dataScope.translationProvenance.records.length })}</Text>
+            <Text style={styles.scopeRow}>{t("privacy.center.scope.contactVerification", { count: dataScope.contactVerificationHistory.records.length })}</Text>
+            <Text style={styles.scopeRow}>{t("privacy.center.scope.contactChanges", { count: dataScope.contactChangeHistory.records.length })}</Text>
+            {(dataScope.translationProvenance.truncated || dataScope.contactVerificationHistory.truncated || dataScope.contactChangeHistory.truncated) ? <Text style={styles.scopeNotice}>{t("privacy.center.scope.truncated")}</Text> : null}
+            {requestType === "erasure" && dataScope.erasureHandling.status === "retention_review_required" ? <Text style={styles.scopeNotice}>{t("privacy.center.scope.erasureReview")}</Text> : null}
+          </View>
+        ) : null}
+
         <Text style={styles.historyTitle}>{t("privacy.center.history")}</Text>
         {requests.isLoading ? <ActivityIndicator color={colors.primary} /> : null}
         {requests.data?.length === 0 ? <Text style={styles.empty}>{t("privacy.center.empty")}</Text> : null}
@@ -187,6 +208,10 @@ function createStyles(colors: ReturnType<typeof useColors>, isRTL: boolean) {
     historyCard: { borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, padding: 14, gap: 4 },
     historyType: { color: colors.foreground, fontSize: 14, fontWeight: "700", textAlign: isRTL ? "right" : "left" },
     historyStatus: { color: colors.muted, fontSize: 13, textAlign: isRTL ? "right" : "left" },
+    scopeCard: { borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: 14, gap: 6 },
+    scopeTitle: { color: colors.foreground, fontSize: 15, fontWeight: "800", textAlign: isRTL ? "right" : "left" },
+    scopeRow: { color: colors.foreground, fontSize: 13, lineHeight: 19, textAlign: isRTL ? "right" : "left" },
+    scopeNotice: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: isRTL ? "right" : "left" },
     pressed: { opacity: 0.7 },
   });
 }

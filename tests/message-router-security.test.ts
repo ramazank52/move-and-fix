@@ -22,6 +22,7 @@ vi.mock("../server/db", async () => {
     softDeleteMessage: vi.fn(),
     listOwnPrivacyRightsRequests: vi.fn(),
     createPrivacyRightsRequest: vi.fn(),
+    getOwnPrivacyDataScope: vi.fn(),
     getUserByEmailNormalized: vi.fn(),
     getActiveAuthChallenge: vi.fn(),
     getLatestActiveAuthChallenge: vi.fn(),
@@ -128,6 +129,15 @@ describe("message router security", () => {
       autoTranslateMessages: false,
       preferredTranslationLanguage: "tr",
     });
+    vi.mocked(messageDb.getOwnPrivacyDataScope).mockResolvedValue({
+      version: "p17-16",
+      generatedAt: new Date("2026-08-20T09:00:00.000Z"),
+      translationPreference: { configured: false, autoTranslateMessages: false, preferredTranslationLanguage: "tr", updatedAt: null },
+      translationProvenance: { records: [], truncated: false },
+      contactVerificationHistory: { records: [], truncated: false },
+      contactChangeHistory: { records: [], truncated: false },
+      erasureHandling: { automaticErasure: false, status: "retention_review_required" },
+    } as never);
     vi.mocked(storageGetSignedUrl).mockResolvedValue("https://storage.example.test/signed-audio-url");
   });
 
@@ -199,22 +209,33 @@ describe("message router security", () => {
       password,
       verificationCode,
     }))
-      .resolves.toEqual({ id: 83, status: "open" });
+      .resolves.toMatchObject({
+        id: 83,
+        status: "open",
+        dataScope: {
+          version: "p17-16",
+          erasureHandling: { automaticErasure: false, status: "retention_review_required" },
+        },
+      });
     await expect(caller.privacyRights.list()).resolves.toEqual([]);
     expect(messageDb.createPrivacyRightsRequest).toHaveBeenCalledWith({
       requesterUserId: 10,
       requestType: "export",
       requestReason: "KVKK veri kopyası",
     });
+    expect(messageDb.getOwnPrivacyDataScope).toHaveBeenCalledWith(10);
     expect(messageDb.listOwnPrivacyRightsRequests).toHaveBeenCalledWith(10);
     expect(messageDb.markAuthChallengeUsed).toHaveBeenCalledWith(702);
     await expect(caller.privacyRights.submit({
       requestType: "erasure",
-      requestReason: "x",
+      requestReason: "Hesap silme talebi",
       password,
       verificationCode,
-    }))
-      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+    })).resolves.toMatchObject({
+      id: 83,
+      dataScope: { erasureHandling: { automaticErasure: false, status: "retention_review_required" } },
+    });
+    expect(messageDb.getOwnPrivacyDataScope).toHaveBeenLastCalledWith(10);
 
     vi.mocked(messageDb.getUserByEmailNormalized).mockResolvedValue({
       user: { id: 999 },

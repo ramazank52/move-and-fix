@@ -1534,6 +1534,14 @@ import {
   type MediaScannerJobStatus,
 } from "./security/MediaScannerJobQueue";
 import { decideMediaScannerDispatchFailure } from "./security/MediaScannerDispatchPolicy";
+import {
+  buildPrivacyDataScope,
+  PRIVACY_SCOPE_RECORD_LIMIT,
+  type PrivacyContactChangeEventScope,
+  type PrivacyContactVerificationScope,
+  type PrivacyTranslationProvenanceScope,
+} from "./privacy/PrivacyDataScope";
+import { decideMediaScannerAttemptCorrelation } from "./security/MediaScannerAttemptCorrelationPolicy";
 
 function resetMediaScannerJobForRetry(input: { sha256: string; storageKey: string }) {
   const job = buildMediaScannerJob({
@@ -4099,9 +4107,11 @@ export async function applyMediaScannerOutcome(input: {
       .limit(1))[0] ?? null;
     if (!job) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_JOB_NOT_FOUND" };
     if (job.sha256.toLowerCase() !== hash) return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_JOB_DIGEST_MISMATCH" };
-    if (!job.dispatchAttemptToken || job.dispatchAttemptToken !== input.dispatchAttemptToken) {
-      return { accepted: false, idempotent: false, reason: "MEDIA_SCAN_STALE_DISPATCH_ATTEMPT" };
-    }
+    const attemptCorrelation = decideMediaScannerAttemptCorrelation({
+      persistedAttemptToken: job.dispatchAttemptToken,
+      callbackAttemptToken: input.dispatchAttemptToken,
+    });
+    if (!attemptCorrelation.allowed) return { accepted: false, idempotent: false, reason: attemptCorrelation.reason };
 
     const transition = decideMediaScannerTransition(record.quarantineStatus, input.outcome);
     const jobTransition = decideMediaScannerJobCompletion(job.status, input.outcome);
@@ -5029,6 +5039,88 @@ export async function listOwnPrivacyRightsRequests(userId: number) {
     .from(privacyRightsRequests)
     .where(eq(privacyRightsRequests.requesterUserId, userId))
     .orderBy(desc(privacyRightsRequests.createdAt), desc(privacyRightsRequests.id));
+}
+
+/**
+ * Returns only records whose ownership is provable from the persisted model.
+ * This is intentionally a scope/provenance view rather than a full export
+ * artifact: secure delivery and all erasure mutations remain review-controlled.
+ */
+export async function getOwnPrivacyDataScope(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+
+  const [preferenceRows, translationRows, verificationRows, contactEventRows] = await Promise.all([
+    db
+      .select({
+        autoTranslateMessages: userTranslationPreferences.autoTranslateMessages,
+        preferredTranslationLanguage: userTranslationPreferences.preferredTranslationLanguage,
+        updatedAt: userTranslationPreferences.updatedAt,
+      })
+      .from(userTranslationPreferences)
+      .where(eq(userTranslationPreferences.userId, userId))
+      .limit(1),
+    db
+      .select({
+        messageId: messageTranslationCache.messageId,
+        sourceLanguage: messageTranslationCache.sourceLanguage,
+        targetLanguage: messageTranslationCache.targetLanguage,
+        translationProvider: messageTranslationCache.translationProvider,
+        model: messageTranslationCache.model,
+        modelVersion: messageTranslationCache.modelVersion,
+        translationVersion: messageTranslationCache.translationVersion,
+        createdAt: messageTranslationCache.createdAt,
+      })
+      .from(messageTranslationCache)
+      .innerJoin(messages, eq(messages.id, messageTranslationCache.messageId))
+      .where(or(eq(messages.senderId, userId), eq(messages.receiverId, userId)))
+      .orderBy(desc(messageTranslationCache.createdAt), desc(messageTranslationCache.id))
+      .limit(PRIVACY_SCOPE_RECORD_LIMIT + 1),
+    db
+      .select({
+        contactType: contactVerificationStates.contactType,
+        status: contactVerificationStates.status,
+        initiatedAt: contactVerificationStates.initiatedAt,
+        verifiedAt: contactVerificationStates.verifiedAt,
+      })
+      .from(contactVerificationStates)
+      .where(eq(contactVerificationStates.userId, userId))
+      .orderBy(desc(contactVerificationStates.initiatedAt), desc(contactVerificationStates.id))
+      .limit(PRIVACY_SCOPE_RECORD_LIMIT + 1),
+    db
+      .select({
+        contactType: contactChangeEvents.contactType,
+        eventType: contactChangeEvents.eventType,
+        contactValueHash: contactChangeEvents.contactValueHash,
+        challengeId: contactChangeEvents.challengeId,
+        metadata: contactChangeEvents.metadata,
+        createdAt: contactChangeEvents.createdAt,
+      })
+      .from(contactChangeEvents)
+      .where(eq(contactChangeEvents.userId, userId))
+      .orderBy(desc(contactChangeEvents.createdAt), desc(contactChangeEvents.id))
+      .limit(PRIVACY_SCOPE_RECORD_LIMIT + 1),
+  ]);
+
+  const preference = preferenceRows[0];
+  return buildPrivacyDataScope({
+    preference: preference
+      ? {
+          configured: true,
+          autoTranslateMessages: preference.autoTranslateMessages === 1,
+          preferredTranslationLanguage: preference.preferredTranslationLanguage,
+          updatedAt: preference.updatedAt,
+        }
+      : {
+          configured: false,
+          autoTranslateMessages: false,
+          preferredTranslationLanguage: "tr",
+          updatedAt: null,
+        },
+    translationProvenance: translationRows as PrivacyTranslationProvenanceScope[],
+    contactVerificationHistory: verificationRows as PrivacyContactVerificationScope[],
+    contactChangeHistory: contactEventRows as PrivacyContactChangeEventScope[],
+  });
 }
 
 export async function listPrivacyRightsRequestsForReview(limit = 100) {
