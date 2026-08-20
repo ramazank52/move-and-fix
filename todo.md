@@ -622,3 +622,25 @@
 - [x] P16-12 — Ödeme SCA/3DS sorumluluk kararını mevcut gateway adapter davranışı ve credential eksikliğiyle EXTERNAL BLOCKER olarak kanıt dosyasına kaydet
 - [x] P16-13 — Final tam regresyon, TypeScript, lint, backend build, iOS/Android/web export, Expo Doctor ve whitespace kalite kapılarını doğrula
 - [x] P16-14 — P16 final closure raporu, üretim durumu eki ve kanıta dayalı A/B/C release kararını hazırla
+
+## P17 — Verified Source-Truth Correction Closure (baseline: a314ce97)
+
+- [x] P17-00 — `p17-verified-closure` branch'ini a314ce97 baseline’ından oluştur, deployment/public-store durumunu kanıtla ve madde bazlı checkpoint disiplinini uygula
+- [x] P17-01 — Provider onboarding akışına operating-model submission/review adımını, service-area doğrulamasını ve fail-closed activation yolunu entegre et
+- [ ] P17-02 — Provider document/onboarding/activation kararlarını capability-jurisdiction-providerType credential resolver’ın tek authoritative DTO’sunda birleştir
+- [ ] P17-03 — Scanner dispatch attempt generation/token correlation, stale callback red ve behavioral race testlerini uygula
+- [ ] P17-04 — Explicit legacy encryption key contract, gerçek old-key decrypt/migration roundtrip ve fail-closed rotation testlerini uygula
+- [ ] P17-05 — Masraf Dosyası multi-evidence collection, secure video desteği ve scanner-bound persistence akışını uygula
+- [ ] P17-06 — Tüm production app/components user-facing metinlerini 13-dil i18n’ye taşı, RTL/hard-coded UI scanner kapsamını genişlet
+- [ ] P17-07 — MoveAI candidate taxonomy’yi public-safe canonical catalog snapshot ve locale-aware response policy ile birleştir
+- [ ] P17-08 — SPDX expression-aware license policy, attribution çıktısı ve behavioral parser testlerini uygula
+- [ ] P17-09 — qs runtime vulnerability için uyumlu remediable resolution/upgrade araştır, uygulayabiliyorsa güvenli yükseltme ve finansal regressions çalıştır
+- [ ] P17-10 — Deterministik JSON tabanlı SCA parser/CI policy, advisory/path/disposition raporları ve approved toolchain exception kaydını uygula
+- [ ] P17-11 — Partial settlement downstream analytics, reconciliation ve admin/payment semantic ayrımını authoritative realized amounts ile düzelt
+- [ ] P17-12 — Canonical `MEDIA_SCANNER_CRON_SECRET` dokümantasyon/config sözleşmesini hizala ve config-contract testini ekle
+- [ ] P17-13 — Authoritative final-production-status belgesini current P17 durumu en üstte görünecek şekilde yeniden düzenle
+- [ ] P17-14 — Kritik P17 sözleşme smoke testlerinin yanına router/database behavioral test kanıtlarını tamamla
+- [ ] P17-15 — qs disposition’ını release classification ile açıkça bağla ve safe resolution yoksa BLOCKED_INTERNAL_DEPENDENCY olarak kaydet
+- [ ] P17-16 — Translation preference/provenance ile contact verification geçmişini Privacy Center export/delete lifecycle’ına bağla
+- [ ] P17-17 — Masraf evidence item sayısı/boyut/süre limitlerini config tabanlı ve server-authoritative olarak uygula
+- [ ] P17-FINAL — Final kalite kapıları, P17 closure raporu, production status, per-item checkpoint referansları ve immutable audit exportu tamamla

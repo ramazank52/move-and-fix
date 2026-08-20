@@ -14,13 +14,17 @@ describe("P16 provider onboarding mobile contract", () => {
     expect(source).not.toContain("demoCatalog");
   });
 
-  it("resets dependent choices, permits canonical category-level scopes and blocks saves without an enabled jurisdiction", () => {
+  it("resets dependent choices and blocks saves without jurisdiction, a verified operating model or a valid service area", () => {
     expect(source).toContain("setSubcategoryId(null)");
     expect(source).toContain("setCapabilityId(null)");
     expect(source).toContain("item.subcategoryId === subcategoryId");
     expect(source).toContain("trpc.countryRegistry.list.useQuery");
-    expect(source).toContain("if (!categoryId || !capabilityId || !jurisdictionCode || configureMutation.isPending) return;");
-    expect(source).toContain("accessibilityState={{ disabled: !categoryId || !capabilityId || !jurisdictionCode || configureMutation.isPending }}");
+    expect(source).toContain("trpc.provider.submitOperatingModel.useMutation");
+    expect(source).toContain("trpc.provider.getOperatingModel.useQuery");
+    expect(source).toContain("const hasValidServiceArea");
+    expect(source).toContain("const operatingModelVerified");
+    expect(source).toContain("if (!categoryId || !capabilityId || !jurisdictionCode || !hasValidServiceArea || !operatingModelVerified || configureMutation.isPending) return;");
+    expect(source).toContain("accessibilityState={{ disabled: !categoryId || !capabilityId || !jurisdictionCode || !operatingModelVerified || !hasValidServiceArea || configureMutation.isPending }}");
     expect(source).toContain("disabled={!item.selectable}");
     expect(source).toContain("jurisdictionCode");
   });

@@ -9,6 +9,7 @@ const complete = {
   dynamicCredentialsVerified: true,
   documentsApproved: true,
   countryLaunchEligible: true,
+  serviceAreaConfigured: true,
 } as const;
 
 describe("provider onboarding activation policy", () => {
@@ -43,6 +44,13 @@ describe("provider onboarding activation policy", () => {
         "DOCUMENTS_NOT_APPROVED",
         "COUNTRY_LAUNCH_NOT_ELIGIBLE",
       ],
+    });
+  });
+
+  it("blocks activation when a provider has no configured service area", () => {
+    expect(decideProviderOnboardingActivation({ ...complete, serviceAreaConfigured: false })).toEqual({
+      status: "BLOCKED",
+      blockers: ["SERVICE_AREA_NOT_CONFIGURED"],
     });
   });
 });

@@ -611,6 +611,7 @@ export const providers = mysqlTable("providers", {
   isAvailable: int("isAvailable").default(1).notNull(),
   latitude: varchar("latitude", { length: 20 }),
   longitude: varchar("longitude", { length: 20 }),
+  serviceRadiusKm: int("serviceRadiusKm"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

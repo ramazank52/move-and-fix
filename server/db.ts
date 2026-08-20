@@ -5186,6 +5186,7 @@ export type ProviderOnboardingStatus = {
   capability: "verified" | "pending_or_missing";
   credentials: "verified" | "blocked_or_missing";
   documents: "approved" | "pending_or_missing";
+  serviceArea: "configured" | "pending_or_missing";
   launchGate: "eligible" | "blocked";
   activation: "eligible" | "blocked";
 };
@@ -5198,10 +5199,16 @@ export async function configureProviderOnboarding(input: {
   subcategoryId: number | null;
   capabilityId: number;
   jurisdictionCode: string;
+  serviceArea: { latitude: number; longitude: number; radiusKm: number };
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const jurisdictionCode = input.jurisdictionCode.trim().toUpperCase();
+  if (!Number.isFinite(input.serviceArea.latitude) || input.serviceArea.latitude < -90 || input.serviceArea.latitude > 90 ||
+    !Number.isFinite(input.serviceArea.longitude) || input.serviceArea.longitude < -180 || input.serviceArea.longitude > 180 ||
+    !Number.isInteger(input.serviceArea.radiusKm) || input.serviceArea.radiusKm < 1 || input.serviceArea.radiusKm > 500) {
+    throw new Error("SERVICE_AREA_INVALID");
+  }
   await assertCountryMarketplaceTransition({
     countryCode: jurisdictionCode,
     transition: "PROVIDER_ACTIVATION",
@@ -5228,9 +5235,6 @@ export async function configureProviderOnboarding(input: {
       (capability.subcategoryId ?? null) !== identity.value.subcategoryId) {
       throw new Error("CAPABILITY_CATALOG_SCOPE_MISMATCH");
     }
-    await tx.update(providers)
-      .set({ categoryId: identity.value.categoryId, verificationStatus: "pending", isVerified: 0 })
-      .where(eq(providers.id, provider.id));
     const jurisdictionRows = await tx.select({ id: jurisdictions.id }).from(jurisdictions)
       .innerJoin(providerOperatingModels, and(
         eq(providerOperatingModels.jurisdictionCode, jurisdictions.countryCode),
@@ -5242,6 +5246,16 @@ export async function configureProviderOnboarding(input: {
         eq(providerOperatingModels.reviewStatus, "verified"),
       ));
     if (jurisdictionRows.length !== 1) throw new Error("PROVIDER_JURISDICTION_BINDING_UNRESOLVED");
+    await tx.update(providers)
+      .set({
+        categoryId: identity.value.categoryId,
+        latitude: String(input.serviceArea.latitude),
+        longitude: String(input.serviceArea.longitude),
+        serviceRadiusKm: input.serviceArea.radiusKm,
+        verificationStatus: "pending",
+        isVerified: 0,
+      })
+      .where(eq(providers.id, provider.id));
     for (const jurisdiction of jurisdictionRows) {
       await tx.insert(providerCapabilityStatuses).values({
         providerId: provider.id,
@@ -5259,7 +5273,8 @@ export async function configureProviderOnboarding(input: {
       capabilityId: capability.id,
       capabilityReviewState: "LEGAL_REVIEW_REQUIRED" as const,
       jurisdictionBindingCount: jurisdictionRows.length,
-      jurisdictionCode,
+    jurisdictionCode,
+      serviceArea: input.serviceArea,
     };
   });
 }
@@ -5436,6 +5451,9 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     id: providers.id,
     displayName: providers.displayName,
     categoryId: providers.categoryId,
+    latitude: providers.latitude,
+    longitude: providers.longitude,
+    serviceRadiusKm: providers.serviceRadiusKm,
   }).from(providers).where(eq(providers.userId, userId)).limit(1);
   const provider = providerRows[0];
   if (!provider) return null;
@@ -5524,6 +5542,11 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     credentials = "blocked_or_missing";
   }
   const profile = provider.displayName.trim().length > 0 ? "complete" as const : "incomplete" as const;
+  const latitude = provider.latitude == null ? Number.NaN : Number(provider.latitude);
+  const longitude = provider.longitude == null ? Number.NaN : Number(provider.longitude);
+  const serviceAreaConfigured = Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 &&
+    Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 &&
+    Number.isInteger(provider.serviceRadiusKm) && (provider.serviceRadiusKm ?? 0) >= 1 && (provider.serviceRadiusKm ?? 0) <= 500;
   const jurisdiction = verifiedModels.length > 0 ? "verified" as const : "pending_or_missing" as const;
   const capability = verifiedCapabilities.length > 0 ? "verified" as const : "pending_or_missing" as const;
   const activationDecision = decideProviderOnboardingActivation({
@@ -5534,6 +5557,7 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     dynamicCredentialsVerified: credentials === "verified",
     documentsApproved,
     countryLaunchEligible: launchGate === "eligible",
+    serviceAreaConfigured,
   });
   const activation = activationDecision.status === "ELIGIBLE" ? "eligible" as const : "blocked" as const;
   return {
@@ -5544,6 +5568,7 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     capability,
     credentials,
     documents: documentsApproved ? "approved" : "pending_or_missing",
+    serviceArea: serviceAreaConfigured ? "configured" : "pending_or_missing",
     launchGate,
     activation,
   };
@@ -8178,11 +8203,17 @@ export async function getNewJobsForProvider(providerId: number) {
     }).allowed;
   });
 
-  return rankServiceOpportunitiesByLocation(
+  const rankedCandidates = rankServiceOpportunitiesByLocation(
     eligibleCandidates,
     provider.latitude,
     provider.longitude,
-  ).slice(0, 20);
+  );
+  const radiusKm = provider.serviceRadiusKm;
+  if (!Number.isInteger(radiusKm) || (radiusKm ?? 0) < 1 || (radiusKm ?? 0) > 500) return [];
+  const validatedRadiusKm = radiusKm as number;
+  return rankedCandidates
+    .filter((candidate) => candidate.distanceKm == null || candidate.distanceKm <= validatedRadiusKm)
+    .slice(0, 20);
 }
 
 export async function getPaymentQuote(requestId: number, userId: number) {

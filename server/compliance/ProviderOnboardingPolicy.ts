@@ -6,6 +6,7 @@ export type ProviderOnboardingActivationInput = {
   dynamicCredentialsVerified: boolean;
   documentsApproved: boolean;
   countryLaunchEligible: boolean;
+  serviceAreaConfigured: boolean;
 };
 
 export type ProviderOnboardingActivationDecision =
@@ -28,5 +29,6 @@ export function decideProviderOnboardingActivation(
   if (!input.dynamicCredentialsVerified) blockers.push("DYNAMIC_CREDENTIALS_NOT_VERIFIED");
   if (!input.documentsApproved) blockers.push("DOCUMENTS_NOT_APPROVED");
   if (!input.countryLaunchEligible) blockers.push("COUNTRY_LAUNCH_NOT_ELIGIBLE");
+  if (!input.serviceAreaConfigured) blockers.push("SERVICE_AREA_NOT_CONFIGURED");
   return blockers.length === 0 ? { status: "ELIGIBLE", blockers: [] } : { status: "BLOCKED", blockers };
 }

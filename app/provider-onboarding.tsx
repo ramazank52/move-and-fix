@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -25,10 +25,19 @@ export default function ProviderOnboardingScreen() {
   const catalogQuery = trpc.provider.getOnboardingCatalog.useQuery(undefined, { refetchOnMount: true });
   const countryRegistryQuery = trpc.countryRegistry.list.useQuery(undefined, { refetchOnMount: true });
   const configureMutation = trpc.provider.configureOnboarding.useMutation();
+  const submitOperatingModelMutation = trpc.provider.submitOperatingModel.useMutation();
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<number | null>(null);
   const [capabilityId, setCapabilityId] = useState<number | null>(null);
   const [jurisdictionCode, setJurisdictionCode] = useState<string | null>(null);
+  const [operatingModel, setOperatingModel] = useState<"employee" | "self_employed" | "sole_trader" | "company_owner" | "company_worker">("self_employed");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [serviceRadiusKm, setServiceRadiusKm] = useState("20");
+  const operatingModelQuery = trpc.provider.getOperatingModel.useQuery(
+    { jurisdictionCode: jurisdictionCode ?? "ZZ" },
+    { enabled: Boolean(jurisdictionCode), refetchOnMount: true },
+  );
 
   const categories = catalogQuery.data?.categories ?? [];
   const subcategories = useMemo(
@@ -41,6 +50,11 @@ export default function ProviderOnboardingScreen() {
     ),
     [catalogQuery.data?.capabilities, categoryId, subcategoryId],
   );
+  const serviceArea = { latitude: Number(latitude), longitude: Number(longitude), radiusKm: Number(serviceRadiusKm) };
+  const hasValidServiceArea = Number.isFinite(serviceArea.latitude) && serviceArea.latitude >= -90 && serviceArea.latitude <= 90 &&
+    Number.isFinite(serviceArea.longitude) && serviceArea.longitude >= -180 && serviceArea.longitude <= 180 &&
+    Number.isInteger(serviceArea.radiusKm) && serviceArea.radiusKm >= 1 && serviceArea.radiusKm <= 500;
+  const operatingModelVerified = operatingModelQuery.data?.reviewStatus === "verified";
 
   const selectCategory = (id: number) => {
     setCategoryId(id);
@@ -52,14 +66,25 @@ export default function ProviderOnboardingScreen() {
     setCapabilityId(null);
   };
   const submit = async () => {
-    if (!categoryId || !capabilityId || !jurisdictionCode || configureMutation.isPending) return;
+    if (!categoryId || !capabilityId || !jurisdictionCode || !hasValidServiceArea || !operatingModelVerified || configureMutation.isPending) return;
     try {
-      await configureMutation.mutateAsync({ categoryId, subcategoryId, capabilityId, jurisdictionCode });
+      await configureMutation.mutateAsync({ categoryId, subcategoryId, capabilityId, jurisdictionCode, serviceArea });
       await Promise.all([utils.provider.getOnboardingStatus.invalidate(), utils.provider.getDocuments.invalidate(), utils.provider.getDocumentRequirements.invalidate()]);
       Alert.alert(t("provider.onboarding.setupSavedTitle"), t("provider.onboarding.setupSavedBody"));
     } catch (error) {
       const message = error instanceof Error ? error.message : t("provider.onboarding.setupFailedBody");
       Alert.alert(t("provider.onboarding.setupFailedTitle"), message);
+    }
+  };
+
+  const submitOperatingModel = async () => {
+    if (!jurisdictionCode || submitOperatingModelMutation.isPending) return;
+    try {
+      await submitOperatingModelMutation.mutateAsync({ jurisdictionCode, operatingModel });
+      await Promise.all([operatingModelQuery.refetch(), lifecycleQuery.refetch()]);
+      Alert.alert("İşletme modeli gönderildi", "İnceleme tamamlanana kadar aktivasyon güvenli biçimde beklemede kalır.");
+    } catch (error) {
+      Alert.alert(t("provider.onboarding.setupFailedTitle"), error instanceof Error ? error.message : t("provider.onboarding.setupFailedBody"));
     }
   };
 
@@ -125,7 +150,20 @@ export default function ProviderOnboardingScreen() {
           <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "700", marginTop: 5 }}>{t("provider.onboarding.capabilityScope")}</Text>
           <ChoiceList items={capabilities.map((item) => ({ id: item.id, name: item.displayName }))} selectedId={capabilityId} onSelect={setCapabilityId} colors={colors} emptyLabel={t("provider.onboarding.noCapability")} />
         </>}
-        <Pressable accessibilityRole="button" accessibilityState={{ disabled: !categoryId || !capabilityId || !jurisdictionCode || configureMutation.isPending }} onPress={submit} style={({ pressed }) => ({ minHeight: 48, justifyContent: "center", alignItems: "center", borderRadius: 10, marginTop: 6, backgroundColor: "#FF7A1A", opacity: pressed || !categoryId || !capabilityId || !jurisdictionCode || configureMutation.isPending ? 0.55 : 1 })}>
+        <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "700", marginTop: 8 }}>İşletme modeli</Text>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 7 }}>
+          {[["self_employed", "Serbest çalışan"], ["sole_trader", "Şahıs işletmesi"], ["company_owner", "Şirket sahibi"], ["company_worker", "Şirket çalışanı"], ["employee", "Çalışan"]].map(([value, label]) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: operatingModel === value }} onPress={() => setOperatingModel(value as typeof operatingModel)} style={({ pressed }) => ({ minHeight: 38, justifyContent: "center", paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: operatingModel === value ? "#FF7A1A" : colors.border, backgroundColor: operatingModel === value ? "#FF7A1A18" : colors.background, opacity: pressed ? 0.7 : 1 })}><Text style={{ color: colors.foreground, fontSize: 12, fontWeight: "700" }}>{label}</Text></Pressable>)}
+        </View>
+        <Text style={{ color: operatingModelVerified ? colors.success : colors.muted, fontSize: 12 }}>{operatingModelVerified ? "İşletme modeli doğrulandı" : operatingModelQuery.data?.reviewStatus === "pending" ? "İşletme modeli incelemede" : "İşletme modeli henüz gönderilmedi"}</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled: !jurisdictionCode || submitOperatingModelMutation.isPending }} onPress={submitOperatingModel} style={({ pressed }) => ({ minHeight: 42, justifyContent: "center", alignItems: "center", borderRadius: 10, borderWidth: 1, borderColor: colors.primary, opacity: pressed || !jurisdictionCode || submitOperatingModelMutation.isPending ? 0.55 : 1 })}>
+          {submitOperatingModelMutation.isPending ? <ActivityIndicator color={colors.primary} /> : <Text style={{ color: colors.primary, fontSize: 13, fontWeight: "800" }}>İşletme modelini gönder</Text>}
+        </Pressable>
+        <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: "700", marginTop: 8 }}>Hizmet alanı</Text>
+        <TextInput value={latitude} onChangeText={setLatitude} keyboardType="numbers-and-punctuation" placeholder="Enlem (örn. 41.0082)" placeholderTextColor={colors.muted} accessibilityLabel="Hizmet alanı enlemi" style={{ minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: colors.border, color: colors.foreground, paddingHorizontal: 12 }} />
+        <TextInput value={longitude} onChangeText={setLongitude} keyboardType="numbers-and-punctuation" placeholder="Boylam (örn. 28.9784)" placeholderTextColor={colors.muted} accessibilityLabel="Hizmet alanı boylamı" style={{ minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: colors.border, color: colors.foreground, paddingHorizontal: 12 }} />
+        <TextInput value={serviceRadiusKm} onChangeText={setServiceRadiusKm} keyboardType="number-pad" placeholder="Hizmet yarıçapı (1–500 km)" placeholderTextColor={colors.muted} accessibilityLabel="Hizmet yarıçapı kilometre" style={{ minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: colors.border, color: colors.foreground, paddingHorizontal: 12 }} />
+        <Text style={{ color: hasValidServiceArea ? colors.success : colors.muted, fontSize: 12 }}>{hasValidServiceArea ? "Hizmet alanı kaydedilmeye hazır" : "Geçerli enlem, boylam ve 1–500 km yarıçap girin."}</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled: !categoryId || !capabilityId || !jurisdictionCode || !operatingModelVerified || !hasValidServiceArea || configureMutation.isPending }} onPress={submit} style={({ pressed }) => ({ minHeight: 48, justifyContent: "center", alignItems: "center", borderRadius: 10, marginTop: 6, backgroundColor: "#FF7A1A", opacity: pressed || !categoryId || !capabilityId || !jurisdictionCode || !operatingModelVerified || !hasValidServiceArea || configureMutation.isPending ? 0.55 : 1 })}>
           {configureMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>{t("provider.onboarding.saveScope")}</Text>}
         </Pressable>
       </View>

@@ -2143,6 +2143,11 @@ export const appRouter = router({
         subcategoryId: z.number().int().positive().nullable(),
         capabilityId: z.number().int().positive(),
         jurisdictionCode: z.string().trim().regex(/^[A-Za-z]{2}$/),
+        serviceArea: z.object({
+          latitude: z.number().finite().min(-90).max(90),
+          longitude: z.number().finite().min(-180).max(180),
+          radiusKm: z.number().int().min(1).max(500),
+        }),
       }))
       .mutation(async ({ ctx, input }) => {
         try {
