@@ -2034,7 +2034,8 @@ export const appRouter = router({
       }),
     uploadDocument: protectedProcedure
       .input(z.object({
-        type: providerDocumentTypeSchema,
+        requirementId: z.number().int().positive(),
+        credentialType: z.string().trim().min(1).max(160),
         fileName: z.string().trim().min(1).max(255).regex(/^[^\\/\u0000-\u001f]+$/, "Geçersiz dosya adı"),
         mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
         base64: z.string().min(4).max(14_000_000),
@@ -2043,7 +2044,10 @@ export const appRouter = router({
         const provider = await db.getProviderProfile(ctx.user.id);
         if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
         const requirements = await db.getProviderDocumentRequirements(ctx.user.id);
-        if (!requirements || !requirements.required.some((requirement) => requirement.type === input.type)) {
+        const requirement = requirements?.status === "RESOLVED"
+          ? requirements.requirements.find((candidate) => candidate.requirementId === input.requirementId && candidate.credentialType === input.credentialType)
+          : undefined;
+        if (!requirement || requirement.action !== "upload") {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Bu belge türü mevcut sunucu gereksinimlerinde tanımlı değil" });
         }
         const buffer = decodeStrictBase64(input.base64);
@@ -2055,20 +2059,27 @@ export const appRouter = router({
         }
         const extension = input.mimeType === "application/pdf" ? "pdf" : input.mimeType.split("/")[1];
         const uploaded = await storagePut(
-          `provider-documents/${provider.id}/${input.type}/${randomUUID()}.${extension}`,
+          `provider-documents/${provider.id}/${input.requirementId}/${randomUUID()}.${extension}`,
           buffer,
           input.mimeType,
         );
         const id = await db.createProviderDocument({
           providerId: provider.id,
           ownerUserId: ctx.user.id,
-          type: input.type,
+          requirementId: requirement.requirementId,
+          type: requirement.credentialType,
           storageKey: uploaded.key,
           fileUrl: uploaded.url,
           fileName: input.fileName,
           mimeType: input.mimeType,
           sizeBytes: buffer.length,
           sha256: createHash("sha256").update(buffer).digest("hex"),
+          credentialSubmission: {
+            jurisdictionId: requirement.jurisdictionId,
+            credentialType: requirement.credentialType,
+            sourceVersion: requirement.sourceVersion,
+            ruleVersion: requirement.ruleVersion,
+          },
         });
         const verificationStatus = await db.refreshProviderVerificationStatus(provider.id);
         return { id, status: "pending" as const, verificationStatus };

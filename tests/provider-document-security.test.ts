@@ -59,7 +59,7 @@ describe("provider document and voice media security", () => {
     await expect(caller.compliance.myCapabilities()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.provider.getInsurancePolicies()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.provider.getOperatingModel({ jurisdictionCode: "TR" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    await expect(caller.provider.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.provider.uploadDocument({ requirementId: 501, credentialType: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.messages.sendVoice({ requestId: 9, receiverId: 10, mimeType: "audio/webm", durationMs: 500, base64: "AAAA" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(storagePut).not.toHaveBeenCalled();
   });
@@ -150,16 +150,31 @@ describe("provider document and voice media security", () => {
   it("derives dynamic document requirements solely from the authenticated provider session", async () => {
     vi.mocked(providerDb.getProviderDocumentRequirements).mockResolvedValue({
       providerId: 905,
-      policyVersion: "tr-provider-documents-2026-08",
-      category: { slug: "courier", name: "Kurye" },
-      required: [{ type: "identity", title: "Kimlik belgesi", description: "T.C. kimlik kartı veya pasaport" }],
+      status: "RESOLVED",
+      requirements: [{
+        requirementId: 501,
+        credentialType: "identity",
+        capabilityId: 401,
+        jurisdictionId: 34,
+        requirementState: "required",
+        minimumAssurance: "B",
+        requiresHumanReview: true,
+        ruleVersion: "TR-GOLD-2026-08-13-v1.0",
+        sourceVersion: "TR-GOLD-2026-08-13-v1.0",
+        countryCode: "TR",
+        capabilityName: "courier_delivery",
+        providerType: "self_employed",
+        currentDocumentStatus: "missing",
+        currentCredentialStatus: "missing",
+        action: "upload",
+      }],
     } as Awaited<ReturnType<typeof providerDb.getProviderDocumentRequirements>>);
     const caller = appRouter.createCaller(createContext(94));
 
     await expect(caller.provider.getDocumentRequirements()).resolves.toMatchObject({
       providerId: 905,
-      category: { slug: "courier" },
-      required: [expect.objectContaining({ type: "identity" })],
+      status: "RESOLVED",
+      requirements: [expect.objectContaining({ requirementId: 501, credentialType: "identity", action: "upload" })],
     });
     expect(providerDb.getProviderDocumentRequirements).toHaveBeenCalledWith(94);
   });
@@ -180,7 +195,7 @@ describe("provider document and voice media security", () => {
     vi.mocked(providerDb.getProviderProfile).mockResolvedValue(null);
     const caller = appRouter.createCaller(createContext(82));
 
-    await expect(caller.provider.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" }))
+    await expect(caller.provider.uploadDocument({ requirementId: 501, credentialType: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "JVBERi0=" }))
       .rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(storagePut).not.toHaveBeenCalled();
   });
@@ -189,7 +204,7 @@ describe("provider document and voice media security", () => {
     vi.mocked(providerDb.getProviderProfile).mockResolvedValue({ id: 902 } as Awaited<ReturnType<typeof providerDb.getProviderProfile>>);
     const caller = appRouter.createCaller(createContext(83));
 
-    await expect(caller.provider.uploadDocument({ type: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "AAAA" }))
+    await expect(caller.provider.uploadDocument({ requirementId: 501, credentialType: "identity", fileName: "kimlik.pdf", mimeType: "application/pdf", base64: "AAAA" }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(caller.messages.sendVoice({ requestId: 9, receiverId: 10, mimeType: "audio/webm", durationMs: 500, base64: "AAAA" }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });

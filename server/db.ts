@@ -892,6 +892,7 @@ export async function markAuthChallengeUsed(id: number) {
 export async function createProviderDocument(data: {
   providerId: number;
   ownerUserId: number;
+  requirementId?: number | null;
   type: string;
   storageKey: string;
   fileUrl: string;
@@ -899,16 +900,38 @@ export async function createProviderDocument(data: {
   mimeType: string;
   sizeBytes: number;
   sha256: string;
+  credentialSubmission?: {
+    jurisdictionId: number;
+    credentialType: string;
+    sourceVersion: string;
+    ruleVersion: string;
+  };
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.transaction(async (tx) => {
     const result = await tx
       .insert(providerDocuments)
-      .values({ ...data, status: "pending", rejectionReason: null, reviewedByUserId: null, reviewedAt: null })
+      .values({
+        providerId: data.providerId,
+        ownerUserId: data.ownerUserId,
+        requirementId: data.requirementId ?? null,
+        type: data.type,
+        storageKey: data.storageKey,
+        fileUrl: data.fileUrl,
+        fileName: data.fileName,
+        mimeType: data.mimeType,
+        sizeBytes: data.sizeBytes,
+        sha256: data.sha256,
+        status: "pending",
+        rejectionReason: null,
+        reviewedByUserId: null,
+        reviewedAt: null,
+      })
       .onDuplicateKeyUpdate({
         set: {
           ownerUserId: data.ownerUserId,
+          requirementId: data.requirementId ?? null,
           storageKey: data.storageKey,
           fileUrl: data.fileUrl,
           fileName: data.fileName,
@@ -925,18 +948,26 @@ export async function createProviderDocument(data: {
           reviewedAt: null,
         },
       });
-    const rows = await tx
-      .select({ id: providerDocuments.id })
-      .from(providerDocuments)
-      .where(
-        and(
-          eq(providerDocuments.providerId, data.providerId),
-          eq(providerDocuments.type, data.type),
-        ),
-      )
-      .limit(1);
+    const rows = await tx.select({ id: providerDocuments.id }).from(providerDocuments).where(
+      data.requirementId == null
+        ? and(eq(providerDocuments.providerId, data.providerId), eq(providerDocuments.type, data.type))
+        : and(eq(providerDocuments.providerId, data.providerId), eq(providerDocuments.requirementId, data.requirementId)),
+    ).limit(1);
     const id = rows[0]?.id ?? Number(result[0].insertId);
     if (!Number.isInteger(id) || id <= 0) throw new Error("PROVIDER_DOCUMENT_CREATE_FAILED");
+    if (data.credentialSubmission) {
+      await tx.insert(providerCredentials).values({
+        providerId: data.providerId,
+        jurisdictionId: data.credentialSubmission.jurisdictionId,
+        documentId: id,
+        credentialType: data.credentialSubmission.credentialType,
+        assuranceLevel: "F",
+        status: "submitted",
+        revocationStatus: "unknown",
+        sourceVersion: data.credentialSubmission.sourceVersion,
+        ruleVersion: data.credentialSubmission.ruleVersion,
+      });
+    }
     await tx.insert(mediaScannerJobs).values(buildMediaScannerJob({
       mediaClass: "provider_document",
       mediaId: String(id),
@@ -973,16 +1004,21 @@ export async function updateProviderDocumentStatus(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db
-    .update(providerDocuments)
-    .set({
+  await db.transaction(async (tx) => {
+    const result = await tx.update(providerDocuments).set({
       status: data.status,
       rejectionReason: data.status === "rejected" ? data.reviewNote ?? "İnceleme reddedildi" : null,
       reviewedByUserId: data.reviewedByUserId,
       reviewedAt: new Date(),
-    })
-    .where(eq(providerDocuments.id, data.id));
-  if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("PROVIDER_DOCUMENT_NOT_FOUND");
+    }).where(eq(providerDocuments.id, data.id));
+    if ((result[0]?.affectedRows ?? 0) !== 1) throw new Error("PROVIDER_DOCUMENT_NOT_FOUND");
+    await tx.update(providerCredentials).set({
+      status: data.status === "approved" ? "verified" : "rejected",
+      verifiedAt: data.status === "approved" ? new Date() : null,
+      reviewedByUserId: data.reviewedByUserId,
+      reviewNote: data.reviewNote ?? null,
+    }).where(eq(providerCredentials.documentId, data.id));
+  });
 }
 
 /**
@@ -5340,6 +5376,24 @@ type ProviderCredentialScope = {
   }>;
 };
 
+export type ProviderAuthoritativeRequirement = {
+  requirementId: number;
+  credentialType: string;
+  requirementState: "required" | "conditional" | "not_required" | "prohibited" | "unknown";
+  minimumAssurance: CredentialAssurance;
+  requiresHumanReview: boolean;
+  countryCode: string;
+  capabilityId: number;
+  capabilityName: string;
+  jurisdictionId: number;
+  providerType: ProviderRequirementType;
+  sourceVersion: string;
+  ruleVersion: string;
+  currentDocumentStatus: "missing" | "pending" | "approved" | "rejected";
+  currentCredentialStatus: "missing" | "submitted" | "verified" | "rejected" | "expired" | "suspended" | "revoked";
+  action: "upload" | "not_required" | "review_required" | "blocked";
+};
+
 /**
  * Resolves only exact, independently reviewed provider scopes.  A category
  * rule is never used as a fallback for a capability: no active source row for
@@ -5432,6 +5486,56 @@ async function resolveProviderCredentialRequirementsForProvider(
   return { status: "RESOLVED" as const, scopes: scopes as ProviderCredentialScope[] };
 }
 
+async function resolveProviderAuthoritativeRequirementsForProvider(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  provider: { id: number; categoryId: number | null },
+) {
+  const resolution = await resolveProviderCredentialRequirementsForProvider(db, provider);
+  if (resolution.status !== "RESOLVED") {
+    return { status: resolution.status, requirements: [] as ProviderAuthoritativeRequirement[] } as const;
+  }
+  const [documents, credentials] = await Promise.all([
+    db.select({ id: providerDocuments.id, requirementId: providerDocuments.requirementId, type: providerDocuments.type, status: providerDocuments.status })
+      .from(providerDocuments).where(eq(providerDocuments.providerId, provider.id)),
+    db.select({ documentId: providerCredentials.documentId, jurisdictionId: providerCredentials.jurisdictionId, credentialType: providerCredentials.credentialType, status: providerCredentials.status })
+      .from(providerCredentials).where(eq(providerCredentials.providerId, provider.id)),
+  ]);
+
+  return {
+    status: "RESOLVED" as const,
+    requirements: resolution.scopes.flatMap((scope) => scope.requirements.map((requirement) => {
+      const document = documents.find((candidate) => candidate.requirementId === requirement.requirementId && candidate.type === requirement.credentialType);
+      const credential = document
+        ? credentials.find((candidate) => candidate.documentId === document.id && candidate.jurisdictionId === scope.jurisdictionId && candidate.credentialType === requirement.credentialType)
+        : undefined;
+      const action = requirement.requirementState === "required"
+        ? "upload" as const
+        : requirement.requirementState === "not_required"
+          ? "not_required" as const
+          : requirement.requirementState === "conditional"
+            ? "review_required" as const
+            : "blocked" as const;
+      return {
+        requirementId: requirement.requirementId,
+        credentialType: requirement.credentialType,
+        requirementState: requirement.requirementState,
+        minimumAssurance: requirement.minimumAssurance,
+        requiresHumanReview: requirement.requiresHumanReview,
+        countryCode: scope.countryCode,
+        capabilityId: scope.capabilityId,
+        capabilityName: scope.capabilityName,
+        jurisdictionId: scope.jurisdictionId,
+        providerType: scope.providerType,
+        sourceVersion: requirement.sourceVersion,
+        ruleVersion: requirement.ruleVersion,
+        currentDocumentStatus: document?.status ?? "missing",
+        currentCredentialStatus: credential?.status ?? "missing",
+        action,
+      } satisfies ProviderAuthoritativeRequirement;
+    })),
+  };
+}
+
 export async function getProviderCredentialRequirements(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -5439,7 +5543,7 @@ export async function getProviderCredentialRequirements(userId: number) {
     .from(providers).where(eq(providers.userId, userId)).limit(1);
   const provider = rows[0];
   if (!provider) return null;
-  return resolveProviderCredentialRequirementsForProvider(db, provider);
+  return resolveProviderAuthoritativeRequirementsForProvider(db, provider);
 }
 
 /** Read-only lifecycle projection. It deliberately treats every missing or
@@ -5488,11 +5592,12 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     capability.capabilityStatus === "active" && capability.categoryId === provider.categoryId &&
     (capability.decision === "VERIFIED" || capability.decision === "VERIFIED_LIMITED_SCOPE"),
   );
-  const requirements = await getProviderRequirementsForCatalog(db, { categoryId: provider.categoryId ?? null });
-  const documents = await getProviderDocuments(provider.id);
-  const documentsApproved = requirements.required.every((requirement) =>
-    documents.some((document) => document.type === requirement.type && document.status === "approved"),
-  );
+  const authoritativeRequirements = await resolveProviderAuthoritativeRequirementsForProvider(db, provider);
+  const documentsApproved = authoritativeRequirements.status === "RESOLVED" &&
+    authoritativeRequirements.requirements.every((requirement) =>
+      requirement.action === "not_required" ||
+      (requirement.action === "upload" && requirement.currentDocumentStatus === "approved" && requirement.currentCredentialStatus === "verified"),
+    );
   const credentialRows = await db.select({
     jurisdictionId: providerCredentials.jurisdictionId,
     credentialType: providerCredentials.credentialType,
@@ -5588,14 +5693,13 @@ export async function getProviderDocumentRequirements(userId: number) {
   const provider = rows[0];
   if (!provider) return null;
 
-  const [documentRequirements, credentialRequirements] = await Promise.all([
-    getProviderRequirementsForCatalog(db, { categoryId: provider.categoryId ?? null }),
-    resolveProviderCredentialRequirementsForProvider(db, { id: provider.providerId, categoryId: provider.categoryId }),
-  ]);
+  const credentialRequirements = await resolveProviderAuthoritativeRequirementsForProvider(
+    db,
+    { id: provider.providerId, categoryId: provider.categoryId },
+  );
   return {
     providerId: provider.providerId,
-    ...documentRequirements,
-    credentialRequirements,
+    ...credentialRequirements,
   };
 }
 

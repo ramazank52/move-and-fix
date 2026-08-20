@@ -738,6 +738,9 @@ export const providerDocuments = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     providerId: int("providerId").notNull(),
     ownerUserId: int("ownerUserId").notNull(),
+    // Legacy records may remain unbound; new submissions must carry an exact
+    // source-derived credential requirement identity.
+    requirementId: int("requirementId"),
     // Source-derived credential identifiers are versioned by the approved
     // compliance pack. Router-side allow-listing prevents arbitrary values.
     type: varchar("type", { length: 160 }).notNull(),
@@ -770,9 +773,10 @@ export const providerDocuments = mysqlTable(
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   (table) => [
-    uniqueIndex("provider_documents_provider_type_unique").on(table.providerId, table.type),
+    uniqueIndex("provider_documents_provider_requirement_unique").on(table.providerId, table.requirementId),
     index("provider_documents_status_idx").on(table.status, table.createdAt),
     index("provider_documents_owner_idx").on(table.ownerUserId),
+    index("provider_documents_requirement_idx").on(table.requirementId, table.status),
     index("provider_documents_retention_idx").on(table.retentionDueAt, table.contentPurgedAt, table.purgeStatus),
   ],
 );

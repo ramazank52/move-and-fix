@@ -526,6 +526,13 @@
       "when": 1789070400000,
       "tag": "0079_p17_provider_service_area",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1789074000000,
+      "tag": "0080_p17_authoritative_provider_requirement_binding",
+      "breakpoints": true
     }
   ]
 }
