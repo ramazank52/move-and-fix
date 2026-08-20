@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "p17-sca-exceptions-v1",
+  "exceptions": [
+    {
+      "advisoryId": "GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "installedVersion": "1.2.1",
+      "dependencyPath": "metro@0.83.7 > image-size@1.2.1",
+      "decision": "P16_EXPO_METRO_SCA_DECISION",
+      "scope": "Expo/Metro build toolchain only; not an application runtime dependency",
+      "status": "EXTERNAL_UPSTREAM_BLOCKER_RECORDED",
+      "reviewRequiredBefore": "Expo SDK/Metro upgrade or dependency-path change"
+    },
+    {
+      "advisoryId": "GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "installedVersion": "1.2.1",
+      "dependencyPath": "metro@0.83.7 > image-size@1.2.1",
+      "decision": "P16_EXPO_METRO_SCA_DECISION",
+      "scope": "Expo/Metro build toolchain only; not an application runtime dependency",
+      "status": "EXTERNAL_UPSTREAM_BLOCKER_RECORDED",
+      "reviewRequiredBefore": "Expo SDK/Metro upgrade or dependency-path change"
+    }
+  ]
+}

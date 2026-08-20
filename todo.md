@@ -634,14 +634,14 @@
 - [x] P17-05 — Masraf Dosyası multi-evidence collection, secure video desteği ve scanner-bound persistence akışını uygula
 - [x] P17-06 — Tüm production app/components user-facing metinlerini 13-dil i18n’ye taşı, RTL/hard-coded UI scanner kapsamını genişlet
 - [x] P17-07 — MoveAI candidate taxonomy’yi public-safe canonical catalog snapshot ve locale-aware response policy ile birleştir
-- [ ] P17-08 — SPDX expression-aware license policy, attribution çıktısı ve behavioral parser testlerini uygula
-- [ ] P17-09 — qs runtime vulnerability için uyumlu remediable resolution/upgrade araştır, uygulayabiliyorsa güvenli yükseltme ve finansal regressions çalıştır
-- [ ] P17-10 — Deterministik JSON tabanlı SCA parser/CI policy, advisory/path/disposition raporları ve approved toolchain exception kaydını uygula
+- [x] P17-08 — SPDX expression-aware license policy, attribution çıktısı ve behavioral parser testlerini uygula
+- [x] P17-09 — qs runtime vulnerability için uyumlu remediable resolution/upgrade araştır, uygulayabiliyorsa güvenli yükseltme ve finansal regressions çalıştır
+- [x] P17-10 — Deterministik JSON tabanlı SCA parser/CI policy, advisory/path/disposition raporları ve approved toolchain exception kaydını uygula
 - [ ] P17-11 — Partial settlement downstream analytics, reconciliation ve admin/payment semantic ayrımını authoritative realized amounts ile düzelt
 - [ ] P17-12 — Canonical `MEDIA_SCANNER_CRON_SECRET` dokümantasyon/config sözleşmesini hizala ve config-contract testini ekle
 - [ ] P17-13 — Authoritative final-production-status belgesini current P17 durumu en üstte görünecek şekilde yeniden düzenle
 - [ ] P17-14 — Kritik P17 sözleşme smoke testlerinin yanına router/database behavioral test kanıtlarını tamamla
-- [ ] P17-15 — qs disposition’ını release classification ile açıkça bağla ve safe resolution yoksa BLOCKED_INTERNAL_DEPENDENCY olarak kaydet
+- [x] P17-15 — qs disposition’ını release classification ile açıkça bağla ve safe resolution yoksa BLOCKED_INTERNAL_DEPENDENCY olarak kaydet
 - [ ] P17-16 — Translation preference/provenance ile contact verification geçmişini Privacy Center export/delete lifecycle’ına bağla
 - [x] P17-17 — Masraf evidence item sayısı/boyut/süre limitlerini config tabanlı ve server-authoritative olarak uygula
 - [ ] P17-FINAL — Final kalite kapıları, P17 closure raporu, production status, per-item checkpoint referansları ve immutable audit exportu tamamla

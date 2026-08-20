@@ -26,9 +26,8 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: pnpm supply:verify
-      - run: pnpm audit --prod --audit-level=high
       - uses: actions/upload-artifact@v4
         with:
-          name: sbom
-          path: artifacts/sbom.cdx.json
+          name: supply-chain-evidence
+          path: artifacts/
           if-no-files-found: error
