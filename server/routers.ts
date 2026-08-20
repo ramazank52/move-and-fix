@@ -43,6 +43,8 @@ import { translateMessageOnDemand } from "./ai/OnDemandMessageTranslation";
 import { evaluateProfessionalAiBoundary } from "./ai/ProfessionalAiBoundary";
 import { evaluateMoveAiMediaConsent } from "./ai/MoveAiMediaPolicy";
 import { MEDIA_UPLOAD_LIMIT_BYTES, isWithinDecodedByteLimit } from "./security/MediaUploadLimits";
+import { EXPENSE_EVIDENCE_LIMITS, isExpenseEvidenceWithinByteLimit } from "../shared/expenseEvidenceLimits";
+import { readIsoBaseMediaDurationMs } from "./security/MediaDurationPolicy";
 import { listPublicCountryLaunchOptions, resolveCountryPaymentContext } from "./compliance/CountryComplianceRepository";
 
 // ── Composition Root: Bağımlılık Enjeksiyonu ──
@@ -1161,20 +1163,29 @@ export const appRouter = router({
         }
 
         const existingMedia = await db.getServiceRequestMedia(input.requestId);
-        if (existingMedia.length >= 8) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Bir talebe en fazla 8 medya eklenebilir" });
+        if (existingMedia.length >= EXPENSE_EVIDENCE_LIMITS.existingRequestMediaMaxItems) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: input.purpose === "expense" ? "EXPENSE_EVIDENCE_LIMIT_EXCEEDED" : "Bir talebe en fazla 8 medya eklenebilir",
+          });
         }
 
         const policy = allowedRequestMedia[input.mimeType];
         const buffer = decodeStrictBase64(input.base64);
-        if (!isWithinDecodedByteLimit(buffer.length, policy.maxBytes)) {
+        const expenseByteLimit = policy.kind === "video" ? EXPENSE_EVIDENCE_LIMITS.videoMaxBytes : EXPENSE_EVIDENCE_LIMITS.imageMaxBytes;
+        const byteLimit = input.purpose === "expense" ? Math.min(policy.maxBytes, expenseByteLimit) : policy.maxBytes;
+        if (!isWithinDecodedByteLimit(buffer.length, byteLimit) || (input.purpose === "expense" && !isExpenseEvidenceWithinByteLimit(policy.kind, buffer.length))) {
           throw new TRPCError({
             code: "PAYLOAD_TOO_LARGE",
-            message: policy.kind === "image" ? "Görsel en fazla 8 MB olabilir" : "Video en fazla 25 MB olabilir",
+            message: input.purpose === "expense" ? "EXPENSE_EVIDENCE_SIZE_EXCEEDED" : policy.kind === "image" ? "Görsel en fazla 8 MB olabilir" : "Video en fazla 25 MB olabilir",
           });
         }
         if (!hasExpectedMediaSignature(buffer, input.mimeType)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Dosya içeriği medya türüyle uyuşmuyor" });
+        }
+        const durationMs = input.purpose === "expense" && policy.kind === "video" ? readIsoBaseMediaDurationMs(buffer) : undefined;
+        if (input.purpose === "expense" && policy.kind === "video" && (durationMs === null || durationMs === undefined || durationMs > EXPENSE_EVIDENCE_LIMITS.maxVideoDurationMs)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "EXPENSE_EVIDENCE_VIDEO_DURATION_EXCEEDED" });
         }
 
         const sha256 = createHash("sha256").update(buffer).digest("hex");
@@ -1191,6 +1202,7 @@ export const appRouter = router({
           originalName: input.originalName,
           mimeType: input.mimeType,
           sizeBytes: buffer.length,
+          durationMs: durationMs ?? undefined,
           sha256,
         });
         return {
@@ -1199,6 +1211,7 @@ export const appRouter = router({
           kind: policy.kind,
           mimeType: input.mimeType,
           sizeBytes: buffer.length,
+          durationMs,
           sha256,
           quarantineStatus: "pending_scan" as const,
         };
@@ -1389,13 +1402,13 @@ export const appRouter = router({
         model: z.string().trim().max(120).optional(),
         quantity: z.number().int().positive().max(100_000).optional(),
         locationUrl: z.string().url().max(500).optional(),
-        mediaIds: z.array(z.number().int().positive()).max(8).superRefine((items, ctx) => {
+        mediaIds: z.array(z.number().int().positive()).max(EXPENSE_EVIDENCE_LIMITS.maxItemsPerExpense).superRefine((items, ctx) => {
           if (new Set(items).size !== items.length) ctx.addIssue({ code: "custom", message: "Tekrarlayan medya kaydı gönderilemez" });
         }).optional(),
         media: z.array(z.object({
           mediaId: z.number().int().positive(),
           mediaRole: z.enum(["receipt", "invoice", "product", "material", "video", "other"]),
-        })).max(8).superRefine((items, ctx) => {
+        })).max(EXPENSE_EVIDENCE_LIMITS.maxItemsPerExpense).superRefine((items, ctx) => {
           if (new Set(items.map((item) => item.mediaId)).size !== items.length) ctx.addIssue({ code: "custom", message: "Tekrarlayan medya kaydı gönderilemez" });
         }).optional(),
       }))

@@ -27,7 +27,10 @@ describe("P16 Masraf Dosyası semantic evidence ve sohbet geçişi", () => {
     expect(expenseScreen).toContain("model");
     expect(expenseScreen).toContain("quantity");
     expect(expenseScreen).toContain("locationUrl");
-    expect(expenseScreen).toContain("mediaRole: evidenceRole");
+    expect(expenseScreen).toContain("evidenceItems");
+    expect(expenseScreen).toContain("media.push({ mediaId: uploaded.id, mediaRole: item.mediaRole })");
+    expect(expenseScreen).toContain("EXPENSE_EVIDENCE_LIMITS");
+    expect(expenseScreen).toContain("pickEvidence");
     expect(chatScreen).toContain("hasValidConversationContext && requestId");
     expect(chatScreen).toContain("/expenses/${requestId}");
     expect(i18n).toContain('"chat.expenseFile"');

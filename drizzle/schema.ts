@@ -1182,6 +1182,8 @@ export const serviceRequestMedia = mysqlTable(
     originalName: varchar("originalName", { length: 255 }).notNull(),
     mimeType: varchar("mimeType", { length: 100 }).notNull(),
     sizeBytes: int("sizeBytes").notNull(),
+    // Server-extracted duration for MP4/QuickTime expense evidence; null otherwise.
+    durationMs: int("durationMs"),
     sha256: varchar("sha256", { length: 64 }).notNull(),
     quarantineStatus: mysqlEnum("quarantineStatus", ["pending_scan", "scanning", "clean", "blocked", "scan_failed", "expired"])
       .default("pending_scan")

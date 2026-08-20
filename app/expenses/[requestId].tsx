@@ -10,6 +10,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useTranslation } from "@/lib/i18n";
 import { trpc } from "@/lib/trpc";
 import { readUriAsBase64 } from "@/lib/file-to-base64";
+import { EXPENSE_EVIDENCE_LIMITS, type ExpenseEvidenceRole } from "@/shared/expenseEvidenceLimits";
 
 const CATEGORIES = [
   ["fuel", "expense.category.fuel"], ["toll", "expense.category.toll"], ["parking", "expense.category.parking"], ["material", "expense.category.material"],
@@ -18,10 +19,10 @@ const CATEGORIES = [
 ] as const;
 
 type ExpenseCategory = (typeof CATEGORIES)[number][0];
-type ExpenseMediaMime = "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif";
-type ExpenseMediaRole = "receipt" | "invoice" | "product" | "material" | "video" | "other";
-const ALLOWED_EXPENSE_MIME_TYPES = new Set<ExpenseMediaMime>(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
-const EVIDENCE_ROLES: readonly ExpenseMediaRole[] = ["receipt", "invoice", "product", "material", "other"];
+type ExpenseMediaMime = "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif" | "video/mp4" | "video/quicktime";
+const ALLOWED_EXPENSE_MIME_TYPES = new Set<ExpenseMediaMime>(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime"]);
+const EVIDENCE_ROLES: readonly ExpenseEvidenceRole[] = ["receipt", "invoice", "product", "material", "video", "other"];
+type LocalExpenseEvidence = { clientId: string; uri: string; originalName: string; mimeType: ExpenseMediaMime; mediaRole: ExpenseEvidenceRole; kind: "image" | "video" };
 
 export default function JobExpensesScreen() {
   const router = useRouter();
@@ -41,8 +42,8 @@ export default function JobExpensesScreen() {
   const [model, setModel] = useState("");
   const [quantity, setQuantity] = useState("");
   const [locationUrl, setLocationUrl] = useState("");
-  const [evidenceRole, setEvidenceRole] = useState<ExpenseMediaRole>("receipt");
-  const [receipt, setReceipt] = useState<{ uri: string; originalName: string; mimeType: ExpenseMediaMime } | null>(null);
+  const [evidenceRole, setEvidenceRole] = useState<ExpenseEvidenceRole>("receipt");
+  const [evidenceItems, setEvidenceItems] = useState<LocalExpenseEvidence[]>([]);
   const [expanded, setExpanded] = useState(false);
 
   const expenses = trpc.agreements.expenses.useQuery({ requestId }, { enabled: Number.isInteger(requestId) && requestId > 0 });
@@ -51,7 +52,7 @@ export default function JobExpensesScreen() {
   const createExpense = trpc.agreements.createExpense.useMutation({
     onSuccess: async () => {
       await utils.agreements.expenses.invalidate({ requestId });
-      setAmount(""); setDescription(""); setVendorName(""); setBrand(""); setModel(""); setQuantity(""); setLocationUrl(""); setEvidenceRole("receipt"); setReceipt(null); setExpanded(false);
+      setAmount(""); setDescription(""); setVendorName(""); setBrand(""); setModel(""); setQuantity(""); setLocationUrl(""); setEvidenceRole("receipt"); setEvidenceItems([]); setExpanded(false);
       Alert.alert(t("expense.alert.savedTitle"), t("expense.alert.savedBody"));
     },
   });
@@ -95,21 +96,68 @@ export default function JobExpensesScreen() {
     );
   };
 
-  const pickReceipt = async () => {
+  const pickEvidence = async () => {
+    const isVideo = evidenceRole === "video";
+    const remaining = Math.min(
+      EXPENSE_EVIDENCE_LIMITS.maxItemsPerExpense,
+      EXPENSE_EVIDENCE_LIMITS.existingRequestMediaMaxItems,
+    ) - evidenceItems.length;
+    if (remaining <= 0) {
+      Alert.alert(t("expense.alert.evidenceLimitTitle"), t("expense.alert.evidenceLimitBody"));
+      return;
+    }
+    if (!isVideo && evidenceItems.filter((item) => item.kind === "image" && item.mediaRole === evidenceRole).length >= EXPENSE_EVIDENCE_LIMITS.maxImagesPerRole) {
+      Alert.alert(t("expense.alert.evidenceLimitTitle"), t("expense.alert.roleLimitBody", { count: EXPENSE_EVIDENCE_LIMITS.maxImagesPerRole }));
+      return;
+    }
+    if (isVideo && evidenceItems.filter((item) => item.kind === "video").length >= EXPENSE_EVIDENCE_LIMITS.maxVideosPerExpense) {
+      Alert.alert(t("expense.alert.evidenceLimitTitle"), t("expense.alert.videoLimitBody", { count: EXPENSE_EVIDENCE_LIMITS.maxVideosPerExpense }));
+      return;
+    }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert(t("expense.alert.galleryPermissionTitle"), t("expense.alert.galleryPermissionBody"));
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85 });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: [isVideo ? "videos" : "images"],
+      allowsMultipleSelection: !isVideo,
+      selectionLimit: isVideo ? 1 : Math.min(remaining, EXPENSE_EVIDENCE_LIMITS.maxImagesPerRole),
+      quality: isVideo ? undefined : 0.85,
+      videoMaxDuration: 60,
+    });
     if (result.canceled) return;
-    const asset = result.assets[0];
-    const mimeType = asset.mimeType ?? "image/jpeg";
-    if (!ALLOWED_EXPENSE_MIME_TYPES.has(mimeType as ExpenseMediaMime) || (asset.fileSize != null && asset.fileSize > 10 * 1024 * 1024)) {
-      Alert.alert(t("expense.alert.receiptRejectedTitle"), t("expense.alert.receiptRejectedBody"));
+    const selected = result.assets.map((asset) => {
+      const kind = asset.type === "video" ? "video" as const : "image" as const;
+      const mimeType = asset.mimeType ?? (kind === "video" ? "video/mp4" : "image/jpeg");
+      return { asset, kind, mimeType };
+    });
+    const invalid = selected.some(({ asset, kind, mimeType }) =>
+      !ALLOWED_EXPENSE_MIME_TYPES.has(mimeType as ExpenseMediaMime)
+      || (kind === "video" && (asset.duration == null || asset.duration > EXPENSE_EVIDENCE_LIMITS.maxVideoDurationMs))
+      || (asset.fileSize != null && asset.fileSize > (kind === "video" ? EXPENSE_EVIDENCE_LIMITS.videoMaxBytes : EXPENSE_EVIDENCE_LIMITS.imageMaxBytes)),
+    );
+    if (invalid) {
+      Alert.alert(t("expense.alert.evidenceRejectedTitle"), t(isVideo ? "expense.alert.videoRejectedBody" : "expense.alert.imageRejectedBody"));
       return;
     }
-    setReceipt({ uri: asset.uri, mimeType: mimeType as ExpenseMediaMime, originalName: asset.fileName ?? `masraf-${Date.now()}.jpg` });
+    const imageCountForRole = evidenceItems.filter((item) => item.kind === "image" && item.mediaRole === evidenceRole).length;
+    const totalImageCount = evidenceItems.filter((item) => item.kind === "image").length;
+    if (!isVideo && (imageCountForRole + selected.length > EXPENSE_EVIDENCE_LIMITS.maxImagesPerRole || totalImageCount + selected.length > EXPENSE_EVIDENCE_LIMITS.maxImagesPerExpense)) {
+      Alert.alert(t("expense.alert.evidenceLimitTitle"), t("expense.alert.evidenceLimitBody"));
+      return;
+    }
+    setEvidenceItems((current) => [
+      ...current,
+      ...selected.map(({ asset, kind, mimeType }, index) => ({
+        clientId: `${Date.now()}-${index}-${asset.uri}`,
+        uri: asset.uri,
+        kind,
+        mimeType: mimeType as ExpenseMediaMime,
+        mediaRole: evidenceRole,
+        originalName: asset.fileName ?? `masraf-${Date.now()}-${index}.${kind === "video" ? "mp4" : "jpg"}`,
+      })),
+    ]);
   };
 
   const saveExpense = async () => {
@@ -133,16 +181,16 @@ export default function JobExpensesScreen() {
       return;
     }
     try {
-      const mediaIds: number[] = [];
-      if (receipt) {
+      const media: { mediaId: number; mediaRole: ExpenseEvidenceRole }[] = [];
+      for (const item of evidenceItems) {
         const uploaded = await uploadMedia.mutateAsync({
           requestId,
-          originalName: receipt.originalName,
-          mimeType: receipt.mimeType,
-          base64: await readUriAsBase64(receipt.uri),
+          originalName: item.originalName,
+          mimeType: item.mimeType,
+          base64: await readUriAsBase64(item.uri),
           purpose: "expense",
         });
-        mediaIds.push(uploaded.id);
+        media.push({ mediaId: uploaded.id, mediaRole: item.mediaRole });
       }
       await createExpense.mutateAsync({
         requestId,
@@ -155,7 +203,7 @@ export default function JobExpensesScreen() {
         model: model.trim() || undefined,
         quantity: normalizedQuantity,
         locationUrl: normalizedLocationUrl,
-        media: mediaIds.map((mediaId) => ({ mediaId, mediaRole: evidenceRole })),
+        media,
       });
     } catch (error) {
       Alert.alert(t("expense.alert.saveFailedTitle"), error instanceof Error ? error.message : t("expense.alert.safeFailure"));
@@ -205,7 +253,9 @@ export default function JobExpensesScreen() {
               <View style={{ marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                 {EVIDENCE_ROLES.map((role) => <Pressable key={role} accessibilityRole="radio" accessibilityLabel={t(`expense.evidenceRole.${role}`)} accessibilityState={{ selected: evidenceRole === role }} onPress={() => setEvidenceRole(role)} style={({ pressed }) => ({ borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: evidenceRole === role ? colors.primary : colors.background, opacity: pressed ? 0.7 : 1 })}><Text style={{ color: evidenceRole === role ? "#fff" : colors.foreground, fontSize: 12, fontWeight: "700" }}>{t(`expense.evidenceRole.${role}`)}</Text></Pressable>)}
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel={receipt ? t("expense.receiptSelectedAccessibility") : t("expense.receiptAddAccessibility")} accessibilityHint={t("expense.receiptHint")} onPress={pickReceipt} style={({ pressed }) => ({ marginTop: 12, minHeight: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary, opacity: pressed ? 0.7 : 1 })}><Text style={{ color: colors.primary, fontWeight: "800" }}>{receipt ? t("expense.receiptSelected") : t("expense.receiptAdd")}</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={t("expense.evidenceAddAccessibility")} accessibilityHint={t("expense.evidenceAddHint")} onPress={pickEvidence} style={({ pressed }) => ({ marginTop: 12, minHeight: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary, opacity: pressed ? 0.7 : 1 })}><Text style={{ color: colors.primary, fontWeight: "800" }}>{t("expense.evidenceAdd")}</Text></Pressable>
+              {evidenceItems.length ? <View style={{ marginTop: 10, gap: 7 }}>{evidenceItems.map((item) => <View key={item.clientId} style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: colors.background }}><Text numberOfLines={1} style={{ flex: 1, color: colors.foreground, fontSize: 12, textAlign: isRTL ? "right" : "left" }}>{t(`expense.evidenceRole.${item.mediaRole}`)} · {item.originalName}</Text><Pressable accessibilityRole="button" accessibilityLabel={t("expense.evidenceRemoveAccessibility", { name: item.originalName })} onPress={() => setEvidenceItems((current) => current.filter((candidate) => candidate.clientId !== item.clientId))} style={({ pressed }) => ({ marginStart: 10, padding: 4, opacity: pressed ? 0.6 : 1 })}><Text style={{ color: colors.error, fontWeight: "800" }}>{t("expense.evidenceRemove")}</Text></Pressable></View>)}</View> : null}
+              <Text className="mt-2 text-xs leading-5 text-muted" style={{ textAlign: isRTL ? "right" : "left" }}>{t("expense.evidenceLimits", { files: EXPENSE_EVIDENCE_LIMITS.existingRequestMediaMaxItems, photos: EXPENSE_EVIDENCE_LIMITS.maxImagesPerRole, videos: EXPENSE_EVIDENCE_LIMITS.maxVideosPerExpense })}</Text>
               <Text className="mt-2 text-xs leading-5 text-muted" style={{ textAlign: isRTL ? "right" : "left" }}>{t("expense.evidenceScanNotice")}</Text>
               <Pressable accessibilityRole="button" accessibilityLabel={t("expense.saveAccessibility")} accessibilityHint={t("expense.saveHint")} disabled={createExpense.isPending || uploadMedia.isPending} onPress={saveExpense} style={({ pressed }) => ({ marginTop: 12, minHeight: 48, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", opacity: pressed || createExpense.isPending || uploadMedia.isPending ? 0.7 : 1 })}><Text className="font-bold text-white">{createExpense.isPending || uploadMedia.isPending ? t("expense.saving") : t("expense.save")}</Text></Pressable>
             </View> : null}

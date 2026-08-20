@@ -51,7 +51,7 @@ import {
 } from "./payments/FinancialLedgerService";
 import { rankServiceOpportunitiesByLocation } from "./matching/location";
 import { buildJobCompletionTimelineEvent } from "./jobs/JobCapsuleLifecycle";
-
+import { assertExpenseEvidenceWithinLimits, type ExpenseEvidenceMetadata } from "./security/ExpenseEvidencePolicy";
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
@@ -3407,6 +3407,7 @@ export async function createServiceRequestMedia(data: {
   originalName: string;
   mimeType: string;
   sizeBytes: number;
+  durationMs?: number;
   sha256: string;
 }) {
   const db = await getDb();
@@ -9382,15 +9383,21 @@ export async function createJobExpense(input: { requestId: number; providerUserI
     ? input.media
     : (input.mediaIds ?? []).map((mediaId) => ({ mediaId, mediaRole: "receipt" as const }));
   const mediaIds = evidence.map(({ mediaId }) => mediaId);
-  if (mediaIds.length > 8 || new Set(mediaIds).size !== mediaIds.length || evidence.some(({ mediaId, mediaRole }) => !Number.isInteger(mediaId) || mediaId <= 0 || !JOB_EXPENSE_MEDIA_ROLES.has(mediaRole))) {
+  if (mediaIds.length > 20 || new Set(mediaIds).size !== mediaIds.length || evidence.some(({ mediaId, mediaRole }) => !Number.isInteger(mediaId) || mediaId <= 0 || !JOB_EXPENSE_MEDIA_ROLES.has(mediaRole))) {
     throw new Error("EXPENSE_EVIDENCE_INVALID");
   }
   return context.database.transaction(async (tx) => {
     if (mediaIds.length) {
-      const media = await tx.select({ id: serviceRequestMedia.id, kind: serviceRequestMedia.kind }).from(serviceRequestMedia).where(and(eq(serviceRequestMedia.requestId, input.requestId), eq(serviceRequestMedia.ownerUserId, input.providerUserId), eq(serviceRequestMedia.purpose, "expense"), inArray(serviceRequestMedia.id, mediaIds)));
+      const media = await tx.select({ id: serviceRequestMedia.id, kind: serviceRequestMedia.kind, sizeBytes: serviceRequestMedia.sizeBytes, durationMs: serviceRequestMedia.durationMs }).from(serviceRequestMedia).where(and(eq(serviceRequestMedia.requestId, input.requestId), eq(serviceRequestMedia.ownerUserId, input.providerUserId), eq(serviceRequestMedia.purpose, "expense"), inArray(serviceRequestMedia.id, mediaIds)));
       if (media.length !== mediaIds.length) throw new Error("EXPENSE_MEDIA_NOT_OWNED");
       if (evidence.some(({ mediaId, mediaRole }) => mediaRole === "video" && media.find((item) => item.id === mediaId)?.kind !== "video")) throw new Error("EXPENSE_EVIDENCE_ROLE_KIND_INVALID");
       if (evidence.some(({ mediaId, mediaRole }) => mediaRole !== "video" && media.find((item) => item.id === mediaId)?.kind === "video")) throw new Error("EXPENSE_EVIDENCE_ROLE_KIND_INVALID");
+      const metadata: ExpenseEvidenceMetadata[] = evidence.map(({ mediaId, mediaRole }) => {
+        const item = media.find((candidate) => candidate.id === mediaId);
+        if (!item) throw new Error("EXPENSE_MEDIA_NOT_OWNED");
+        return { mediaId, mediaRole, kind: item.kind, sizeBytes: item.sizeBytes, durationMs: item.durationMs };
+      });
+      assertExpenseEvidenceWithinLimits(metadata);
     }
     const result = await tx.insert(jobExpenses).values({ requestId: input.requestId, agreementId: context.agreement.id, providerId: context.agreement.providerId, category: input.category, amount: input.amount, description: input.description, purchasedAt: input.purchasedAt, vendorName: input.vendorName, brand: input.brand, model: input.model, quantity: input.quantity, locationUrl: input.locationUrl });
     const expenseId = Number(result[0].insertId);

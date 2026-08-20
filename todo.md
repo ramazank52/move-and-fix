@@ -629,8 +629,9 @@
 - [x] P17-01 — Provider onboarding akışına operating-model submission/review adımını, service-area doğrulamasını ve fail-closed activation yolunu entegre et
 - [x] P17-02 — Provider document/onboarding/activation kararlarını capability-jurisdiction-providerType credential resolver’ın tek authoritative DTO’sunda birleştir
 - [x] P17-03 — Scanner dispatch attempt generation/token correlation, stale callback red ve behavioral race testlerini uygula
+- [x] P17-03-R — Uygulanmış 0081 scanner migration’ı için eksik Drizzle journal kaydını source-of-truth ile hizala
 - [x] P17-04 — Explicit legacy encryption key contract, gerçek old-key decrypt/migration roundtrip ve fail-closed rotation testlerini uygula
-- [ ] P17-05 — Masraf Dosyası multi-evidence collection, secure video desteği ve scanner-bound persistence akışını uygula
+- [x] P17-05 — Masraf Dosyası multi-evidence collection, secure video desteği ve scanner-bound persistence akışını uygula
 - [ ] P17-06 — Tüm production app/components user-facing metinlerini 13-dil i18n’ye taşı, RTL/hard-coded UI scanner kapsamını genişlet
 - [ ] P17-07 — MoveAI candidate taxonomy’yi public-safe canonical catalog snapshot ve locale-aware response policy ile birleştir
 - [ ] P17-08 — SPDX expression-aware license policy, attribution çıktısı ve behavioral parser testlerini uygula
@@ -642,5 +643,5 @@
 - [ ] P17-14 — Kritik P17 sözleşme smoke testlerinin yanına router/database behavioral test kanıtlarını tamamla
 - [ ] P17-15 — qs disposition’ını release classification ile açıkça bağla ve safe resolution yoksa BLOCKED_INTERNAL_DEPENDENCY olarak kaydet
 - [ ] P17-16 — Translation preference/provenance ile contact verification geçmişini Privacy Center export/delete lifecycle’ına bağla
-- [ ] P17-17 — Masraf evidence item sayısı/boyut/süre limitlerini config tabanlı ve server-authoritative olarak uygula
+- [x] P17-17 — Masraf evidence item sayısı/boyut/süre limitlerini config tabanlı ve server-authoritative olarak uygula
 - [ ] P17-FINAL — Final kalite kapıları, P17 closure raporu, production status, per-item checkpoint referansları ve immutable audit exportu tamamla
