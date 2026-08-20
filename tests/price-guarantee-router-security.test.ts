@@ -7,6 +7,11 @@ vi.mock("../server/db", () => ({
   createPriceIntelligenceAssessment: vi.fn(),
 }));
 
+vi.mock("../server/compliance/CountryComplianceRepository", () => ({
+  listPublicCountryLaunchOptions: vi.fn(),
+  resolveCountryPaymentContext: vi.fn(async () => ({ countryCode: "TR", currency: "TRY" })),
+}));
+
 import * as db from "../server/db";
 import { appRouter } from "../server/routers";
 
@@ -98,13 +103,13 @@ describe("No Surprise Price router security", () => {
     });
     const caller = appRouter.createCaller(createContext(41));
 
-    await expect(caller.priceIntelligence.estimate({ categoryId: 6, requestId: 21, currency: "TRY", countryCode: "tr" }))
+    await expect(caller.priceIntelligence.estimate({ categoryId: 6, requestId: 21, countryCode: "tr" }))
       .resolves.toMatchObject({ status: "available", medianAmount: 900 });
     expect(db.createPriceIntelligenceAssessment).toHaveBeenCalledWith({
       categoryId: 6,
       requestId: 21,
       currency: "TRY",
-      countryCode: "tr",
+      countryCode: "TR",
       requestedByUserId: 41,
     });
   });
@@ -113,15 +118,14 @@ describe("No Surprise Price router security", () => {
     const anonymous = appRouter.createCaller({ ...createContext(), user: null });
     const authenticated = appRouter.createCaller(createContext());
 
-    await expect(anonymous.priceIntelligence.estimate({ categoryId: 6 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(anonymous.priceIntelligence.estimate({ categoryId: 6, countryCode: "TR" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(authenticated.priceIntelligence.estimate({ categoryId: 0 } as never)).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    vi.mocked(db.createPriceIntelligenceAssessment).mockRejectedValue(new Error("PRICE_INTELLIGENCE_CURRENCY_NOT_SUPPORTED"));
-    await expect(authenticated.priceIntelligence.estimate({ categoryId: 6, currency: "EUR" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(authenticated.priceIntelligence.estimate({ categoryId: 6 } as never)).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("maps a non-participant assessment to FORBIDDEN instead of estimating a price", async () => {
     vi.mocked(db.createPriceIntelligenceAssessment).mockRejectedValue(new Error("SERVICE_REQUEST_PARTICIPANT_FORBIDDEN"));
     const caller = appRouter.createCaller(createContext(99));
-    await expect(caller.priceIntelligence.estimate({ categoryId: 6, requestId: 21 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.priceIntelligence.estimate({ categoryId: 6, requestId: 21, countryCode: "TR" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

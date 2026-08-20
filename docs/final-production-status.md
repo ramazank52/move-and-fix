@@ -192,3 +192,20 @@ P13 ayrıca chat list/detail DTO’larında e-posta PII sızıntısını testle 
 | `pnpm audit --audit-level=high` | **C — NO-GO external gate — 7 moderate / 4 high**; Expo/Metro transitif PostCSS/image-size |
 
 **P15 durumu:** Uygulanabilir iç kod, test ve platform export kapsamı **A — INTERNAL READY**; canlı production deployment **C — NO-GO**. High SCA gate, onaylı hukuk metinleri/şirket kimliği, gerçek scanner/ödeme/iletişim/APM credential’ları, production DNS/HTTPS ve fiziksel cihaz E2E hâlâ dış release gate’tir. Ayrıntılı kanıt: [P15 Faz 1](./compliance/P15_PHASE1_MALWARE_SCANNER_CLOSURE.md), [Faz 2](./compliance/P15_PHASE2_DEPENDENCY_GATE.md), [Faz 3](./compliance/P15_PHASE3_LEGAL_PRIVACY_CLOSURE.md), [Faz 4](./compliance/P15_PHASE4_SECURITY_OPERATIONS_CLOSURE.md) ve [Final Quality Evidence](./compliance/P15_FINAL_QUALITY_EVIDENCE.md).
+
+---
+
+## P16 RESIDUAL CLOSURE — 20 Ağustos 2026 Eki
+
+**Baseline:** `be3c1927` (P15 final). P16; completion dispute partial settlement, fail-closed Job Safety Engine, server-authoritative provider onboarding ve capability/jurisdiction/provider-type credential resolver, semantic Masraf Dosyası kanıtları, 13 dil i18n/privacy rectification, staged contact lifecycle, MoveAI canonical catalog/country UX, scanner watchdog/ayrı cron secret ve production fixture hygiene alanlarını kapattı.
+
+| P16 kalite kapısı | Sonuç |
+|---|---:|
+| Tam regresyon | **PASS — 116 dosya / 690 test** |
+| TypeScript / lint / backend build | **PASS / PASS / PASS** (`dist/index.js` 943.5 kB) |
+| iOS / Android / web export | **PASS — 24 asset / 1 bundle; 32 asset / 1 bundle; 79 rota** |
+| Expo Doctor | **PASS — 20/20** |
+| `git diff --check` | **PASS — temiz** |
+| Expo/Metro SCA | **C — NO-GO external toolchain gate**; Expo 55 zincirindeki `image-size@1.2.1` advisory için upstream çözüm yoktur; override uygulanmadı. |
+
+**P16 durumu:** Uygulanabilir internal residual kapsam **A — INTERNAL READY**; canlı production deployment **C — NO-GO**. Gerçek scanner/ödeme/SMS/e-posta/push/observability credential’ları, DNS/HTTPS, onaylı hukuk metinleri ve fiziksel cihaz E2E kapanmadan Publish uygulanmamalıdır. Ayrıntılı kanıt: [P16 Final Closure Report](./compliance/P16_FINAL_CLOSURE_REPORT.md) ve [P16 Expo/Metro SCA Decision](./compliance/P16_EXPO_METRO_SCA_DECISION.md).

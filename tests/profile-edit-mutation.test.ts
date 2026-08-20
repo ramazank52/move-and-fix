@@ -49,19 +49,19 @@ describe("auth.updateProfile", () => {
     expect(authDb.updateOwnUserProfile).not.toHaveBeenCalled();
   });
 
-  it("writes only the authenticated user's normalized profile and returns verification requirements", async () => {
-    const user = { ...createContext().user!, email: "new@example.com", emailVerifiedAt: null };
-    vi.mocked(authDb.updateOwnUserProfile).mockResolvedValue({ user, emailChanged: true, phoneChanged: false } as never);
+  it("writes only the authenticated user's normalized name and never overwrites an unchanged primary contact", async () => {
+    const user = createContext().user!;
+    vi.mocked(authDb.updateOwnUserProfile).mockResolvedValue({ user } as never);
 
     await expect(appRouter.createCaller(createContext()).auth.updateProfile({
-      name: "  Yeni Profil  ", email: "NEW@EXAMPLE.COM", phone: null,
+      name: "  Yeni Profil  ", email: "OWNER@EXAMPLE.COM", phone: "+905551112233",
     })).resolves.toMatchObject({
-      user: { id: 71, email: "new@example.com" },
-      emailVerificationRequired: true,
+      user: { id: 71, email: "owner@example.com" },
+      emailVerificationRequired: false,
       phoneVerificationRequired: false,
     });
     expect(authDb.updateOwnUserProfile).toHaveBeenCalledWith({
-      userId: 71, name: "Yeni Profil", email: "new@example.com", phone: null,
+      userId: 71, name: "Yeni Profil",
     });
   });
 

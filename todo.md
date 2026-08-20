@@ -618,5 +618,7 @@
 - [x] P16-10 — Country Launch Gate’in public-safe registry DTO’sunu customer ve provider country seçimlerine bağla; silent TR/currency fallback’lerini kaldır
 - [x] P16-11 — Scanner outbox’ta stuck job watchdog, bounded recovery/dead-letter ve scanner’a özel cron secret isolation uygula
 - [x] P16-11 — AES-256-GCM key-version rotasyonunda legacy payload decrypt uyumluluğunu gerçek key-ring sözleşmesiyle doğrula
-- [ ] P16-12 — Production’da demo/sample/test seed veya geliştirme route’larının erişilemediğini doğrula; fixture’ların canlı veri katmanına sızmasını engelle
-- [ ] P16-12 — Ödeme SCA/3DS sorumluluk kararını mevcut gateway adapter davranışı ve credential eksikliğiyle EXTERNAL BLOCKER olarak kanıt dosyasına kaydet
+- [x] P16-12 — Production’da demo/sample/test seed veya geliştirme route’larının erişilemediğini doğrula; fixture’ların canlı veri katmanına sızmasını engelle
+- [x] P16-12 — Ödeme SCA/3DS sorumluluk kararını mevcut gateway adapter davranışı ve credential eksikliğiyle EXTERNAL BLOCKER olarak kanıt dosyasına kaydet
+- [x] P16-13 — Final tam regresyon, TypeScript, lint, backend build, iOS/Android/web export, Expo Doctor ve whitespace kalite kapılarını doğrula
+- [x] P16-14 — P16 final closure raporu, üretim durumu eki ve kanıta dayalı A/B/C release kararını hazırla

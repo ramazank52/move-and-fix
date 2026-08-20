@@ -5,10 +5,25 @@ import { getLocalAuthSessionByTokenHash, touchLocalAuthSession } from "../db";
 import { COOKIE_NAME } from "../../shared/const";
 import { sdk } from "./sdk";
 
+/**
+ * Request authentication needs stable identity/profile fields only. Pending
+ * contact-change fields remain a private persistence concern and are fetched
+ * through their owner-bound lifecycle helpers when required.
+ */
+export type SessionUser = Omit<
+  User,
+  | "pendingEmailChange"
+  | "pendingEmailToken"
+  | "pendingEmailTokenExpiry"
+  | "pendingPhoneChange"
+  | "pendingPhoneToken"
+  | "pendingPhoneTokenExpiry"
+>;
+
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: User | null;
+  user: SessionUser | null;
   localSessionId?: string | null;
   sessionFingerprint?: string | null;
 };
@@ -26,7 +41,7 @@ function getSessionToken(req: CreateExpressContextOptions["req"]) {
 }
 
 export async function createContext(opts: CreateExpressContextOptions): Promise<TrpcContext> {
-  let user: User | null = null;
+  let user: SessionUser | null = null;
   let localSessionId: string | null = null;
   let sessionFingerprint: string | null = null;
 

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolveServiceCatalogAlias } from "../server/compliance/ServiceCatalogResolver";
 
 const readProjectFile = (relativePath: string) =>
-  readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
+  readFileSync(resolve(process.cwd(), relativePath), "utf8");
 
 describe("P16 MoveAI canonical catalog and country launch contract", () => {
   it("requires an explicit active canonical alias and blocks unknown aliases", () => {

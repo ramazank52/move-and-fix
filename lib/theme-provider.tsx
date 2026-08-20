@@ -14,7 +14,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 const THEME_STORAGE_KEY = "movefix:color-scheme";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useSystemColorScheme() ?? "light";
+  const systemScheme: ColorScheme = useSystemColorScheme() === "dark" ? "dark" : "light";
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>(systemScheme);
   const [hasStoredPreference, setHasStoredPreference] = useState(false);
 

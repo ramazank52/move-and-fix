@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const schemaSource = readFileSync(new URL("../drizzle/schema.ts", import.meta.url), "utf8");
-const dbSource = readFileSync(new URL("../server/db.ts", import.meta.url), "utf8");
-const routerSource = readFileSync(new URL("../server/routers.ts", import.meta.url), "utf8");
-const profileEditSource = readFileSync(new URL("../app/settings/profile-edit.tsx", import.meta.url), "utf8");
-const verifyEmailSource = readFileSync(new URL("../app/verify-email.tsx", import.meta.url), "utf8");
-const verifyPhoneSource = readFileSync(new URL("../app/verify-phone.tsx", import.meta.url), "utf8");
+const readProjectSource = (relativePath: string) =>
+  readFileSync(resolve(process.cwd(), "tests", relativePath), "utf8");
+
+const schemaSource = readProjectSource("../drizzle/schema.ts");
+const dbSource = readProjectSource("../server/db.ts");
+const routerSource = readProjectSource("../server/routers.ts");
+const profileEditSource = readProjectSource("../app/settings/profile-edit.tsx");
+const verifyEmailSource = readProjectSource("../app/verify-email.tsx");
+const verifyPhoneSource = readProjectSource("../app/verify-phone.tsx");
 const contactChangeEventsMarker = "export const contactChangeEvents = mysqlTable(";
 const contactChangeEventsSchema = schemaSource.slice(
   schemaSource.indexOf(contactChangeEventsMarker),
