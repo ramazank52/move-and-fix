@@ -629,7 +629,7 @@
 - [x] P17-01 — Provider onboarding akışına operating-model submission/review adımını, service-area doğrulamasını ve fail-closed activation yolunu entegre et
 - [x] P17-02 — Provider document/onboarding/activation kararlarını capability-jurisdiction-providerType credential resolver’ın tek authoritative DTO’sunda birleştir
 - [x] P17-03 — Scanner dispatch attempt generation/token correlation, stale callback red ve behavioral race testlerini uygula
-- [ ] P17-04 — Explicit legacy encryption key contract, gerçek old-key decrypt/migration roundtrip ve fail-closed rotation testlerini uygula
+- [x] P17-04 — Explicit legacy encryption key contract, gerçek old-key decrypt/migration roundtrip ve fail-closed rotation testlerini uygula
 - [ ] P17-05 — Masraf Dosyası multi-evidence collection, secure video desteği ve scanner-bound persistence akışını uygula
 - [ ] P17-06 — Tüm production app/components user-facing metinlerini 13-dil i18n’ye taşı, RTL/hard-coded UI scanner kapsamını genişlet
 - [ ] P17-07 — MoveAI candidate taxonomy’yi public-safe canonical catalog snapshot ve locale-aware response policy ile birleştir

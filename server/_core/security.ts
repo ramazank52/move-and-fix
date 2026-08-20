@@ -273,6 +273,7 @@ export class EncryptionService {
   private algorithm = 'aes-256-gcm';
   private encryptionKeys: Map<string, Buffer>;
   private activeKeyVersion: string;
+  private legacyEncryptionKey?: Buffer;
 
   constructor(
     encryptionKeyMaterial = resolveEncryptionKey(),
@@ -280,6 +281,7 @@ export class EncryptionService {
       keyVersion?: string;
       previousKeyMaterial?: string;
       previousKeyVersion?: string;
+      legacyKey?: string;
     } = {},
   ) {
     this.activeKeyVersion = normalizeEncryptionKeyVersion(options.keyVersion ?? process.env.ENCRYPTION_KEY_VERSION ?? 'v1');
@@ -291,6 +293,13 @@ export class EncryptionService {
       const version = normalizeEncryptionKeyVersion(previousKeyVersion);
       if (version === this.activeKeyVersion) throw new Error('ENCRYPTION_ROTATION_CONFIGURATION_INVALID');
       this.encryptionKeys.set(version, deriveEncryptionKey(previousKeyMaterial));
+    }
+
+    const legacyKeyMaterial = options.legacyKey === undefined
+      ? process.env.ENCRYPTION_LEGACY_KEY?.trim()
+      : options.legacyKey.trim();
+    if (legacyKeyMaterial) {
+      this.legacyEncryptionKey = deriveEncryptionKey(legacyKeyMaterial);
     }
   }
 
@@ -318,7 +327,7 @@ export class EncryptionService {
     const isLegacyPayload = parts.length === 3;
     if (!isLegacyPayload && parts.length !== 4) throw new Error('ENCRYPTED_PAYLOAD_INVALID');
     const [keyVersion, ivHex, authTagHex, encrypted] = isLegacyPayload
-      ? [this.activeKeyVersion, parts[0], parts[1], parts[2]]
+      ? [undefined, parts[0], parts[1], parts[2]]
       : parts;
     if (!ivHex || !authTagHex || !encrypted || !/^[a-f0-9]+$/i.test(ivHex) || !/^[a-f0-9]+$/i.test(authTagHex)) {
       throw new Error('ENCRYPTED_PAYLOAD_INVALID');
@@ -327,13 +336,29 @@ export class EncryptionService {
     const authTag = Buffer.from(authTagHex, 'hex');
     if (iv.length !== 16 || authTag.length !== 16) throw new Error('ENCRYPTED_PAYLOAD_INVALID');
 
-    const decipher = crypto.createDecipheriv(this.algorithm, this.requireKey(normalizeEncryptionKeyVersion(keyVersion)), iv);
+    const decryptionKey = isLegacyPayload
+      ? this.requireLegacyKey()
+      : this.requireKey(normalizeEncryptionKeyVersion(keyVersion ?? ''));
+    const decipher = crypto.createDecipheriv(this.algorithm, decryptionKey, iv);
     (decipher as any).setAuthTag?.(authTag);
 
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
 
     return decrypted;
+  }
+
+  /**
+   * Converts a three-part legacy payload into the active versioned envelope.
+   * Callers must persist `ciphertext`, emit their domain audit event, and only
+   * retire the legacy key after all records have completed this verified path.
+   */
+  migrateLegacyPayload(ciphertext: string): string {
+    if (ciphertext.split(':').length !== 3) throw new Error('ENCRYPTED_PAYLOAD_NOT_LEGACY');
+    const plaintext = this.decrypt(ciphertext);
+    const migrated = this.encrypt(plaintext);
+    if (this.decrypt(migrated) !== plaintext) throw new Error('ENCRYPTION_MIGRATION_VERIFICATION_FAILED');
+    return migrated;
   }
 
   /**
@@ -354,6 +379,11 @@ export class EncryptionService {
     const key = this.encryptionKeys.get(version);
     if (!key) throw new Error('ENCRYPTION_KEY_VERSION_UNAVAILABLE');
     return key;
+  }
+
+  private requireLegacyKey(): Buffer {
+    if (!this.legacyEncryptionKey) throw new Error('ENCRYPTION_LEGACY_KEY_UNAVAILABLE');
+    return this.legacyEncryptionKey;
   }
 }
 

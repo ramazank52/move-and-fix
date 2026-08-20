@@ -10309,7 +10309,9 @@ export async function createSafetyTrustedContact(input: {
   }
   const database = await getDb();
   if (!database) throw new Error("Database not available");
-  const encryptedContactJson = new EncryptionService().encrypt(JSON.stringify({ name: normalizedName, phone: normalizedPhone }));
+  const encryptedContactJson = new EncryptionService(undefined, {
+    legacyKey: ENV.encryptionLegacyKey,
+  }).encrypt(JSON.stringify({ name: normalizedName, phone: normalizedPhone }));
   const result = await database.insert(safetyTrustedContacts).values({
     userId: input.userId,
     encryptedContactJson,

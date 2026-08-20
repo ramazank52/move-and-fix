@@ -40,6 +40,7 @@ describe("P13 canonical environment contract", () => {
     expect(validation.hasFatalConfigurationError).toBe(false);
     expect(validation.values.proxyCommProviderApiKey).toBe("");
     expect(validation.values.mediaScannerCallbackSecret).toBe("");
+    expect(validation.values.encryptionLegacyKey).toBe("");
   });
 
   it("rejects a partial encryption rotation while permitting an entirely unconfigured optional operation", () => {

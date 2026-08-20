@@ -64,6 +64,7 @@ export const ENV = {
   encryptionKeyVersion: environmentContract.values.encryptionKeyVersion || "v1",
   encryptionPreviousKey: environmentContract.values.encryptionPreviousKey,
   encryptionPreviousKeyVersion: environmentContract.values.encryptionPreviousKeyVersion,
+  encryptionLegacyKey: environmentContract.values.encryptionLegacyKey,
   unsubscribeSecret: requiredInProduction("UNSUBSCRIBE_SECRET"),
   environmentContractIssues: environmentContract.issues.map(({ code, canonicalName }) => ({ code, canonicalName })),
 };

@@ -16,6 +16,7 @@ const DEFINITIONS = {
   encryptionKeyVersion: { canonicalName: "ENCRYPTION_KEY_VERSION" },
   encryptionPreviousKey: { canonicalName: "ENCRYPTION_KEY_PREVIOUS" },
   encryptionPreviousKeyVersion: { canonicalName: "ENCRYPTION_KEY_PREVIOUS_VERSION" },
+  encryptionLegacyKey: { canonicalName: "ENCRYPTION_LEGACY_KEY" },
   mediaScannerCallbackSecret: {
     canonicalName: "MEDIA_SCANNER_CALLBACK_SECRET",
     aliases: ["MEDIA_SCANNER_WEBHOOK_SECRET"],
