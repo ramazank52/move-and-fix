@@ -52,6 +52,14 @@ import {
 import { rankServiceOpportunitiesByLocation } from "./matching/location";
 import { buildJobCompletionTimelineEvent } from "./jobs/JobCapsuleLifecycle";
 import { assertExpenseEvidenceWithinLimits, type ExpenseEvidenceMetadata } from "./security/ExpenseEvidencePolicy";
+import {
+  assertOwnerSettableCapabilityProfileStatus,
+  evaluateCapabilityProfileActivationState,
+  isTrBlock1CapabilityProfileKey,
+  resolveTrBlock1CapabilityProfileScope,
+  type CapabilityProfileActivationState,
+  type OwnerSettableCapabilityProfileStatus,
+} from "./compliance/ProviderCapabilityProfilePolicy";
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
@@ -1450,6 +1458,7 @@ import {
   providerCapabilityAppeals,
   providerCapabilityReviews,
   providerCapabilityStatuses,
+  providerCapabilityProfiles,
   moveAiDrafts,
   moveAiDraftMedia,
   trustProfiles,
@@ -5358,12 +5367,87 @@ export type ProviderOnboardingStatus = {
   canonicalService: "selected" | "missing" | "invalid";
   jurisdiction: "verified" | "pending_or_missing";
   capability: "verified" | "pending_or_missing";
+  capabilityProfile: CapabilityProfileActivationState;
   credentials: "verified" | "blocked_or_missing";
   documents: "approved" | "pending_or_missing";
   serviceArea: "configured" | "pending_or_missing";
   launchGate: "eligible" | "blocked";
   activation: "eligible" | "blocked";
 };
+
+export async function getProviderCapabilityProfile(input: {
+  userId: number;
+  capabilityKey: string;
+  jurisdictionCode: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  const providerRows = await db.select({ id: providers.id }).from(providers)
+    .where(eq(providers.userId, input.userId)).limit(1);
+  const provider = providerRows[0];
+  if (!provider) return null;
+  const rows = await db.select().from(providerCapabilityProfiles).where(and(
+    eq(providerCapabilityProfiles.providerId, provider.id),
+    eq(providerCapabilityProfiles.capabilityKey, input.capabilityKey.trim()),
+    eq(providerCapabilityProfiles.jurisdictionCode, input.jurisdictionCode.trim().toUpperCase()),
+  )).limit(1);
+  return rows[0] ?? null;
+}
+
+/** A provider owner may submit facts or safely suspend service. Legal and
+ * product approval references are intentionally absent from this contract. */
+export async function saveProviderCapabilityProfile(input: {
+  userId: number;
+  capabilityKey: string;
+  jurisdictionCode: string;
+  operatingModel: "individual" | "company";
+  vehicleType?: string | null;
+  profileStatus: OwnerSettableCapabilityProfileStatus;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  const capabilityKey = input.capabilityKey.trim();
+  const jurisdictionCode = input.jurisdictionCode.trim().toUpperCase();
+  if (!isTrBlock1CapabilityProfileKey(capabilityKey) || jurisdictionCode !== "TR") {
+    throw new Error("CAPABILITY_PROFILE_SCOPE_NOT_APPROVED");
+  }
+  assertOwnerSettableCapabilityProfileStatus(input.profileStatus);
+  const providerRows = await db.select({ id: providers.id }).from(providers)
+    .where(eq(providers.userId, input.userId)).limit(1);
+  const provider = providerRows[0];
+  if (!provider) throw new Error("PROVIDER_NOT_FOUND");
+  const vehicleType = input.vehicleType?.trim() || null;
+  await db.insert(providerCapabilityProfiles).values({
+    providerId: provider.id,
+    capabilityKey,
+    jurisdictionCode,
+    operatingModel: input.operatingModel,
+    vehicleType,
+    profileStatus: input.profileStatus,
+  }).onDuplicateKeyUpdate({
+    set: {
+      operatingModel: input.operatingModel,
+      vehicleType,
+      profileStatus: input.profileStatus,
+      updatedAt: new Date(),
+    },
+  });
+  const rows = await db.select().from(providerCapabilityProfiles).where(and(
+    eq(providerCapabilityProfiles.providerId, provider.id),
+    eq(providerCapabilityProfiles.capabilityKey, capabilityKey),
+    eq(providerCapabilityProfiles.jurisdictionCode, jurisdictionCode),
+  )).limit(1);
+  const profile = rows[0];
+  if (!profile) throw new Error("CAPABILITY_PROFILE_UPSERT_FAILED");
+  await logOperationEvent({
+    eventType: "provider.capability_profile.saved",
+    severity: "info",
+    actorId: input.userId,
+    subjectId: profile.id,
+    payload: { providerId: provider.id, capabilityKey, jurisdictionCode, profileStatus: input.profileStatus },
+  });
+  return profile;
+}
 
 /** A provider can select only an active canonical scope and capability. The
  * selection always enters legal review and never self-activates the provider. */
@@ -5700,11 +5784,13 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
   const provider = providerRows[0];
   if (!provider) return null;
 
-  const catalog = provider.categoryId == null
-    ? "missing" as const
-    : resolveCanonicalServiceIdentity(await loadServiceCatalogSnapshot(db), { categoryId: provider.categoryId }).status === "RESOLVED"
-      ? "selected" as const
-      : "invalid" as const;
+  const catalogSnapshot = await loadServiceCatalogSnapshot(db);
+  const catalogResolution = provider.categoryId == null
+    ? null
+    : resolveCanonicalServiceIdentity(catalogSnapshot, { categoryId: provider.categoryId });
+  const catalog = catalogResolution?.status === "RESOLVED"
+    ? "selected" as const
+    : provider.categoryId == null ? "missing" as const : "invalid" as const;
   const models = await db.select({
     countryCode: providerOperatingModels.jurisdictionCode,
     providerType: providerOperatingModels.operatingModel,
@@ -5730,6 +5816,23 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     capability.capabilityStatus === "active" && capability.categoryId === provider.categoryId &&
     (capability.decision === "VERIFIED" || capability.decision === "VERIFIED_LIMITED_SCOPE"),
   );
+  const capabilityProfiles = await db.select({
+    capabilityKey: providerCapabilityProfiles.capabilityKey,
+    jurisdictionCode: providerCapabilityProfiles.jurisdictionCode,
+    profileStatus: providerCapabilityProfiles.profileStatus,
+    legalSourceApprovalRef: providerCapabilityProfiles.legalSourceApprovalRef,
+    productReleaseApprovalRef: providerCapabilityProfiles.productReleaseApprovalRef,
+  }).from(providerCapabilityProfiles).where(eq(providerCapabilityProfiles.providerId, provider.id));
+  const profileScope = catalogResolution?.status === "RESOLVED"
+    ? resolveTrBlock1CapabilityProfileScope(catalogResolution.value)
+    : { state: "not_required" as const };
+  const profileKey = "profileKey" in profileScope ? profileScope.profileKey : null;
+  const capabilityProfile = evaluateCapabilityProfileActivationState({
+    scope: profileScope,
+    profile: profileKey
+      ? capabilityProfiles.find((candidate) => candidate.capabilityKey === profileKey && candidate.jurisdictionCode === "TR")
+      : null,
+  });
   const authoritativeRequirements = await resolveProviderAuthoritativeRequirementsForProvider(db, provider);
   const documentsApproved = authoritativeRequirements.status === "RESOLVED" &&
     authoritativeRequirements.requirements.every((requirement) =>
@@ -5801,6 +5904,7 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     documentsApproved,
     countryLaunchEligible: launchGate === "eligible",
     serviceAreaConfigured,
+    capabilityProfileStatus: capabilityProfile,
   });
   const activation = activationDecision.status === "ELIGIBLE" ? "eligible" as const : "blocked" as const;
   return {
@@ -5809,6 +5913,7 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     canonicalService: catalog,
     jurisdiction,
     capability,
+    capabilityProfile,
     credentials,
     documents: documentsApproved ? "approved" : "pending_or_missing",
     serviceArea: serviceAreaConfigured ? "configured" : "pending_or_missing",

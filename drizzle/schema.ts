@@ -616,6 +616,56 @@ export const providers = mysqlTable("providers", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+/**
+ * Provider-entered operating context for one exact canonical capability in one
+ * jurisdiction. This is intentionally distinct from providerCapabilityStatuses:
+ * the latter reflects credential evaluation; this record retains the declared
+ * operating model and the independently recorded legal/product approvals that
+ * must precede activation.
+ */
+export const providerCapabilityProfiles = mysqlTable(
+  "provider_capability_profiles",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    providerId: int("providerId")
+      .notNull()
+      .references(() => providers.id, { onDelete: "cascade" }),
+    capabilityKey: varchar("capabilityKey", { length: 120 }).notNull(),
+    jurisdictionCode: varchar("jurisdictionCode", { length: 2 }).notNull(),
+    operatingModel: mysqlEnum("operatingModel", ["individual", "company"]).notNull(),
+    vehicleType: varchar("vehicleType", { length: 120 }),
+    profileStatus: mysqlEnum("profileStatus", [
+      "draft",
+      "pending_legal_review",
+      "source_unverified",
+      "legal_approved",
+      "active",
+      "suspended",
+    ])
+      .default("draft")
+      .notNull(),
+    // These are deliberately separate; product/operational approval can never
+    // substitute for a competent Türkiye legal/compliance approval.
+    legalSourceApprovalRef: varchar("legalSourceApprovalRef", { length: 160 }),
+    productReleaseApprovalRef: varchar("productReleaseApprovalRef", { length: 160 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_capability_profiles_scope_unique").on(
+      table.providerId,
+      table.capabilityKey,
+      table.jurisdictionCode,
+    ),
+    index("provider_capability_profiles_status_idx").on(table.providerId, table.profileStatus),
+    index("provider_capability_profiles_capability_idx").on(
+      table.jurisdictionCode,
+      table.capabilityKey,
+      table.profileStatus,
+    ),
+  ],
+);
+
 export const providerFavorites = mysqlTable(
   "provider_favorites",
   {

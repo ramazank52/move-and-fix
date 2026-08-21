@@ -650,3 +650,13 @@
 - [x] Privacy Center export çıktısına owner translation preference/provenance ve contact verification geçmişini dahil et
 - [x] Privacy Center silme akışını mevcut re-auth, legal-hold ve retention semantiğini koruyarak bu veri kümelerine bağla
 - [x] P17-16 owner/export/delete route-db behavioral, authorization ve edge-case testlerini ekle
+
+## Türkiye Otonom Belge Doğrulama — Blok 1: Nakliye / Çekici / Evden Eve
+- [x] B1-P1 — Mevcut servis, capability, sağlayıcı ve credential veri modelinin read-only envanterini çıkar
+- [x] B1-P2 — Nakliye/çekici/evden eve capability profile schema’sını additive ve fail-closed tasarla
+- [x] B1-P3/4 — Resmî kaynak taslağı, SOURCE_UNVERIFIED service–credential matrix ve coverage manifestini hazırla
+- [x] B1-Gate-A — Yetkin hukuk/uyum sorumlusu `LEGAL_SOURCE_APPROVAL` vermeden rule-pack aktivasyonunu kapalı tut
+- [x] B1-P5 — Capability profile veri katmanı, owner-only tRPC yazma/okuma sözleşmesi ve onboarding activation bağını uygula
+- [x] B1-P6 — Capability profile, acil durdurma ve activation fail-closed davranış testlerini ekle
+- [x] B1-P7 — Migration bütünlüğü ile tam regression, lint, TypeScript ve backend build kalite kapılarını doğrula
+- [x] B1-P8 — Faz 8-A Blok 1 ara checkpoint’i ve kanıta dayalı durum raporunu hazırla

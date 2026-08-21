@@ -2151,6 +2151,40 @@ export const appRouter = router({
       }
       return requirements;
     }),
+    getCapabilityProfile: protectedProcedure
+      .input(z.object({
+        capabilityKey: z.enum(["transport.freight", "towing.roadside", "moving.household"]),
+        jurisdictionCode: z.literal("TR"),
+      }))
+      .query(async ({ ctx, input }) => {
+        const profile = await db.getProviderCapabilityProfile({ userId: ctx.user.id, ...input });
+        if (!profile) {
+          const provider = await db.getProviderProfile(ctx.user.id);
+          if (!provider) throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+        }
+        return profile;
+      }),
+    setCapabilityProfile: protectedProcedure
+      .input(z.object({
+        capabilityKey: z.enum(["transport.freight", "towing.roadside", "moving.household"]),
+        jurisdictionCode: z.literal("TR"),
+        operatingModel: z.enum(["individual", "company"]),
+        vehicleType: z.string().trim().min(1).max(120).nullable().optional(),
+        // Legal approval and active status are deliberately absent: a provider
+        // can submit facts or suspend, never manufacture a legal approval.
+        profileStatus: z.enum(["draft", "pending_legal_review", "source_unverified", "suspended"]).default("draft"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.saveProviderCapabilityProfile({ userId: ctx.user.id, ...input });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "CAPABILITY_PROFILE_SAVE_FAILED";
+          if (message === "PROVIDER_NOT_FOUND") {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Bu işlem yalnız profesyonel hesaplara açıktır" });
+          }
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+        }
+      }),
     getOnboardingStatus: protectedProcedure.query(async ({ ctx }) => {
       const status = await db.getProviderOnboardingStatus(ctx.user.id);
       if (!status) {
