@@ -53,11 +53,15 @@ import { rankServiceOpportunitiesByLocation } from "./matching/location";
 import { buildJobCompletionTimelineEvent } from "./jobs/JobCapsuleLifecycle";
 import { assertExpenseEvidenceWithinLimits, type ExpenseEvidenceMetadata } from "./security/ExpenseEvidencePolicy";
 import {
+  assertAuthorizedCapabilityProfileActor,
   assertOwnerSettableCapabilityProfileStatus,
   evaluateCapabilityProfileActivationState,
+  isCapabilityProfileOperatingModelCode,
   isTrBlock1CapabilityProfileKey,
+  mapLegacyOperatingModel,
   resolveTrBlock1CapabilityProfileScope,
   type CapabilityProfileActivationState,
+  type CapabilityProfileOperatingModelCode,
   type OwnerSettableCapabilityProfileStatus,
 } from "./compliance/ProviderCapabilityProfilePolicy";
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -1459,6 +1463,8 @@ import {
   providerCapabilityReviews,
   providerCapabilityStatuses,
   providerCapabilityProfiles,
+  providerCapabilityApprovalLedger,
+  providerCapabilityEnforcementEvents,
   moveAiDrafts,
   moveAiDraftMedia,
   trustProfiles,
@@ -5400,9 +5406,13 @@ export async function saveProviderCapabilityProfile(input: {
   userId: number;
   capabilityKey: string;
   jurisdictionCode: string;
-  operatingModel: "individual" | "company";
+  /** Legacy 0083 istemcileri için geriye uyumlu kabul edilir. */
+  operatingModel?: "individual" | "company";
+  operatingModelCode?: CapabilityProfileOperatingModelCode;
+  operatingModelContext?: Record<string, unknown> | null;
   vehicleType?: string | null;
   profileStatus: OwnerSettableCapabilityProfileStatus;
+  expectedStateVersion?: number;
 }) {
   const db = await getDb();
   if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
@@ -5416,22 +5426,65 @@ export async function saveProviderCapabilityProfile(input: {
     .where(eq(providers.userId, input.userId)).limit(1);
   const provider = providerRows[0];
   if (!provider) throw new Error("PROVIDER_NOT_FOUND");
+  const existingRows = await db.select({
+    id: providerCapabilityProfiles.id,
+    profileStatus: providerCapabilityProfiles.profileStatus,
+    enforcementState: providerCapabilityProfiles.enforcementState,
+    stateVersion: providerCapabilityProfiles.stateVersion,
+  }).from(providerCapabilityProfiles).where(and(
+    eq(providerCapabilityProfiles.providerId, provider.id),
+    eq(providerCapabilityProfiles.capabilityKey, capabilityKey),
+    eq(providerCapabilityProfiles.jurisdictionCode, jurisdictionCode),
+  )).limit(1);
+  const existing = existingRows[0];
+  if (existing?.enforcementState !== undefined && existing.enforcementState !== "clear") {
+    throw new Error("CAPABILITY_PROFILE_ENFORCEMENT_LOCKED");
+  }
+  if (existing && input.expectedStateVersion !== undefined && input.expectedStateVersion !== existing.stateVersion) {
+    throw new Error("CAPABILITY_PROFILE_STALE_WRITE");
+  }
+  const operatingModelCode = input.operatingModelCode
+    ?? (input.operatingModel ? mapLegacyOperatingModel(input.operatingModel) : undefined);
+  if (!operatingModelCode || !isCapabilityProfileOperatingModelCode(operatingModelCode)) {
+    throw new Error("CAPABILITY_PROFILE_OPERATING_MODEL_INVALID");
+  }
+  const operatingModel = input.operatingModel ?? (operatingModelCode === "company" ? "company" : "individual");
   const vehicleType = input.vehicleType?.trim() || null;
-  await db.insert(providerCapabilityProfiles).values({
-    providerId: provider.id,
-    capabilityKey,
-    jurisdictionCode,
-    operatingModel: input.operatingModel,
-    vehicleType,
-    profileStatus: input.profileStatus,
-  }).onDuplicateKeyUpdate({
-    set: {
-      operatingModel: input.operatingModel,
+  const voluntarySuspensionState = input.profileStatus === "suspended" ? "suspended" as const : "active" as const;
+  const profileStatus = input.profileStatus === "suspended"
+    ? (existing?.profileStatus === "active" ? "active" : "draft")
+    : input.profileStatus;
+  if (existing) {
+    const updated = await db.update(providerCapabilityProfiles).set({
+      operatingModel,
+      operatingModelVersion: "v2",
+      operatingModelCode,
+      operatingModelContextJson: input.operatingModelContext ?? null,
       vehicleType,
-      profileStatus: input.profileStatus,
+      profileStatus,
+      voluntarySuspensionState,
+      stateVersion: sql`${providerCapabilityProfiles.stateVersion} + 1`,
       updatedAt: new Date(),
-    },
-  });
+    }).where(and(
+      eq(providerCapabilityProfiles.id, existing.id),
+      eq(providerCapabilityProfiles.stateVersion, existing.stateVersion),
+    ));
+    if ((updated[0]?.affectedRows ?? 0) !== 1) throw new Error("CAPABILITY_PROFILE_STALE_WRITE");
+  } else {
+    await db.insert(providerCapabilityProfiles).values({
+      providerId: provider.id,
+      capabilityKey,
+      jurisdictionCode,
+      operatingModel,
+      operatingModelVersion: "v2",
+      operatingModelCode,
+      operatingModelContextJson: input.operatingModelContext ?? null,
+      vehicleType,
+      profileStatus,
+      voluntarySuspensionState,
+      stateVersion: 1,
+    });
+  }
   const rows = await db.select().from(providerCapabilityProfiles).where(and(
     eq(providerCapabilityProfiles.providerId, provider.id),
     eq(providerCapabilityProfiles.capabilityKey, capabilityKey),
@@ -5444,9 +5497,87 @@ export async function saveProviderCapabilityProfile(input: {
     severity: "info",
     actorId: input.userId,
     subjectId: profile.id,
-    payload: { providerId: provider.id, capabilityKey, jurisdictionCode, profileStatus: input.profileStatus },
+    payload: { providerId: provider.id, capabilityKey, jurisdictionCode, profileStatus, operatingModelCode },
   });
   return profile;
+}
+
+/** Internal append-only path. Provider owners have no router access to it. */
+export async function recordProviderCapabilityApprovalLedgerEvent(input: {
+  profileId: number;
+  approvalType: "legal_source" | "product_release";
+  eventType: "granted" | "revoked" | "expired" | "superseded";
+  rulePackVersion: string;
+  requirementVersion: string;
+  approverUserId: number;
+  approverRole: string;
+  authorityScope: string;
+  evidenceHash: string;
+  evidenceStatus?: "present" | "deleted";
+  validFrom?: Date | null;
+  validUntil?: Date | null;
+  reasonCode?: string | null;
+  priorLedgerEventId?: number | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  assertAuthorizedCapabilityProfileActor(input.approvalType, input.approverRole);
+  if (!/^[a-f0-9]{64}$/i.test(input.evidenceHash)) throw new Error("CAPABILITY_PROFILE_EVIDENCE_HASH_INVALID");
+  const created = await db.insert(providerCapabilityApprovalLedger).values({
+    ...input,
+    evidenceStatus: input.evidenceStatus ?? "present",
+    validFrom: input.validFrom ?? null,
+    validUntil: input.validUntil ?? null,
+    reasonCode: input.reasonCode ?? null,
+    priorLedgerEventId: input.priorLedgerEventId ?? null,
+  });
+  await logOperationEvent({
+    eventType: "provider.capability_profile.approval_ledger.appended",
+    severity: "warning",
+    actorId: input.approverUserId,
+    subjectId: input.profileId,
+    payload: { approvalType: input.approvalType, eventType: input.eventType, rulePackVersion: input.rulePackVersion, requirementVersion: input.requirementVersion },
+  });
+  return created;
+}
+
+/** System enforcement can only be changed by an audited authorized actor. */
+export async function recordProviderCapabilityEnforcementEvent(input: {
+  profileId: number;
+  action: "suspend" | "block" | "release";
+  reasonCode: string;
+  actorUserId: number;
+  actorRole: string;
+  evidenceHash: string;
+  expectedStateVersion: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DATABASE_NOT_AVAILABLE");
+  assertAuthorizedCapabilityProfileActor("enforcement", input.actorRole);
+  if (!/^[a-f0-9]{64}$/i.test(input.evidenceHash)) throw new Error("CAPABILITY_PROFILE_EVIDENCE_HASH_INVALID");
+  return db.transaction(async (tx) => {
+    const enforcementState = input.action === "release" ? "clear" : input.action === "block" ? "blocked" : "suspended";
+    const updated = await tx.update(providerCapabilityProfiles).set({
+      enforcementState,
+      enforcementReasonCode: input.action === "release" ? null : input.reasonCode,
+      enforcementUpdatedAt: new Date(),
+      stateVersion: sql`${providerCapabilityProfiles.stateVersion} + 1`,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(providerCapabilityProfiles.id, input.profileId),
+      eq(providerCapabilityProfiles.stateVersion, input.expectedStateVersion),
+    ));
+    if ((updated[0]?.affectedRows ?? 0) !== 1) throw new Error("CAPABILITY_PROFILE_STALE_WRITE");
+    await tx.insert(providerCapabilityEnforcementEvents).values({
+      profileId: input.profileId,
+      action: input.action,
+      reasonCode: input.reasonCode,
+      actorUserId: input.actorUserId,
+      actorRole: input.actorRole,
+      evidenceHash: input.evidenceHash,
+    });
+    return { profileId: input.profileId, enforcementState };
+  });
 }
 
 /** A provider can select only an active canonical scope and capability. The
@@ -5817,9 +5948,15 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     (capability.decision === "VERIFIED" || capability.decision === "VERIFIED_LIMITED_SCOPE"),
   );
   const capabilityProfiles = await db.select({
+    id: providerCapabilityProfiles.id,
     capabilityKey: providerCapabilityProfiles.capabilityKey,
     jurisdictionCode: providerCapabilityProfiles.jurisdictionCode,
     profileStatus: providerCapabilityProfiles.profileStatus,
+    sourceVerificationState: providerCapabilityProfiles.sourceVerificationState,
+    voluntarySuspensionState: providerCapabilityProfiles.voluntarySuspensionState,
+    enforcementState: providerCapabilityProfiles.enforcementState,
+    requiredRulePackVersion: providerCapabilityProfiles.requiredRulePackVersion,
+    requiredRequirementVersion: providerCapabilityProfiles.requiredRequirementVersion,
     legalSourceApprovalRef: providerCapabilityProfiles.legalSourceApprovalRef,
     productReleaseApprovalRef: providerCapabilityProfiles.productReleaseApprovalRef,
   }).from(providerCapabilityProfiles).where(eq(providerCapabilityProfiles.providerId, provider.id));
@@ -5827,10 +5964,29 @@ export async function getProviderOnboardingStatus(userId: number): Promise<Provi
     ? resolveTrBlock1CapabilityProfileScope(catalogResolution.value)
     : { state: "not_required" as const };
   const profileKey = "profileKey" in profileScope ? profileScope.profileKey : null;
+  const scopedCapabilityProfile = profileKey
+    ? capabilityProfiles.find((candidate) => candidate.capabilityKey === profileKey && candidate.jurisdictionCode === "TR")
+    : null;
+  const approvalLedgerEvents = scopedCapabilityProfile
+    ? await db.select({
+      approvalType: providerCapabilityApprovalLedger.approvalType,
+      eventType: providerCapabilityApprovalLedger.eventType,
+      rulePackVersion: providerCapabilityApprovalLedger.rulePackVersion,
+      requirementVersion: providerCapabilityApprovalLedger.requirementVersion,
+      approverRole: providerCapabilityApprovalLedger.approverRole,
+      authorityScope: providerCapabilityApprovalLedger.authorityScope,
+      evidenceHash: providerCapabilityApprovalLedger.evidenceHash,
+      evidenceStatus: providerCapabilityApprovalLedger.evidenceStatus,
+      validFrom: providerCapabilityApprovalLedger.validFrom,
+      validUntil: providerCapabilityApprovalLedger.validUntil,
+      createdAt: providerCapabilityApprovalLedger.createdAt,
+    }).from(providerCapabilityApprovalLedger)
+      .where(eq(providerCapabilityApprovalLedger.profileId, scopedCapabilityProfile.id))
+    : [];
   const capabilityProfile = evaluateCapabilityProfileActivationState({
     scope: profileScope,
-    profile: profileKey
-      ? capabilityProfiles.find((candidate) => candidate.capabilityKey === profileKey && candidate.jurisdictionCode === "TR")
+    profile: scopedCapabilityProfile
+      ? { ...scopedCapabilityProfile, approvalLedgerEvents }
       : null,
   });
   const authoritativeRequirements = await resolveProviderAuthoritativeRequirementsForProvider(db, provider);

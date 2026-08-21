@@ -42,6 +42,9 @@ export function decideProviderOnboardingActivation(
     case "source_unverified": blockers.push("CAPABILITY_PROFILE_SOURCE_UNVERIFIED"); break;
     case "legal_approved": blockers.push("CAPABILITY_PROFILE_PRODUCT_RELEASE_PENDING"); break;
     case "suspended": blockers.push("CAPABILITY_PROFILE_SUSPENDED"); break;
+    case "voluntarily_suspended": blockers.push("CAPABILITY_PROFILE_VOLUNTARILY_SUSPENDED"); break;
+    case "enforcement_suspended": blockers.push("CAPABILITY_PROFILE_ENFORCEMENT_SUSPENDED"); break;
+    case "approval_invalid": blockers.push("CAPABILITY_PROFILE_APPROVAL_INVALID"); break;
     case "scope_unresolved": blockers.push("CAPABILITY_PROFILE_SCOPE_UNRESOLVED"); break;
     case "hard_blocked": blockers.push("CAPABILITY_PROFILE_HARD_BLOCKED"); break;
   }

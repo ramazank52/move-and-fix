@@ -633,6 +633,11 @@ export const providerCapabilityProfiles = mysqlTable(
     capabilityKey: varchar("capabilityKey", { length: 120 }).notNull(),
     jurisdictionCode: varchar("jurisdictionCode", { length: 2 }).notNull(),
     operatingModel: mysqlEnum("operatingModel", ["individual", "company"]).notNull(),
+    // 0084 keeps the 0083 enum for backwards reads while v2 retains the exact
+    // declared business relationship required by the capability policy.
+    operatingModelVersion: varchar("operatingModelVersion", { length: 32 }).default("v2").notNull(),
+    operatingModelCode: varchar("operatingModelCode", { length: 80 }).default("independent_tradesperson").notNull(),
+    operatingModelContextJson: json("operatingModelContextJson").$type<Record<string, unknown> | null>(),
     vehicleType: varchar("vehicleType", { length: 120 }),
     profileStatus: mysqlEnum("profileStatus", [
       "draft",
@@ -648,6 +653,17 @@ export const providerCapabilityProfiles = mysqlTable(
     // substitute for a competent Türkiye legal/compliance approval.
     legalSourceApprovalRef: varchar("legalSourceApprovalRef", { length: 160 }),
     productReleaseApprovalRef: varchar("productReleaseApprovalRef", { length: 160 }),
+    declarationState: mysqlEnum("declarationState", ["draft", "submitted", "withdrawn", "locked"]).default("draft").notNull(),
+    sourceVerificationState: mysqlEnum("sourceVerificationState", ["unverified", "verified", "blocked"]).default("unverified").notNull(),
+    legalApprovalState: mysqlEnum("legalApprovalState", ["pending", "approved", "revoked", "expired"]).default("pending").notNull(),
+    releaseApprovalState: mysqlEnum("releaseApprovalState", ["pending", "approved", "revoked", "expired"]).default("pending").notNull(),
+    voluntarySuspensionState: mysqlEnum("voluntarySuspensionState", ["active", "suspended"]).default("active").notNull(),
+    enforcementState: mysqlEnum("enforcementState", ["clear", "suspended", "blocked"]).default("clear").notNull(),
+    enforcementReasonCode: varchar("enforcementReasonCode", { length: 120 }),
+    requiredRulePackVersion: varchar("requiredRulePackVersion", { length: 120 }).default("unknown").notNull(),
+    requiredRequirementVersion: varchar("requiredRequirementVersion", { length: 120 }).default("unknown").notNull(),
+    stateVersion: int("stateVersion").default(1).notNull(),
+    enforcementUpdatedAt: timestamp("enforcementUpdatedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -658,12 +674,54 @@ export const providerCapabilityProfiles = mysqlTable(
       table.jurisdictionCode,
     ),
     index("provider_capability_profiles_status_idx").on(table.providerId, table.profileStatus),
+    index("provider_capability_profiles_enforcement_idx").on(table.providerId, table.enforcementState),
     index("provider_capability_profiles_capability_idx").on(
       table.jurisdictionCode,
       table.capabilityKey,
       table.profileStatus,
     ),
   ],
+);
+
+export const providerCapabilityApprovalLedger = mysqlTable(
+  "provider_capability_approval_ledger",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    profileId: int("profileId").notNull().references(() => providerCapabilityProfiles.id, { onDelete: "cascade" }),
+    approvalType: mysqlEnum("approvalType", ["legal_source", "product_release"]).notNull(),
+    eventType: mysqlEnum("eventType", ["granted", "revoked", "expired", "superseded"]).notNull(),
+    rulePackVersion: varchar("rulePackVersion", { length: 120 }).notNull(),
+    requirementVersion: varchar("requirementVersion", { length: 120 }).notNull(),
+    approverUserId: int("approverUserId").notNull(),
+    approverRole: varchar("approverRole", { length: 120 }).notNull(),
+    authorityScope: varchar("authorityScope", { length: 240 }).notNull(),
+    evidenceHash: varchar("evidenceHash", { length: 128 }).notNull(),
+    evidenceStatus: mysqlEnum("evidenceStatus", ["present", "deleted"]).default("present").notNull(),
+    validFrom: timestamp("validFrom"),
+    validUntil: timestamp("validUntil"),
+    reasonCode: varchar("reasonCode", { length: 160 }),
+    priorLedgerEventId: int("priorLedgerEventId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("provider_capability_approval_ledger_profile_type_idx").on(table.profileId, table.approvalType, table.createdAt),
+    index("provider_capability_approval_ledger_approver_idx").on(table.approverUserId, table.createdAt),
+  ],
+);
+
+export const providerCapabilityEnforcementEvents = mysqlTable(
+  "provider_capability_enforcement_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    profileId: int("profileId").notNull().references(() => providerCapabilityProfiles.id, { onDelete: "cascade" }),
+    action: mysqlEnum("action", ["suspend", "block", "release"]).notNull(),
+    reasonCode: varchar("reasonCode", { length: 160 }).notNull(),
+    actorUserId: int("actorUserId").notNull(),
+    actorRole: varchar("actorRole", { length: 120 }).notNull(),
+    evidenceHash: varchar("evidenceHash", { length: 128 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("provider_capability_enforcement_profile_idx").on(table.profileId, table.createdAt)],
 );
 
 export const providerFavorites = mysqlTable(

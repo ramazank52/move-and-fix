@@ -660,3 +660,10 @@
 - [x] B1-P6 — Capability profile, acil durdurma ve activation fail-closed davranış testlerini ekle
 - [x] B1-P7 — Migration bütünlüğü ile tam regression, lint, TypeScript ve backend build kalite kapılarını doğrula
 - [x] B1-P8 — Faz 8-A Blok 1 ara checkpoint’i ve kanıta dayalı durum raporunu hazırla
+- [x] B1-H1 — Sürümlü ve kayıpsız operating model eşlemesi ile mevcut profile kayıtlarını additive migre et
+- [x] B1-H2 — Append-only immutable approval ledger ve doğrulanmış onay bağını ekle
+- [x] B1-H3 — Profile, kaynak, hukuk, release, kullanıcı askısı ve enforcement durumlarını ayrıştırılmış state-machine olarak uygula
+- [x] B1-H4 — Ledger doğrulamalı activation ile sistem askısı için yetkili/auditli kaldırma kapısını uygula
+- [x] B1-H5 — Sahte/geçersiz/stale onay, askı aşma ve eşzamanlı yazma davranış testlerini ekle
+- [x] B1-H6 — Additive migration, kalite kapıları ve non-destructive veri eşlemesini doğrula
+- [x] B1-H7 — Blok 1 kilidini koruyan v3 salt-okunur kanıt paketini teslim et

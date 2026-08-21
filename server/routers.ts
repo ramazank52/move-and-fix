@@ -2168,11 +2168,29 @@ export const appRouter = router({
       .input(z.object({
         capabilityKey: z.enum(["transport.freight", "towing.roadside", "moving.household"]),
         jurisdictionCode: z.literal("TR"),
-        operatingModel: z.enum(["individual", "company"]),
+        // `operatingModel` is retained for 0083 clients. Exact affiliation is
+        // recorded in operatingModelCode and never inferred from a free text.
+        operatingModel: z.enum(["individual", "company"]).optional(),
+        operatingModelCode: z.enum([
+          "independent_tradesperson",
+          "sole_proprietorship",
+          "company",
+          "company_authorized_representative",
+          "employee",
+          "subcontractor",
+          "owner_driver",
+          "employee_driver",
+          "fleet_operator",
+        ]).optional(),
+        operatingModelContext: z.record(z.string(), z.unknown()).nullable().optional(),
         vehicleType: z.string().trim().min(1).max(120).nullable().optional(),
         // Legal approval and active status are deliberately absent: a provider
         // can submit facts or suspend, never manufacture a legal approval.
         profileStatus: z.enum(["draft", "pending_legal_review", "source_unverified", "suspended"]).default("draft"),
+        expectedStateVersion: z.number().int().positive().optional(),
+      }).refine((value) => Boolean(value.operatingModel || value.operatingModelCode), {
+        message: "CAPABILITY_PROFILE_OPERATING_MODEL_REQUIRED",
+        path: ["operatingModelCode"],
       }))
       .mutation(async ({ ctx, input }) => {
         try {

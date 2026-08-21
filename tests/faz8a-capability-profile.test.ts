@@ -90,6 +90,93 @@ describe("Faz 8-A capability profile", () => {
     expect(decision).toEqual({ status: "BLOCKED", blockers: ["CAPABILITY_PROFILE_SOURCE_UNVERIFIED"] });
   });
 
+  it("serbest metin referansını değil, yalnız aynı sürümde geçerli immutable ledger grantlerini kabul eder", () => {
+    const now = new Date("2026-08-21T12:00:00.000Z");
+    const baseProfile = {
+      profileStatus: "active" as const,
+      sourceVerificationState: "verified" as const,
+      requiredRulePackVersion: "TR-GOLD-2026-08-13-v1.0",
+      requiredRequirementVersion: "requirements-v1",
+      legalSourceApprovalRef: "SAHTE-REF",
+      productReleaseApprovalRef: "PRODUCT-REF",
+    };
+    const grant = (approvalType: "legal_source" | "product_release", createdAt: string) => ({
+      approvalType,
+      eventType: "granted" as const,
+      rulePackVersion: "TR-GOLD-2026-08-13-v1.0",
+      requirementVersion: "requirements-v1",
+      approverRole: approvalType === "legal_source" ? "turkiye_legal_compliance_officer" : "product_release_authority",
+      authorityScope: "TR:towing.roadside",
+      evidenceHash: "a".repeat(64),
+      evidenceStatus: "present" as const,
+      validFrom: null,
+      validUntil: null,
+      createdAt: new Date(createdAt),
+    });
+
+    expect(evaluateCapabilityProfileActivationState({
+      scope: { profileKey: "towing.roadside" }, profile: {
+        ...baseProfile,
+        approvalLedgerEvents: [grant("legal_source", "2026-08-21T11:00:00.000Z"), grant("product_release", "2026-08-21T11:01:00.000Z")],
+      }, now,
+    })).toBe("active");
+
+    expect(evaluateCapabilityProfileActivationState({
+      scope: { profileKey: "towing.roadside" }, profile: {
+        ...baseProfile,
+        approvalLedgerEvents: [
+          grant("legal_source", "2026-08-21T11:00:00.000Z"),
+          grant("product_release", "2026-08-21T11:01:00.000Z"),
+          { ...grant("legal_source", "2026-08-21T11:02:00.000Z"), eventType: "revoked" as const },
+        ],
+      }, now,
+    })).toBe("approval_invalid");
+
+    expect(evaluateCapabilityProfileActivationState({
+      scope: { profileKey: "towing.roadside" }, profile: {
+        ...baseProfile,
+        approvalLedgerEvents: [
+          { ...grant("legal_source", "2026-08-21T11:00:00.000Z"), validUntil: new Date("2026-08-21T11:59:59.000Z") },
+          { ...grant("product_release", "2026-08-21T11:01:00.000Z"), rulePackVersion: "TR-GOLD-OLD" },
+        ],
+      }, now,
+    })).toBe("approval_invalid");
+
+    expect(evaluateCapabilityProfileActivationState({
+      scope: { profileKey: "towing.roadside" }, profile: {
+        ...baseProfile,
+        approvalLedgerEvents: [
+          { ...grant("legal_source", "2026-08-21T11:00:00.000Z"), evidenceStatus: "deleted" as const },
+          { ...grant("product_release", "2026-08-21T11:01:00.000Z"), requirementVersion: "requirements-v0" },
+        ],
+      }, now,
+    })).toBe("approval_invalid");
+  });
+
+  it("sistem askısı ve stale-write reddini provider API üzerinden aşmaya izin vermez", async () => {
+    const caller = appRouter.createCaller(createContext());
+    vi.mocked(providerDb.saveProviderCapabilityProfile)
+      .mockRejectedValueOnce(new Error("CAPABILITY_PROFILE_ENFORCEMENT_LOCKED"))
+      .mockRejectedValueOnce(new Error("CAPABILITY_PROFILE_STALE_WRITE"));
+
+    await expect(caller.provider.setCapabilityProfile({
+      ...saveInput,
+      operatingModelCode: "owner_driver",
+      expectedStateVersion: 4,
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(caller.provider.setCapabilityProfile({
+      ...saveInput,
+      operatingModelCode: "owner_driver",
+      expectedStateVersion: 4,
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(providerDb.saveProviderCapabilityProfile).toHaveBeenNthCalledWith(1, {
+      userId: 811,
+      ...saveInput,
+      operatingModelCode: "owner_driver",
+      expectedStateVersion: 4,
+    });
+  });
+
   it("sahte veya süresi dolmuş zorunlu belge sinyali activation kararını fail-closed engeller", () => {
     const decision = decideProviderOnboardingActivation({
       profileComplete: true,
