@@ -667,3 +667,12 @@
 - [x] B1-H5 — Sahte/geçersiz/stale onay, askı aşma ve eşzamanlı yazma davranış testlerini ekle
 - [x] B1-H6 — Additive migration, kalite kapıları ve non-destructive veri eşlemesini doğrula
 - [x] B1-H7 — Blok 1 kilidini koruyan v3 salt-okunur kanıt paketini teslim et
+
+## Beş Ülke Güvenli Altyapı — Faz 0 ve Germany/Berlin CHECKPOINT A
+- [x] G5-P0 — Üç ek dosyayı, binding komutu ve default-off seed sınırını eksiksiz denetle
+- [x] G5-P0 — Türkiye checkpoint, kullanıcı verisi ve production/country activation koruma sınırlarını kanıtla
+- [x] G5-S1 — Common Global Scaffold’u yalnız additive ve default-off olarak kur
+- [x] G5-DE-A — Germany/Berlin SOURCE_UNVERIFIED kaynak, connector, legal locale ve capability scaffoldunu CHECKPOINT A sınırında doğrula
+- [x] G5-DE-A — Germany/Berlin CHECKPOINT A kapsamını uygulayıp ülke/capability activationını kapalı tut
+- [x] G5-QA — Migration, authorization, fail-closed ve regresyon kalite kanıtlarını tamamla
+- [x] G5-CP-A — CHECKPOINT A kanıt paketini hazırla ve sonraki bloklara geçmeden dur

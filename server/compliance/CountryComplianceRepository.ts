@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import {
+  countryDeployments,
   jurisdictions,
   jurisdictionCompliancePackages,
   jurisdictionLaunchGates,
@@ -16,6 +17,7 @@ import {
   type CountryLaunchChecklist,
 } from "./CountryLaunchGateService";
 import { evaluateTurkeyPaymentLaunchReadiness } from "./TurkeyPaymentLaunchPolicy";
+import { countryDeploymentTransitionBlockReason, type CountryDeploymentTransition } from "./CountryDeploymentPolicy";
 
 export type CompliancePackageStatus = "draft" | "legal_review" | "approved" | "enabled" | "blocked" | "retired";
 export type OfficialSourceStatus = "draft" | "verified" | "superseded" | "revoked";
@@ -65,6 +67,17 @@ export async function assertCountryMarketplaceTransition(input: {
   if (!db) throw new Error(`COUNTRY_LAUNCH_GATE_BLOCKED:${input.transition}:DATABASE_UNAVAILABLE`);
 
   const countryCode = input.countryCode?.trim().toUpperCase() ?? "";
+  const deploymentRows = /^[A-Z]{2}$/.test(countryCode)
+    ? await db.select().from(countryDeployments).where(eq(countryDeployments.countryCode, countryCode)).limit(2)
+    : [];
+  const deployment = deploymentRows.length === 1 ? deploymentRows[0]! : null;
+  if (deployment) {
+    const deploymentReason = countryDeploymentTransitionBlockReason({
+      deployment,
+      transition: input.transition as CountryDeploymentTransition,
+    });
+    if (deploymentReason) throw new Error(deploymentReason);
+  }
   let jurisdiction = null as (typeof jurisdictions.$inferSelect) | null;
   if (input.jurisdictionId != null) {
     const rows = await db.select().from(jurisdictions).where(eq(jurisdictions.id, input.jurisdictionId)).limit(1);

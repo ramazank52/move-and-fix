@@ -909,6 +909,386 @@ export const jurisdictions = mysqlTable(
   ],
 );
 
+/**
+ * Global country deployment shells are intentionally independent from the
+ * legacy jurisdiction launch gate. A row is never a marketplace enablement:
+ * every feature switch begins at false and every policy state begins blocked.
+ */
+export const countryDeployments = mysqlTable(
+  "country_deployments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryCode: varchar("countryCode", { length: 2 }).notNull(),
+    displayName: varchar("displayName", { length: 160 }).notNull(),
+    state: mysqlEnum("state", [
+      "SCAFFOLD_ONLY",
+      "RESEARCHING",
+      "SOURCE_REVIEW",
+      "LEGAL_REVIEW",
+      "CONNECTOR_PENDING",
+      "STAGING_READY",
+      "PILOT_READY",
+      "PRODUCTION_PARTIAL",
+      "PRODUCTION_ACTIVE",
+      "SUSPENDED",
+      "INFRA_ONLY_NO_GO",
+    ]).default("SCAFFOLD_ONLY").notNull(),
+    dataPlaneClass: varchar("dataPlaneClass", { length: 80 }).notNull(),
+    defaultLocale: varchar("defaultLocale", { length: 32 }).notNull(),
+    defaultCurrency: varchar("defaultCurrency", { length: 3 }).notNull(),
+    defaultTimeZone: varchar("defaultTimeZone", { length: 64 }).notNull(),
+    rawCredentialGlobalTransferAllowed: int("rawCredentialGlobalTransferAllowed").default(0).notNull(),
+    localDataPlaneReady: int("localDataPlaneReady").default(0).notNull(),
+    countryShellEnabled: int("countryShellEnabled").default(0).notNull(),
+    jurisdictionEnabled: int("jurisdictionEnabled").default(0).notNull(),
+    consumerDiscoveryEnabled: int("consumerDiscoveryEnabled").default(0).notNull(),
+    providerOnboardingEnabled: int("providerOnboardingEnabled").default(0).notNull(),
+    bookingEnabled: int("bookingEnabled").default(0).notNull(),
+    paymentsEnabled: int("paymentsEnabled").default(0).notNull(),
+    aiAssistantEnabled: int("aiAssistantEnabled").default(0).notNull(),
+    supportEnabled: int("supportEnabled").default(0).notNull(),
+    productionStateReachable: int("productionStateReachable").default(0).notNull(),
+    seedVersion: varchar("seedVersion", { length: 64 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_deployments_country_unique").on(table.countryCode),
+    index("country_deployments_state_idx").on(table.state),
+  ],
+);
+
+/** Hierarchical country, regional and municipal deployment boundary. */
+export const jurisdictionNodes = mysqlTable(
+  "jurisdiction_nodes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    parentId: int("parentId"),
+    nodeCode: varchar("nodeCode", { length: 96 }).notNull(),
+    displayName: varchar("displayName", { length: 160 }).notNull(),
+    nodeType: mysqlEnum("nodeType", ["country", "state", "province", "region", "city", "district", "municipality"]).notNull(),
+    state: mysqlEnum("state", ["SCAFFOLD_ONLY", "SUSPENDED", "ACTIVE"]).default("SCAFFOLD_ONLY").notNull(),
+    locale: varchar("locale", { length: 32 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    timeZone: varchar("timeZone", { length: 64 }).notNull(),
+    addressProfile: varchar("addressProfile", { length: 80 }).default("UNKNOWN").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("jurisdiction_nodes_node_code_unique").on(table.nodeCode),
+    index("jurisdiction_nodes_country_parent_idx").on(table.countryDeploymentId, table.parentId),
+    index("jurisdiction_nodes_state_idx").on(table.state),
+  ],
+);
+
+/**
+ * Catalog-facing capability shell. Existing service_capabilities stay
+ * authoritative for the legacy product; this table only adds country policy
+ * dimensions and starts every service blocked.
+ */
+export const serviceCapabilityDefinitions = mysqlTable(
+  "service_capability_definitions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    canonicalServiceKey: varchar("canonicalServiceKey", { length: 120 }).notNull(),
+    canonicalCategoryId: int("canonicalCategoryId"),
+    // The existing service_capabilities table remains catalog-authoritative.
+    // This nullable, unique link lets the global policy scaffold cover every
+    // live capability without treating a category seed as its task definition.
+    canonicalCapabilityId: int("canonicalCapabilityId"),
+    displayName: varchar("displayName", { length: 160 }).notNull(),
+    serviceLevel: mysqlEnum("serviceLevel", ["category", "subcategory", "task"]).default("category").notNull(),
+    requiredDimensionsJson: json("requiredDimensionsJson").$type<string[]>().notNull(),
+    blockedByDefault: int("blockedByDefault").default(1).notNull(),
+    mappingState: mysqlEnum("mappingState", ["UNMAPPED_SERVICE_BLOCKED", "MAPPED_BLOCKED", "MAPPED_ELIGIBLE"]).default("UNMAPPED_SERVICE_BLOCKED").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("service_capability_definitions_key_unique").on(table.canonicalServiceKey),
+    uniqueIndex("service_capability_definitions_canonical_capability_unique").on(table.canonicalCapabilityId),
+    index("service_capability_definitions_category_idx").on(table.canonicalCategoryId, table.mappingState),
+  ],
+);
+
+export const officialSources = mysqlTable(
+  "official_sources",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    jurisdictionNodeId: int("jurisdictionNodeId"),
+    sourceKey: varchar("sourceKey", { length: 160 }).notNull(),
+    authorityName: varchar("authorityName", { length: 240 }).notNull(),
+    sourceUrl: varchar("sourceUrl", { length: 2048 }).notNull(),
+    sourceVersion: varchar("sourceVersion", { length: 160 }).notNull(),
+    sourceHash: varchar("sourceHash", { length: 128 }),
+    sourceStatus: mysqlEnum("sourceStatus", ["SOURCE_UNVERIFIED", "SOURCE_VERIFIED", "SUPERSEDED", "REVOKED"]).default("SOURCE_UNVERIFIED").notNull(),
+    retrievalMethod: mysqlEnum("retrievalMethod", ["MANUAL_REFERENCE", "PERMITTED_API", "AUTHORIZED_EXPORT", "UNKNOWN"]).default("UNKNOWN").notNull(),
+    verifiedByApprovalLedgerId: int("verifiedByApprovalLedgerId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("official_sources_scope_key_unique").on(table.countryDeploymentId, table.sourceKey, table.sourceVersion),
+    index("official_sources_country_status_idx").on(table.countryDeploymentId, table.sourceStatus),
+  ],
+);
+
+export const legalRequirements = mysqlTable(
+  "legal_requirements",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    jurisdictionNodeId: int("jurisdictionNodeId"),
+    capabilityDefinitionId: int("capabilityDefinitionId"),
+    requirementKey: varchar("requirementKey", { length: 160 }).notNull(),
+    requirementVersion: varchar("requirementVersion", { length: 80 }).notNull(),
+    requirementState: mysqlEnum("requirementState", ["UNKNOWN", "REQUIRED", "CONDITIONAL", "NOT_REQUIRED", "PROHIBITED"]).default("UNKNOWN").notNull(),
+    authoritative: int("authoritative").default(0).notNull(),
+    sourceStatus: mysqlEnum("sourceStatus", ["SOURCE_UNVERIFIED", "SOURCE_VERIFIED"]).default("SOURCE_UNVERIFIED").notNull(),
+    legalApprovalState: mysqlEnum("legalApprovalState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),
+    officialSourceId: int("officialSourceId"),
+    sourceReference: varchar("sourceReference", { length: 320 }),
+    blockingReasonCode: varchar("blockingReasonCode", { length: 160 }).default("UNKNOWN_LEGAL_REQUIREMENT").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("legal_requirements_scope_key_version_unique").on(table.countryDeploymentId, table.requirementKey, table.requirementVersion),
+    index("legal_requirements_capability_state_idx").on(table.capabilityDefinitionId, table.requirementState, table.authoritative),
+  ],
+);
+
+export const credentialTypes = mysqlTable(
+  "credential_types",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    credentialKey: varchar("credentialKey", { length: 160 }).notNull(),
+    displayName: varchar("displayName", { length: 200 }).notNull(),
+    rawCredentialClassification: varchar("rawCredentialClassification", { length: 80 }).default("UNCLASSIFIED").notNull(),
+    extractionAllowed: int("extractionAllowed").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [uniqueIndex("credential_types_country_key_unique").on(table.countryDeploymentId, table.credentialKey)],
+);
+
+export const credentialIssuers = mysqlTable(
+  "credential_issuers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    credentialTypeId: int("credentialTypeId").notNull(),
+    issuerKey: varchar("issuerKey", { length: 160 }).notNull(),
+    displayName: varchar("displayName", { length: 240 }).notNull(),
+    issuerStatus: mysqlEnum("issuerStatus", ["UNVERIFIED", "VERIFIED", "REVOKED"]).default("UNVERIFIED").notNull(),
+    officialSourceId: int("officialSourceId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [uniqueIndex("credential_issuers_country_key_unique").on(table.countryDeploymentId, table.issuerKey)],
+);
+
+export const verificationConnectors = mysqlTable(
+  "verification_connectors",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    jurisdictionNodeId: int("jurisdictionNodeId"),
+    connectorKey: varchar("connectorKey", { length: 160 }).notNull(),
+    displayName: varchar("displayName", { length: 240 }).notNull(),
+    status: mysqlEnum("status", ["PENDING", "UNVERIFIED", "AUTHORIZED", "OPERATIONAL", "REVOKED", "NOT_CONFIGURED"]).default("PENDING").notNull(),
+    assuranceLevel: mysqlEnum("assuranceLevel", ["NONE", "DOCUMENT_ONLY", "ISSUER_SIGNATURE", "REGISTRY_MATCH", "REGISTRY_STATUS"]).default("NONE").notNull(),
+    forbiddenScraping: int("forbiddenScraping").default(1).notNull(),
+    authorizationEvidenceHash: varchar("authorizationEvidenceHash", { length: 128 }),
+    officialSourceId: int("officialSourceId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("verification_connectors_country_key_unique").on(table.countryDeploymentId, table.connectorKey),
+    index("verification_connectors_status_idx").on(table.countryDeploymentId, table.status, table.assuranceLevel),
+  ],
+);
+
+export const credentialEvidence = mysqlTable(
+  "credential_evidence",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    providerCredentialId: int("providerCredentialId"),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    credentialTypeId: int("credentialTypeId"),
+    evidenceLevel: mysqlEnum("evidenceLevel", ["SELF_ASSERTED", "DOCUMENT_UPLOADED", "DOCUMENT_EXTRACTED", "ISSUER_SIGNATURE_VERIFIED", "REGISTRY_MATCHED", "REGISTRY_STATUS_ACTIVE", "REVOCATION_MONITORED"]).default("SELF_ASSERTED").notNull(),
+    evidenceHash: varchar("evidenceHash", { length: 128 }).notNull(),
+    evidenceStatus: mysqlEnum("evidenceStatus", ["PENDING", "UNVERIFIED", "VERIFIED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("credential_evidence_country_status_idx").on(table.countryDeploymentId, table.evidenceStatus, table.evidenceLevel)],
+);
+
+export const verificationEvents = mysqlTable(
+  "verification_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    credentialEvidenceId: int("credentialEvidenceId"),
+    verificationConnectorId: int("verificationConnectorId"),
+    eventType: mysqlEnum("eventType", ["REQUESTED", "EXTRACTED", "MATCHED", "STATUS_CHECKED", "FAILED", "REVOKED"]).notNull(),
+    resultState: mysqlEnum("resultState", ["UNVERIFIED", "MATCHED", "ACTIVE", "FAILED", "REVOKED"]).default("UNVERIFIED").notNull(),
+    correlationId: varchar("correlationId", { length: 128 }).notNull(),
+    evidenceHash: varchar("evidenceHash", { length: 128 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("verification_events_correlation_unique").on(table.correlationId),
+    index("verification_events_connector_created_idx").on(table.verificationConnectorId, table.createdAt),
+  ],
+);
+
+export const legalDocuments = mysqlTable(
+  "legal_documents",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    documentKey: varchar("documentKey", { length: 160 }).notNull(),
+    documentVersion: varchar("documentVersion", { length: 80 }).notNull(),
+    documentSurface: mysqlEnum("documentSurface", ["consumer_terms", "provider_agreement", "privacy_notice", "cookie_notice", "appeal_notice", "incident_notice"]).notNull(),
+    legalApprovalState: mysqlEnum("legalApprovalState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [uniqueIndex("legal_documents_country_key_version_unique").on(table.countryDeploymentId, table.documentKey, table.documentVersion)],
+);
+
+export const localizedLegalVersions = mysqlTable(
+  "localized_legal_versions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    legalDocumentId: int("legalDocumentId").notNull(),
+    locale: varchar("locale", { length: 32 }).notNull(),
+    localizationState: mysqlEnum("localizationState", ["DRAFT_MACHINE", "HUMAN_TRANSLATED", "LEGAL_REVIEWED", "LINGUIST_REVIEWED", "APPROVED_STAGING", "APPROVED_PRODUCTION", "RETIRED"]).default("DRAFT_MACHINE").notNull(),
+    contentHash: varchar("contentHash", { length: 128 }),
+    contentStorageKey: varchar("contentStorageKey", { length: 512 }),
+    runtimeSelectable: int("runtimeSelectable").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [uniqueIndex("localized_legal_versions_document_locale_unique").on(table.legalDocumentId, table.locale)],
+);
+
+/** Generic country artifact approval ledger. Application policy treats it append-only. */
+export const approvalLedger = mysqlTable(
+  "approval_ledger",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    jurisdictionNodeId: int("jurisdictionNodeId"),
+    subjectType: mysqlEnum("subjectType", ["OFFICIAL_SOURCE", "LEGAL_REQUIREMENT", "CONNECTOR", "LEGAL_DOCUMENT", "CAPABILITY_POLICY", "COUNTRY_ACTIVATION"]).notNull(),
+    subjectKey: varchar("subjectKey", { length: 240 }).notNull(),
+    approvalType: mysqlEnum("approvalType", ["SOURCE_VERIFICATION", "LOCAL_LEGAL", "LINGUIST", "CONNECTOR_AUTHORIZATION", "DATA_PRIVACY", "PAYMENT_FUNDS_FLOW", "PRODUCT_RELEASE"]).notNull(),
+    eventType: mysqlEnum("eventType", ["GRANTED", "REVOKED", "EXPIRED", "SUPERSEDED"]).notNull(),
+    approverUserId: int("approverUserId").notNull(),
+    approverRole: varchar("approverRole", { length: 120 }).notNull(),
+    authorityScope: varchar("authorityScope", { length: 240 }).notNull(),
+    evidenceHash: varchar("evidenceHash", { length: 128 }).notNull(),
+    validFrom: timestamp("validFrom"),
+    validUntil: timestamp("validUntil"),
+    priorLedgerEventId: int("priorLedgerEventId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("approval_ledger_subject_idx").on(table.countryDeploymentId, table.subjectType, table.subjectKey, table.createdAt),
+    index("approval_ledger_approver_idx").on(table.approverUserId, table.createdAt),
+  ],
+);
+
+export const capabilityPolicyDecisions = mysqlTable(
+  "capability_policy_decisions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    jurisdictionNodeId: int("jurisdictionNodeId"),
+    capabilityDefinitionId: int("capabilityDefinitionId").notNull(),
+    scopeKey: varchar("scopeKey", { length: 280 }).notNull(),
+    decision: mysqlEnum("decision", ["BLOCKED", "REVIEW_REQUIRED", "POLICY_ELIGIBLE", "ACTIVE", "SUSPENDED"]).default("BLOCKED").notNull(),
+    sourceState: mysqlEnum("sourceState", ["UNVERIFIED", "VERIFIED", "BLOCKED"]).default("UNVERIFIED").notNull(),
+    legalState: mysqlEnum("legalState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),
+    connectorState: mysqlEnum("connectorState", ["PENDING", "UNVERIFIED", "AUTHORIZED", "OPERATIONAL", "BLOCKED"]).default("PENDING").notNull(),
+    releaseState: mysqlEnum("releaseState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),
+    enforcementState: mysqlEnum("enforcementState", ["CLEAR", "SUSPENDED", "BLOCKED"]).default("CLEAR").notNull(),
+    translationState: mysqlEnum("translationState", ["UNREVIEWED", "DRAFT_MACHINE", "APPROVED"]).default("UNREVIEWED").notNull(),
+    dataResidencyState: mysqlEnum("dataResidencyState", ["UNKNOWN", "NOT_READY", "READY", "BLOCKED"]).default("UNKNOWN").notNull(),
+    sanctionsState: mysqlEnum("sanctionsState", ["UNKNOWN", "CLEAR", "BLOCKED"]).default("UNKNOWN").notNull(),
+    stateVersion: int("stateVersion").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("capability_policy_decisions_scope_unique").on(table.scopeKey),
+    index("capability_policy_decisions_country_decision_idx").on(table.countryDeploymentId, table.decision, table.enforcementState),
+  ],
+);
+
+export const countryCapabilityAppeals = mysqlTable(
+  "country_capability_appeals",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    capabilityPolicyDecisionId: int("capabilityPolicyDecisionId").notNull(),
+    providerId: int("providerId"),
+    status: mysqlEnum("status", ["SUBMITTED", "UNDER_REVIEW", "ACCEPTED", "REJECTED", "WITHDRAWN"]).default("SUBMITTED").notNull(),
+    statement: text("statement").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [index("country_capability_appeals_decision_status_idx").on(table.capabilityPolicyDecisionId, table.status)],
+);
+
+export const incidentJurisdictionMatrix = mysqlTable(
+  "incident_jurisdiction_matrix",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    jurisdictionNodeId: int("jurisdictionNodeId"),
+    incidentType: varchar("incidentType", { length: 120 }).notNull(),
+    notificationState: mysqlEnum("notificationState", ["UNKNOWN", "NOT_CONFIGURED", "CONFIGURED", "BLOCKED"]).default("NOT_CONFIGURED").notNull(),
+    legalRequirementId: int("legalRequirementId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [uniqueIndex("incident_jurisdiction_matrix_scope_unique").on(table.countryDeploymentId, table.incidentType)],
+);
+
+export const incidentNotices = mysqlTable(
+  "incident_notices",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    incidentJurisdictionMatrixId: int("incidentJurisdictionMatrixId").notNull(),
+    locale: varchar("locale", { length: 32 }).notNull(),
+    localizationState: mysqlEnum("localizationState", ["DRAFT_MACHINE", "HUMAN_TRANSLATED", "LEGAL_REVIEWED", "APPROVED_PRODUCTION", "RETIRED"]).default("DRAFT_MACHINE").notNull(),
+    runtimeSelectable: int("runtimeSelectable").default(0).notNull(),
+    contentHash: varchar("contentHash", { length: 128 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [uniqueIndex("incident_notices_matrix_locale_unique").on(table.incidentJurisdictionMatrixId, table.locale)],
+);
+
+export const countryActivationRuns = mysqlTable(
+  "country_activation_runs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    requestedState: varchar("requestedState", { length: 40 }).notNull(),
+    result: mysqlEnum("result", ["BLOCKED", "PASSED", "ABORTED"]).default("BLOCKED").notNull(),
+    blockersJson: json("blockersJson").$type<string[]>().notNull(),
+    actorUserId: int("actorUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("country_activation_runs_country_created_idx").on(table.countryDeploymentId, table.createdAt)],
+);
+
 // Capability is intentionally separate from a profile verification. For example,
 // a single provider may be eligible for courier work but blocked for towing.
 export const serviceCapabilities = mysqlTable(
