@@ -1,0 +1,7 @@
+Bu paket bilinçli olarak aşağıdakileri içermez:
+- .env, .env.*, secret, API key, token, private key, certificate, credential
+- node_modules, build cache, .expo, dist ve coverage çıktıları
+- kullanıcı veya sağlayıcı kişisel verisi, belge binary’si ve medya
+- production database dump, bağlantı dizesi veya oturum çerezi
+- resmi kaynak arşiv kopyası; bu paketteki kaynak kayıtları SOURCE_UNVERIFIED discovery referanslarıdır
+- otomatik activation, connector çağrısı, scraping veya yayın işlemi

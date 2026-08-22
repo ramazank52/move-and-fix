@@ -680,3 +680,6 @@
 - [x] G5-CP-A-R2 — 79 satırlık UNKNOWN=BLOCK service–credential matrix ve hukukçu review template’ini oluştur
 - [x] G5-CP-A-R3 — Berlin source registry, connector gap, locale, migration, authorization ve OOM kanıtlarını tamamla
 - [x] G5-CP-A-R4 — Hash-manifestli salt-okunur ZIP inceleme paketini oluştur ve CHECKPOINT A’da dur
+- [x] G5-CP-A-R5 — Kullanıcı revizyonuna göre satır-bazlı katalog, matrix, source, connector, locale ve migration kanıtını denetle
+- [x] G5-CP-A-R6 — DE_BERLIN_CHECKPOINT_A_REVIEW_PACKAGE adlı revize ZIP ve dış dosya/hash tutarlılığını teslim et
+- [x] G5-CP-A-R7 — Audit export kopyalarını TypeScript kaynak kapsamından çıkarıp gerçek proje typecheck’ini yeniden doğrula

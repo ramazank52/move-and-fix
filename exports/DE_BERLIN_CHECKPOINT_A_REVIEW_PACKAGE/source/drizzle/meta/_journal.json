@@ -1,0 +1,580 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1763372440610,
+      "tag": "0000_elite_eternals",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1786037575887,
+      "tag": "0001_unique_nuke",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786209693325,
+      "tag": "0002_redundant_photon",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1786214188737,
+      "tag": "0003_exotic_otto_octavius",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1786214867604,
+      "tag": "0004_glamorous_blue_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1786216157566,
+      "tag": "0005_whole_boomer",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1786216619177,
+      "tag": "0006_lame_centennial",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1786217194720,
+      "tag": "0007_concerned_toro",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1786218548326,
+      "tag": "0008_silent_young_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1786262309394,
+      "tag": "0009_productive_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1786269696786,
+      "tag": "0010_little_slapstick",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1786281075031,
+      "tag": "0011_productive_deadpool",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1786281988158,
+      "tag": "0012_phase31_catalog_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1786283916750,
+      "tag": "0013_clumsy_celestials",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1786760047858,
+      "tag": "0014_ambitious_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1786760211811,
+      "tag": "0015_serious_imperial_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1786763556044,
+      "tag": "0016_foamy_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1786767671160,
+      "tag": "0017_brief_lucky_pierre",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1786768602081,
+      "tag": "0018_dizzy_the_liberteens",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1786769036377,
+      "tag": "0019_nosy_doctor_octopus",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1786769745484,
+      "tag": "0020_dark_night_nurse",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1786770168306,
+      "tag": "0021_damp_layla_miller",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1786774735585,
+      "tag": "0023_silky_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1786775908396,
+      "tag": "0024_parallel_revanche",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1786776791753,
+      "tag": "0025_tranquil_selene",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1786777814312,
+      "tag": "0026_stormy_red_wolf",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1786778025230,
+      "tag": "0027_empty_blue_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "5",
+      "when": 1786778306944,
+      "tag": "0028_overrated_firelord",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1786778558845,
+      "tag": "0029_charming_stellaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1786778733065,
+      "tag": "0030_eager_yellowjacket",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1786779542535,
+      "tag": "0031_mysterious_nighthawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1786780141438,
+      "tag": "0032_kind_greymalkin",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1786781669677,
+      "tag": "0033_moaning_ikaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1786782879995,
+      "tag": "0034_melodic_overlord",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1786807685989,
+      "tag": "0035_shiny_steve_rogers",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "5",
+      "when": 1786810948722,
+      "tag": "0036_unknown_black_tom",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "5",
+      "when": 1786839101756,
+      "tag": "0037_needy_lilandra",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "5",
+      "when": 1786839443830,
+      "tag": "0038_secret_martin_li",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "5",
+      "when": 1786840189038,
+      "tag": "0039_handy_timeslip",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1786842084016,
+      "tag": "0040_black_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "5",
+      "when": 1786842634665,
+      "tag": "0041_mushy_warhawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1786843327112,
+      "tag": "0042_flawless_moira_mactaggert",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "5",
+      "when": 1786844119900,
+      "tag": "0043_glossy_elektra",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "5",
+      "when": 1786845505953,
+      "tag": "0044_blue_silver_sable",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "5",
+      "when": 1786859504932,
+      "tag": "0045_chubby_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "5",
+      "when": 1786860889611,
+      "tag": "0046_nosy_epoch",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1786861438178,
+      "tag": "0047_known_squadron_supreme",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "5",
+      "when": 1786861904372,
+      "tag": "0048_equal_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "5",
+      "when": 1786863200306,
+      "tag": "0049_silly_glorian",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "5",
+      "when": 1786865554099,
+      "tag": "0050_slow_enchantress",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "5",
+      "when": 1786867069030,
+      "tag": "0051_curved_killmonger",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "5",
+      "when": 1786867367024,
+      "tag": "0052_same_ultimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "5",
+      "when": 1786867460709,
+      "tag": "0053_mixed_cyclops",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "5",
+      "when": 1786870700000,
+      "tag": "0054_p11_scope_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "5",
+      "when": 1786870800000,
+      "tag": "0055_p11_conditional_rule_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "5",
+      "when": 1786870900000,
+      "tag": "0056_p11_media_quarantine",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "5",
+      "when": 1786871000000,
+      "tag": "0057_p11_message_translation_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "5",
+      "when": 1786871100000,
+      "tag": "0058_p11_privacy_rectification",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "5",
+      "when": 1786871200000,
+      "tag": "0059_p11_insurance_classification_safety",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "5",
+      "when": 1787058556000,
+      "tag": "0060_p12_media_quarantine_all_classes",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "5",
+      "when": 1787130000000,
+      "tag": "0061_p13_compliance_requirement_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "5",
+      "when": 1787131000000,
+      "tag": "0062_p13_media_scanner_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "5",
+      "when": 1787132000000,
+      "tag": "0063_p13_service_request_jurisdiction_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "5",
+      "when": 1787133000000,
+      "tag": "0064_p13_provider_document_dynamic_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "5",
+      "when": 1787140000000,
+      "tag": "0065_p14_canonical_service_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "5",
+      "when": 1787141000000,
+      "tag": "0066_p14_dynamic_credential_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1787212800000,
+      "tag": "0067_p14_provider_document_reviewer_permission",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1787220000000,
+      "tag": "0072_p14_chat_translation_metadata_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1787221000000,
+      "tag": "0073_p14_contact_verification_stages",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1787337600000,
+      "tag": "0074_p15_malware_scanner_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1788960000000,
+      "tag": "0075_p16_completion_dispute_partial_settlement",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1788970000000,
+      "tag": "0076_p16_job_safety_fail_closed",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1788980000000,
+      "tag": "0077_p16_expense_evidence_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1788990000000,
+      "tag": "0078_p16_staged_contact_change",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1789070400000,
+      "tag": "0079_p17_provider_service_area",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1789074000000,
+      "tag": "0080_p17_authoritative_provider_requirement_binding",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1789077600000,
+      "tag": "0081_p17_scanner_dispatch_attempt_correlation",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1787250703000,
+      "tag": "0082_p17_expense_evidence_duration",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1787290298875,
+      "tag": "0083_faz8a_capability_profile",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1787327903196,
+      "tag": "0084_faz8a_approval_ledger_state_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1787331000000,
+      "tag": "0085_global_country_scaffold",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1787345400000,
+      "tag": "0086_global_country_capability_binding_berlin_scaffold",
+      "breakpoints": true
+    }
+  ]
+}
