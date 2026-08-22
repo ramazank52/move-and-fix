@@ -1,0 +1,1690 @@
+[1mdiff --git a/artifacts/sca/sca-report.json b/artifacts/sca/sca-report.json[m
+[1mindex 3968ae1..a4c36e7 100644[m
+[1m--- a/artifacts/sca/sca-report.json[m
+[1m+++ b/artifacts/sca/sca-report.json[m
+[36m@@ -1,6 +1,6 @@[m
+ {[m
+   "schemaVersion": "p17-sca-v1",[m
+[31m-  "generatedAt": "2026-08-20T20:39:56.668Z",[m
+[32m+[m[32m  "generatedAt": "2026-08-22T02:24:18.999Z",[m
+   "gate": "PASS",[m
+   "counts": {[m
+     "total": 4,[m
+[1mdiff --git a/docs/compliance/CHECKPOINT_A_GERMANY_BERLIN_REPORT.md b/docs/compliance/CHECKPOINT_A_GERMANY_BERLIN_REPORT.md[m
+[1mnew file mode 100644[m
+[1mindex 0000000..86cf2d6[m
+[1m--- /dev/null[m
+[1m+++ b/docs/compliance/CHECKPOINT_A_GERMANY_BERLIN_REPORT.md[m
+[36m@@ -0,0 +1,148 @@[m
+[32m+[m[32m# CHECKPOINT A — Germany / Berlin Güvenli Altyapı Raporu[m
+[32m+[m
+[32m+[m[32m**Tarih:** 22 Ağustos 2026[m[41m  [m
+[32m+[m[32m**Başlangıç checkpoint’i:** `70645d3c` — Faz 8-A Blok 1 v3[m[41m  [m
+[32m+[m[32m**Bağlayıcı talimat:** `MoveFix_Manus_Bes_Ulke_Guvenli_Altyapi_Komutu_v1(1).txt`, §§ 9, 13–16[m[41m  [m
+[32m+[m[32m**Durum:** **CHECKPOINT A’DA DURULDU — hiçbir ülke veya capability açılmadı.**[m
+[32m+[m
+[32m+[m[32m> Bu rapor bir hukuk görüşü, local counsel onayı, resmi connector doğrulaması veya ürün yayın onayı değildir. Tüm Germany/Berlin kaynak satırları `SOURCE_UNVERIFIED` kalır; hiçbir capability `POLICY_ELIGIBLE` ya da production-active değildir.[m
+[32m+[m
+[32m+[m[32m## 1. Outcome: Tamamlananlar ve Korunanlar[m
+[32m+[m
+[32m+[m[32mFaz 0 denetimi tamamlandı; ardından ortak global scaffold ile Germany/Berlin Faz 1–4 kapsamı yalnız additive migration, default-off country gate, fail-closed runtime policy ve SOURCE_UNVERIFIED discovery kayıtları olarak kuruldu. İş burada **CHECKPOINT A** gereği durmaktadır. Japan/Tokyo, ABD/Los Angeles, Çin/Shanghai ve Rusya/Moskova için şehir node’u, country-specific requirement, connector ya da activation hazırlığı başlatılmadı.[m
+[32m+[m
+[32m+[m[32m| Konu | Sonuç | Değişmedi / güvenlik sonucu |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| Türkiye Blok 1 | Korundu | Üç capability için SOURCE_UNVERIFIED mutasyonu `0`; NO-GO devam eder |[m
+[32m+[m[32m| Beş country shell | Oluşturuldu | DE/JP/US/CN `SCAFFOLD_ONLY`; RU `INFRA_ONLY_NO_GO` |[m
+[32m+[m[32m| Feature gate’leri | Oluşturuldu | Kontrol edilen tüm country gate’leri `0` |[m
+[32m+[m[32m| Berlin jurisdiction | `DE-BE-BERLIN` scaffold | State `SCAFFOLD_ONLY`, `EUR`, `Europe/Berlin`, `de-DE` |[m
+[32m+[m[32m| Germany capability matrix | 79/79 default-off policy satırı | Tümü `BLOCKED`; PASS allowlist yok |[m
+[32m+[m[32m| Production publish / activation | Yapılmadı | Production reachable flag `0` |[m
+[32m+[m[32m| Kullanıcı/provider verisi | Değiştirilmedi | Faz 0’da yalnız toplulaştırılmış sorgular kullanıldı |[m
+[32m+[m
+[32m+[m[32m## 2. Dosyalar, Migration’lar, Runtime Etkisi ve Testler[m
+[32m+[m
+[32m+[m[32m| Artefakt | İşlev | Güvenlik sınırı |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| `drizzle/0085_global_country_scaffold.sql` | Country, hierarchy, capability definition, source/legal/credential/connector/evidence, localization, decision, appeal, incident ve activation-run modelleri | Additive; tüm başlangıç state’leri kapalı |[m
+[32m+[m[32m| `drizzle/0086_global_country_capability_binding_berlin_scaffold.sql` | Mevcut 79 canonical capability bağını ve Berlin discovery/locale/connector shell’ini ekler | Capability mapping ≠ eligibility; tamamı blocked |[m
+[32m+[m[32m| `drizzle/schema.ts` | 0085/0086 Drizzle modeli | Eski Türkiye/servis/provider tabloları silinmedi |[m
+[32m+[m[32m| `server/compliance/CountryDeploymentPolicy.ts` | Country-state, flag, China local data plane ve Russia NO-GO fail-closed policy | State/flag bir açılma yolu yaratmaz |[m
+[32m+[m[32m| `server/compliance/CountryComplianceRepository.ts` | Mevcut country gate önüne deployment policy katmanı | Country kaydı varsa geçişi yalnız daraltır |[m
+[32m+[m[32m| `tests/country-deployment-policy.test.ts` | Transition/preflight state koruması | SCAFFOLD/SUSPENDED/RU açılmaz |[m
+[32m+[m[32m| `tests/global-country-scaffold-contract.test.ts` | Berlin unknown-source / locale / connector / coverage blokları | All-positive input bile wrong state’i açamaz |[m
+[32m+[m[32m| `docs/compliance/FAZ0_FIVE_COUNTRY_AUDIT.md` | Preserve, gap, migration, rollback denetim kanıtı | Salt-okunur Faz 0 sonucu |[m
+[32m+[m[32m| `docs/compliance/DE_BERLIN_CHECKPOINT_A_MATRIX.md` | Satır-bazlı source/credential/connector/localization matrisi | SOURCE_UNVERIFIED / PENDING kaydı |[m
+[32m+[m
+[32m+[m[32m| Kanıt dosyası | SHA-256 |[m
+[32m+[m[32m|---|---|[m
+[32m+[m[32m| `0085_global_country_scaffold.sql` | `b08b02d9c550912749e3beb1630ad1a0bb9da409637a0efbcf5bb1210e1e564b` |[m
+[32m+[m[32m| `0086_global_country_capability_binding_berlin_scaffold.sql` | `7a6da89629cc5d3dbab0c24fc59b5ad0d2d5b8bbd7853ae914f336fab3aca014` |[m
+[32m+[m[32m| `FAZ0_FIVE_COUNTRY_AUDIT.md` | `cb2063e2c6fa36bdfc46e56db2486f3dd084d4fc4bbbec26d9d83fee5f5a72c7` |[m
+[32m+[m[32m| `DE_BERLIN_CHECKPOINT_A_MATRIX.md` | `23369a87c694616a9afb32daaede6b1ec1493864a39d92177bfa7364cd2f4006` |[m
+[32m+[m
+[32m+[m[32m## 3. Country / Jurisdiction / Catalog Coverage[m
+[32m+[m
+[32m+[m[32m| Coverage metriği | Gerçek kayıt | Değer |[m
+[32m+[m[32m|---|---|---:|[m
+[32m+[m[32m| Country shell | DE, JP, US, CN, RU | 5 |[m
+[32m+[m[32m| Default scaffold country | DE, JP, US, CN | 4 |[m
+[32m+[m[32m| Infrastructure-only country | RU | 1 |[m
+[32m+[m[32m| Açık country gate | Tüm beş country için | 0 |[m
+[32m+[m[32m| Berlin pilot node | `DE-BE-BERLIN` | 1 |[m
+[32m+[m[32m| Sonraki checkpoint şehir node’ları | Tokyo / LA / Shanghai / Moscow | 0 |[m
+[32m+[m[32m| Mevcut canonical catalog capability | `service_capabilities` | 79 |[m
+[32m+[m[32m| Berlin default-off policy | 79 capability | 79 `BLOCKED` |[m
+[32m+[m[32m| Berlin non-blocked policy | 79 capability | 0 |[m
+[32m+[m
+[32m+[m[32m13 başlangıç hizmet anahtarının canlı katalog eşleşmesinde 9 doğrudan eşleşme ve 4 eşleşmemiş, otomatik olarak `UNMAPPED_SERVICE_BLOCKED` bırakılmış anahtar vardır: `air_conditioning`, `heating`, `roadside_assistance` ve `furniture`. Bu sonuç 79 canonical capability bağını azaltmaz; yalnız seed-level service shortcut’ın erişilebilir bir hukuk/capability eşlemesi olmadığını kanıtlar. Tahmini capability veya alias üretilmemiştir.[m
+[32m+[m
+[32m+[m[32m`countryDeploymentTransitionBlockReason` önce Russia/infra-only, sonra production state, country shell/jurisdiction gate, action-specific gate ve China ayrı local data plane koşulunu denetler. `countryActivationPreflight` ayrıca exact catalog coverage, mandatory source, local legal approval, approved connector, legal locale, data/payment/privacy ve product release kanıtlarını ayrı blocker olarak döndürür. `SCAFFOLD_ONLY`, `RESEARCHING`, `SUSPENDED` ve `INFRA_ONLY_NO_GO` state’leri tüm diğer input’lar varsayımsal olumlu verilse dahi preflight’tan geçemez.[m
+[32m+[m
+[32m+[m[32m## 4. Source / Legal / Connector / Localization Durumu[m
+[32m+[m
+[32m+[m[32m| Domain | Verified | Unverified / pending | Sonuç |[m
+[32m+[m[32m|---|---:|---:|---|[m
+[32m+[m[32m| Berlin official-source discovery | 0 | 10 `SOURCE_UNVERIFIED` | Source hash ve counsel onayı yok |[m
+[32m+[m[32m| Berlin legal requirement | 0 authoritative | 10 `UNKNOWN` + `PENDING` | Local counsel review gerekir |[m
+[32m+[m[32m| Verification connector | 0 configured | 4 `PENDING`, assurance `NONE` | Scraping forbidden; izinli API/sözleşme yok |[m
+[32m+[m[32m| Legal localisation | 0 approved | 6 `DRAFT_MACHINE` | Runtime selectable `0` |[m
+[32m+[m[32m| Product release | 0 | 79 `PENDING` | Açılma yok |[m
+[32m+[m
+[32m+[m[32m| Connector | State | Assurance | Authorization evidence | Sonuç |[m
+[32m+[m[32m|---|---|---|---|---|[m
+[32m+[m[32m| `DE_HANDWERKSKAMMER_REGISTRY` | `PENDING` | `NONE` | Yok | `NOT_CONFIGURED` |[m
+[32m+[m[32m| `DE_UTILITY_INSTALLER_REGISTRY` | `PENDING` | `NONE` | Yok | `NOT_CONFIGURED` |[m
+[32m+[m[32m| `DE_BALM_FREIGHT_REGISTRY` | `PENDING` | `NONE` | Yok | `NOT_CONFIGURED` |[m
+[32m+[m[32m| `DE_BNETZA_POST_REGISTRY` | `PENDING` | `NONE` | Yok | `NOT_CONFIGURED` |[m
+[32m+[m
+[32m+[m[32mTam satır-bazlı Germany/Berlin service–credential ve source matrix, [DE_BERLIN_CHECKPOINT_A_MATRIX.md](DE_BERLIN_CHECKPOINT_A_MATRIX.md) dosyasındadır. Bu matrix’in yalnız discovery referansı olan URL’leri, tam metin/ek/madde counsel tarafından doğrulanmadan source verification olarak kullanılmayacaktır.[m
+[32m+[m
+[32m+[m[32m## 5. Sağlayıcı Etkisi, Geçiş ve Veri Güvenliği[m
+[32m+[m
+[32m+[m[32mFaz 0’daki toplulaştırılmış sorgu 2 toplam provider, 0 doğrulanmış/onaylı provider ve 2 müsait provider göstermiştir. Berlin rule-pack activate edilmediği için mevcut provider’a notice, grace period, document request veya suspension uygulanmadı. Türkiye Blok 1 üç capability’si için source-state değişikliği `0` olarak tekrar doğrulandı.[m
+[32m+[m
+[32m+[m[32m| Gate | Durum | Neden |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| Privacy / data residency | `NOT_READY` | Local data/privacy review yok |[m
+[32m+[m[32m| Payment / tax / worker / consumer | `BLOCKED` | Country shell yalnız scaffold |[m
+[32m+[m[32m| AI / OCR | `BLOCKED` | AI/OCR authority verification üretemez |[m
+[32m+[m[32m| Germany connector health / outage | `NOT_CONFIGURED` | Connector yok; cache/stale claim yok |[m
+[32m+[m[32m| China local data plane | `BLOCKED` | China country shell açılmamış; separate plane ready değil |[m
+[32m+[m[32m| Russia sanctions / payment / data | `INFRA_ONLY_NO_GO` | Teknik olarak tüm transition’lar unreachable |[m
+[32m+[m
+[32m+[m[32m## 6. Exact PASS Allowlist ve NO-GO[m
+[32m+[m
+[32m+[m[32m**Exact PASS allowlist:** Boş.[m[41m  [m
+[32m+[m[32m**Exact production allowlist:** Boş.[m
+[32m+[m
+[32m+[m[32m| Exact NO-GO kapsamı | Neden |[m
+[32m+[m[32m|---|---|[m
+[32m+[m[32m| Berlin’de 79/79 capability | `BLOCKED`, source `UNVERIFIED`, legal/connector/release `PENDING` |[m
+[32m+[m[32m| Germany country transition’ları | `SCAFFOLD_ONLY`; tüm feature gate’ler 0 |[m
+[32m+[m[32m| Japan/Tokyo | CHECKPOINT A’dan sonra başlatılması yasak |[m
+[32m+[m[32m| USA/Los Angeles | CHECKPOINT A’dan sonra başlatılması yasak |[m
+[32m+[m[32m| China/Shanghai | CHECKPOINT A’dan sonra başlatılması yasak; ayrıca local data plane mandatory |[m
+[32m+[m[32m| Russia/Moscow | `INFRA_ONLY_NO_GO`; hiçbir capability açılmaz |[m
+[32m+[m[32m| Türkiye Blok 1 üç capability | Önceki SOURCE_UNVERIFIED / NO-GO kilidi korunur |[m
+[32m+[m
+[32m+[m[32m## 7. Çalıştırılan Kalite Kapıları ve Gerçek Sonuçlar[m
+[32m+[m
+[32m+[m[32m| Komut | Sonuç | Kanıt |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| `pnpm vitest run tests/country-deployment-policy.test.ts tests/global-country-scaffold-contract.test.ts tests/country-launch-gate-contract.test.ts` | PASS | 3 dosya / 12 test |[m
+[32m+[m[32m| `pnpm test` | PASS | **127 dosya / 741 test** |[m
+[32m+[m[32m| `pnpm lint` | PASS | Expo lint, 0 çıktı/uyarı |[m
+[32m+[m[32m| `NODE_OPTIONS=--max-old-space-size=512 pnpm exec tsc --noEmit --skipLibCheck` | ENVIRONMENTAL LIMIT / BLOCKER | Node heap OOM; recursive ölçümde peak RSS 612,416 KiB, V8 heap 524.2 MB sınırında abort |[m
+[32m+[m[32m| `NODE_OPTIONS=--max-old-space-size=1792 pnpm exec tsc --noEmit --skipLibCheck` | PASS | Yerel dev süreçleri durdurulduktan sonra TypeScript error yok |[m
+[32m+[m[32m| `pnpm build` | PASS | Server bundle üretildi |[m
+[32m+[m[32m| `pnpm drizzle-kit check` | PASS | “Everything's fine” |[m
+[32m+[m[32m| `pnpm supply:sca` | PASS | 4 advisory, 0 blocking release, 2 onaylı exception |[m
+[32m+[m[32m| `git diff --check` | PASS | Whitespace hatası yok |[m
+[32m+[m
+[32m+[m[32m512 MB TypeScript denetimi bu repo/sandbox için Node heap sınırına çarpmıştır; bu sonucu PASS olarak sunmuyorum. Aynı denetim geniş heap ile tip hatası olmadan tamamlanmıştır.[m
+[32m+[m
+[32m+[m[32m## 8. Rollback Kanıtı ve Planı[m
+[32m+[m
+[32m+[m[32mSchema rollback uygulanmadı ve destructive `DROP TABLE` planlanmadı. Rollback, append-only migrationları koruyup davranışı server/owner-only mantıksal kapatma ile geri alma şeklindedir. İlgili country için tüm gate’ler `0` kalır veya `SUSPENDED` state’e geçirilir; country policy herhangi bir marketplace transition’ını `COUNTRY_DEPLOYMENT_BLOCKED:*` ile reddeder. Capability policy satırları `BLOCKED` kalır; Türkiye profile/ledger verisine temas edilmez. `SUSPENDED` preflight regresyon testi, varsayımsal diğer kanıtların tamamı olumlu olsa dahi aktivasyonu reddettiğini doğrulamaktadır.[m
+[32m+[m
+[32m+[m[32mManaged TiDB’de 0085/0086 additive SQL uygulanıp satır düzeyinde default-off sonuçları doğrulandı. Ancak production/staging/development fiziksel ayrımı kanıtlanmamıştır ve `__drizzle_migrations` içindeki mevcut metadata yalnız eski bir kayıt içerir. Bu nedenle **ENVIRONMENT_SEPARATION_UNVERIFIED** sürer; bu uygulama production-applied sayılmaz ve production için ayrı, onaylı change-record olmadan replay edilmez.[m
+[32m+[m
+[32m+[m[32m## 9. Tek CREDENTIALS / SECRETS / APPROVALS PENDING Listesi[m
+[32m+[m
+[32m+[m[32mBu checkpoint hiçbir gerçek secret istemez veya üretmez. Sonraki fazlara geçmeden önce aşağıdaki bağımsız girdiler gerekir:[m
+[32m+[m
+[32m+[m[32m| Gerekli girdi | Tür | Neden |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| Her Berlin requirement için local counsel resmî kaynak/madde/istisna review kaydı | Legal approval | `SOURCE_UNVERIFIED` → `SOURCE_VERIFIED` geçişi ancak bununla değerlendirilir |[m
+[32m+[m[32m| Yetkili legal/uyum sorumlusunun immutable approval ledger kaydı | Legal approval | Requirement/rule-pack scope, rol, tarih, evidence hash ve geçerlilik gerekir |[m
+[32m+[m[32m| Her resmi registry için izinli API/sözleşme ve authorization evidence | Connector authorization | PENDING connector herhangi bir authority verification yapamaz |[m
+[32m+[m[32m| Connector credential’ları (varsa) | Secret | Yalnız izinli integration tasarlanıp onaylandığında güvenli secret yönetimiyle eklenir |[m
+[32m+[m[32m| de-DE legal + linguist + product approval ledger kayıtları | Legal/localization approval | `DRAFT_MACHINE` kullanıcı runtime’ına çıkamaz |[m
+[32m+[m[32m| Açık `PRODUCT_RELEASE_APPROVAL` | Product approval | Legal source onayından ayrı, activation öncesi zorunludur |[m
+[32m+[m[32m| Environment isolation ve production change record | Operations evidence | Managed TiDB sonucu production-applied sayılmamalıdır |[m
+[32m+[m
+[32m+[m[32m## 10. Required Owner Checkpoint Decision[m
+[32m+[m
+[32m+[m[32m**CHECKPOINT A’da duruldu.** Owner’ın sonraki adıma ilişkin açık kararına kadar yalnız mevcut common scaffold ve Germany/Berlin discovery kayıtları korunacaktır. Bu karar, tek başına hukuk onayı, connector yetkisi, release onayı veya production aktivasyonu değildir. Açık yönlendirme gelmeden Japan/Tokyo, ABD/Los Angeles, Çin/Shanghai, Rusya/Moskova ve CHECKPOINT B başlatılmayacaktır.[m
+[1mdiff --git a/docs/compliance/DE_BERLIN_CHECKPOINT_A_MATRIX.md b/docs/compliance/DE_BERLIN_CHECKPOINT_A_MATRIX.md[m
+[1mnew file mode 100644[m
+[1mindex 0000000..4ddec0d[m
+[1m--- /dev/null[m
+[1m+++ b/docs/compliance/DE_BERLIN_CHECKPOINT_A_MATRIX.md[m
+[36m@@ -0,0 +1,104 @@[m
+[32m+[m[32m# Germany / Berlin — CHECKPOINT A Source and Service-Credential Matrix[m
+[32m+[m
+[32m+[m[32m**Country deployment:** `DE` — `SCAFFOLD_ONLY`[m[41m  [m
+[32m+[m[32m**Pilot jurisdiction node:** `DE-BE-BERLIN` — `SCAFFOLD_ONLY`[m[41m  [m
+[32m+[m[32m**Scope boundary:** Common Global Scaffold + Germany/Berlin Faz 1–4 only[m[41m  [m
+[32m+[m[32m**Status:** **CHECKPOINT A — NO-GO / owner decision required**[m
+[32m+[m
+[32m+[m[32m> Bu kayıtlar, kullanıcı tarafından sağlanan başlangıç araştırmasından alınmış **OFFICIAL_SOURCE_FOUND + SOURCE_UNVERIFIED** discovery satırlarıdır. URL’nin kaydedilmesi, hukuki metnin doğrulanması, bir istisnanın yorumlanması, bir issuer’ın yetkilendirilmesi veya connector erişim izni anlamına gelmez. Bu belge hiçbir şekilde `LEGAL_SOURCE_APPROVAL` ya da `PRODUCT_RELEASE_APPROVAL` değildir.[m
+[32m+[m
+[32m+[m[32m## 1. Coverage ve Varsayılan-Kapalı Karar[m
+[32m+[m
+[32m+[m[32mMevcut canlı kataloğun 79 canonical capability kaydı, `service_capability_definitions` tablosundaki `capability:*` kaydıyla bire bir ilişkilendirilmiştir. `DE-BE-BERLIN` için bu 79 kaydın her biri ayrı `capability_policy_decisions` satırına sahip olsa da tamamı `BLOCKED` durumundadır. Bu, capability’nin Berlin’de sunulabileceği veya herhangi bir belge gerektiği anlamına gelmez; yalnız belirsizlikte market erişiminin kapalı kaldığını gösterir.[m
+[32m+[m
+[32m+[m[32m| Ölçüm | Değer | Güvenlik etkisi |[m
+[32m+[m[32m|---|---:|---|[m
+[32m+[m[32m| Canonical capability tanımı | 79 | Mevcut katalog kapsamı kayıpsız ilişkilendirildi |[m
+[32m+[m[32m| Berlin policy kararı | 79 | Her satır `BLOCKED` |[m
+[32m+[m[32m| `SOURCE_VERIFIED` policy | 0 | Hiçbiri policy eligible değildir |[m
+[32m+[m[32m| `DRAFT_MACHINE` policy localization | 79 | Kullanıcı runtime’ına açılamaz |[m
+[32m+[m[32m| Berlin dışı sonraki checkpoint city node’u | 0 | Tokyo/LA/Shanghai/Moskova başlatılmadı |[m
+[32m+[m
+[32m+[m[32m| Ortak capability-decision alanı | Berlin başlangıç değeri | Açılma sonucu |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| `decision` | `BLOCKED` | Teklif, onboarding, booking ve ödeme açılmaz |[m
+[32m+[m[32m| `sourceState` | `UNVERIFIED` | SOURCE_VERIFIED / POLICY_ELIGIBLE üretilemez |[m
+[32m+[m[32m| `legalState` | `PENDING` | Local counsel onayı yok |[m
+[32m+[m[32m| `connectorState` | `PENDING` | Resmî doğrulama yok |[m
+[32m+[m[32m| `releaseState` | `PENDING` | Product release onayı yok |[m
+[32m+[m[32m| `translationState` | `DRAFT_MACHINE` | Legal/runtime fallback yasak |[m
+[32m+[m[32m| `dataResidencyState` | `NOT_READY` | Data/privacy gate kapalı |[m
+[32m+[m[32m| `sanctionsState` | `UNKNOWN` | Belirsizlikte blok |[m
+[32m+[m
+[32m+[m[32m## 2. Service–Credential Matrix[m
+[32m+[m
+[32m+[m[32mBu checkpoint’te hiçbir credential type, canlı capability’ye hukuken bağlanmış değildir. Bu nedenle aşağıdaki satırlar **belge isteme kuralı değildir**; yalnız sonraki counsel/source review için boş, default-off credential şablonlarıdır. Painting, towing, moving, courier veya başka bir capability’ye bu checkpoint’te otomatik belge yükleme zorunluluğu uygulanmaz; capability zaten kapalıdır.[m
+[32m+[m
+[32m+[m[32m| Capability coverage | Credential shell | Classification | Extraction / verification | Mevcut karar |[m
+[32m+[m[32m|---|---|---|---|---|[m
+[32m+[m[32m| 79 canonical Berlin capability’sinin tamamı | `DE_HANDWERKSROLLE` | `UNCLASSIFIED` | `extractionAllowed=0`; authority verification yok | `BLOCKED` |[m
+[32m+[m[32m| 79 canonical Berlin capability’sinin tamamı | `DE_UTILITY_INSTALLER_LIST` | `UNCLASSIFIED` | `extractionAllowed=0`; connector yok | `BLOCKED` |[m
+[32m+[m[32m| 79 canonical Berlin capability’sinin tamamı | `DE_FGAS_PERSON_COMPANY_CERTIFICATE` | `UNCLASSIFIED` | `extractionAllowed=0`; issuer/scope doğrulanmadı | `BLOCKED` |[m
+[32m+[m[32m| 79 canonical Berlin capability’sinin tamamı | `DE_FREIGHT_AUTHORITY_AND_INSURANCE` | `UNCLASSIFIED` | `extractionAllowed=0`; route/weight/vehicle trigger doğrulanmadı | `BLOCKED` |[m
+[32m+[m[32m| 79 canonical Berlin capability’sinin tamamı | `DE_POSTAL_PROVIDER_REGISTRY` | `UNCLASSIFIED` | `extractionAllowed=0`; postal/cargo ayrımı doğrulanmadı | `BLOCKED` |[m
+[32m+[m
+[32m+[m[32m> **UNKNOWN = BLOCK:** Service/capability → credential bağının bulunmaması, ilgili capability için bir “belge gerekmiyor” sonucu değildir. Bu bağlantı kurulup yetkili local counsel tarafından onaylanana kadar `PROFILE_INCOMPLETE` / `SOURCE_UNVERIFIED` nedeniyle activation mümkün değildir.[m
+[32m+[m
+[32m+[m[32m## 3. Berlin Requirement–Source Matrix[m
+[32m+[m
+[32m+[m[32m| Requirement / discovery key | Araştırma referansı | Başlangıç kapsam notu | Source state | Authoritative / legal approval | Enforcement |[m
+[32m+[m[32m|---|---|---|---|---|---|[m
+[32m+[m[32m| `DE-BE-DE-HWO` | [Handwerksordnung](https://www.gesetze-im-internet.de/hwo/) | Anlage A/B craft/notification tetiklerinin araştırma kaydı | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-NAV-13` | [NAV §13](https://www.gesetze-im-internet.de/nav/BJNR247710006.html) | Electric utility installer-list discovery | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-AVBWASSERV-12` | [AVBWasserV §12](https://www.gesetze-im-internet.de/avbwasserv/BJNR007500980.html) | Water utility installer-list discovery | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-NDAV-13` | [NDAV §13](https://www.gesetze-im-internet.de/ndav/__13.html) | Gas installer directory discovery | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-CHEMKLIMASCHUTZV-2026` | [ChemKlimaschutzV 2026](https://www.gesetze-im-internet.de/chemklimaschutzv_2026/) | F-gas person/company discovery | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-BALM-GUETERVERKEHR` | [BALM freight FAQ](https://www.balm.bund.de/DE/Service/FragenAntwortenFAQ/FragenAntwortenGueterverkehr/fragenantwortengueterverkehr.html) | Moving/freight authority, route/weight/insurance discovery | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-POSTG-2024` | [PostG 2024](https://www.gesetze-im-internet.de/postg_2024/BJNR0EC0B0024.html) | Postal-service versus cargo discovery | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-BNETZA-POST-DIRECTORY` | [Bundesnetzagentur provider directory](https://www.bundesnetzagentur.de/DE/Fachthemen/Post/Anbieterverzeichnis/artikel.html) | Postal provider directory discovery | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-DVGW-INSTALLER-RESEARCH` | [DVGW](https://www.dvgw.de/) | Gas/water installer discovery reference | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m[32m| `DE-BE-DE-VDE-TAB-RESEARCH` | [VDE](https://www.vde.com/) | VDE/TAB/utility technical reference discovery | `SOURCE_UNVERIFIED` | `false` / `PENDING` | `BLOCKED` |[m
+[32m+[m
+[32m+[m[32m**Source counts:** `SOURCE_VERIFIED = 0 / 10`; `SOURCE_UNVERIFIED = 10 / 10`; source hash present = `0 / 10`. Satırların hiçbirinde source hash veya counsel approval kaydı yoktur; bunun yerine `SOURCE_UNVERIFIED_LOCAL_COUNSEL_REQUIRED` blok nedeni bulunur.[m
+[32m+[m
+[32m+[m[32m## 4. Connector Registry[m
+[32m+[m
+[32m+[m[32mBu dört kayıt bir connector integration veya yetkili sorgu yüzeyi değildir. Hepsi `PENDING`, assurance `NONE`, `forbiddenScraping=1` ve authorization evidence hash’i boştur. Login gerektiren portal scrape edilmemiştir.[m
+[32m+[m
+[32m+[m[32m| Connector key | Discovery source | Durum | Assurance | Forbidden scraping | Yetkili API/sözleşme |[m
+[32m+[m[32m|---|---|---|---|---:|---|[m
+[32m+[m[32m| `DE_HANDWERKSKAMMER_REGISTRY` | `DE-HWO` | `PENDING` | `NONE` | 1 | `NOT_CONFIGURED` |[m
+[32m+[m[32m| `DE_UTILITY_INSTALLER_REGISTRY` | `DE-NAV-13` | `PENDING` | `NONE` | 1 | `NOT_CONFIGURED` |[m
+[32m+[m[32m| `DE_BALM_FREIGHT_REGISTRY` | `DE-BALM-GUETERVERKEHR` | `PENDING` | `NONE` | 1 | `NOT_CONFIGURED` |[m
+[32m+[m[32m| `DE_BNETZA_POST_REGISTRY` | `DE-BNETZA-POST-DIRECTORY` | `PENDING` | `NONE` | 1 | `NOT_CONFIGURED` |[m
+[32m+[m
+[32m+[m[32m## 5. Legal Localization Shell[m
+[32m+[m
+[32m+[m[32m| Legal surface | Locale | Localization state | Runtime selectable | Legal approval |[m
+[32m+[m[32m|---|---|---|---:|---|[m
+[32m+[m[32m| Consumer terms | `de-DE` | `DRAFT_MACHINE` | 0 | `PENDING` |[m
+[32m+[m[32m| Provider agreement | `de-DE` | `DRAFT_MACHINE` | 0 | `PENDING` |[m
+[32m+[m[32m| Privacy notice | `de-DE` | `DRAFT_MACHINE` | 0 | `PENDING` |[m
+[32m+[m[32m| Cookie notice | `de-DE` | `DRAFT_MACHINE` | 0 | `PENDING` |[m
+[32m+[m[32m| Appeal notice | `de-DE` | `DRAFT_MACHINE` | 0 | `PENDING` |[m
+[32m+[m[32m| Incident notice | `de-DE` | `DRAFT_MACHINE` | 0 | `PENDING` |[m
+[32m+[m
+[32m+[m[32mBu kayıtların `contentHash` ve `contentStorageKey` alanları boştur. Bu intentional fail-closed tasarımdır: makine taslağı üretildi, kullanıma sunuldu veya hukuken onaylandı iddiası yoktur.[m
+[32m+[m
+[32m+[m[32m## 6. Exact NO-GO List ve CHECKPOINT A Kararı[m
+[32m+[m
+[32m+[m[32m| NO-GO nedeni | Kapsam | Açılmayı engelleyen kanıt |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| Country shell kapalı | `DE` ve tüm 79 Berlin capability | Tüm feature gate’ler `0`; country state `SCAFFOLD_ONLY` |[m
+[32m+[m[32m| Jurisdiction scaffold-only | `DE-BE-BERLIN` | Node state `SCAFFOLD_ONLY` |[m
+[32m+[m[32m| Kaynak belirsiz | 10/10 discovery satırı | `SOURCE_UNVERIFIED`; source hash yok |[m
+[32m+[m[32m| Local counsel approval yok | Tüm source/requirement satırları | `authoritative=false`, legal state `PENDING` |[m
+[32m+[m[32m| Official connector yok | 4 connector shell | `PENDING`, `NONE`, `forbiddenScraping=1` |[m
+[32m+[m[32m| Legal locale onaylı değil | 6 de-DE legal surface | `DRAFT_MACHINE`, runtime selectable `0` |[m
+[32m+[m[32m| Product release onayı yok | Tüm Berlin capability | release state `PENDING` |[m
+[32m+[m[32m| Data/privacy/payment gate kapalı | Tüm Berlin capability | data-residency `NOT_READY` |[m
+[32m+[m[32m| Türkiye Blok 1 korunuyor | `transport.freight`, `moving.household`, `towing.roadside` | SOURCE_UNVERIFIED state mutasyonu = `0` |[m
+[32m+[m
+[32m+[m[32m**Exact PASS allowlist:** Yok.[m[41m  [m
+[32m+[m[32m**Exact production allowlist:** Yok.[m[41m  [m
+[32m+[m[32m**Checkpoint A kararı:** Germany/Berlin source/credential matrix owner incelemesine sunulmuştur. `SOURCE_VERIFIED`, `LEGAL_SOURCE_APPROVAL`, `PRODUCT_RELEASE_APPROVAL`, connector assurance veya production activation oluşturulmamıştır. CHECKPOINT B / Japan-Tokyo başlatılamaz.[m
+[1mdiff --git a/docs/compliance/FAZ0_FIVE_COUNTRY_AUDIT.md b/docs/compliance/FAZ0_FIVE_COUNTRY_AUDIT.md[m
+[1mnew file mode 100644[m
+[1mindex 0000000..3c4519f[m
+[1m--- /dev/null[m
+[1m+++ b/docs/compliance/FAZ0_FIVE_COUNTRY_AUDIT.md[m
+[36m@@ -0,0 +1,120 @@[m
+[32m+[m[32m# Faz 0 — Beş Ülke Güvenli Altyapı Salt-Okunur Denetimi[m
+[32m+[m
+[32m+[m[32m**Tarih:** 22 Ağustos 2026[m[41m  [m
+[32m+[m[32m**Bağlayıcı talimat:** `MoveFix_Manus_Bes_Ulke_Guvenli_Altyapi_Komutu_v1(1).txt`[m[41m  [m
+[32m+[m[32m**Baseline:** `70645d3c4631e150012367cd57e5d8a7b5ab7394` (`70645d3`)[m[41m  [m
+[32m+[m[32m**Kapsam sınırı:** Bu denetim hiçbir country deployment, rule-pack, connector, release kaydı veya production aktivasyonu oluşturmaz.[m
+[32m+[m
+[32m+[m[32m> Bu belge yalnız Faz 0 gerçeklik envanteridir. Araştırma raporu ve seed dosyası **SOURCE_UNVERIFIED** / bağlayıcı olmayan başlangıç girdisidir. Hiçbir satır hukuk onayı, resmi kaynak doğrulaması ya da ürün yayın onayı değildir.[m
+[32m+[m
+[32m+[m[32m## 1. Sonuç ve Korunan Durum[m
+[32m+[m
+[32m+[m[32mÇalışma ağacı `main` dalında ve HEAD `70645d3` checkpoint’indedir. Çalışma ağacındaki tek değişiklik `todo.md` idi; bu kullanıcı/iş takip değişikliği korunmuştur. Audit sırasında production publish, country veya capability activation, kullanıcı verisi değişimi ve Türkiye Blok 1’e yazım yapılmamıştır.[m
+[32m+[m
+[32m+[m[32m| Denetim maddesi | Kanıt / sonuç | Durum |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| Aktif dal ve HEAD | `main`, `70645d3c4631e150012367cd57e5d8a7b5ab7394` | Korundu |[m
+[32m+[m[32m| Kirli çalışma ağacı | Yalnız `todo.md` değiştirilmişti | Korundu; üzerine yazılmadı |[m
+[32m+[m[32m| Türkiye Blok 1 | `transport.freight`, `moving.household`, `towing.roadside` SOURCE_UNVERIFIED / NO-GO | Değişmedi |[m
+[32m+[m[32m| LEGAL_SOURCE_APPROVAL | Yok | NO-GO korunur |[m
+[32m+[m[32m| PRODUCT_RELEASE_APPROVAL | Yok | NO-GO korunur |[m
+[32m+[m[32m| Publish / production activation | Yapılmadı | Yasak sürüyor |[m
+[32m+[m
+[32m+[m[32m## 2. Mevcut Migration ve Capability Profile Gerçekliği[m
+[32m+[m
+[32m+[m[32m`0083_faz8a_capability_profile.sql`, `provider_capability_profiles` tablosunu eklemiştir. Bu tablo ilk sürümde provider/capability/jurisdiction kapsamı, legacy `operatingModel`, profile statüsü ve serbest metin onay referanslarını içeriyordu. `0084_faz8a_approval_ledger_state_machine.sql`, mevcut 0083 satırlarını silmeden operating model sürümü/kodu, ayrık declaration/source/legal/release/voluntary suspension/enforcement durumları ve optimistic `stateVersion` eklemiştir.[m
+[32m+[m
+[32m+[m[32m| Varlık | Doğrulanmış mevcut güvenlik niteliği | Beş ülke scaffold açısından sınır |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| `provider_capability_profiles` | Provider’a ait capability profili; enforcement ve ayrı state alanları mevcut | Global country deployment veya jurisdiction hierarchy değildir |[m
+[32m+[m[32m| `provider_capability_approval_ledger` | Profile-bazlı, append-only olay modeli; legal source/product release türleri | Tüm artifact türlerini kapsayan ülke-geneli ledger değildir |[m
+[32m+[m[32m| `provider_capability_enforcement_events` | Suspend/block/release olayları, yetkili/auditli akış | Country-level release veya connector state modeli değildir |[m
+[32m+[m[32m| `jurisdictions` | `countryCode` + isteğe bağlı `regionCode`; tekil country-region kaydı | Parent/child hierarchy, locale/timezone/data plane ve pilot state içermez |[m
+[32m+[m[32m| `service_capabilities` | Mevcut capability envanteri | Canonical service/subservice/task + risk + required dimensions global modeli değildir |[m
+[32m+[m
+[32m+[m[32mMigration günlüğünde son kayıt `0084_faz8a_approval_ledger_state_machine` olduğundan sonraki additive migration numarası **0085**’tir.[m
+[32m+[m
+[32m+[m[32m## 3. Türkiye Blok 1 ve Sağlayıcı Etkisi[m
+[32m+[m
+[32m+[m[32mFaz 0 sorgusu yalnız toplulaştırılmış sonuç üretmiştir; kişisel veri alınmamıştır. Mevcut sistemde 2 sağlayıcı bulunur; 0 sağlayıcı doğrulanmış/onaylı, 2 sağlayıcı müsait durumundadır. Bu sonuç herhangi bir profile activation veya transition window başlatmaz.[m
+[32m+[m
+[32m+[m[32m| Alan | Değer | Sonuç |[m
+[32m+[m[32m|---|---:|---|[m
+[32m+[m[32m| Toplam sağlayıcı | 2 | Sadece etki envanteri |[m
+[32m+[m[32m| Doğrulanmış/onaylı sağlayıcı | 0 | Geçiş penceresi/aktif kural tetiklemez |[m
+[32m+[m[32m| Müsait sağlayıcı | 2 | Kişisel veri olmadan toplulaştırıldı |[m
+[32m+[m[32m| Türkiye mevcut jurisdiction kaydı | 1 | Mevcut veri korunacak |[m
+[32m+[m[32m| Türkiye üç yüksek risk capability | 3 | SOURCE_UNVERIFIED ve NO-GO değişmeden kalacak |[m
+[32m+[m
+[32m+[m[32mTürkiye rule-pack ve profile politikasında provider’ın kendi API’siyle source, legal, release veya enforcement state oluşturmasına izin verilmez. Provider belge/profil beyanı yazabilir; sistem durumları server/owner yetkisine ve doğrulanmış ledger ilişkilerine bağlıdır. Bu ayrım 0084 modelinde `declarationState`, `sourceVerificationState`, `legalApprovalState`, `releaseApprovalState`, `voluntarySuspensionState` ve `enforcementState` ile açıkça bulunur.[m
+[32m+[m
+[32m+[m[32m## 4. Katalog, Yerelleştirme ve Environment Envanteri[m
+[32m+[m
+[32m+[m[32mGerçek database sorgusuna göre aktif katalogda 16 üst hizmet, 62 aktif alt hizmet ve 46 aktif alias bulunur. Mevcut capability sayısı 79’dur. Bunlar henüz beş-ülke canonical mapping’i değildir; bu nedenle yeni ülkeler için `canonical_mapped_count`, `unmapped_count`, `blocked_count` ve coverage yüzdesi Faz 0’da hesaplanamaz. Scaffold sonrasında tüm yeni country/capability yolları varsayılan olarak block edilmiş başlayacaktır.[m
+[32m+[m
+[32m+[m[32m| Envanter | Doğrulanmış değer | Faz 0 yorumu |[m
+[32m+[m[32m|---|---:|---|[m
+[32m+[m[32m| Aktif üst hizmet | 16 | Canlı katalog source-of-truth |[m
+[32m+[m[32m| Aktif alt hizmet | 62 | Country service matrix henüz yok |[m
+[32m+[m[32m| Aktif alias | 46 | Alias resmi/uyum fallback’i değildir |[m
+[32m+[m[32m| Mevcut capability | 79 | Yeni service capability definitions ile ilişkilendirilecek, kopyalanmayacak |[m
+[32m+[m[32m| Feature-flag sürüm kaydı | 0 | Country-specific default-off bayrakları yeni scaffold ile eklenecek |[m
+[32m+[m[32m| Mevcut country/jurisdiction kaydı | 1 | Türkiye kaydı korunacak |[m
+[32m+[m
+[32m+[m[32mUygulama bugün `tr-TR` ve 13-dil i18n altyapısına; para birimi alanlarında `TRY` varsayılanına; bazı kayıtlarda `countryCode` alanına sahiptir. Ancak country deployment’a bağlı locale/timezone/address profile/data plane modeli yoktur. `price_intelligence_assessments` tablosu `countryCode` ve üç harfli `currency` tutsa da tek başına bir country launch gate oluşturmaz.[m
+[32m+[m
+[32m+[m[32mEnvironment sözleşmesi `NODE_ENV=production` için zorunlu secret/config kontrolleri uygular; salt-okunur denetim mevcut managed TiDB çalışma ortamına ve development server’a erişmiştir. Production, staging ve development’ın fiziksel/veri/log/connector olarak ayrıldığına ilişkin kanıt veya production change-record yoktur. Bu nedenle durum **ENVIRONMENT_SEPARATION_UNVERIFIED**’dır; hiçbir migration production-applied sayılmaz.[m
+[32m+[m
+[32m+[m[32m## 5. Mevcut Privacy, Notice, Appeal, Incident ve Audit Modelleri[m
+[32m+[m
+[32m+[m[32m| Alan | Mevcut model | Global scaffold gap’i |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| Privacy | `privacy_rights_requests`, `privacy_legal_holds` | Country legal text/data-residency bağları yok |[m
+[32m+[m[32m| Incident | `safety_incidents`, check-in/contact modelleri | Jurisdiction clock/regulator/template matrisi yok |[m
+[32m+[m[32m| Appeal | `provider_capability_appeals` | Country notice locale, bağımsızlık kanıtı ve policy-decision referansı yok |[m
+[32m+[m[32m| Audit | Job timeline, consent events ve Faz 8-A ledger/event tabloları | Tek bir country artifact/approval/activation audit graph’ı yok |[m
+[32m+[m[32m| Legal documents | Uygulama yüzeylerinde i18n ve privacy metinleri vardır | `legal_documents` / `localized_legal_versions` sürüm-onay ledger’ı yok |[m
+[32m+[m
+[32m+[m[32m## 6. Preserve List[m
+[32m+[m
+[32m+[m[32m1. Türkiye Blok 1 üç capability’sinin SOURCE_UNVERIFIED, NO-GO, approval yok ve enforcement fail-closed statüsü.[m
+[32m+[m[32m2. Mevcut kullanıcı, provider, katalog, credential ve financial kayıtları.[m
+[32m+[m[32m3. 0083/0084 provider profile, ledger ve enforcement davranışları.[m
+[32m+[m[32m4. Mevcut `jurisdictions`, `service_capabilities`, provider document, appeal, privacy, incident ve audit tablolarının isimleri ve davranışları.[m
+[32m+[m[32m5. Kullanıcının `todo.md` değişikliği ve tüm mevcut mobil/MoveOS UI düzeni.[m
+[32m+[m[32m6. Mevcut 13-dil i18n düzeni; yeni makine-çevirisi runtime’a veya kullanıcıya gösterilmeyecek.[m
+[32m+[m
+[32m+[m[32m## 7. Gap List[m
+[32m+[m
+[32m+[m[32m1. Beş country shell için `country_deployments`, ayrı feature gate’ler, data plane kimliği ve immutable activation run kaydı yoktur.[m
+[32m+[m[32m2. Parent/child jurisdiction, official code, locale, timezone, currency ve address profile taşıyan hiyerarşik model yoktur.[m
+[32m+[m[32m3. Canonical service/subservice/task + risk + required profile dimensions + `blocked_by_default` modeli yoktur.[m
+[32m+[m[32m4. Global `official_sources`, `legal_requirements`, credential type/issuer, verification connector/evidence/event modelleri yoktur.[m
+[32m+[m[32m5. Country-wide source/legal/connector/release/enforcement/translation/data/sanctions durumlarını ayrı tutan policy decision modeli yoktur.[m
+[32m+[m[32m6. Ülke/yargı alanına göre legal-document localisation, incident notice matrix, appeal ve country activation preflight modelleri yoktur.[m
+[32m+[m[32m7. Country dashboard, catalog coverage, source/legal/connector dashboard ve activation preflight owner ekranları yoktur.[m
+[32m+[m[32m8. DE-BE-BERLIN için Handwerksordnung/NAV/AVBWasserV/DVGW/VDE/TAB satırları yoktur; kaynak onayı veya connector kanıtı da yoktur.[m
+[32m+[m
+[32m+[m[32m## 8. Additive Migration ve Uygulama Planı[m
+[32m+[m
+[32m+[m[32m| Sıra | Planlanan işlem | Başlangıç güvenlik durumu |[m
+[32m+[m[32m|---|---|---|[m
+[32m+[m[32m| 0085 | Global country deployment, jurisdiction node, capability definition, source/legal/credential/connector/evidence, legal localisation, decision, appeal, incident ve activation-run tabloları | Tüm country gate’leri `false`; state `SCAFFOLD_ONLY`; source `SOURCE_UNVERIFIED`; authoritative `false` |[m
+[32m+[m[32m| 0085 seed | Beş country shell ve root/pilot jurisdiction kayıtları | DE/JP/US/CN `SCAFFOLD_ONLY`; RU `INFRA_ONLY_NO_GO`; hiçbir capability açılmaz |[m
+[32m+[m[32m| Policy | Server-only country activation preflight, explicit allowlist, NO-GO/unknown block | Provider system state yazamaz; machine locale `DRAFT_MACHINE` kalır |[m
+[32m+[m[32m| DE-BE | Berlin source/matrix/locale/connector shell | Requirement ve connectorlar UNVERIFIED/PENDING; tüm capability’ler blocked |[m
+[32m+[m[32m| QA | Migration-forward, authorization, default-off, NO-GO, Türkiye regression testleri | Test atlama veya zayıflatma yok |[m
+[32m+[m
+[32m+[m[32m## 9. Rollback Planı[m
+[32m+[m
+[32m+[m[32mBu görev için rollback destructive `DROP TABLE` değildir. Uygulama geri alma planı aşağıdaki gibi kalacaktır:[m
+[32m+[m
+[32m+[m[32m1. Owner/server-only kill switch ile ilgili country gate’lerini `false` yap.[m
+[32m+[m[32m2. `country_deployments.state` değerini `SUSPENDED` veya başlangıç kabuğuna geri döndür; activation run’a immutable rollback olayı ekle.[m
+[32m+[m[32m3. Her capability policy decision’ı `BLOCKED` / NO-GO üretir; mevcut Türkiye policy verisine dokunulmaz.[m
+[32m+[m[32m4. Forward migration tabloları korunur; test/staging dışındaki fiziksel schema rollback yalnız onaylı change record ve doğrulanmış yedek/restore planı ile değerlendirilir.[m
+[32m+[m[32m5. Her migration için idempotent/additive forward test ve mantıksal rollback testi yazılır.[m
+[32m+[m
+[32m+[m[32m## 10. Faz 0 Kararı[m
+[32m+[m
+[32m+[m[32m**Faz 0 tamamlandı.** Common Global Scaffold, yalnız yukarıdaki preserve/gap/migration/rollback sınırları altında uygulanabilir. Audit herhangi bir local counsel, official source, connector, legal approval veya product release approval üretmemiştir. Germany/Berlin çalışması yalnız **CHECKPOINT A** kapsamına kadar ilerleyebilir; Japan/Tokyo ve sonraki ülke blokları başlatılamaz.[m
+[1mdiff --git a/drizzle/0085_global_country_scaffold.sql b/drizzle/0085_global_country_scaffold.sql[m
+[1mnew file mode 100644[m
+[1mindex 0000000..c3cc096[m
+[1m--- /dev/null[m
+[1m+++ b/drizzle/0085_global_country_scaffold.sql[m
+[36m@@ -0,0 +1,329 @@[m
+[32m+[m[32m-- Global country infrastructure is additive and default-off. It deliberately[m
+[32m+[m[32m-- does not modify Turkey's legacy jurisdiction, rule-pack or provider data.[m
+[32m+[m[32mCREATE TABLE `country_deployments` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryCode` varchar(2) NOT NULL,[m
+[32m+[m[32m  `displayName` varchar(160) NOT NULL,[m
+[32m+[m[32m  `state` enum('SCAFFOLD_ONLY','RESEARCHING','SOURCE_REVIEW','LEGAL_REVIEW','CONNECTOR_PENDING','STAGING_READY','PILOT_READY','PRODUCTION_PARTIAL','PRODUCTION_ACTIVE','SUSPENDED','INFRA_ONLY_NO_GO') NOT NULL DEFAULT 'SCAFFOLD_ONLY',[m
+[32m+[m[32m  `dataPlaneClass` varchar(80) NOT NULL,[m
+[32m+[m[32m  `defaultLocale` varchar(32) NOT NULL,[m
+[32m+[m[32m  `defaultCurrency` varchar(3) NOT NULL,[m
+[32m+[m[32m  `defaultTimeZone` varchar(64) NOT NULL,[m
+[32m+[m[32m  `rawCredentialGlobalTransferAllowed` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `localDataPlaneReady` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `countryShellEnabled` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `jurisdictionEnabled` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `consumerDiscoveryEnabled` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `providerOnboardingEnabled` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `bookingEnabled` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `paymentsEnabled` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `aiAssistantEnabled` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `supportEnabled` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `productionStateReachable` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `seedVersion` varchar(64) NOT NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `country_deployments_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `country_deployments_country_unique` UNIQUE (`countryCode`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `jurisdiction_nodes` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `parentId` int NULL,[m
+[32m+[m[32m  `nodeCode` varchar(96) NOT NULL,[m
+[32m+[m[32m  `displayName` varchar(160) NOT NULL,[m
+[32m+[m[32m  `nodeType` enum('country','state','province','region','city','district','municipality') NOT NULL,[m
+[32m+[m[32m  `state` enum('SCAFFOLD_ONLY','SUSPENDED','ACTIVE') NOT NULL DEFAULT 'SCAFFOLD_ONLY',[m
+[32m+[m[32m  `locale` varchar(32) NOT NULL,[m
+[32m+[m[32m  `currency` varchar(3) NOT NULL,[m
+[32m+[m[32m  `timeZone` varchar(64) NOT NULL,[m
+[32m+[m[32m  `addressProfile` varchar(80) NOT NULL DEFAULT 'UNKNOWN',[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `jurisdiction_nodes_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `jurisdiction_nodes_node_code_unique` UNIQUE (`nodeCode`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `service_capability_definitions` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `canonicalServiceKey` varchar(120) NOT NULL,[m
+[32m+[m[32m  `canonicalCategoryId` int NULL,[m
+[32m+[m[32m  `displayName` varchar(160) NOT NULL,[m
+[32m+[m[32m  `serviceLevel` enum('category','subcategory','task') NOT NULL DEFAULT 'category',[m
+[32m+[m[32m  `requiredDimensionsJson` json NOT NULL,[m
+[32m+[m[32m  `blockedByDefault` int NOT NULL DEFAULT 1,[m
+[32m+[m[32m  `mappingState` enum('UNMAPPED_SERVICE_BLOCKED','MAPPED_BLOCKED','MAPPED_ELIGIBLE') NOT NULL DEFAULT 'UNMAPPED_SERVICE_BLOCKED',[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `service_capability_definitions_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `service_capability_definitions_key_unique` UNIQUE (`canonicalServiceKey`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `official_sources` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `jurisdictionNodeId` int NULL,[m
+[32m+[m[32m  `sourceKey` varchar(160) NOT NULL,[m
+[32m+[m[32m  `authorityName` varchar(240) NOT NULL,[m
+[32m+[m[32m  `sourceUrl` varchar(2048) NOT NULL,[m
+[32m+[m[32m  `sourceVersion` varchar(160) NOT NULL,[m
+[32m+[m[32m  `sourceHash` varchar(128) NULL,[m
+[32m+[m[32m  `sourceStatus` enum('SOURCE_UNVERIFIED','SOURCE_VERIFIED','SUPERSEDED','REVOKED') NOT NULL DEFAULT 'SOURCE_UNVERIFIED',[m
+[32m+[m[32m  `retrievalMethod` enum('MANUAL_REFERENCE','PERMITTED_API','AUTHORIZED_EXPORT','UNKNOWN') NOT NULL DEFAULT 'UNKNOWN',[m
+[32m+[m[32m  `verifiedByApprovalLedgerId` int NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `official_sources_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `official_sources_scope_key_unique` UNIQUE (`countryDeploymentId`,`sourceKey`,`sourceVersion`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `legal_requirements` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `jurisdictionNodeId` int NULL,[m
+[32m+[m[32m  `capabilityDefinitionId` int NULL,[m
+[32m+[m[32m  `requirementKey` varchar(160) NOT NULL,[m
+[32m+[m[32m  `requirementVersion` varchar(80) NOT NULL,[m
+[32m+[m[32m  `requirementState` enum('UNKNOWN','REQUIRED','CONDITIONAL','NOT_REQUIRED','PROHIBITED') NOT NULL DEFAULT 'UNKNOWN',[m
+[32m+[m[32m  `authoritative` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `sourceStatus` enum('SOURCE_UNVERIFIED','SOURCE_VERIFIED') NOT NULL DEFAULT 'SOURCE_UNVERIFIED',[m
+[32m+[m[32m  `legalApprovalState` enum('PENDING','APPROVED','REVOKED','EXPIRED') NOT NULL DEFAULT 'PENDING',[m
+[32m+[m[32m  `officialSourceId` int NULL,[m
+[32m+[m[32m  `sourceReference` varchar(320) NULL,[m
+[32m+[m[32m  `blockingReasonCode` varchar(160) NOT NULL DEFAULT 'UNKNOWN_LEGAL_REQUIREMENT',[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `legal_requirements_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `legal_requirements_scope_key_version_unique` UNIQUE (`countryDeploymentId`,`requirementKey`,`requirementVersion`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `credential_types` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `credentialKey` varchar(160) NOT NULL,[m
+[32m+[m[32m  `displayName` varchar(200) NOT NULL,[m
+[32m+[m[32m  `rawCredentialClassification` varchar(80) NOT NULL DEFAULT 'UNCLASSIFIED',[m
+[32m+[m[32m  `extractionAllowed` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `credential_types_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `credential_types_country_key_unique` UNIQUE (`countryDeploymentId`,`credentialKey`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `credential_issuers` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `credentialTypeId` int NOT NULL,[m
+[32m+[m[32m  `issuerKey` varchar(160) NOT NULL,[m
+[32m+[m[32m  `displayName` varchar(240) NOT NULL,[m
+[32m+[m[32m  `issuerStatus` enum('UNVERIFIED','VERIFIED','REVOKED') NOT NULL DEFAULT 'UNVERIFIED',[m
+[32m+[m[32m  `officialSourceId` int NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `credential_issuers_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `credential_issuers_country_key_unique` UNIQUE (`countryDeploymentId`,`issuerKey`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `verification_connectors` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `jurisdictionNodeId` int NULL,[m
+[32m+[m[32m  `connectorKey` varchar(160) NOT NULL,[m
+[32m+[m[32m  `displayName` varchar(240) NOT NULL,[m
+[32m+[m[32m  `status` enum('PENDING','UNVERIFIED','AUTHORIZED','OPERATIONAL','REVOKED','NOT_CONFIGURED') NOT NULL DEFAULT 'PENDING',[m
+[32m+[m[32m  `assuranceLevel` enum('NONE','DOCUMENT_ONLY','ISSUER_SIGNATURE','REGISTRY_MATCH','REGISTRY_STATUS') NOT NULL DEFAULT 'NONE',[m
+[32m+[m[32m  `forbiddenScraping` int NOT NULL DEFAULT 1,[m
+[32m+[m[32m  `authorizationEvidenceHash` varchar(128) NULL,[m
+[32m+[m[32m  `officialSourceId` int NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `verification_connectors_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `verification_connectors_country_key_unique` UNIQUE (`countryDeploymentId`,`connectorKey`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `credential_evidence` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `providerCredentialId` int NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `credentialTypeId` int NULL,[m
+[32m+[m[32m  `evidenceLevel` enum('SELF_ASSERTED','DOCUMENT_UPLOADED','DOCUMENT_EXTRACTED','ISSUER_SIGNATURE_VERIFIED','REGISTRY_MATCHED','REGISTRY_STATUS_ACTIVE','REVOCATION_MONITORED') NOT NULL DEFAULT 'SELF_ASSERTED',[m
+[32m+[m[32m  `evidenceHash` varchar(128) NOT NULL,[m
+[32m+[m[32m  `evidenceStatus` enum('PENDING','UNVERIFIED','VERIFIED','REVOKED','EXPIRED') NOT NULL DEFAULT 'PENDING',[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `credential_evidence_id` PRIMARY KEY (`id`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `verification_events` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `credentialEvidenceId` int NULL,[m
+[32m+[m[32m  `verificationConnectorId` int NULL,[m
+[32m+[m[32m  `eventType` enum('REQUESTED','EXTRACTED','MATCHED','STATUS_CHECKED','FAILED','REVOKED') NOT NULL,[m
+[32m+[m[32m  `resultState` enum('UNVERIFIED','MATCHED','ACTIVE','FAILED','REVOKED') NOT NULL DEFAULT 'UNVERIFIED',[m
+[32m+[m[32m  `correlationId` varchar(128) NOT NULL,[m
+[32m+[m[32m  `evidenceHash` varchar(128) NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `verification_events_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `verification_events_correlation_unique` UNIQUE (`correlationId`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `legal_documents` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `documentKey` varchar(160) NOT NULL,[m
+[32m+[m[32m  `documentVersion` varchar(80) NOT NULL,[m
+[32m+[m[32m  `documentSurface` enum('consumer_terms','provider_agreement','privacy_notice','cookie_notice','appeal_notice','incident_notice') NOT NULL,[m
+[32m+[m[32m  `legalApprovalState` enum('PENDING','APPROVED','REVOKED','EXPIRED') NOT NULL DEFAULT 'PENDING',[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `legal_documents_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `legal_documents_country_key_version_unique` UNIQUE (`countryDeploymentId`,`documentKey`,`documentVersion`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `localized_legal_versions` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `legalDocumentId` int NOT NULL,[m
+[32m+[m[32m  `locale` varchar(32) NOT NULL,[m
+[32m+[m[32m  `localizationState` enum('DRAFT_MACHINE','HUMAN_TRANSLATED','LEGAL_REVIEWED','LINGUIST_REVIEWED','APPROVED_STAGING','APPROVED_PRODUCTION','RETIRED') NOT NULL DEFAULT 'DRAFT_MACHINE',[m
+[32m+[m[32m  `contentHash` varchar(128) NULL,[m
+[32m+[m[32m  `contentStorageKey` varchar(512) NULL,[m
+[32m+[m[32m  `runtimeSelectable` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `localized_legal_versions_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `localized_legal_versions_document_locale_unique` UNIQUE (`legalDocumentId`,`locale`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `approval_ledger` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `jurisdictionNodeId` int NULL,[m
+[32m+[m[32m  `subjectType` enum('OFFICIAL_SOURCE','LEGAL_REQUIREMENT','CONNECTOR','LEGAL_DOCUMENT','CAPABILITY_POLICY','COUNTRY_ACTIVATION') NOT NULL,[m
+[32m+[m[32m  `subjectKey` varchar(240) NOT NULL,[m
+[32m+[m[32m  `approvalType` enum('SOURCE_VERIFICATION','LOCAL_LEGAL','LINGUIST','CONNECTOR_AUTHORIZATION','DATA_PRIVACY','PAYMENT_FUNDS_FLOW','PRODUCT_RELEASE') NOT NULL,[m
+[32m+[m[32m  `eventType` enum('GRANTED','REVOKED','EXPIRED','SUPERSEDED') NOT NULL,[m
+[32m+[m[32m  `approverUserId` int NOT NULL,[m
+[32m+[m[32m  `approverRole` varchar(120) NOT NULL,[m
+[32m+[m[32m  `authorityScope` varchar(240) NOT NULL,[m
+[32m+[m[32m  `evidenceHash` varchar(128) NOT NULL,[m
+[32m+[m[32m  `validFrom` timestamp NULL,[m
+[32m+[m[32m  `validUntil` timestamp NULL,[m
+[32m+[m[32m  `priorLedgerEventId` int NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `approval_ledger_id` PRIMARY KEY (`id`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `capability_policy_decisions` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `jurisdictionNodeId` int NULL,[m
+[32m+[m[32m  `capabilityDefinitionId` int NOT NULL,[m
+[32m+[m[32m  `scopeKey` varchar(280) NOT NULL,[m
+[32m+[m[32m  `decision` enum('BLOCKED','REVIEW_REQUIRED','POLICY_ELIGIBLE','ACTIVE','SUSPENDED') NOT NULL DEFAULT 'BLOCKED',[m
+[32m+[m[32m  `sourceState` enum('UNVERIFIED','VERIFIED','BLOCKED') NOT NULL DEFAULT 'UNVERIFIED',[m
+[32m+[m[32m  `legalState` enum('PENDING','APPROVED','REVOKED','EXPIRED') NOT NULL DEFAULT 'PENDING',[m
+[32m+[m[32m  `connectorState` enum('PENDING','UNVERIFIED','AUTHORIZED','OPERATIONAL','BLOCKED') NOT NULL DEFAULT 'PENDING',[m
+[32m+[m[32m  `releaseState` enum('PENDING','APPROVED','REVOKED','EXPIRED') NOT NULL DEFAULT 'PENDING',[m
+[32m+[m[32m  `enforcementState` enum('CLEAR','SUSPENDED','BLOCKED') NOT NULL DEFAULT 'CLEAR',[m
+[32m+[m[32m  `translationState` enum('UNREVIEWED','DRAFT_MACHINE','APPROVED') NOT NULL DEFAULT 'UNREVIEWED',[m
+[32m+[m[32m  `dataResidencyState` enum('UNKNOWN','NOT_READY','READY','BLOCKED') NOT NULL DEFAULT 'UNKNOWN',[m
+[32m+[m[32m  `sanctionsState` enum('UNKNOWN','CLEAR','BLOCKED') NOT NULL DEFAULT 'UNKNOWN',[m
+[32m+[m[32m  `stateVersion` int NOT NULL DEFAULT 1,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `capability_policy_decisions_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `capability_policy_decisions_scope_unique` UNIQUE (`scopeKey`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `country_capability_appeals` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `capabilityPolicyDecisionId` int NOT NULL,[m
+[32m+[m[32m  `providerId` int NULL,[m
+[32m+[m[32m  `status` enum('SUBMITTED','UNDER_REVIEW','ACCEPTED','REJECTED','WITHDRAWN') NOT NULL DEFAULT 'SUBMITTED',[m
+[32m+[m[32m  `statement` text NOT NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `country_capability_appeals_id` PRIMARY KEY (`id`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `incident_jurisdiction_matrix` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `jurisdictionNodeId` int NULL,[m
+[32m+[m[32m  `incidentType` varchar(120) NOT NULL,[m
+[32m+[m[32m  `notificationState` enum('UNKNOWN','NOT_CONFIGURED','CONFIGURED','BLOCKED') NOT NULL DEFAULT 'NOT_CONFIGURED',[m
+[32m+[m[32m  `legalRequirementId` int NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `incident_jurisdiction_matrix_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `incident_jurisdiction_matrix_scope_unique` UNIQUE (`countryDeploymentId`,`incidentType`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `incident_notices` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `incidentJurisdictionMatrixId` int NOT NULL,[m
+[32m+[m[32m  `locale` varchar(32) NOT NULL,[m
+[32m+[m[32m  `localizationState` enum('DRAFT_MACHINE','HUMAN_TRANSLATED','LEGAL_REVIEWED','APPROVED_PRODUCTION','RETIRED') NOT NULL DEFAULT 'DRAFT_MACHINE',[m
+[32m+[m[32m  `runtimeSelectable` int NOT NULL DEFAULT 0,[m
+[32m+[m[32m  `contentHash` varchar(128) NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `incident_notices_id` PRIMARY KEY (`id`),[m
+[32m+[m[32m  CONSTRAINT `incident_notices_matrix_locale_unique` UNIQUE (`incidentJurisdictionMatrixId`,`locale`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE TABLE `country_activation_runs` ([m
+[32m+[m[32m  `id` int AUTO_INCREMENT NOT NULL,[m
+[32m+[m[32m  `countryDeploymentId` int NOT NULL,[m
+[32m+[m[32m  `requestedState` varchar(40) NOT NULL,[m
+[32m+[m[32m  `result` enum('BLOCKED','PASSED','ABORTED') NOT NULL DEFAULT 'BLOCKED',[m
+[32m+[m[32m  `blockersJson` json NOT NULL,[m
+[32m+[m[32m  `actorUserId` int NULL,[m
+[32m+[m[32m  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,[m
+[32m+[m[32m  CONSTRAINT `country_activation_runs_id` PRIMARY KEY (`id`)[m
+[32m+[m[32m);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `country_deployments_state_idx` ON `country_deployments` (`state`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `jurisdiction_nodes_country_parent_idx` ON `jurisdiction_nodes` (`countryDeploymentId`,`parentId`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `jurisdiction_nodes_state_idx` ON `jurisdiction_nodes` (`state`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `service_capability_definitions_category_idx` ON `service_capability_definitions` (`canonicalCategoryId`,`mappingState`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `official_sources_country_status_idx` ON `official_sources` (`countryDeploymentId`,`sourceStatus`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `legal_requirements_capability_state_idx` ON `legal_requirements` (`capabilityDefinitionId`,`requirementState`,`authoritative`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `verification_connectors_status_idx` ON `verification_connectors` (`countryDeploymentId`,`status`,`assuranceLevel`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `credential_evidence_country_status_idx` ON `credential_evidence` (`countryDeploymentId`,`evidenceStatus`,`evidenceLevel`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `verification_events_connector_created_idx` ON `verification_events` (`verificationConnectorId`,`createdAt`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `approval_ledger_subject_idx` ON `approval_ledger` (`countryDeploymentId`,`subjectType`,`subjectKey`,`createdAt`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `approval_ledger_approver_idx` ON `approval_ledger` (`approverUserId`,`createdAt`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `capability_policy_decisions_country_decision_idx` ON `capability_policy_decisions` (`countryDeploymentId`,`decision`,`enforcementState`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `country_capability_appeals_decision_status_idx` ON `country_capability_appeals` (`capabilityPolicyDecisionId`,`status`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE INDEX `country_activation_runs_country_created_idx` ON `country_activation_runs` (`countryDeploymentId`,`createdAt`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mINSERT INTO `country_deployments` (`countryCode`,`displayName`,`state`,`dataPlaneClass`,`defaultLocale`,`defaultCurrency`,`defaultTimeZone`,`rawCredentialGlobalTransferAllowed`,`localDataPlaneReady`,`countryShellEnabled`,`jurisdictionEnabled`,`consumerDiscoveryEnabled`,`providerOnboardingEnabled`,`bookingEnabled`,`paymentsEnabled`,`aiAssistantEnabled`,`supportEnabled`,`productionStateReachable`,`seedVersion`) VALUES[m
+[32m+[m[32m  ('DE','Germany','SCAFFOLD_ONLY','EU_REGIONAL','de-DE','EUR','Europe/Berlin',0,0,0,0,0,0,0,0,0,0,0,'1.0.0'),[m
+[32m+[m[32m  ('JP','Japan','SCAFFOLD_ONLY','JP_LOCAL_OR_APPROVED_REGIONAL','ja-JP','JPY','Asia/Tokyo',0,0,0,0,0,0,0,0,0,0,0,'1.0.0'),[m
+[32m+[m[32m  ('US','United States','SCAFFOLD_ONLY','US_REGIONAL','en-US','USD','America/Los_Angeles',0,0,0,0,0,0,0,0,0,0,0,'1.0.0'),[m
+[32m+[m[32m  ('CN','China','SCAFFOLD_ONLY','CN_SEPARATE_LOCAL','zh-Hans-CN','CNY','Asia/Shanghai',0,0,0,0,0,0,0,0,0,0,0,'1.0.0'),[m
+[32m+[m[32m  ('RU','Russia','INFRA_ONLY_NO_GO','RU_SEPARATE_LOCAL','ru-RU','RUB','Europe/Moscow',0,0,0,0,0,0,0,0,0,0,0,'1.0.0');[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mINSERT INTO `jurisdiction_nodes` (`countryDeploymentId`,`parentId`,`nodeCode`,`displayName`,`nodeType`,`state`,`locale`,`currency`,`timeZone`,`addressProfile`)[m
+[32m+[m[32mSELECT `id`, NULL, `countryCode`, `displayName`, 'country', 'SCAFFOLD_ONLY', `defaultLocale`, `defaultCurrency`, `defaultTimeZone`, 'UNKNOWN' FROM `country_deployments`;[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mINSERT INTO `jurisdiction_nodes` (`countryDeploymentId`,`parentId`,`nodeCode`,`displayName`,`nodeType`,`state`,`locale`,`currency`,`timeZone`,`addressProfile`) VALUES[m
+[32m+[m[32m  ((SELECT id FROM country_deployments WHERE countryCode = 'DE'),(SELECT id FROM jurisdiction_nodes WHERE nodeCode = 'DE'),'DE-BE-BERLIN','Berlin','city','SCAFFOLD_ONLY','de-DE','EUR','Europe/Berlin','UNKNOWN');[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mINSERT INTO `service_capability_definitions` (`canonicalServiceKey`,`canonicalCategoryId`,`displayName`,`serviceLevel`,`requiredDimensionsJson`,`blockedByDefault`,`mappingState`)[m
+[32m+[m[32mSELECT `slug`, `id`, `name`, 'category', JSON_ARRAY('country','jurisdiction','provider_type','legal_source','connector','release'), 1, 'UNMAPPED_SERVICE_BLOCKED'[m
+[32m+[m[32mFROM `service_categories` WHERE `isActive` = 1;[m
+[1mdiff --git a/drizzle/0086_global_country_capability_binding_berlin_scaffold.sql b/drizzle/0086_global_country_capability_binding_berlin_scaffold.sql[m
+[1mnew file mode 100644[m
+[1mindex 0000000..3a00754[m
+[1m--- /dev/null[m
+[1m+++ b/drizzle/0086_global_country_capability_binding_berlin_scaffold.sql[m
+[36m@@ -0,0 +1,146 @@[m
+[32m+[m[32m-- Additive CHECKPOINT A extension. This migration does not mutate legacy[m
+[32m+[m[32m-- service_capabilities, Turkey compliance records, provider profiles or users.[m
+[32m+[m[32m-- It binds the default-off scaffold to every canonical service capability and[m
+[32m+[m[32m-- adds only Germany/Berlin research shells. All source and legal statuses stay[m
+[32m+[m[32m-- unverified/pending; no country or capability becomes selectable.[m
+[32m+[m[32mALTER TABLE `service_capability_definitions`[m
+[32m+[m[32m  ADD COLUMN `canonicalCapabilityId` int NULL;[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m[32mCREATE UNIQUE INDEX `service_capability_definitions_canonical_capability_unique`[m
+[32m+[m[32m  ON `service_capability_definitions` (`canonicalCapabilityId`);[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m
+[32m+[m[32m-- Preserve the category-level seed from 0085 and add one explicit, default-off[m
+[32m+[m[32m-- task definition per existing authoritative catalog capability.[m
+[32m+[m[32mINSERT INTO `service_capability_definitions` ([m
+[32m+[m[32m  `canonicalServiceKey`, `canonicalCategoryId`, `canonicalCapabilityId`, `displayName`,[m
+[32m+[m[32m  `serviceLevel`, `requiredDimensionsJson`, `blockedByDefault`, `mappingState`[m
+[32m+[m[32m)[m
+[32m+[m[32mSELECT[m
+[32m+[m[32m  CONCAT('capability:', `key`),[m
+[32m+[m[32m  `categoryId`,[m
+[32m+[m[32m  `id`,[m
+[32m+[m[32m  `displayName`,[m
+[32m+[m[32m  'task',[m
+[32m+[m[32m  JSON_ARRAY('PROFILE', 'LEGAL_SOURCE', 'OFFICIAL_EVIDENCE', 'CONNECTOR', 'LOCAL_LEGAL_APPROVAL', 'PRODUCT_RELEASE_APPROVAL'),[m
+[32m+[m[32m  1,[m
+[32m+[m[32m  'MAPPED_BLOCKED'[m
+[32m+[m[32mFROM `service_capabilities`;[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m
+[32m+[m[32m-- A capability policy row is materialized only for the Berlin pilot node.[m
+[32m+[m[32m-- The five country shells remain infrastructure records; no JP/US/CN/RU city[m
+[32m+[m[32m-- node or capability policy is introduced before its explicit checkpoint.[m
+[32m+[m[32mINSERT INTO `capability_policy_decisions` ([m
+[32m+[m[32m  `countryDeploymentId`, `jurisdictionNodeId`, `capabilityDefinitionId`, `scopeKey`,[m
+[32m+[m[32m  `decision`, `sourceState`, `legalState`, `connectorState`, `releaseState`,[m
+[32m+[m[32m  `enforcementState`, `translationState`, `dataResidencyState`, `sanctionsState`, `stateVersion`[m
+[32m+[m[32m)[m
+[32m+[m[32mSELECT[m
+[32m+[m[32m  deployment.`id`,[m
+[32m+[m[32m  berlin.`id`,[m
+[32m+[m[32m  definition.`id`,[m
+[32m+[m[32m  CONCAT('DE-BE-BERLIN:', definition.`canonicalServiceKey`),[m
+[32m+[m[32m  'BLOCKED', 'UNVERIFIED', 'PENDING', 'PENDING', 'PENDING',[m
+[32m+[m[32m  'CLEAR', 'DRAFT_MACHINE', 'NOT_READY', 'UNKNOWN', 1[m
+[32m+[m[32mFROM `country_deployments` deployment[m
+[32m+[m[32mINNER JOIN `jurisdiction_nodes` berlin ON berlin.`countryDeploymentId` = deployment.`id`[m
+[32m+[m[32mINNER JOIN `service_capability_definitions` definition ON definition.`canonicalCapabilityId` IS NOT NULL[m
+[32m+[m[32mWHERE BINARY deployment.`countryCode` = BINARY 'DE' AND BINARY berlin.`nodeCode` = BINARY 'DE-BE-BERLIN';[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m
+[32m+[m[32m-- These references are discovery records copied from the user-supplied[m
+[32m+[m[32m-- research input. They are not legal verification, a source hash, a counsel[m
+[32m+[m[32m-- approval or an authority/connector authorization.[m
+[32m+[m[32mINSERT INTO `official_sources` ([m
+[32m+[m[32m  `countryDeploymentId`, `jurisdictionNodeId`, `sourceKey`, `authorityName`, `sourceUrl`,[m
+[32m+[m[32m  `sourceVersion`, `sourceHash`, `sourceStatus`, `retrievalMethod`[m
+[32m+[m[32m)[m
+[32m+[m[32mSELECT deployment.`id`, berlin.`id`, source_seed.`sourceKey`, source_seed.`authorityName`, source_seed.`sourceUrl`,[m
+[32m+[m[32m  'research-reference-2026-08-21', NULL, 'SOURCE_UNVERIFIED', 'MANUAL_REFERENCE'[m
+[32m+[m[32mFROM `country_deployments` deployment[m
+[32m+[m[32mINNER JOIN `jurisdiction_nodes` berlin ON berlin.`countryDeploymentId` = deployment.`id`[m
+[32m+[m[32mINNER JOIN ([m
+[32m+[m[32m  SELECT 'DE-HWO' AS `sourceKey`, 'Federal Ministry of Justice / gesetze-im-internet' AS `authorityName`, 'https://www.gesetze-im-internet.de/hwo/' AS `sourceUrl`[m
+[32m+[m[32m  UNION ALL SELECT 'DE-NAV-13', 'Federal Ministry of Justice / gesetze-im-internet', 'https://www.gesetze-im-internet.de/nav/BJNR247710006.html'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-AVBWASSERV-12', 'Federal Ministry of Justice / gesetze-im-internet', 'https://www.gesetze-im-internet.de/avbwasserv/BJNR007500980.html'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-NDAV-13', 'Federal Ministry of Justice / gesetze-im-internet', 'https://www.gesetze-im-internet.de/ndav/__13.html'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-CHEMKLIMASCHUTZV-2026', 'Federal Ministry of Justice / gesetze-im-internet', 'https://www.gesetze-im-internet.de/chemklimaschutzv_2026/'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-BALM-GUETERVERKEHR', 'Federal Office for Logistics and Mobility', 'https://www.balm.bund.de/DE/Service/FragenAntwortenFAQ/FragenAntwortenGueterverkehr/fragenantwortengueterverkehr.html'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-POSTG-2024', 'Federal Ministry of Justice / gesetze-im-internet', 'https://www.gesetze-im-internet.de/postg_2024/BJNR0EC0B0024.html'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-BNETZA-POST-DIRECTORY', 'Bundesnetzagentur', 'https://www.bundesnetzagentur.de/DE/Fachthemen/Post/Anbieterverzeichnis/artikel.html'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-DVGW-INSTALLER-RESEARCH', 'DVGW (research reference)', 'https://www.dvgw.de/'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-VDE-TAB-RESEARCH', 'VDE / local network operator (research reference)', 'https://www.vde.com/'[m
+[32m+[m[32m) source_seed ON 1 = 1[m
+[32m+[m[32mWHERE BINARY deployment.`countryCode` = BINARY 'DE' AND BINARY berlin.`nodeCode` = BINARY 'DE-BE-BERLIN';[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m
+[32m+[m[32mINSERT INTO `legal_requirements` ([m
+[32m+[m[32m  `countryDeploymentId`, `jurisdictionNodeId`, `capabilityDefinitionId`, `requirementKey`,[m
+[32m+[m[32m  `requirementVersion`, `requirementState`, `authoritative`, `sourceStatus`,[m
+[32m+[m[32m  `legalApprovalState`, `officialSourceId`, `sourceReference`, `blockingReasonCode`[m
+[32m+[m[32m)[m
+[32m+[m[32mSELECT[m
+[32m+[m[32m  deployment.`id`, berlin.`id`, NULL,[m
+[32m+[m[32m  CONCAT('DE-BE-', source.`sourceKey`),[m
+[32m+[m[32m  'research-reference-2026-08-21',[m
+[32m+[m[32m  'UNKNOWN', 0, 'SOURCE_UNVERIFIED', 'PENDING', source.`id`,[m
+[32m+[m[32m  CONCAT('Research-only reference: ', source.`sourceKey`),[m
+[32m+[m[32m  'SOURCE_UNVERIFIED_LOCAL_COUNSEL_REQUIRED'[m
+[32m+[m[32mFROM `country_deployments` deployment[m
+[32m+[m[32mINNER JOIN `jurisdiction_nodes` berlin ON berlin.`countryDeploymentId` = deployment.`id`[m
+[32m+[m[32mINNER JOIN `official_sources` source ON source.`countryDeploymentId` = deployment.`id` AND source.`jurisdictionNodeId` = berlin.`id`[m
+[32m+[m[32mWHERE BINARY deployment.`countryCode` = BINARY 'DE' AND BINARY berlin.`nodeCode` = BINARY 'DE-BE-BERLIN';[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m
+[32m+[m[32mINSERT INTO `credential_types` (`countryDeploymentId`, `credentialKey`, `displayName`, `rawCredentialClassification`, `extractionAllowed`)[m
+[32m+[m[32mSELECT deployment.`id`, credential_seed.`credentialKey`, credential_seed.`displayName`, 'UNCLASSIFIED', 0[m
+[32m+[m[32mFROM `country_deployments` deployment[m
+[32m+[m[32mINNER JOIN ([m
+[32m+[m[32m  SELECT 'DE_HANDWERKSROLLE' AS `credentialKey`, 'Handwerksrolle / business registration (research shell)' AS `displayName`[m
+[32m+[m[32m  UNION ALL SELECT 'DE_UTILITY_INSTALLER_LIST', 'Utility installer-list evidence (research shell)'[m
+[32m+[m[32m  UNION ALL SELECT 'DE_FGAS_PERSON_COMPANY_CERTIFICATE', 'F-gas person/company certification evidence (research shell)'[m
+[32m+[m[32m  UNION ALL SELECT 'DE_FREIGHT_AUTHORITY_AND_INSURANCE', 'Freight authority / licence / insurance evidence (research shell)'[m
+[32m+[m[32m  UNION ALL SELECT 'DE_POSTAL_PROVIDER_REGISTRY', 'Postal provider registry evidence (research shell)'[m
+[32m+[m[32m) credential_seed ON 1 = 1[m
+[32m+[m[32mWHERE BINARY deployment.`countryCode` = BINARY 'DE';[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m
+[32m+[m[32mINSERT INTO `verification_connectors` ([m
+[32m+[m[32m  `countryDeploymentId`, `jurisdictionNodeId`, `connectorKey`, `displayName`, `status`,[m
+[32m+[m[32m  `assuranceLevel`, `forbiddenScraping`, `authorizationEvidenceHash`, `officialSourceId`[m
+[32m+[m[32m)[m
+[32m+[m[32mSELECT deployment.`id`, berlin.`id`, connector_seed.`connectorKey`, connector_seed.`displayName`, 'PENDING',[m
+[32m+[m[32m  'NONE', 1, NULL, source.`id`[m
+[32m+[m[32mFROM `country_deployments` deployment[m
+[32m+[m[32mINNER JOIN `jurisdiction_nodes` berlin ON berlin.`countryDeploymentId` = deployment.`id`[m
+[32m+[m[32mINNER JOIN ([m
+[32m+[m[32m  SELECT 'DE_HANDWERKSKAMMER_REGISTRY' AS `connectorKey`, 'Handwerkskammer registry connector (not configured)' AS `displayName`, 'DE-HWO' AS `sourceKey`[m
+[32m+[m[32m  UNION ALL SELECT 'DE_UTILITY_INSTALLER_REGISTRY', 'Utility installer-list connector (not configured)', 'DE-NAV-13'[m
+[32m+[m[32m  UNION ALL SELECT 'DE_BALM_FREIGHT_REGISTRY', 'BALM freight authority connector (not configured)', 'DE-BALM-GUETERVERKEHR'[m
+[32m+[m[32m  UNION ALL SELECT 'DE_BNETZA_POST_REGISTRY', 'Bundesnetzagentur post directory connector (not configured)', 'DE-BNETZA-POST-DIRECTORY'[m
+[32m+[m[32m) connector_seed ON 1 = 1[m
+[32m+[m[32mLEFT JOIN `official_sources` source ON source.`countryDeploymentId` = deployment.`id`[m
+[32m+[m[32m  AND source.`jurisdictionNodeId` = berlin.`id` AND BINARY source.`sourceKey` = BINARY connector_seed.`sourceKey`[m
+[32m+[m[32mWHERE BINARY deployment.`countryCode` = BINARY 'DE' AND BINARY berlin.`nodeCode` = BINARY 'DE-BE-BERLIN';[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m
+[32m+[m[32mINSERT INTO `legal_documents` (`countryDeploymentId`, `documentKey`, `documentVersion`, `documentSurface`, `legalApprovalState`)[m
+[32m+[m[32mSELECT deployment.`id`, document_seed.`documentKey`, '0.0.0-draft-machine', document_seed.`documentSurface`, 'PENDING'[m
+[32m+[m[32mFROM `country_deployments` deployment[m
+[32m+[m[32mINNER JOIN ([m
+[32m+[m[32m  SELECT 'DE-BE-CONSUMER-TERMS' AS `documentKey`, 'consumer_terms' AS `documentSurface`[m
+[32m+[m[32m  UNION ALL SELECT 'DE-BE-PROVIDER-AGREEMENT', 'provider_agreement'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-BE-PRIVACY-NOTICE', 'privacy_notice'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-BE-COOKIE-NOTICE', 'cookie_notice'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-BE-APPEAL-NOTICE', 'appeal_notice'[m
+[32m+[m[32m  UNION ALL SELECT 'DE-BE-INCIDENT-NOTICE', 'incident_notice'[m
+[32m+[m[32m) document_seed ON 1 = 1[m
+[32m+[m[32mWHERE BINARY deployment.`countryCode` = BINARY 'DE';[m
+[32m+[m[32m--> statement-breakpoint[m
+[32m+[m
+[32m+[m[32mINSERT INTO `localized_legal_versions` (`legalDocumentId`, `locale`, `localizationState`, `contentHash`, `contentStorageKey`, `runtimeSelectable`)[m
+[32m+[m[32mSELECT document.`id`, 'de-DE', 'DRAFT_MACHINE', NULL, NULL, 0[m
+[32m+[m[32mFROM `legal_documents` document[m
+[32m+[m[32mINNER JOIN `country_deployments` deployment ON deployment.`id` = document.`countryDeploymentId`[m
+[32m+[m[32mWHERE BINARY deployment.`countryCode` = BINARY 'DE' AND BINARY document.`documentVersion` = BINARY '0.0.0-draft-machine';[m
+[1mdiff --git a/drizzle/meta/_journal.json b/drizzle/meta/_journal.json[m
+[1mindex 717407b..9d02ffa 100644[m
+[1m--- a/drizzle/meta/_journal.json[m
+[1m+++ b/drizzle/meta/_journal.json[m
+[36m@@ -561,6 +561,20 @@[m
+       "when": 1787327903196,[m
+       "tag": "0084_faz8a_approval_ledger_state_machine",[m
+       "breakpoints": true[m
+[32m+[m[32m    },[m
+[32m+[m[32m    {[m
+[32m+[m[32m      "idx": 85,[m
+[32m+[m[32m      "version": "7",[m
+[32m+[m[32m      "when": 1787331000000,[m
+[32m+[m[32m      "tag": "0085_global_country_scaffold",[m
+[32m+[m[32m      "breakpoints": true[m
+[32m+[m[32m    },[m
+[32m+[m[32m    {[m
+[32m+[m[32m      "idx": 86,[m
+[32m+[m[32m      "version": "7",[m
+[32m+[m[32m      "when": 1787345400000,[m
+[32m+[m[32m      "tag": "0086_global_country_capability_binding_berlin_scaffold",[m
+[32m+[m[32m      "breakpoints": true[m
+     }[m
+   ][m
+ }[m
+[1mdiff --git a/drizzle/schema.ts b/drizzle/schema.ts[m
+[1mindex 5c3bde5..75693b8 100644[m
+[1m--- a/drizzle/schema.ts[m
+[1m+++ b/drizzle/schema.ts[m
+[36m@@ -909,6 +909,386 @@[m [mexport const jurisdictions = mysqlTable([m
+   ],[m
+ );[m
+ [m
+[32m+[m[32m/**[m
+[32m+[m[32m * Global country deployment shells are intentionally independent from the[m
+[32m+[m[32m * legacy jurisdiction launch gate. A row is never a marketplace enablement:[m
+[32m+[m[32m * every feature switch begins at false and every policy state begins blocked.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport const countryDeployments = mysqlTable([m
+[32m+[m[32m  "country_deployments",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryCode: varchar("countryCode", { length: 2 }).notNull(),[m
+[32m+[m[32m    displayName: varchar("displayName", { length: 160 }).notNull(),[m
+[32m+[m[32m    state: mysqlEnum("state", [[m
+[32m+[m[32m      "SCAFFOLD_ONLY",[m
+[32m+[m[32m      "RESEARCHING",[m
+[32m+[m[32m      "SOURCE_REVIEW",[m
+[32m+[m[32m      "LEGAL_REVIEW",[m
+[32m+[m[32m      "CONNECTOR_PENDING",[m
+[32m+[m[32m      "STAGING_READY",[m
+[32m+[m[32m      "PILOT_READY",[m
+[32m+[m[32m      "PRODUCTION_PARTIAL",[m
+[32m+[m[32m      "PRODUCTION_ACTIVE",[m
+[32m+[m[32m      "SUSPENDED",[m
+[32m+[m[32m      "INFRA_ONLY_NO_GO",[m
+[32m+[m[32m    ]).default("SCAFFOLD_ONLY").notNull(),[m
+[32m+[m[32m    dataPlaneClass: varchar("dataPlaneClass", { length: 80 }).notNull(),[m
+[32m+[m[32m    defaultLocale: varchar("defaultLocale", { length: 32 }).notNull(),[m
+[32m+[m[32m    defaultCurrency: varchar("defaultCurrency", { length: 3 }).notNull(),[m
+[32m+[m[32m    defaultTimeZone: varchar("defaultTimeZone", { length: 64 }).notNull(),[m
+[32m+[m[32m    rawCredentialGlobalTransferAllowed: int("rawCredentialGlobalTransferAllowed").default(0).notNull(),[m
+[32m+[m[32m    localDataPlaneReady: int("localDataPlaneReady").default(0).notNull(),[m
+[32m+[m[32m    countryShellEnabled: int("countryShellEnabled").default(0).notNull(),[m
+[32m+[m[32m    jurisdictionEnabled: int("jurisdictionEnabled").default(0).notNull(),[m
+[32m+[m[32m    consumerDiscoveryEnabled: int("consumerDiscoveryEnabled").default(0).notNull(),[m
+[32m+[m[32m    providerOnboardingEnabled: int("providerOnboardingEnabled").default(0).notNull(),[m
+[32m+[m[32m    bookingEnabled: int("bookingEnabled").default(0).notNull(),[m
+[32m+[m[32m    paymentsEnabled: int("paymentsEnabled").default(0).notNull(),[m
+[32m+[m[32m    aiAssistantEnabled: int("aiAssistantEnabled").default(0).notNull(),[m
+[32m+[m[32m    supportEnabled: int("supportEnabled").default(0).notNull(),[m
+[32m+[m[32m    productionStateReachable: int("productionStateReachable").default(0).notNull(),[m
+[32m+[m[32m    seedVersion: varchar("seedVersion", { length: 64 }).notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    uniqueIndex("country_deployments_country_unique").on(table.countryCode),[m
+[32m+[m[32m    index("country_deployments_state_idx").on(table.state),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32m/** Hierarchical country, regional and municipal deployment boundary. */[m
+[32m+[m[32mexport const jurisdictionNodes = mysqlTable([m
+[32m+[m[32m  "jurisdiction_nodes",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    parentId: int("parentId"),[m
+[32m+[m[32m    nodeCode: varchar("nodeCode", { length: 96 }).notNull(),[m
+[32m+[m[32m    displayName: varchar("displayName", { length: 160 }).notNull(),[m
+[32m+[m[32m    nodeType: mysqlEnum("nodeType", ["country", "state", "province", "region", "city", "district", "municipality"]).notNull(),[m
+[32m+[m[32m    state: mysqlEnum("state", ["SCAFFOLD_ONLY", "SUSPENDED", "ACTIVE"]).default("SCAFFOLD_ONLY").notNull(),[m
+[32m+[m[32m    locale: varchar("locale", { length: 32 }).notNull(),[m
+[32m+[m[32m    currency: varchar("currency", { length: 3 }).notNull(),[m
+[32m+[m[32m    timeZone: varchar("timeZone", { length: 64 }).notNull(),[m
+[32m+[m[32m    addressProfile: varchar("addressProfile", { length: 80 }).default("UNKNOWN").notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    uniqueIndex("jurisdiction_nodes_node_code_unique").on(table.nodeCode),[m
+[32m+[m[32m    index("jurisdiction_nodes_country_parent_idx").on(table.countryDeploymentId, table.parentId),[m
+[32m+[m[32m    index("jurisdiction_nodes_state_idx").on(table.state),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Catalog-facing capability shell. Existing service_capabilities stay[m
+[32m+[m[32m * authoritative for the legacy product; this table only adds country policy[m
+[32m+[m[32m * dimensions and starts every service blocked.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport const serviceCapabilityDefinitions = mysqlTable([m
+[32m+[m[32m  "service_capability_definitions",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    canonicalServiceKey: varchar("canonicalServiceKey", { length: 120 }).notNull(),[m
+[32m+[m[32m    canonicalCategoryId: int("canonicalCategoryId"),[m
+[32m+[m[32m    // The existing service_capabilities table remains catalog-authoritative.[m
+[32m+[m[32m    // This nullable, unique link lets the global policy scaffold cover every[m
+[32m+[m[32m    // live capability without treating a category seed as its task definition.[m
+[32m+[m[32m    canonicalCapabilityId: int("canonicalCapabilityId"),[m
+[32m+[m[32m    displayName: varchar("displayName", { length: 160 }).notNull(),[m
+[32m+[m[32m    serviceLevel: mysqlEnum("serviceLevel", ["category", "subcategory", "task"]).default("category").notNull(),[m
+[32m+[m[32m    requiredDimensionsJson: json("requiredDimensionsJson").$type<string[]>().notNull(),[m
+[32m+[m[32m    blockedByDefault: int("blockedByDefault").default(1).notNull(),[m
+[32m+[m[32m    mappingState: mysqlEnum("mappingState", ["UNMAPPED_SERVICE_BLOCKED", "MAPPED_BLOCKED", "MAPPED_ELIGIBLE"]).default("UNMAPPED_SERVICE_BLOCKED").notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    uniqueIndex("service_capability_definitions_key_unique").on(table.canonicalServiceKey),[m
+[32m+[m[32m    uniqueIndex("service_capability_definitions_canonical_capability_unique").on(table.canonicalCapabilityId),[m
+[32m+[m[32m    index("service_capability_definitions_category_idx").on(table.canonicalCategoryId, table.mappingState),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const officialSources = mysqlTable([m
+[32m+[m[32m  "official_sources",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    jurisdictionNodeId: int("jurisdictionNodeId"),[m
+[32m+[m[32m    sourceKey: varchar("sourceKey", { length: 160 }).notNull(),[m
+[32m+[m[32m    authorityName: varchar("authorityName", { length: 240 }).notNull(),[m
+[32m+[m[32m    sourceUrl: varchar("sourceUrl", { length: 2048 }).notNull(),[m
+[32m+[m[32m    sourceVersion: varchar("sourceVersion", { length: 160 }).notNull(),[m
+[32m+[m[32m    sourceHash: varchar("sourceHash", { length: 128 }),[m
+[32m+[m[32m    sourceStatus: mysqlEnum("sourceStatus", ["SOURCE_UNVERIFIED", "SOURCE_VERIFIED", "SUPERSEDED", "REVOKED"]).default("SOURCE_UNVERIFIED").notNull(),[m
+[32m+[m[32m    retrievalMethod: mysqlEnum("retrievalMethod", ["MANUAL_REFERENCE", "PERMITTED_API", "AUTHORIZED_EXPORT", "UNKNOWN"]).default("UNKNOWN").notNull(),[m
+[32m+[m[32m    verifiedByApprovalLedgerId: int("verifiedByApprovalLedgerId"),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    uniqueIndex("official_sources_scope_key_unique").on(table.countryDeploymentId, table.sourceKey, table.sourceVersion),[m
+[32m+[m[32m    index("official_sources_country_status_idx").on(table.countryDeploymentId, table.sourceStatus),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const legalRequirements = mysqlTable([m
+[32m+[m[32m  "legal_requirements",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    jurisdictionNodeId: int("jurisdictionNodeId"),[m
+[32m+[m[32m    capabilityDefinitionId: int("capabilityDefinitionId"),[m
+[32m+[m[32m    requirementKey: varchar("requirementKey", { length: 160 }).notNull(),[m
+[32m+[m[32m    requirementVersion: varchar("requirementVersion", { length: 80 }).notNull(),[m
+[32m+[m[32m    requirementState: mysqlEnum("requirementState", ["UNKNOWN", "REQUIRED", "CONDITIONAL", "NOT_REQUIRED", "PROHIBITED"]).default("UNKNOWN").notNull(),[m
+[32m+[m[32m    authoritative: int("authoritative").default(0).notNull(),[m
+[32m+[m[32m    sourceStatus: mysqlEnum("sourceStatus", ["SOURCE_UNVERIFIED", "SOURCE_VERIFIED"]).default("SOURCE_UNVERIFIED").notNull(),[m
+[32m+[m[32m    legalApprovalState: mysqlEnum("legalApprovalState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),[m
+[32m+[m[32m    officialSourceId: int("officialSourceId"),[m
+[32m+[m[32m    sourceReference: varchar("sourceReference", { length: 320 }),[m
+[32m+[m[32m    blockingReasonCode: varchar("blockingReasonCode", { length: 160 }).default("UNKNOWN_LEGAL_REQUIREMENT").notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    uniqueIndex("legal_requirements_scope_key_version_unique").on(table.countryDeploymentId, table.requirementKey, table.requirementVersion),[m
+[32m+[m[32m    index("legal_requirements_capability_state_idx").on(table.capabilityDefinitionId, table.requirementState, table.authoritative),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const credentialTypes = mysqlTable([m
+[32m+[m[32m  "credential_types",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    credentialKey: varchar("credentialKey", { length: 160 }).notNull(),[m
+[32m+[m[32m    displayName: varchar("displayName", { length: 200 }).notNull(),[m
+[32m+[m[32m    rawCredentialClassification: varchar("rawCredentialClassification", { length: 80 }).default("UNCLASSIFIED").notNull(),[m
+[32m+[m[32m    extractionAllowed: int("extractionAllowed").default(0).notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [uniqueIndex("credential_types_country_key_unique").on(table.countryDeploymentId, table.credentialKey)],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const credentialIssuers = mysqlTable([m
+[32m+[m[32m  "credential_issuers",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    credentialTypeId: int("credentialTypeId").notNull(),[m
+[32m+[m[32m    issuerKey: varchar("issuerKey", { length: 160 }).notNull(),[m
+[32m+[m[32m    displayName: varchar("displayName", { length: 240 }).notNull(),[m
+[32m+[m[32m    issuerStatus: mysqlEnum("issuerStatus", ["UNVERIFIED", "VERIFIED", "REVOKED"]).default("UNVERIFIED").notNull(),[m
+[32m+[m[32m    officialSourceId: int("officialSourceId"),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [uniqueIndex("credential_issuers_country_key_unique").on(table.countryDeploymentId, table.issuerKey)],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const verificationConnectors = mysqlTable([m
+[32m+[m[32m  "verification_connectors",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    jurisdictionNodeId: int("jurisdictionNodeId"),[m
+[32m+[m[32m    connectorKey: varchar("connectorKey", { length: 160 }).notNull(),[m
+[32m+[m[32m    displayName: varchar("displayName", { length: 240 }).notNull(),[m
+[32m+[m[32m    status: mysqlEnum("status", ["PENDING", "UNVERIFIED", "AUTHORIZED", "OPERATIONAL", "REVOKED", "NOT_CONFIGURED"]).default("PENDING").notNull(),[m
+[32m+[m[32m    assuranceLevel: mysqlEnum("assuranceLevel", ["NONE", "DOCUMENT_ONLY", "ISSUER_SIGNATURE", "REGISTRY_MATCH", "REGISTRY_STATUS"]).default("NONE").notNull(),[m
+[32m+[m[32m    forbiddenScraping: int("forbiddenScraping").default(1).notNull(),[m
+[32m+[m[32m    authorizationEvidenceHash: varchar("authorizationEvidenceHash", { length: 128 }),[m
+[32m+[m[32m    officialSourceId: int("officialSourceId"),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    uniqueIndex("verification_connectors_country_key_unique").on(table.countryDeploymentId, table.connectorKey),[m
+[32m+[m[32m    index("verification_connectors_status_idx").on(table.countryDeploymentId, table.status, table.assuranceLevel),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const credentialEvidence = mysqlTable([m
+[32m+[m[32m  "credential_evidence",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    providerCredentialId: int("providerCredentialId"),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    credentialTypeId: int("credentialTypeId"),[m
+[32m+[m[32m    evidenceLevel: mysqlEnum("evidenceLevel", ["SELF_ASSERTED", "DOCUMENT_UPLOADED", "DOCUMENT_EXTRACTED", "ISSUER_SIGNATURE_VERIFIED", "REGISTRY_MATCHED", "REGISTRY_STATUS_ACTIVE", "REVOCATION_MONITORED"]).default("SELF_ASSERTED").notNull(),[m
+[32m+[m[32m    evidenceHash: varchar("evidenceHash", { length: 128 }).notNull(),[m
+[32m+[m[32m    evidenceStatus: mysqlEnum("evidenceStatus", ["PENDING", "UNVERIFIED", "VERIFIED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [index("credential_evidence_country_status_idx").on(table.countryDeploymentId, table.evidenceStatus, table.evidenceLevel)],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const verificationEvents = mysqlTable([m
+[32m+[m[32m  "verification_events",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    credentialEvidenceId: int("credentialEvidenceId"),[m
+[32m+[m[32m    verificationConnectorId: int("verificationConnectorId"),[m
+[32m+[m[32m    eventType: mysqlEnum("eventType", ["REQUESTED", "EXTRACTED", "MATCHED", "STATUS_CHECKED", "FAILED", "REVOKED"]).notNull(),[m
+[32m+[m[32m    resultState: mysqlEnum("resultState", ["UNVERIFIED", "MATCHED", "ACTIVE", "FAILED", "REVOKED"]).default("UNVERIFIED").notNull(),[m
+[32m+[m[32m    correlationId: varchar("correlationId", { length: 128 }).notNull(),[m
+[32m+[m[32m    evidenceHash: varchar("evidenceHash", { length: 128 }),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    uniqueIndex("verification_events_correlation_unique").on(table.correlationId),[m
+[32m+[m[32m    index("verification_events_connector_created_idx").on(table.verificationConnectorId, table.createdAt),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const legalDocuments = mysqlTable([m
+[32m+[m[32m  "legal_documents",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    documentKey: varchar("documentKey", { length: 160 }).notNull(),[m
+[32m+[m[32m    documentVersion: varchar("documentVersion", { length: 80 }).notNull(),[m
+[32m+[m[32m    documentSurface: mysqlEnum("documentSurface", ["consumer_terms", "provider_agreement", "privacy_notice", "cookie_notice", "appeal_notice", "incident_notice"]).notNull(),[m
+[32m+[m[32m    legalApprovalState: mysqlEnum("legalApprovalState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [uniqueIndex("legal_documents_country_key_version_unique").on(table.countryDeploymentId, table.documentKey, table.documentVersion)],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const localizedLegalVersions = mysqlTable([m
+[32m+[m[32m  "localized_legal_versions",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    legalDocumentId: int("legalDocumentId").notNull(),[m
+[32m+[m[32m    locale: varchar("locale", { length: 32 }).notNull(),[m
+[32m+[m[32m    localizationState: mysqlEnum("localizationState", ["DRAFT_MACHINE", "HUMAN_TRANSLATED", "LEGAL_REVIEWED", "LINGUIST_REVIEWED", "APPROVED_STAGING", "APPROVED_PRODUCTION", "RETIRED"]).default("DRAFT_MACHINE").notNull(),[m
+[32m+[m[32m    contentHash: varchar("contentHash", { length: 128 }),[m
+[32m+[m[32m    contentStorageKey: varchar("contentStorageKey", { length: 512 }),[m
+[32m+[m[32m    runtimeSelectable: int("runtimeSelectable").default(0).notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [uniqueIndex("localized_legal_versions_document_locale_unique").on(table.legalDocumentId, table.locale)],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32m/** Generic country artifact approval ledger. Application policy treats it append-only. */[m
+[32m+[m[32mexport const approvalLedger = mysqlTable([m
+[32m+[m[32m  "approval_ledger",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    jurisdictionNodeId: int("jurisdictionNodeId"),[m
+[32m+[m[32m    subjectType: mysqlEnum("subjectType", ["OFFICIAL_SOURCE", "LEGAL_REQUIREMENT", "CONNECTOR", "LEGAL_DOCUMENT", "CAPABILITY_POLICY", "COUNTRY_ACTIVATION"]).notNull(),[m
+[32m+[m[32m    subjectKey: varchar("subjectKey", { length: 240 }).notNull(),[m
+[32m+[m[32m    approvalType: mysqlEnum("approvalType", ["SOURCE_VERIFICATION", "LOCAL_LEGAL", "LINGUIST", "CONNECTOR_AUTHORIZATION", "DATA_PRIVACY", "PAYMENT_FUNDS_FLOW", "PRODUCT_RELEASE"]).notNull(),[m
+[32m+[m[32m    eventType: mysqlEnum("eventType", ["GRANTED", "REVOKED", "EXPIRED", "SUPERSEDED"]).notNull(),[m
+[32m+[m[32m    approverUserId: int("approverUserId").notNull(),[m
+[32m+[m[32m    approverRole: varchar("approverRole", { length: 120 }).notNull(),[m
+[32m+[m[32m    authorityScope: varchar("authorityScope", { length: 240 }).notNull(),[m
+[32m+[m[32m    evidenceHash: varchar("evidenceHash", { length: 128 }).notNull(),[m
+[32m+[m[32m    validFrom: timestamp("validFrom"),[m
+[32m+[m[32m    validUntil: timestamp("validUntil"),[m
+[32m+[m[32m    priorLedgerEventId: int("priorLedgerEventId"),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    index("approval_ledger_subject_idx").on(table.countryDeploymentId, table.subjectType, table.subjectKey, table.createdAt),[m
+[32m+[m[32m    index("approval_ledger_approver_idx").on(table.approverUserId, table.createdAt),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const capabilityPolicyDecisions = mysqlTable([m
+[32m+[m[32m  "capability_policy_decisions",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    jurisdictionNodeId: int("jurisdictionNodeId"),[m
+[32m+[m[32m    capabilityDefinitionId: int("capabilityDefinitionId").notNull(),[m
+[32m+[m[32m    scopeKey: varchar("scopeKey", { length: 280 }).notNull(),[m
+[32m+[m[32m    decision: mysqlEnum("decision", ["BLOCKED", "REVIEW_REQUIRED", "POLICY_ELIGIBLE", "ACTIVE", "SUSPENDED"]).default("BLOCKED").notNull(),[m
+[32m+[m[32m    sourceState: mysqlEnum("sourceState", ["UNVERIFIED", "VERIFIED", "BLOCKED"]).default("UNVERIFIED").notNull(),[m
+[32m+[m[32m    legalState: mysqlEnum("legalState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),[m
+[32m+[m[32m    connectorState: mysqlEnum("connectorState", ["PENDING", "UNVERIFIED", "AUTHORIZED", "OPERATIONAL", "BLOCKED"]).default("PENDING").notNull(),[m
+[32m+[m[32m    releaseState: mysqlEnum("releaseState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),[m
+[32m+[m[32m    enforcementState: mysqlEnum("enforcementState", ["CLEAR", "SUSPENDED", "BLOCKED"]).default("CLEAR").notNull(),[m
+[32m+[m[32m    translationState: mysqlEnum("translationState", ["UNREVIEWED", "DRAFT_MACHINE", "APPROVED"]).default("UNREVIEWED").notNull(),[m
+[32m+[m[32m    dataResidencyState: mysqlEnum("dataResidencyState", ["UNKNOWN", "NOT_READY", "READY", "BLOCKED"]).default("UNKNOWN").notNull(),[m
+[32m+[m[32m    sanctionsState: mysqlEnum("sanctionsState", ["UNKNOWN", "CLEAR", "BLOCKED"]).default("UNKNOWN").notNull(),[m
+[32m+[m[32m    stateVersion: int("stateVersion").default(1).notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [[m
+[32m+[m[32m    uniqueIndex("capability_policy_decisions_scope_unique").on(table.scopeKey),[m
+[32m+[m[32m    index("capability_policy_decisions_country_decision_idx").on(table.countryDeploymentId, table.decision, table.enforcementState),[m
+[32m+[m[32m  ],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const countryCapabilityAppeals = mysqlTable([m
+[32m+[m[32m  "country_capability_appeals",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    capabilityPolicyDecisionId: int("capabilityPolicyDecisionId").notNull(),[m
+[32m+[m[32m    providerId: int("providerId"),[m
+[32m+[m[32m    status: mysqlEnum("status", ["SUBMITTED", "UNDER_REVIEW", "ACCEPTED", "REJECTED", "WITHDRAWN"]).default("SUBMITTED").notNull(),[m
+[32m+[m[32m    statement: text("statement").notNull(),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [index("country_capability_appeals_decision_status_idx").on(table.capabilityPolicyDecisionId, table.status)],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const incidentJurisdictionMatrix = mysqlTable([m
+[32m+[m[32m  "incident_jurisdiction_matrix",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    jurisdictionNodeId: int("jurisdictionNodeId"),[m
+[32m+[m[32m    incidentType: varchar("incidentType", { length: 120 }).notNull(),[m
+[32m+[m[32m    notificationState: mysqlEnum("notificationState", ["UNKNOWN", "NOT_CONFIGURED", "CONFIGURED", "BLOCKED"]).default("NOT_CONFIGURED").notNull(),[m
+[32m+[m[32m    legalRequirementId: int("legalRequirementId"),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [uniqueIndex("incident_jurisdiction_matrix_scope_unique").on(table.countryDeploymentId, table.incidentType)],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const incidentNotices = mysqlTable([m
+[32m+[m[32m  "incident_notices",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    incidentJurisdictionMatrixId: int("incidentJurisdictionMatrixId").notNull(),[m
+[32m+[m[32m    locale: varchar("locale", { length: 32 }).notNull(),[m
+[32m+[m[32m    localizationState: mysqlEnum("localizationState", ["DRAFT_MACHINE", "HUMAN_TRANSLATED", "LEGAL_REVIEWED", "APPROVED_PRODUCTION", "RETIRED"]).default("DRAFT_MACHINE").notNull(),[m
+[32m+[m[32m    runtimeSelectable: int("runtimeSelectable").default(0).notNull(),[m
+[32m+[m[32m    contentHash: varchar("contentHash", { length: 128 }),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [uniqueIndex("incident_notices_matrix_locale_unique").on(table.incidentJurisdictionMatrixId, table.locale)],[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mexport const countryActivationRuns = mysqlTable([m
+[32m+[m[32m  "country_activation_runs",[m
+[32m+[m[32m  {[m
+[32m+[m[32m    id: int("id").autoincrement().primaryKey(),[m
+[32m+[m[32m    countryDeploymentId: int("countryDeploymentId").notNull(),[m
+[32m+[m[32m    requestedState: varchar("requestedState", { length: 40 }).notNull(),[m
+[32m+[m[32m    result: mysqlEnum("result", ["BLOCKED", "PASSED", "ABORTED"]).default("BLOCKED").notNull(),[m
+[32m+[m[32m    blockersJson: json("blockersJson").$type<string[]>().notNull(),[m
+[32m+[m[32m    actorUserId: int("actorUserId"),[m
+[32m+[m[32m    createdAt: timestamp("createdAt").defaultNow().notNull(),[m
+[32m+[m[32m  },[m
+[32m+[m[32m  (table) => [index("country_activation_runs_country_created_idx").on(table.countryDeploymentId, table.createdAt)],[m
+[32m+[m[32m);[m
+[32m+[m
+ // Capability is intentionally separate from a profile verification. For example,[m
+ // a single provider may be eligible for courier work but blocked for towing.[m
+ export const serviceCapabilities = mysqlTable([m
+[1mdiff --git a/server/compliance/CountryComplianceRepository.ts b/server/compliance/CountryComplianceRepository.ts[m
+[1mindex df0e44c..3d62e84 100644[m
+[1m--- a/server/compliance/CountryComplianceRepository.ts[m
+[1m+++ b/server/compliance/CountryComplianceRepository.ts[m
+[36m@@ -1,6 +1,7 @@[m
+ import { and, desc, eq, isNull } from "drizzle-orm";[m
+ [m
+ import {[m
+[32m+[m[32m  countryDeployments,[m
+   jurisdictions,[m
+   jurisdictionCompliancePackages,[m
+   jurisdictionLaunchGates,[m
+[36m@@ -16,6 +17,7 @@[m [mimport {[m
+   type CountryLaunchChecklist,[m
+ } from "./CountryLaunchGateService";[m
+ import { evaluateTurkeyPaymentLaunchReadiness } from "./TurkeyPaymentLaunchPolicy";[m
+[32m+[m[32mimport { countryDeploymentTransitionBlockReason, type CountryDeploymentTransition } from "./CountryDeploymentPolicy";[m
+ [m
+ export type CompliancePackageStatus = "draft" | "legal_review" | "approved" | "enabled" | "blocked" | "retired";[m
+ export type OfficialSourceStatus = "draft" | "verified" | "superseded" | "revoked";[m
+[36m@@ -65,6 +67,17 @@[m [mexport async function assertCountryMarketplaceTransition(input: {[m
+   if (!db) throw new Error(`COUNTRY_LAUNCH_GATE_BLOCKED:${input.transition}:DATABASE_UNAVAILABLE`);[m
+ [m
+   const countryCode = input.countryCode?.trim().toUpperCase() ?? "";[m
+[32m+[m[32m  const deploymentRows = /^[A-Z]{2}$/.test(countryCode)[m
+[32m+[m[32m    ? await db.select().from(countryDeployments).where(eq(countryDeployments.countryCode, countryCode)).limit(2)[m
+[32m+[m[32m    : [];[m
+[32m+[m[32m  const deployment = deploymentRows.length === 1 ? deploymentRows[0]! : null;[m
+[32m+[m[32m  if (deployment) {[m
+[32m+[m[32m    const deploymentReason = countryDeploymentTransitionBlockReason({[m
+[32m+[m[32m      deployment,[m
+[32m+[m[32m      transition: input.transition as CountryDeploymentTransition,[m
+[32m+[m[32m    });[m
+[32m+[m[32m    if (deploymentReason) throw new Error(deploymentReason);[m
+[32m+[m[32m  }[m
+   let jurisdiction = null as (typeof jurisdictions.$inferSelect) | null;[m
+   if (input.jurisdictionId != null) {[m
+     const rows = await db.select().from(jurisdictions).where(eq(jurisdictions.id, input.jurisdictionId)).limit(1);[m
+[1mdiff --git a/server/compliance/CountryDeploymentPolicy.ts b/server/compliance/CountryDeploymentPolicy.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..8296436[m
+[1m--- /dev/null[m
+[1m+++ b/server/compliance/CountryDeploymentPolicy.ts[m
+[36m@@ -0,0 +1,132 @@[m
+[32m+[m[32mexport type CountryDeploymentState =[m
+[32m+[m[32m  | "SCAFFOLD_ONLY"[m
+[32m+[m[32m  | "RESEARCHING"[m
+[32m+[m[32m  | "SOURCE_REVIEW"[m
+[32m+[m[32m  | "LEGAL_REVIEW"[m
+[32m+[m[32m  | "CONNECTOR_PENDING"[m
+[32m+[m[32m  | "STAGING_READY"[m
+[32m+[m[32m  | "PILOT_READY"[m
+[32m+[m[32m  | "PRODUCTION_PARTIAL"[m
+[32m+[m[32m  | "PRODUCTION_ACTIVE"[m
+[32m+[m[32m  | "SUSPENDED"[m
+[32m+[m[32m  | "INFRA_ONLY_NO_GO";[m
+[32m+[m
+[32m+[m[32mexport type CountryDeploymentRuntime = {[m
+[32m+[m[32m  countryCode: string;[m
+[32m+[m[32m  state: CountryDeploymentState;[m
+[32m+[m[32m  localDataPlaneReady: number;[m
+[32m+[m[32m  countryShellEnabled: number;[m
+[32m+[m[32m  jurisdictionEnabled: number;[m
+[32m+[m[32m  consumerDiscoveryEnabled: number;[m
+[32m+[m[32m  providerOnboardingEnabled: number;[m
+[32m+[m[32m  bookingEnabled: number;[m
+[32m+[m[32m  paymentsEnabled: number;[m
+[32m+[m[32m  aiAssistantEnabled: number;[m
+[32m+[m[32m  supportEnabled: number;[m
+[32m+[m[32m  productionStateReachable: number;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mexport type CountryDeploymentTransition =[m
+[32m+[m[32m  | "REQUEST_CREATION"[m
+[32m+[m[32m  | "PROVIDER_ACTIVATION"[m
+[32m+[m[32m  | "OPPORTUNITY_EXPOSURE"[m
+[32m+[m[32m  | "OFFER_SUBMIT"[m
+[32m+[m[32m  | "OFFER_ACCEPTANCE"[m
+[32m+[m[32m  | "PAYMENT_INITIATION";[m
+[32m+[m
+[32m+[m[32mexport type LocalizedLegalRuntimeState =[m
+[32m+[m[32m  | "DRAFT_MACHINE"[m
+[32m+[m[32m  | "HUMAN_TRANSLATED"[m
+[32m+[m[32m  | "LEGAL_REVIEWED"[m
+[32m+[m[32m  | "LINGUIST_REVIEWED"[m
+[32m+[m[32m  | "APPROVED_STAGING"[m
+[32m+[m[32m  | "APPROVED_PRODUCTION"[m
+[32m+[m[32m  | "RETIRED";[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * There is deliberately no language fallback for country legal documents.[m
+[32m+[m[32m * A machine draft is internal review material, not a user-facing substitute.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport function legalLocaleRuntimeBlockReason(input: {[m
+[32m+[m[32m  localizationState: LocalizedLegalRuntimeState;[m
+[32m+[m[32m  runtimeSelectable: number;[m
+[32m+[m[32m}) {[m
+[32m+[m[32m  if (input.localizationState === "DRAFT_MACHINE") return "LEGAL_LOCALE_BLOCKED:DRAFT_MACHINE";[m
+[32m+[m[32m  if (input.localizationState === "RETIRED") return "LEGAL_LOCALE_BLOCKED:RETIRED";[m
+[32m+[m[32m  if (input.localizationState !== "APPROVED_PRODUCTION") {[m
+[32m+[m[32m    return `LEGAL_LOCALE_BLOCKED:STATE_${input.localizationState}`;[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (input.runtimeSelectable !== 1) return "LEGAL_LOCALE_BLOCKED:RUNTIME_SELECTION_DISABLED";[m
+[32m+[m[32m  return null;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mconst flagForTransition: Record<CountryDeploymentTransition, keyof CountryDeploymentRuntime> = {[m
+[32m+[m[32m  REQUEST_CREATION: "bookingEnabled",[m
+[32m+[m[32m  PROVIDER_ACTIVATION: "providerOnboardingEnabled",[m
+[32m+[m[32m  OPPORTUNITY_EXPOSURE: "consumerDiscoveryEnabled",[m
+[32m+[m[32m  OFFER_SUBMIT: "bookingEnabled",[m
+[32m+[m[32m  OFFER_ACCEPTANCE: "bookingEnabled",[m
+[32m+[m[32m  PAYMENT_INITIATION: "paymentsEnabled",[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * A deployment record narrows the pre-existing country gate; it never creates[m
+[32m+[m[32m * an enable path. Unknown/missing state, a separate-plane not ready signal and[m
+[32m+[m[32m * every non-production state stay fail-closed.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport function countryDeploymentTransitionBlockReason(input: {[m
+[32m+[m[32m  deployment: CountryDeploymentRuntime;[m
+[32m+[m[32m  transition: CountryDeploymentTransition;[m
+[32m+[m[32m}) {[m
+[32m+[m[32m  const countryCode = input.deployment.countryCode.trim().toUpperCase();[m
+[32m+[m[32m  if (countryCode === "RU" || input.deployment.state === "INFRA_ONLY_NO_GO") {[m
+[32m+[m[32m    return `COUNTRY_DEPLOYMENT_BLOCKED:${input.transition}:INFRA_ONLY_NO_GO`;[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (input.deployment.state !== "PRODUCTION_ACTIVE") {[m
+[32m+[m[32m    return `COUNTRY_DEPLOYMENT_BLOCKED:${input.transition}:STATE_${input.deployment.state}`;[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (input.deployment.productionStateReachable !== 1) {[m
+[32m+[m[32m    return `COUNTRY_DEPLOYMENT_BLOCKED:${input.transition}:PRODUCTION_STATE_UNREACHABLE`;[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (input.deployment.countryShellEnabled !== 1 || input.deployment.jurisdictionEnabled !== 1) {[m
+[32m+[m[32m    return `COUNTRY_DEPLOYMENT_BLOCKED:${input.transition}:COUNTRY_SHELL_DISABLED`;[m
+[32m+[m[32m  }[m
+[32m+[m[32m  const transitionFlag = flagForTransition[input.transition];[m
+[32m+[m[32m  if (input.deployment[transitionFlag] !== 1) {[m
+[32m+[m[32m    return `COUNTRY_DEPLOYMENT_BLOCKED:${input.transition}:${transitionFlag.toUpperCase()}_DISABLED`;[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (countryCode === "CN" && input.deployment.localDataPlaneReady !== 1) {[m
+[32m+[m[32m    return `COUNTRY_DEPLOYMENT_BLOCKED:${input.transition}:CN_LOCAL_DATA_PLANE_NOT_READY`;[m
+[32m+[m[32m  }[m
+[32m+[m[32m  return null;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function countryActivationPreflight(input: {[m
+[32m+[m[32m  deployment: CountryDeploymentRuntime;[m
+[32m+[m[32m  mandatorySourceVerified: boolean;[m
+[32m+[m[32m  localLegalApproved: boolean;[m
+[32m+[m[32m  approvedConnectorAvailable: boolean;[m
+[32m+[m[32m  legalLocaleReady: boolean;[m
+[32m+[m[32m  dataPaymentAndPrivacyReady: boolean;[m
+[32m+[m[32m  productReleaseApproved: boolean;[m
+[32m+[m[32m  catalogCoveragePercent: number;[m
+[32m+[m[32m}) {[m
+[32m+[m[32m  const blockers: string[] = [];[m
+[32m+[m[32m  const countryCode = input.deployment.countryCode.trim().toUpperCase();[m
+[32m+[m[32m  const activatableStates = new Set<CountryDeploymentState>(["PILOT_READY", "PRODUCTION_PARTIAL"]);[m
+[32m+[m[32m  if (input.deployment.state === "INFRA_ONLY_NO_GO" || countryCode === "RU") blockers.push("INFRA_ONLY_NO_GO");[m
+[32m+[m[32m  if (!activatableStates.has(input.deployment.state)) {[m
+[32m+[m[32m    blockers.push(`COUNTRY_DEPLOYMENT_STATE_NOT_ACTIVATABLE:${input.deployment.state}`);[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (input.catalogCoveragePercent !== 100) blockers.push("LIVE_CATALOG_COVERAGE_INCOMPLETE");[m
+[32m+[m[32m  if (!input.mandatorySourceVerified) blockers.push("MANDATORY_SOURCE_UNVERIFIED");[m
+[32m+[m[32m  if (!input.localLegalApproved) blockers.push("LOCAL_LEGAL_APPROVAL_MISSING");[m
+[32m+[m[32m  if (!input.approvedConnectorAvailable) blockers.push("OFFICIAL_CONNECTOR_UNAVAILABLE");[m
+[32m+[m[32m  if (!input.legalLocaleReady) blockers.push("LEGAL_LOCALE_NOT_APPROVED");[m
+[32m+[m[32m  if (!input.dataPaymentAndPrivacyReady) blockers.push("DATA_PAYMENT_PRIVACY_GATE_BLOCKED");[m
+[32m+[m[32m  if (!input.productReleaseApproved) blockers.push("PRODUCT_RELEASE_APPROVAL_MISSING");[m
+[32m+[m[32m  if ((countryCode === "CN" || countryCode === "RU") && input.deployment.localDataPlaneReady !== 1) {[m
+[32m+[m[32m    blockers.push("LOCAL_DATA_PLANE_NOT_READY");[m
+[32m+[m[32m  }[m
+[32m+[m[32m  return { allowed: blockers.length === 0, blockers } as const;[m
+[32m+[m[32m}[m
+[1mdiff --git a/tests/country-deployment-policy.test.ts b/tests/country-deployment-policy.test.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..cb415ad[m
+[1m--- /dev/null[m
+[1m+++ b/tests/country-deployment-policy.test.ts[m
+[36m@@ -0,0 +1,86 @@[m
+[32m+[m[32mimport { describe, expect, it } from "vitest";[m
+[32m+[m
+[32m+[m[32mimport {[m
+[32m+[m[32m  countryActivationPreflight,[m
+[32m+[m[32m  countryDeploymentTransitionBlockReason,[m
+[32m+[m[32m  type CountryDeploymentRuntime,[m
+[32m+[m[32m} from "../server/compliance/CountryDeploymentPolicy";[m
+[32m+[m
+[32m+[m[32mconst transitions = [[m
+[32m+[m[32m  "REQUEST_CREATION",[m
+[32m+[m[32m  "PROVIDER_ACTIVATION",[m
+[32m+[m[32m  "OPPORTUNITY_EXPOSURE",[m
+[32m+[m[32m  "OFFER_SUBMIT",[m
+[32m+[m[32m  "OFFER_ACCEPTANCE",[m
+[32m+[m[32m  "PAYMENT_INITIATION",[m
+[32m+[m[32m] as const;[m
+[32m+[m
+[32m+[m[32mfunction deployment(overrides: Partial<CountryDeploymentRuntime> = {}): CountryDeploymentRuntime {[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    countryCode: "DE",[m
+[32m+[m[32m    state: "SCAFFOLD_ONLY",[m
+[32m+[m[32m    localDataPlaneReady: 0,[m
+[32m+[m[32m    countryShellEnabled: 0,[m
+[32m+[m[32m    jurisdictionEnabled: 0,[m
+[32m+[m[32m    consumerDiscoveryEnabled: 0,[m
+[32m+[m[32m    providerOnboardingEnabled: 0,[m
+[32m+[m[32m    bookingEnabled: 0,[m
+[32m+[m[32m    paymentsEnabled: 0,[m
+[32m+[m[32m    aiAssistantEnabled: 0,[m
+[32m+[m[32m    supportEnabled: 0,[m
+[32m+[m[32m    productionStateReachable: 0,[m
+[32m+[m[32m    ...overrides,[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mdescribe("global country deployment policy", () => {[m
+[32m+[m[32m  it("blocks every marketplace transition for a default-off scaffold", () => {[m
+[32m+[m[32m    for (const transition of transitions) {[m
+[32m+[m[32m      expect(countryDeploymentTransitionBlockReason({ deployment: deployment(), transition }))[m
+[32m+[m[32m        .toBe(`COUNTRY_DEPLOYMENT_BLOCKED:${transition}:STATE_SCAFFOLD_ONLY`);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it("keeps China blocked without a separate ready local data plane and Russia infra-only", () => {[m
+[32m+[m[32m    const otherwiseOpenChina = deployment({[m
+[32m+[m[32m      countryCode: "CN",[m
+[32m+[m[32m      state: "PRODUCTION_ACTIVE",[m
+[32m+[m[32m      countryShellEnabled: 1,[m
+[32m+[m[32m      jurisdictionEnabled: 1,[m
+[32m+[m[32m      providerOnboardingEnabled: 1,[m
+[32m+[m[32m      consumerDiscoveryEnabled: 1,[m
+[32m+[m[32m      bookingEnabled: 1,[m
+[32m+[m[32m      paymentsEnabled: 1,[m
+[32m+[m[32m      productionStateReachable: 1,[m
+[32m+[m[32m    });[m
+[32m+[m[32m    expect(countryDeploymentTransitionBlockReason({[m
+[32m+[m[32m      deployment: otherwiseOpenChina,[m
+[32m+[m[32m      transition: "PAYMENT_INITIATION",[m
+[32m+[m[32m    })).toBe("COUNTRY_DEPLOYMENT_BLOCKED:PAYMENT_INITIATION:CN_LOCAL_DATA_PLANE_NOT_READY");[m
+[32m+[m
+[32m+[m[32m    expect(countryDeploymentTransitionBlockReason({[m
+[32m+[m[32m      deployment: deployment({ countryCode: "RU", state: "INFRA_ONLY_NO_GO" }),[m
+[32m+[m[32m      transition: "REQUEST_CREATION",[m
+[32m+[m[32m    })).toBe("COUNTRY_DEPLOYMENT_BLOCKED:REQUEST_CREATION:INFRA_ONLY_NO_GO");[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it("requires complete independent activation evidence and exact catalog coverage", () => {[m
+[32m+[m[32m    const base = {[m
+[32m+[m[32m      deployment: deployment({ state: "PILOT_READY" }),[m
+[32m+[m[32m      mandatorySourceVerified: true,[m
+[32m+[m[32m      localLegalApproved: true,[m
+[32m+[m[32m      approvedConnectorAvailable: true,[m
+[32m+[m[32m      legalLocaleReady: true,[m
+[32m+[m[32m      dataPaymentAndPrivacyReady: true,[m
+[32m+[m[32m      productReleaseApproved: true,[m
+[32m+[m[32m    };[m
+[32m+[m[32m    expect(countryActivationPreflight({ ...base, catalogCoveragePercent: 99 })).toEqual({[m
+[32m+[m[32m      allowed: false,[m
+[32m+[m[32m      blockers: ["LIVE_CATALOG_COVERAGE_INCOMPLETE"],[m
+[32m+[m[32m    });[m
+[32m+[m[32m    expect(countryActivationPreflight({ ...base, catalogCoveragePercent: 100 })).toEqual({[m
+[32m+[m[32m      allowed: true,[m
+[32m+[m[32m      blockers: [],[m
+[32m+[m[32m    });[m
+[32m+[m[32m  });[m
+[32m+[m[32m});[m
+[1mdiff --git a/tests/global-country-scaffold-contract.test.ts b/tests/global-country-scaffold-contract.test.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..af4ce19[m
+[1m--- /dev/null[m
+[1m+++ b/tests/global-country-scaffold-contract.test.ts[m
+[36m@@ -0,0 +1,90 @@[m
+[32m+[m[32mimport { describe, expect, it } from "vitest";[m
+[32m+[m
+[32m+[m[32mimport { countryActivationPreflight, legalLocaleRuntimeBlockReason } from "../server/compliance/CountryDeploymentPolicy";[m
+[32m+[m
+[32m+[m[32mconst berlinScaffold = {[m
+[32m+[m[32m  countryCode: "DE",[m
+[32m+[m[32m  state: "SCAFFOLD_ONLY" as const,[m
+[32m+[m[32m  localDataPlaneReady: 0,[m
+[32m+[m[32m  countryShellEnabled: 0,[m
+[32m+[m[32m  jurisdictionEnabled: 0,[m
+[32m+[m[32m  consumerDiscoveryEnabled: 0,[m
+[32m+[m[32m  providerOnboardingEnabled: 0,[m
+[32m+[m[32m  bookingEnabled: 0,[m
+[32m+[m[32m  paymentsEnabled: 0,[m
+[32m+[m[32m  aiAssistantEnabled: 0,[m
+[32m+[m[32m  supportEnabled: 0,[m
+[32m+[m[32m  productionStateReachable: 0,[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mdescribe("global country scaffold contract", () => {[m
+[32m+[m[32m  it("Berlin research-source, connector and machine-locale defaults cannot pass activation preflight", () => {[m
+[32m+[m[32m    const result = countryActivationPreflight({[m
+[32m+[m[32m      deployment: berlinScaffold,[m
+[32m+[m[32m      mandatorySourceVerified: false,[m
+[32m+[m[32m      localLegalApproved: false,[m
+[32m+[m[32m      approvedConnectorAvailable: false,[m
+[32m+[m[32m      legalLocaleReady: false,[m
+[32m+[m[32m      dataPaymentAndPrivacyReady: false,[m
+[32m+[m[32m      productReleaseApproved: false,[m
+[32m+[m[32m      catalogCoveragePercent: 100,[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    expect(result.allowed).toBe(false);[m
+[32m+[m[32m    expect(result.blockers).toEqual(expect.arrayContaining([[m
+[32m+[m[32m      "MANDATORY_SOURCE_UNVERIFIED",[m
+[32m+[m[32m      "LOCAL_LEGAL_APPROVAL_MISSING",[m
+[32m+[m[32m      "OFFICIAL_CONNECTOR_UNAVAILABLE",[m
+[32m+[m[32m      "LEGAL_LOCALE_NOT_APPROVED",[m
+[32m+[m[32m      "DATA_PAYMENT_PRIVACY_GATE_BLOCKED",[m
+[32m+[m[32m      "PRODUCT_RELEASE_APPROVAL_MISSING",[m
+[32m+[m[32m    ]));[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it("an incomplete canonical capability map remains a country activation blocker", () => {[m
+[32m+[m[32m    const result = countryActivationPreflight({[m
+[32m+[m[32m      deployment: berlinScaffold,[m
+[32m+[m[32m      mandatorySourceVerified: true,[m
+[32m+[m[32m      localLegalApproved: true,[m
+[32m+[m[32m      approvedConnectorAvailable: true,[m
+[32m+[m[32m      legalLocaleReady: true,[m
+[32m+[m[32m      dataPaymentAndPrivacyReady: true,[m
+[32m+[m[32m      productReleaseApproved: true,[m
+[32m+[m[32m      catalogCoveragePercent: 99,[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    expect(result.allowed).toBe(false);[m
+[32m+[m[32m    expect(result.blockers).toContain("LIVE_CATALOG_COVERAGE_INCOMPLETE");[m
+[32m+[m[32m  });[m
+[32m+[m
+[32m+[m[32m  it.each(["SCAFFOLD_ONLY", "RESEARCHING", "SUSPENDED", "INFRA_ONLY_NO_GO"] as const)([m
+[32m+[m[32m    "%s state cannot pass preflight even when all approval inputs are asserted",[m
+[32m+[m[32m    (state) => {[m
+[32m+[m[32m      const result = countryActivationPreflight({[m
+[32m+[m[32m        deployment: { ...berlinScaffold, state },[m
+[32m+[m[32m        mandatorySourceVerified: true,[m
+[32m+[m[32m        localLegalApproved: true,[m
+[32m+[m[32m        approvedConnectorAvailable: true,[m
+[32m+[m[32m        legalLocaleReady: true,[m
+[32m+[m[32m        dataPaymentAndPrivacyReady: true,[m
+[32m+[m[32m        productReleaseApproved: true,[m
+[32m+[m[32m        catalogCoveragePercent: 100,[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      expect(result.allowed).toBe(false);[m
+[32m+[m[32m      expect(result.blockers).toContain(`COUNTRY_DEPLOYMENT_STATE_NOT_ACTIVATABLE:${state}`);[m
+[32m+[m[32m    },[m
+[32m+[m[32m  );[m
+[32m+[m
+[32m+[m[32m  it("never exposes a DRAFT_MACHINE legal locale or silently falls back to another legal text", () => {[m
+[32m+[m[32m    expect(legalLocaleRuntimeBlockReason({ localizationState: "DRAFT_MACHINE", runtimeSelectable: 0 })).toBe([m
+[32m+[m[32m      "LEGAL_LOCALE_BLOCKED:DRAFT_MACHINE",[m
+[32m+[m[32m    );[m
+[32m+[m[32m    expect(legalLocaleRuntimeBlockReason({ localizationState: "LEGAL_REVIEWED", runtimeSelectable: 1 })).toBe([m
+[32m+[m[32m      "LEGAL_LOCALE_BLOCKED:STATE_LEGAL_REVIEWED",[m
+[32m+[m[32m    );[m
+[32m+[m[32m    expect(legalLocaleRuntimeBlockReason({ localizationState: "APPROVED_PRODUCTION", runtimeSelectable: 0 })).toBe([m
+[32m+[m[32m      "LEGAL_LOCALE_BLOCKED:RUNTIME_SELECTION_DISABLED",[m
+[32m+[m[32m    );[m
+[32m+[m[32m  });[m
+[32m+[m[32m});[m
+[1mdiff --git a/todo.md b/todo.md[m
+[1mindex d851d99..be93536 100644[m
+[1m--- a/todo.md[m
+[1m+++ b/todo.md[m
+[36m@@ -667,3 +667,16 @@[m
+ - [x] B1-H5 — Sahte/geçersiz/stale onay, askı aşma ve eşzamanlı yazma davranış testlerini ekle[m
+ - [x] B1-H6 — Additive migration, kalite kapıları ve non-destructive veri eşlemesini doğrula[m
+ - [x] B1-H7 — Blok 1 kilidini koruyan v3 salt-okunur kanıt paketini teslim et[m
+[32m+[m
+[32m+[m[32m## Beş Ülke Güvenli Altyapı — Faz 0 ve Germany/Berlin CHECKPOINT A[m
+[32m+[m[32m- [x] G5-P0 — Üç ek dosyayı, binding komutu ve default-off seed sınırını eksiksiz denetle[m
+[32m+[m[32m- [x] G5-P0 — Türkiye checkpoint, kullanıcı verisi ve production/country activation koruma sınırlarını kanıtla[m
+[32m+[m[32m- [x] G5-S1 — Common Global Scaffold’u yalnız additive ve default-off olarak kur[m
+[32m+[m[32m- [x] G5-DE-A — Germany/Berlin SOURCE_UNVERIFIED kaynak, connector, legal locale ve capability scaffoldunu CHECKPOINT A sınırında doğrula[m
+[32m+[m[32m- [x] G5-DE-A — Germany/Berlin CHECKPOINT A kapsamını uygulayıp ülke/capability activationını kapalı tut[m
+[32m+[m[32m- [x] G5-QA — Migration, authorization, fail-closed ve regresyon kalite kanıtlarını tamamla[m
+[32m+[m[32m- [x] G5-CP-A — CHECKPOINT A kanıt paketini hazırla ve sonraki bloklara geçmeden dur[m
+[32m+[m[32m- [x] G5-CP-A-R1 — Canlı katalog snapshot’ı, canonical capability hesap ve 13 hizmet eşleşme kanıtını oluştur[m
+[32m+[m[32m- [x] G5-CP-A-R2 — 79 satırlık UNKNOWN=BLOCK service–credential matrix ve hukukçu review template’ini oluştur[m
+[32m+[m[32m- [x] G5-CP-A-R3 — Berlin source registry, connector gap, locale, migration, authorization ve OOM kanıtlarını tamamla[m
+[32m+[m[32m- [x] G5-CP-A-R4 — Hash-manifestli salt-okunur ZIP inceleme paketini oluştur ve CHECKPOINT A’da dur[m

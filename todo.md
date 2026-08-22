@@ -676,3 +676,7 @@
 - [x] G5-DE-A — Germany/Berlin CHECKPOINT A kapsamını uygulayıp ülke/capability activationını kapalı tut
 - [x] G5-QA — Migration, authorization, fail-closed ve regresyon kalite kanıtlarını tamamla
 - [x] G5-CP-A — CHECKPOINT A kanıt paketini hazırla ve sonraki bloklara geçmeden dur
+- [x] G5-CP-A-R1 — Canlı katalog snapshot’ı, canonical capability hesap ve 13 hizmet eşleşme kanıtını oluştur
+- [x] G5-CP-A-R2 — 79 satırlık UNKNOWN=BLOCK service–credential matrix ve hukukçu review template’ini oluştur
+- [x] G5-CP-A-R3 — Berlin source registry, connector gap, locale, migration, authorization ve OOM kanıtlarını tamamla
+- [x] G5-CP-A-R4 — Hash-manifestli salt-okunur ZIP inceleme paketini oluştur ve CHECKPOINT A’da dur
