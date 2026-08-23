@@ -1,7 +1,10 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import {
+  countryCoveragePolicyDecisions,
+  countryServiceCoverage,
   countryDeployments,
+  jurisdictionNodes,
   jurisdictions,
   jurisdictionCompliancePackages,
   jurisdictionLaunchGates,
@@ -17,7 +20,11 @@ import {
   type CountryLaunchChecklist,
 } from "./CountryLaunchGateService";
 import { evaluateTurkeyPaymentLaunchReadiness } from "./TurkeyPaymentLaunchPolicy";
-import { countryDeploymentTransitionBlockReason, type CountryDeploymentTransition } from "./CountryDeploymentPolicy";
+import {
+  countryCoverageActivationBlockReasons,
+  countryDeploymentTransitionBlockReason,
+  type CountryDeploymentTransition,
+} from "./CountryDeploymentPolicy";
 
 export type CompliancePackageStatus = "draft" | "legal_review" | "approved" | "enabled" | "blocked" | "retired";
 export type OfficialSourceStatus = "draft" | "verified" | "superseded" | "revoked";
@@ -112,6 +119,59 @@ export async function assertCountryMarketplaceTransition(input: {
     transition: input.transition,
     gateStatus: "enabled" as const,
   };
+}
+
+/**
+ * Reads a server-resolved jurisdiction node plus canonical service IDs before
+ * invoking the existing country gate. This path is intentionally additive and
+ * read-only: provider/client input cannot write source, connector, approval or
+ * coverage decision state.
+ */
+export async function assertCountryCoverageTransition(input: {
+  countryCode: string;
+  resolvedJurisdictionNodeCode: string;
+  canonicalCategoryId: number;
+  canonicalSubcategoryId: number;
+  transition: CountryMarketplaceTransition;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error(`COUNTRY_COVERAGE_BLOCKED:${input.transition}:DATABASE_UNAVAILABLE`);
+
+  const countryCode = input.countryCode.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(countryCode)) throw new Error(`COUNTRY_COVERAGE_BLOCKED:${input.transition}:COUNTRY_UNKNOWN`);
+  const coverageRows = await db
+    .select({ coverage: countryServiceCoverage, decision: countryCoveragePolicyDecisions })
+    .from(countryServiceCoverage)
+    .innerJoin(jurisdictionNodes, eq(jurisdictionNodes.id, countryServiceCoverage.jurisdictionNodeId))
+    .leftJoin(countryCoveragePolicyDecisions, eq(countryCoveragePolicyDecisions.coverageId, countryServiceCoverage.id))
+    .innerJoin(countryDeployments, eq(countryDeployments.id, countryServiceCoverage.countryDeploymentId))
+    .where(and(
+      eq(countryDeployments.countryCode, countryCode),
+      eq(jurisdictionNodes.nodeCode, input.resolvedJurisdictionNodeCode),
+      eq(countryServiceCoverage.canonicalCategoryId, input.canonicalCategoryId),
+      eq(countryServiceCoverage.canonicalSubcategoryId, input.canonicalSubcategoryId),
+    ))
+    .limit(2);
+  if (coverageRows.length !== 1 || !coverageRows[0]?.decision) {
+    throw new Error(`COUNTRY_COVERAGE_BLOCKED:${input.transition}:COVERAGE_UNKNOWN_OR_INCOMPLETE`);
+  }
+
+  const { coverage, decision } = coverageRows[0];
+  const coverageResult = countryCoverageActivationBlockReasons({
+    mappingState: coverage.mappingState,
+    productionState: coverage.productionState,
+    sourceState: coverage.sourceState,
+    legalState: coverage.legalState,
+    connectorState: coverage.connectorState,
+    decision: decision.decision,
+    assuranceLevel: decision.assuranceLevel,
+    legalApprovalState: decision.legalApprovalState,
+    productReleaseState: decision.productReleaseState,
+  });
+  if (!coverageResult.allowed) {
+    throw new Error(`COUNTRY_COVERAGE_BLOCKED:${input.transition}:${coverageResult.blockers.join(",")}`);
+  }
+  return assertCountryMarketplaceTransition({ countryCode, transition: input.transition });
 }
 
 async function getTurkeyPaymentLaunchReadiness(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {

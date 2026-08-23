@@ -1,0 +1,22 @@
+{
+  "schema": "movefix.us-ca-la.checkpoint-a.evidence.v1",
+  "generatedAt": "2026-08-23T23:30:15.709Z",
+  "scope": "US-CA-LOS_ANGELES; read-only; no provider or personal data",
+  "coverage": {
+    "rows": 62,
+    "mappedBlocked": 62,
+    "blockedPendingGates": 62,
+    "sourceUnverified": 62,
+    "legalNotApproved": 62,
+    "connectorNotOperational": 62
+  },
+  "sourceRows": 28,
+  "connectorRows": 28,
+  "localeRows": 12,
+  "fileHashes": {
+    "coverageMatrix": "9b6c9bf560025034eccdb1ff08c138f3e483dbba9b0de966b851b5eff4aad478",
+    "sourceRegistry": "6684d82ff6857bc8264a925f0345c00db0969dce885c330e4804e871a07f5ae4",
+    "connectorRegistry": "0a1b6362858d6d52de31621b6412c5cb0a12790309fb84cac8243b02040f6fd8",
+    "localeRegistry": "a2b6290a7b10ed35b208b97d3249646f6d9c16b444d2c0d6e44263c65a59084a"
+  }
+}

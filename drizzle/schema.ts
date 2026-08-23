@@ -1,4 +1,4 @@
-import { index, int, json, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { foreignKey, index, int, json, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -1287,6 +1287,230 @@ export const countryActivationRuns = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => [index("country_activation_runs_country_created_idx").on(table.countryDeploymentId, table.createdAt)],
+);
+
+/**
+ * One immutable research-row binding per live country/jurisdiction/subservice.
+ * A row is never an authorization: its initial state intentionally blocks every
+ * provider transition until a separate, scoped evidence decision exists.
+ */
+export const countryServiceCoverage = mysqlTable(
+  "country_service_coverage",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    jurisdictionNodeId: int("jurisdictionNodeId").notNull(),
+    canonicalCategoryId: int("canonicalCategoryId").notNull(),
+    canonicalSubcategoryId: int("canonicalSubcategoryId").notNull(),
+    researchRowId: varchar("researchRowId", { length: 240 }).notNull(),
+    researchRulePackVersion: varchar("researchRulePackVersion", { length: 80 }).notNull(),
+    researchRowHash: varchar("researchRowHash", { length: 128 }).notNull(),
+    mappingState: mysqlEnum("mappingState", ["MAPPED_BLOCKED", "UNMAPPED_SERVICE_BLOCKED"]).default("UNMAPPED_SERVICE_BLOCKED").notNull(),
+    sourceState: mysqlEnum("sourceState", ["AI_RESEARCHED_UNVERIFIED", "SOURCE_UNVERIFIED", "SOURCE_VERIFIED"]).default("AI_RESEARCHED_UNVERIFIED").notNull(),
+    legalState: mysqlEnum("legalState", ["NOT_REVIEWED", "PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("NOT_REVIEWED").notNull(),
+    connectorState: mysqlEnum("connectorState", ["NOT_IMPLEMENTED_OR_NOT_AUTHORIZED", "PENDING", "AUTHORIZED", "OPERATIONAL", "REVOKED"]).default("NOT_IMPLEMENTED_OR_NOT_AUTHORIZED").notNull(),
+    productionState: mysqlEnum("productionState", ["BLOCKED_PENDING_GATES", "NO_GO", "POLICY_ELIGIBLE", "ACTIVE"]).default("BLOCKED_PENDING_GATES").notNull(),
+    riskLevel: mysqlEnum("riskLevel", ["LOW", "MEDIUM", "HIGH", "CRITICAL"]).notNull(),
+    mandatoryEvidenceJson: json("mandatoryEvidenceJson").$type<string[]>().notNull(),
+    intakeQuestionsJson: json("intakeQuestionsJson").$type<string[]>().notNull(),
+    sourceIdsJson: json("sourceIdsJson").$type<string[]>().notNull(),
+    conditionalTriggerSummary: text("conditionalTriggerSummary"),
+    missingEvidenceDecision: varchar("missingEvidenceDecision", { length: 120 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_service_coverage_scope_subservice_unique").on(table.countryDeploymentId, table.jurisdictionNodeId, table.canonicalSubcategoryId),
+    uniqueIndex("country_service_coverage_research_row_unique").on(table.countryDeploymentId, table.researchRowId, table.researchRulePackVersion),
+    index("country_service_coverage_policy_idx").on(table.countryDeploymentId, table.productionState, table.mappingState),
+    foreignKey({ columns: [table.countryDeploymentId], foreignColumns: [countryDeployments.id], name: "fk_country_service_coverage_deployment" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.jurisdictionNodeId], foreignColumns: [jurisdictionNodes.id], name: "fk_country_service_coverage_jurisdiction" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.canonicalCategoryId], foreignColumns: [serviceCategories.id], name: "fk_country_service_coverage_category" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.canonicalSubcategoryId], foreignColumns: [serviceSubcategories.id], name: "fk_country_service_coverage_subcategory" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countryRulePackVersions = mysqlTable(
+  "country_rule_pack_versions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    jurisdictionNodeId: int("jurisdictionNodeId").notNull(),
+    version: varchar("version", { length: 80 }).notNull(),
+    researchSeedHash: varchar("researchSeedHash", { length: 128 }).notNull(),
+    state: mysqlEnum("state", ["AI_RESEARCHED_UNVERIFIED", "SOURCE_REVIEW", "LEGAL_REVIEW", "APPROVED", "REVOKED"]).default("AI_RESEARCHED_UNVERIFIED").notNull(),
+    legalApprovalLedgerId: int("legalApprovalLedgerId"),
+    activatedAt: timestamp("activatedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_rule_pack_versions_scope_unique").on(table.countryDeploymentId, table.jurisdictionNodeId, table.version),
+    foreignKey({ columns: [table.countryDeploymentId], foreignColumns: [countryDeployments.id], name: "fk_country_rule_pack_deployment" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.jurisdictionNodeId], foreignColumns: [jurisdictionNodes.id], name: "fk_country_rule_pack_jurisdiction" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.legalApprovalLedgerId], foreignColumns: [approvalLedger.id], name: "fk_country_rule_pack_legal_ledger" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countryRequirementBundles = mysqlTable(
+  "country_requirement_bundles",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    rulePackVersionId: int("rulePackVersionId").notNull(),
+    bundleKey: varchar("bundleKey", { length: 160 }).notNull(),
+    title: varchar("title", { length: 320 }).notNull(),
+    riskLevel: mysqlEnum("riskLevel", ["LOW", "MEDIUM", "HIGH", "CRITICAL"]).notNull(),
+    sourceState: mysqlEnum("sourceState", ["AI_RESEARCHED_UNVERIFIED", "SOURCE_UNVERIFIED", "SOURCE_VERIFIED"]).default("AI_RESEARCHED_UNVERIFIED").notNull(),
+    legalState: mysqlEnum("legalState", ["NOT_REVIEWED", "PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("NOT_REVIEWED").notNull(),
+    decisionIfMissing: varchar("decisionIfMissing", { length: 120 }).notNull(),
+    triggerDescription: text("triggerDescription").notNull(),
+    verificationDescription: text("verificationDescription").notNull(),
+    requiredEvidenceJson: json("requiredEvidenceJson").$type<string[]>().notNull(),
+    subjectTypesJson: json("subjectTypesJson").$type<string[]>().notNull(),
+    note: text("note"),
+    researchHash: varchar("researchHash", { length: 128 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_requirement_bundles_scope_unique").on(table.countryDeploymentId, table.rulePackVersionId, table.bundleKey),
+    index("country_requirement_bundles_state_idx").on(table.countryDeploymentId, table.sourceState, table.legalState),
+    foreignKey({ columns: [table.countryDeploymentId], foreignColumns: [countryDeployments.id], name: "fk_country_requirement_bundle_deployment" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.rulePackVersionId], foreignColumns: [countryRulePackVersions.id], name: "fk_country_requirement_bundle_rule_pack" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countryCoverageBundleBindings = mysqlTable(
+  "country_coverage_bundle_bindings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    coverageId: int("coverageId").notNull(),
+    bundleId: int("bundleId").notNull(),
+    bindingKind: mysqlEnum("bindingKind", ["MANDATORY", "CONDITIONAL"]).notNull(),
+    conditionSummary: text("conditionSummary"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_coverage_bundle_binding_unique").on(table.coverageId, table.bundleId, table.bindingKind),
+    foreignKey({ columns: [table.coverageId], foreignColumns: [countryServiceCoverage.id], name: "fk_country_coverage_bundle_coverage" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.bundleId], foreignColumns: [countryRequirementBundles.id], name: "fk_country_coverage_bundle_bundle" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countryRequirementSubjectBindings = mysqlTable(
+  "country_requirement_subject_bindings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bundleId: int("bundleId").notNull(),
+    subjectType: mysqlEnum("subjectType", ["PERSON", "BUSINESS", "QUALIFIED_MANAGER", "DRIVER", "VEHICLE", "SITE", "OPERATOR", "PROJECT", "CUSTOMER_AUTHORITY", "POLICY", "QUALIFIER"]).notNull(),
+    required: int("required").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_requirement_subject_binding_unique").on(table.bundleId, table.subjectType),
+    foreignKey({ columns: [table.bundleId], foreignColumns: [countryRequirementBundles.id], name: "fk_country_requirement_subject_bundle" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countrySourceArchives = mysqlTable(
+  "country_source_archives",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    officialSourceId: int("officialSourceId").notNull(),
+    retrievalHash: varchar("retrievalHash", { length: 128 }).notNull(),
+    archiveReference: varchar("archiveReference", { length: 512 }).notNull(),
+    sectionReference: varchar("sectionReference", { length: 320 }),
+    effectiveDateText: varchar("effectiveDateText", { length: 160 }),
+    exceptionText: text("exceptionText"),
+    researchState: mysqlEnum("researchState", ["AI_RESEARCHED_UNVERIFIED", "SOURCE_UNVERIFIED", "SOURCE_VERIFIED", "SUPERSEDED"]).default("AI_RESEARCHED_UNVERIFIED").notNull(),
+    retrievedAt: timestamp("retrievedAt").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_source_archives_source_hash_unique").on(table.officialSourceId, table.retrievalHash),
+    foreignKey({ columns: [table.officialSourceId], foreignColumns: [officialSources.id], name: "fk_country_source_archive_source" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countryRequirementSourceBindings = mysqlTable(
+  "country_requirement_source_bindings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bundleId: int("bundleId").notNull(),
+    officialSourceId: int("officialSourceId").notNull(),
+    sourceArchiveId: int("sourceArchiveId").notNull(),
+    requirementReference: varchar("requirementReference", { length: 320 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_requirement_source_binding_unique").on(table.bundleId, table.officialSourceId),
+    foreignKey({ columns: [table.bundleId], foreignColumns: [countryRequirementBundles.id], name: "fk_country_requirement_source_bundle" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.officialSourceId], foreignColumns: [officialSources.id], name: "fk_country_requirement_source_source" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.sourceArchiveId], foreignColumns: [countrySourceArchives.id], name: "fk_country_requirement_source_archive" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countryCoveragePolicyDecisions = mysqlTable(
+  "country_coverage_policy_decisions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    coverageId: int("coverageId").notNull(),
+    rulePackVersionId: int("rulePackVersionId").notNull(),
+    decision: mysqlEnum("decision", ["BLOCKED", "PROFILE_INCOMPLETE", "LEGAL_REVIEW_REQUIRED", "PENDING_OFFICIAL_VERIFICATION", "AUTHORITY_VERIFIED", "POLICY_ELIGIBLE", "VERIFIED_LIMITED_SCOPE", "REJECTED", "EXPIRED_OR_SUSPENDED", "NO_GO"]).default("BLOCKED").notNull(),
+    assuranceLevel: mysqlEnum("assuranceLevel", ["SELF_ASSERTED", "DOCUMENT_UPLOADED", "DOCUMENT_EXTRACTED", "ISSUER_SIGNATURE_VERIFIED", "REGISTRY_MATCHED", "REGISTRY_STATUS_ACTIVE", "REVOCATION_MONITORED"]).default("SELF_ASSERTED").notNull(),
+    sourceState: mysqlEnum("sourceState", ["AI_RESEARCHED_UNVERIFIED", "SOURCE_UNVERIFIED", "SOURCE_VERIFIED"]).default("AI_RESEARCHED_UNVERIFIED").notNull(),
+    connectorState: mysqlEnum("connectorState", ["NOT_IMPLEMENTED_OR_NOT_AUTHORIZED", "PENDING", "AUTHORIZED", "OPERATIONAL", "REVOKED"]).default("NOT_IMPLEMENTED_OR_NOT_AUTHORIZED").notNull(),
+    legalApprovalState: mysqlEnum("legalApprovalState", ["NOT_REVIEWED", "PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("NOT_REVIEWED").notNull(),
+    productReleaseState: mysqlEnum("productReleaseState", ["PENDING", "APPROVED", "REVOKED", "EXPIRED"]).default("PENDING").notNull(),
+    stateVersion: int("stateVersion").default(1).notNull(),
+    reasonCodesJson: json("reasonCodesJson").$type<string[]>().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_coverage_policy_decisions_coverage_unique").on(table.coverageId),
+    index("country_coverage_policy_decisions_decision_idx").on(table.decision, table.sourceState, table.connectorState),
+    foreignKey({ columns: [table.coverageId], foreignColumns: [countryServiceCoverage.id], name: "fk_country_coverage_policy_coverage" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.rulePackVersionId], foreignColumns: [countryRulePackVersions.id], name: "fk_country_coverage_policy_rule_pack" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countryCoveragePolicyEvents = mysqlTable(
+  "country_coverage_policy_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    coveragePolicyDecisionId: int("coveragePolicyDecisionId").notNull(),
+    eventType: mysqlEnum("eventType", ["SEEDED", "REVIEW_REQUESTED", "SUSPENDED", "REVOKED", "EVIDENCE_REJECTED"]).notNull(),
+    actorUserId: int("actorUserId"),
+    reasonCode: varchar("reasonCode", { length: 160 }).notNull(),
+    evidenceHash: varchar("evidenceHash", { length: 128 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("country_coverage_policy_events_decision_idx").on(table.coveragePolicyDecisionId, table.createdAt),
+    foreignKey({ columns: [table.coveragePolicyDecisionId], foreignColumns: [countryCoveragePolicyDecisions.id], name: "fk_country_coverage_policy_event_decision" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.actorUserId], foreignColumns: [users.id], name: "fk_country_coverage_policy_event_actor" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+export const countryActiveProviderTransitions = mysqlTable(
+  "country_active_provider_transitions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    coverageId: int("coverageId").notNull(),
+    providerId: int("providerId").notNull(),
+    state: mysqlEnum("state", ["NOT_APPLICABLE", "PENDING_OWNER_APPROVAL", "WINDOW_APPROVED", "NOTIFIED", "BLOCKED", "EXPIRED_OR_SUSPENDED"]).default("NOT_APPLICABLE").notNull(),
+    transitionWindowEndsAt: timestamp("transitionWindowEndsAt"),
+    ownerApprovalLedgerId: int("ownerApprovalLedgerId"),
+    notificationEvidenceHash: varchar("notificationEvidenceHash", { length: 128 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_active_provider_transition_unique").on(table.coverageId, table.providerId),
+    foreignKey({ columns: [table.coverageId], foreignColumns: [countryServiceCoverage.id], name: "fk_country_active_provider_transition_coverage" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.providerId], foreignColumns: [providers.id], name: "fk_country_active_provider_transition_provider" }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ columns: [table.ownerApprovalLedgerId], foreignColumns: [approvalLedger.id], name: "fk_country_active_provider_transition_ledger" }).onDelete("restrict").onUpdate("cascade"),
+  ],
 );
 
 // Capability is intentionally separate from a profile verification. For example,

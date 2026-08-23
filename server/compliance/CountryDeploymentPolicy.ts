@@ -130,3 +130,53 @@ export function countryActivationPreflight(input: {
   }
   return { allowed: blockers.length === 0, blockers } as const;
 }
+
+export type CountryCoverageActivationRuntime = {
+  mappingState: "MAPPED_BLOCKED" | "UNMAPPED_SERVICE_BLOCKED";
+  productionState: "BLOCKED_PENDING_GATES" | "NO_GO" | "POLICY_ELIGIBLE" | "ACTIVE";
+  sourceState: "AI_RESEARCHED_UNVERIFIED" | "SOURCE_UNVERIFIED" | "SOURCE_VERIFIED";
+  legalState: "NOT_REVIEWED" | "PENDING" | "APPROVED" | "REVOKED" | "EXPIRED";
+  connectorState: "NOT_IMPLEMENTED_OR_NOT_AUTHORIZED" | "PENDING" | "AUTHORIZED" | "OPERATIONAL" | "REVOKED";
+  decision: "BLOCKED" | "PROFILE_INCOMPLETE" | "LEGAL_REVIEW_REQUIRED" | "PENDING_OFFICIAL_VERIFICATION" | "AUTHORITY_VERIFIED" | "POLICY_ELIGIBLE" | "VERIFIED_LIMITED_SCOPE" | "REJECTED" | "EXPIRED_OR_SUSPENDED" | "NO_GO";
+  assuranceLevel: "SELF_ASSERTED" | "DOCUMENT_UPLOADED" | "DOCUMENT_EXTRACTED" | "ISSUER_SIGNATURE_VERIFIED" | "REGISTRY_MATCHED" | "REGISTRY_STATUS_ACTIVE" | "REVOCATION_MONITORED";
+  legalApprovalState: "NOT_REVIEWED" | "PENDING" | "APPROVED" | "REVOKED" | "EXPIRED";
+  productReleaseState: "PENDING" | "APPROVED" | "REVOKED" | "EXPIRED";
+};
+
+/**
+ * A country may pass a coarse preflight only when every covered service passes
+ * this derived evaluator. Research material, self-assertion and a connector
+ * merely configured for later use are never sufficient to activate a service.
+ */
+export function countryCoverageActivationBlockReasons(input: CountryCoverageActivationRuntime) {
+  const blockers: string[] = [];
+  if (input.mappingState !== "MAPPED_BLOCKED") blockers.push("CANONICAL_SERVICE_MAPPING_UNRESOLVED");
+  if (input.productionState !== "ACTIVE") blockers.push(`COVERAGE_PRODUCTION_STATE_${input.productionState}`);
+  if (input.sourceState !== "SOURCE_VERIFIED") blockers.push(`COVERAGE_SOURCE_${input.sourceState}`);
+  if (input.legalState !== "APPROVED") blockers.push(`COVERAGE_LEGAL_STATE_${input.legalState}`);
+  if (input.connectorState !== "OPERATIONAL") blockers.push(`COVERAGE_CONNECTOR_${input.connectorState}`);
+  if (input.decision !== "AUTHORITY_VERIFIED" && input.decision !== "POLICY_ELIGIBLE" && input.decision !== "VERIFIED_LIMITED_SCOPE") {
+    blockers.push(`COVERAGE_DECISION_${input.decision}`);
+  }
+  if (input.assuranceLevel !== "REGISTRY_STATUS_ACTIVE" && input.assuranceLevel !== "REVOCATION_MONITORED") {
+    blockers.push(`COVERAGE_ASSURANCE_${input.assuranceLevel}`);
+  }
+  if (input.legalApprovalState !== "APPROVED") blockers.push(`LOCAL_LEGAL_APPROVAL_${input.legalApprovalState}`);
+  if (input.productReleaseState !== "APPROVED") blockers.push(`PRODUCT_RELEASE_APPROVAL_${input.productReleaseState}`);
+  return { allowed: blockers.length === 0, blockers } as const;
+}
+
+export function activeProviderTransitionWindowBlockReason(input: {
+  coverageProductionState: CountryCoverageActivationRuntime["productionState"];
+  coverageDecision: CountryCoverageActivationRuntime["decision"];
+  ownerApprovalLedgerValid: boolean;
+  notificationEvidencePresent: boolean;
+}) {
+  if (input.coverageProductionState !== "ACTIVE") return `ACTIVE_PROVIDER_TRANSITION_BLOCKED:COVERAGE_${input.coverageProductionState}`;
+  if (input.coverageDecision !== "POLICY_ELIGIBLE" && input.coverageDecision !== "VERIFIED_LIMITED_SCOPE") {
+    return `ACTIVE_PROVIDER_TRANSITION_BLOCKED:DECISION_${input.coverageDecision}`;
+  }
+  if (!input.ownerApprovalLedgerValid) return "ACTIVE_PROVIDER_TRANSITION_BLOCKED:OWNER_APPROVAL_LEDGER_MISSING";
+  if (!input.notificationEvidencePresent) return "ACTIVE_PROVIDER_TRANSITION_BLOCKED:NOTICE_EVIDENCE_MISSING";
+  return null;
+}

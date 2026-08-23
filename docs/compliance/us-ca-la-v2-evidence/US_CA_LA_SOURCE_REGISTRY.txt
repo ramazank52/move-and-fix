@@ -1,0 +1,29 @@
+source_key|authority|url|source_status
+G-NIST-IAL|NIST|https://pages.nist.gov/800-63-4/sp800-63a.html|SOURCE_UNVERIFIED
+G-W3C-VC|W3C|https://www.w3.org/TR/vc-data-model-2.0/|SOURCE_UNVERIFIED
+US-BAR-ARD|California Bureau of Automotive Repair|https://www.bar.ca.gov/apply|SOURCE_UNVERIFIED
+US-BAR-LOOKUP|California BAR|https://bar.ca.gov/public-records|SOURCE_UNVERIFIED
+US-BC-LICENSE|California Board of Barbering and Cosmetology|https://www.barbercosmo.ca.gov/licensees/|SOURCE_UNVERIFIED
+US-BC-PSP|California Board of Barbering and Cosmetology|https://barbercosmo.ca.gov/licensees/psp_info.shtml|SOURCE_UNVERIFIED
+US-BHGS-MOVER|California BHGS|https://www.bhgs.dca.ca.gov/licensee/hhm_faqs.shtml|SOURCE_UNVERIFIED
+US-BHGS-REPAIR|California BHGS|https://bhgs.dca.ca.gov/licensee/bear_faqs.shtml|SOURCE_UNVERIFIED
+US-BPC-7048|California Legislature|https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=BPC&sectionNum=7048.|SOURCE_UNVERIFIED
+US-BSIS-ALARM|California BSIS|https://www.bsis.ca.gov/forms_pubs/alarm_fact.shtml|SOURCE_UNVERIFIED
+US-BSIS-LOCK|California BSIS|https://www.bsis.ca.gov/forms_pubs/locksmith_fact.shtml|SOURCE_UNVERIFIED
+US-BSIS-VERIFY|California BSIS|https://www.bsis.ca.gov/forms_pubs/online_services/verify_license.shtml|SOURCE_UNVERIFIED
+US-CAMTC|California Massage Therapy Council|https://www.camtc.org/faqs/|SOURCE_UNVERIFIED
+US-CSLB-CLASS|California CSLB|https://www2.cslb.ca.gov/about_us/library/licensing_classifications/|SOURCE_UNVERIFIED
+US-CSLB-TRIGGER|California CSLB|https://www.cslb.ca.gov/Consumers/Hire_A_Contractor/What_Kind_Of_Contractor.aspx|SOURCE_UNVERIFIED
+US-CSLB-VERIFY|California CSLB|https://www.cslb.ca.gov/Onlineservices/DataPortal/ListByClassification.aspx|SOURCE_UNVERIFIED
+US-DCA-LOOKUP|California DCA|https://search.dca.ca.gov/|SOURCE_UNVERIFIED
+US-DIR-ASBESTOS|California DIR|https://www.dir.ca.gov/dosh/asbestos.html|SOURCE_UNVERIFIED
+US-DMV-CDL|California DMV|https://www.dmv.ca.gov/portal/driver-licenses-identification-cards/commercial-driver-licenses-cdl/commercial-driver-license-classes-certifications/|SOURCE_UNVERIFIED
+US-DMV-MCP|California DMV|https://www.dmv.ca.gov/portal/vehicle-industry-services/motor-carrier-services-mcs/motor-carrier-permits/|SOURCE_UNVERIFIED
+US-DMV-TTD|California DMV|https://www.dmv.ca.gov/portal/driver-education-and-safety/dmv-safety-guidelines-actions/driver-license-certificates-and-endorsements/|SOURCE_UNVERIFIED
+US-DPR-PEST|California DPR|https://apps.cdpr.ca.gov/docs/license/currlic.cfm|SOURCE_UNVERIFIED
+US-EPA-608|US EPA|https://www.epa.gov/section608/section-608-technician-certification-requirements|SOURCE_UNVERIFIED
+US-EPA-RRP|US EPA|https://www.epa.gov/lead/renovation-repair-and-painting-program-contractors|SOURCE_UNVERIFIED
+US-FMCSA-AUTH|FMCSA|https://www.fmcsa.dot.gov/registration/get-mc-number-authority-operate|SOURCE_UNVERIFIED
+US-FMCSA-MOVER|FMCSA|https://www.fmcsa.dot.gov/protect-your-move/search-mover|SOURCE_UNVERIFIED
+US-LA-BTRC|City of Los Angeles Office of Finance|https://finance.lacity.gov/tax-education/new-business-registration/how-register-btrc|SOURCE_UNVERIFIED
+US-LA-TOW|Los Angeles Police Department|https://www.lapdonline.org/permit-requirements-for-tow-unit-operator/|SOURCE_UNVERIFIED

@@ -683,3 +683,10 @@
 - [x] G5-CP-A-R5 — Kullanıcı revizyonuna göre satır-bazlı katalog, matrix, source, connector, locale ve migration kanıtını denetle
 - [x] G5-CP-A-R6 — DE_BERLIN_CHECKPOINT_A_REVIEW_PACKAGE adlı revize ZIP ve dış dosya/hash tutarlılığını teslim et
 - [x] G5-CP-A-R7 — Audit export kopyalarını TypeScript kaynak kapsamından çıkarıp gerçek proje typecheck’ini yeniden doğrula
+
+## Beş Ülke Belge Doğrulama v2 — ABD / California / Los Angeles
+- [x] G5V2-US-P0 — Teslim paketini, binding komutu ve mevcut CHECKPOINT A dondurma koşullarını salt-okunur denetle
+- [x] G5V2-US-A1 — 16 hizmet/62 alt hizmet için canonical ID tabanlı California/Los Angeles matrix ve coverage kanıtını kur
+- [x] G5V2-US-A2 — Tüm US requirement/source/connector/locale kayıtlarını additive, SOURCE_UNVERIFIED, PENDING ve DRAFT_MACHINE default-off olarak oluştur
+- [x] G5V2-US-A3 — Provider eligibility, transition-window ve Türkiye/Berlin izolasyonu için fail-closed politika/test kanıtlarını tamamla
+- [x] G5V2-US-CP-A — US/California/Los Angeles CHECKPOINT A kanıt paketini üret ve Rusya’ya başlamadan dur
