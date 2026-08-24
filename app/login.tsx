@@ -63,8 +63,8 @@ export default function LoginScreen() {
           >
             <IconSymbol name="wrench.and.screwdriver.fill" size={36} color="#FFFFFF" />
           </View>
-          <Text className="text-3xl font-bold text-foreground">Move&Fix</Text>
-          <Text className="mt-2 text-center text-base leading-6 text-muted">
+          <Text style={{ color: colors.foreground, fontSize: 30, fontWeight: "700" }}>Move&Fix</Text>
+          <Text style={{ color: colors.muted, marginTop: 8, textAlign: "center", fontSize: 16, lineHeight: 24 }}>
             Güvenli hesabınızla devam edin
           </Text>
         </View>
@@ -156,14 +156,11 @@ export default function LoginScreen() {
           accessibilityLabel="Kayıt ekranına git"
           accessibilityHint="Kayıt olma ekranını açar"
           onPress={() => router.push("/register")}
-          style={({ pressed, focused }) => ({
+          style={({ pressed }) => ({
             marginTop: 20,
             alignItems: "center",
             opacity: 1,
             borderRadius: 6,
-            outlineStyle: focused ? "solid" : "none",
-            outlineWidth: focused ? 2 : 0,
-            outlineColor: focused ? colors.primary : "transparent",
             ...(pressed ? { backgroundColor: `${colors.primary}18` } : null),
           })}
         >

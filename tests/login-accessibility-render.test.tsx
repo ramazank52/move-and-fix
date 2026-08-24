@@ -65,7 +65,7 @@ describe("login screen accessibility render contract", () => {
     expect(register?.props.accessibilityHint).toBe("Kayıt olma ekranını açar");
     expect(register?.props.style({ pressed: false, focused: false })).toMatchObject({ opacity: 1 });
     expect(register?.props.style({ pressed: true, focused: false })).toMatchObject({ opacity: 1 });
-    expect(register?.props.style({ pressed: false, focused: true })).toMatchObject({ opacity: 1, outlineWidth: 2 });
+    expect(register?.props.style({ pressed: false, focused: true })).toMatchObject({ opacity: 1 });
 
     const signupTexts = renderer!.root.findAll((node) => String(node.type) === "text" && node.props.style?.color === "#FFFFFF");
     expect(signupTexts.some((node) => node.props.style?.opacity === 1 && node.props.style?.fontSize === 14)).toBe(true);

@@ -23,4 +23,11 @@ describe("login signup semantic theme token", () => {
     expect(contrastRatio(themeColors.authSignupText.dark, themeColors.background.dark)).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio(themeColors.authSignupText.light, themeColors.background.light)).toBeGreaterThanOrEqual(4.5);
   });
+
+  it("keeps the login heading and semantic muted subtitle at WCAG AA contrast in both schemes", () => {
+    for (const scheme of ["light", "dark"] as const) {
+      expect(contrastRatio(themeColors.foreground[scheme], themeColors.background[scheme])).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(themeColors.muted[scheme], themeColors.background[scheme])).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
