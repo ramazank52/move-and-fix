@@ -837,7 +837,7 @@
 
 ## Master Closure — Pasted Content 13/15
 - [x] CLOSURE-0 — Talimatları mevcut country/capability NO-GO, source snapshot ve canonical code paths ile uzlaştır; Türkiye Blok 1 activation talebini fail-closed reddet
-- [ ] CLOSURE-1 — Opportunity outbox consumer/claim-lease/retry/dead-letter/revoke/in-app RBAC akışını additive uygula
+- [x] CLOSURE-1 — Opportunity outbox consumer/claim-lease/retry/dead-letter/revoke/in-app RBAC akışını additive uygula (0092 reviewed but unapplied; gerçek transaction/lifecycle evidence CLOSURE-2/TiDB altında açık)
 - [ ] CLOSURE-2 — Outbox PII/deep-link/idempotency/revoke/IDOR negatif testlerini ve gerçek in-app teslim kanıtını ekle
 - [ ] CLOSURE-3 — Migration-backed maxConcurrentJobs=1, canonical job lifecycle role matrix ve capability partial deactivation uygulamasını ekle
 - [ ] CLOSURE-4 — Marketplace concurrency/ownership/privacy/fairness negatif testlerini ve observability kanıtını ekle

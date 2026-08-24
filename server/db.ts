@@ -1478,6 +1478,7 @@ import {
   financialLedgerEntries,
   financialReconciliationAlerts,
   financialReconciliationRuns,
+  inAppNotifications,
   providerCapabilityAppeals,
   providerCapabilityReviews,
   providerCapabilityStatuses,
@@ -2001,16 +2002,127 @@ export async function enqueueProviderOpportunityNotification(input: {
     deepLink: intent.deepLink,
     reasonCode: intent.reasonCode,
     revokedAt: intent.type === "opportunity_revoked" ? new Date() : null,
+    nextAttemptAt: new Date(),
   }).onDuplicateKeyUpdate({
     set: {
       status: intent.type === "opportunity_revoked" ? "revoked" : "queued",
       deepLink: intent.deepLink,
       reasonCode: intent.reasonCode,
       revokedAt: intent.type === "opportunity_revoked" ? new Date() : null,
+      nextAttemptAt: new Date(),
+      claimToken: null,
+      claimedAt: null,
+      claimUntil: null,
+      lastErrorCode: null,
       updatedAt: new Date(),
     },
   });
   return intent;
+}
+
+const OPPORTUNITY_OUTBOX_MAX_ATTEMPTS = 5;
+const OPPORTUNITY_OUTBOX_LEASE_MS = 60_000;
+
+export type ClaimedOpportunityNotification = {
+  id: number;
+  requestId: number;
+  providerId: number;
+  eventType: "opportunity_available" | "opportunity_revoked";
+  deepLink: string;
+  reasonCode: string;
+  attemptCount: number;
+  claimToken: string;
+};
+
+/** Claims due intents under a short DB lease; no external delivery occurs here. */
+export async function claimMarketplaceOpportunityNotifications(input: { limit: number; now?: Date }): Promise<ClaimedOpportunityNotification[]> {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const now = input.now ?? new Date();
+  const limit = Math.min(Math.max(Math.floor(input.limit), 1), 100);
+  const candidates = await database.select({ id: marketplaceOpportunityNotifications.id })
+    .from(marketplaceOpportunityNotifications)
+    .where(and(eq(marketplaceOpportunityNotifications.status, "queued"), lte(marketplaceOpportunityNotifications.nextAttemptAt, now)))
+    .orderBy(marketplaceOpportunityNotifications.createdAt)
+    .limit(limit);
+  const candidateIds = candidates.map((candidate) => candidate.id);
+  if (candidateIds.length === 0) return [];
+  const claimToken = randomUUID();
+  const claimUntil = new Date(now.getTime() + OPPORTUNITY_OUTBOX_LEASE_MS);
+  await database.update(marketplaceOpportunityNotifications)
+    .set({ status: "processing", claimToken, claimedAt: now, claimUntil, updatedAt: now })
+    .where(and(inArray(marketplaceOpportunityNotifications.id, candidateIds), eq(marketplaceOpportunityNotifications.status, "queued")));
+  const claimed = await database.select().from(marketplaceOpportunityNotifications)
+    .where(eq(marketplaceOpportunityNotifications.claimToken, claimToken));
+  return claimed.map((intent) => ({
+    id: intent.id,
+    requestId: intent.requestId,
+    providerId: intent.providerId,
+    eventType: intent.eventType,
+    deepLink: intent.deepLink,
+    reasonCode: intent.reasonCode,
+    attemptCount: intent.attemptCount,
+    claimToken,
+  }));
+}
+
+/** Writes only the provider's in-app inbox. Push, SMS and email remain untouched. */
+export async function deliverMarketplaceOpportunityInApp(input: ClaimedOpportunityNotification) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const current = await database.select({ id: marketplaceOpportunityNotifications.id })
+    .from(marketplaceOpportunityNotifications)
+    .where(and(eq(marketplaceOpportunityNotifications.id, input.id), eq(marketplaceOpportunityNotifications.claimToken, input.claimToken), eq(marketplaceOpportunityNotifications.status, "processing")))
+    .limit(1);
+  if (!current[0]) throw new Error("OPPORTUNITY_OUTBOX_CLAIM_LOST");
+  const inApp = await database.insert(inAppNotifications).values({
+    userId: input.providerId,
+    type: input.eventType === "opportunity_available" ? "opportunity_available" : "opportunity_revoked",
+    title: input.eventType === "opportunity_available" ? "Yeni iş fırsatı" : "İş fırsatı güncellendi",
+    body: input.eventType === "opportunity_available" ? "Uygun olduğunuz yeni bir iş fırsatı var." : "Bir iş fırsatının uygunluk durumu değişti.",
+    dataJson: JSON.stringify({ requestId: input.requestId, deepLink: input.deepLink }),
+    status: "sent",
+  });
+  const notificationId = inApp[0].insertId;
+  await database.update(marketplaceOpportunityNotifications).set({
+    status: "delivered", deliveredAt: new Date(), claimToken: null, claimUntil: null, deliveryNotificationId: notificationId, updatedAt: new Date(),
+  }).where(and(eq(marketplaceOpportunityNotifications.id, input.id), eq(marketplaceOpportunityNotifications.claimToken, input.claimToken)));
+  return notificationId;
+}
+
+export async function retryOrDeadLetterMarketplaceOpportunityNotification(input: { id: number; claimToken: string; errorCode: string; now?: Date }) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const now = input.now ?? new Date();
+  const rows = await database.select().from(marketplaceOpportunityNotifications)
+    .where(and(eq(marketplaceOpportunityNotifications.id, input.id), eq(marketplaceOpportunityNotifications.claimToken, input.claimToken)))
+    .limit(1);
+  const current = rows[0];
+  if (!current || current.status !== "processing") throw new Error("OPPORTUNITY_OUTBOX_CLAIM_LOST");
+  const attemptCount = current.attemptCount + 1;
+  const deadLetter = attemptCount >= OPPORTUNITY_OUTBOX_MAX_ATTEMPTS;
+  const backoffMs = Math.min(60_000 * 2 ** Math.max(attemptCount - 1, 0), 3_600_000);
+  await database.update(marketplaceOpportunityNotifications).set({
+    status: deadLetter ? "dead_letter" : "queued",
+    attemptCount,
+    nextAttemptAt: new Date(now.getTime() + backoffMs),
+    claimToken: null,
+    claimUntil: null,
+    lastErrorCode: input.errorCode.slice(0, 160),
+    updatedAt: now,
+  }).where(and(eq(marketplaceOpportunityNotifications.id, input.id), eq(marketplaceOpportunityNotifications.claimToken, input.claimToken)));
+  return { deadLetter, attemptCount } as const;
+}
+
+/** Revokes only queued/leased opportunity intent rows; no request/customer details are emitted. */
+export async function revokeMarketplaceOpportunityNotifications(input: { requestId: number; providerId?: number; reasonCode: string }) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const conditions = [eq(marketplaceOpportunityNotifications.requestId, input.requestId), inArray(marketplaceOpportunityNotifications.status, ["queued", "processing"])];
+  if (input.providerId) conditions.push(eq(marketplaceOpportunityNotifications.providerId, input.providerId));
+  await database.update(marketplaceOpportunityNotifications).set({
+    status: "revoked", revokedAt: new Date(), claimToken: null, claimUntil: null, reasonCode: input.reasonCode.slice(0, 160), updatedAt: new Date(),
+  }).where(and(...conditions));
 }
 
 export async function upsertJobSafetyRule(input: {
