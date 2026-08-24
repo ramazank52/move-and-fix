@@ -784,8 +784,8 @@
 - [x] FINAL-2-05-14-ASSESSMENT — 05–14 gerçek route/import sınırlarını değerlendir; ödeme/tracking/wallet/mutation lifecycle ekranlarını BLOCKED, diğerlerini gelecekte ekran-spesifik extraction adayı olarak kaydet
 - [x] FINAL-3 — 74 rota tema/erişilebilirlik matrisini kanıt türü, Dark/Light ve state bazında dürüstçe güncelle
 - [x] FINAL-4 — Kimlik, hesap, onboarding ve privacy akışlarının internal fail-closed/anti-enumeration/RBAC sözleşmelerini denetle
-- [ ] FINAL-5 — Müşteri ve hizmet sağlayıcı iş akışlarının ownership, capability, document, ledger ve safety sözleşmelerini denetle
-- [ ] FINAL-6 — Önceki kritik bulgular, güvenlik/veri bütünlüğü, authorization ve supply-chain denetimlerini yeniden doğrula
+- [x] FINAL-5 — Müşteri ve hizmet sağlayıcı iş akışlarının ownership, capability, document, ledger ve safety sözleşmelerini denetle
+- [x] FINAL-6 — Önceki kritik bulgular, güvenlik/veri bütünlüğü, authorization ve supply-chain denetimlerini yeniden doğrula
 - [ ] FINAL-7 — Harici ödeme/SMS/e-posta/push/OAuth/scanner/storage entegrasyonlarını credential olmadan CODE_READY_NOT_CONFIGURED veya EXTERNAL_BLOCKER olarak doğrula
 - [ ] FINAL-8 — Web/native/store öncesi kalite, izin, deep-link, release preflight ve kanıt sınıfı kontrollerini tamamla
 - [ ] FINAL-9 — Nihai evidence paketi, 74 rota matrisi, güvenlik/entegrasyon durumları, external blocker listesi ve A/B/C release kararını hazırla
