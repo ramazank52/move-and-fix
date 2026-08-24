@@ -774,7 +774,7 @@
 - [x] THEME-HOME-PILOT-8 — 01-only kapsamda TypeScript/lint/build/hedefli/tam regresyon ve fiziki-kanıt durum güncellemesini tekrar tamamla
 
 ## Final Completion & Release-Readiness Command
-- [ ] FINAL-0 — Mevcut checkpoint, clean/dirty çalışma ağacı, route/role/backend/integration/feature-flag/country gate envanteri ve development-only build dışlama baseline’ını doğrula
+- [x] FINAL-0 — Mevcut checkpoint, clean/dirty çalışma ağacı, route/role/backend/integration/feature-flag/country gate envanteri ve development-only build dışlama baseline’ını doğrula
 - [ ] FINAL-1 — 01 Ana Sayfa fixture’da disabled/pressed/focused fiziksel kanıtını doğrula veya sadece kanıt türüne uygun PARTIAL/BLOCKED durumunu kaydet
 - [ ] FINAL-2 — Kalan 02–14 ekran için gerçek ortak-view extraction uygulanabilirliğini sırayla değerlendir; güvenli değilse BLOCKED_COMPONENT_NOT_ISOLATABLE bırak
 - [ ] FINAL-3 — 74 rota tema/erişilebilirlik matrisini kanıt türü, Dark/Light ve state bazında dürüstçe güncelle
