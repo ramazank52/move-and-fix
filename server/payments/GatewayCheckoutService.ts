@@ -32,6 +32,8 @@ export interface CheckoutBuyer {
   city?: string;
   zipCode?: string;
   ipAddress: string;
+  registrationDate?: Date | null;
+  lastLoginDate?: Date | null;
 }
 
 export interface GatewayCheckoutInput {
@@ -112,6 +114,19 @@ function splitName(fullName: string) {
   if (parts.length === 0) return { name: "MoveFix", surname: "Kullanıcısı" };
   if (parts.length === 1) return { name: parts[0], surname: "Kullanıcısı" };
   return { name: parts.slice(0, -1).join(" "), surname: parts.at(-1) ?? "Kullanıcısı" };
+}
+
+function iyzicoDate(value: Date | null | undefined): string | undefined {
+  return value ? value.toISOString().slice(0, 19).replace("T", " ") : undefined;
+}
+
+function assertIyzicoPaymentPageUrl(value: string, configuredBaseUrl: string): string {
+  const candidate = new URL(value);
+  const provider = new URL(configuredBaseUrl);
+  if (candidate.protocol !== "https:" || candidate.hostname !== provider.hostname) {
+    throw new GatewayCheckoutError("GATEWAY_INVALID_RESPONSE", "iyzico ödeme yönlendirmesi doğrulanamadı");
+  }
+  return candidate.toString();
 }
 
 function ensurePositiveTryAmount(amount: number) {
@@ -277,7 +292,6 @@ export class GatewayCheckoutService {
     });
     const person = splitName(input.buyer.name);
     const amount = input.amount.toFixed(2);
-    const currentDate = new Date().toISOString().slice(0, 19).replace("T", " ");
     const address = {
       contactName: input.buyer.name,
       city: input.buyer.city,
@@ -303,8 +317,8 @@ export class GatewayCheckoutService {
         gsmNumber: input.buyer.gsmNumber,
         email: input.buyer.email,
         identityNumber: input.buyer.identityNumber,
-        lastLoginDate: currentDate,
-        registrationDate: currentDate,
+        ...(iyzicoDate(input.buyer.lastLoginDate) ? { lastLoginDate: iyzicoDate(input.buyer.lastLoginDate) } : {}),
+        ...(iyzicoDate(input.buyer.registrationDate) ? { registrationDate: iyzicoDate(input.buyer.registrationDate) } : {}),
         registrationAddress: input.buyer.address,
         ip: input.buyer.ipAddress,
         city: input.buyer.city,
@@ -351,7 +365,7 @@ export class GatewayCheckoutService {
         provider: "iyzico",
         gatewayTransactionId: response.token,
         checkoutToken: response.token,
-        paymentPageUrl: response.paymentPageUrl,
+        paymentPageUrl: assertIyzicoPaymentPageUrl(response.paymentPageUrl, this.config.iyzicoBaseUrl),
         status: "requires_action",
       };
     } catch (error) {

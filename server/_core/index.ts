@@ -277,17 +277,11 @@ export async function createApp() {
     const configuredSecret = ENV.completionAutoReleaseSecret;
     const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
     const actualAuthorization = String(req.headers.authorization ?? "");
-    const callbackToken = String(req.body?.token ?? "");
     const hasBearerMatch =
       expectedAuthorization.length > 0 &&
       actualAuthorization.length === expectedAuthorization.length &&
       timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
-    const hasPayloadMatch =
-      configuredSecret.length > 0 &&
-      callbackToken.length === configuredSecret.length &&
-      timingSafeEqual(Buffer.from(callbackToken), Buffer.from(configuredSecret));
-    const matches = hasBearerMatch || hasPayloadMatch;
-    if (!matches) {
+    if (!hasBearerMatch) {
       res.status(configuredSecret ? 401 : 503).json({
         error: configuredSecret ? "Unauthorized scheduled callback" : "Scheduled callback is not configured",
       });
@@ -323,16 +317,11 @@ export async function createApp() {
     const configuredSecret = ENV.financialReconciliationSecret;
     const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
     const actualAuthorization = String(req.headers.authorization ?? "");
-    const callbackToken = String(req.body?.token ?? "");
     const hasBearerMatch =
       expectedAuthorization.length > 0 &&
       actualAuthorization.length === expectedAuthorization.length &&
       timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
-    const hasPayloadMatch =
-      configuredSecret.length > 0 &&
-      callbackToken.length === configuredSecret.length &&
-      timingSafeEqual(Buffer.from(callbackToken), Buffer.from(configuredSecret));
-    if (!hasBearerMatch && !hasPayloadMatch) {
+    if (!hasBearerMatch) {
       res.status(configuredSecret ? 401 : 503).json({
         error: configuredSecret ? "Unauthorized scheduled callback" : "Financial reconciliation is not configured",
       });
@@ -369,16 +358,11 @@ export async function createApp() {
     const configuredSecret = ENV.documentRetentionSecret;
     const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
     const actualAuthorization = String(req.headers.authorization ?? "");
-    const callbackToken = String(req.body?.token ?? "");
     const hasBearerMatch =
       expectedAuthorization.length > 0 &&
       actualAuthorization.length === expectedAuthorization.length &&
       timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
-    const hasPayloadMatch =
-      configuredSecret.length > 0 &&
-      callbackToken.length === configuredSecret.length &&
-      timingSafeEqual(Buffer.from(callbackToken), Buffer.from(configuredSecret));
-    if (!hasBearerMatch && !hasPayloadMatch) {
+    if (!hasBearerMatch) {
       res.status(configuredSecret ? 401 : 503).json({
         error: configuredSecret ? "Unauthorized scheduled callback" : "Document retention is not configured",
       });
@@ -417,16 +401,11 @@ export async function createApp() {
     const configuredSecret = ENV.complianceReverificationSecret;
     const expectedAuthorization = configuredSecret ? `Bearer ${configuredSecret}` : "";
     const actualAuthorization = String(req.headers.authorization ?? "");
-    const callbackToken = String(req.body?.token ?? "");
     const hasBearerMatch =
       expectedAuthorization.length > 0 &&
       actualAuthorization.length === expectedAuthorization.length &&
       timingSafeEqual(Buffer.from(actualAuthorization), Buffer.from(expectedAuthorization));
-    const hasPayloadMatch =
-      configuredSecret.length > 0 &&
-      callbackToken.length === configuredSecret.length &&
-      timingSafeEqual(Buffer.from(callbackToken), Buffer.from(configuredSecret));
-    if (!hasBearerMatch && !hasPayloadMatch) {
+    if (!hasBearerMatch) {
       res.status(configuredSecret ? 401 : 503).json({
         error: configuredSecret ? "Unauthorized scheduled callback" : "Compliance reverification is not configured",
       });

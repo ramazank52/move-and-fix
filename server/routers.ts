@@ -2639,13 +2639,18 @@ Do not infer unavailable categories. If no candidate is exact enough, use "gener
             amount: payment.amount,
             currency: quote.currency,
             idempotencyKey: payment.idempotencyKey ?? `payment:${payment.id}`,
-            buyer: {
-              id: ctx.user.id,
-              name: ctx.user.name?.trim() || "MoveFix Kullanıcısı",
-              email: ctx.user.email?.trim() || "noreply@movefix.invalid",
-              ipAddress: ctx.req.ip || ctx.req.socket.remoteAddress || "127.0.0.1",
-              ...input.buyer,
-            },
+            buyer: (() => {
+              const name = ctx.user.name?.trim();
+              const email = ctx.user.email?.trim();
+              if (!name || !email) throw new Error("PAYMENT_BUYER_DATA_REQUIRED");
+              return {
+                id: ctx.user.id,
+                name,
+                email,
+                ipAddress: ctx.req.ip || ctx.req.socket.remoteAddress || "0.0.0.0",
+                ...input.buyer,
+              };
+            })(),
           });
           await db.attachPaymentGatewayTransaction({
             paymentId: payment.id,
@@ -2669,6 +2674,9 @@ Do not infer unavailable categories. If no candidate is exact enough, use "gener
             throw new TRPCError({ code: "CONFLICT", message: "Ödeme sağlayıcısı mevcut ödeme durumunda başlatılamaz" });
           }
           if (message.startsWith("COUNTRY_LAUNCH_GATE_BLOCKED:")) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+          }
+          if (message === "PAYMENT_BUYER_DATA_REQUIRED") {
             throw new TRPCError({ code: "PRECONDITION_FAILED", message });
           }
           if (message.startsWith("PAYMENT_PROVIDER_") || message.startsWith("GLOBAL_PAYMENT_")) {

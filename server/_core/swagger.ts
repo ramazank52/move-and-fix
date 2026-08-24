@@ -678,13 +678,21 @@ export const swaggerSpec = {
  * API Documentation Routes
  */
 export const setupSwaggerDocs = (app: import('express').Express) => {
+  const production = process.env.NODE_ENV === "production";
+  const denyProductionDocumentation = (res: import("express").Response) => {
+    if (!production) return false;
+    res.status(404).json({ error: "NOT_FOUND" });
+    return true;
+  };
   // Swagger UI endpoint
   app.get('/api-docs', (_req, res) => {
+    if (denyProductionDocumentation(res)) return;
     res.json(swaggerSpec);
   });
 
   // Swagger UI HTML
   app.get('/api-docs/ui', (_req, res) => {
+    if (denyProductionDocumentation(res)) return;
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -692,7 +700,6 @@ export const setupSwaggerDocs = (app: import('express').Express) => {
           <title>Move&Fix API Documentation</title>
           <meta charset="utf-8"/>
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
           <style>
             body {
               margin: 0;
@@ -702,7 +709,7 @@ export const setupSwaggerDocs = (app: import('express').Express) => {
         </head>
         <body>
           <redoc spec-url='/api-docs'></redoc>
-          <script src="https://cdn.jsdelivr.net/npm/redoc@latest/bundles/redoc.standalone.js"> </script>
+          <script src="/assets/redoc.standalone.js"> </script>
         </body>
       </html>
     `);

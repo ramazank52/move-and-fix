@@ -854,3 +854,10 @@
 
 ## P17 Private-Staging Salt-Okunur Preflight
 - [x] P17-PREFLIGHT-1 — Mevcut secret/config içinde private staging TiDB bağlantısını değer açıklamadan denetle; verified connection bulunmadığı için fail-closed kurulum gereksinimlerini raporla; ledger/schema preflightı çalıştırılmadı
+
+## P18 Final Residual Verification Addendum
+- [ ] P18-1 — Public diagnostic/Swagger/CSP/scheduler secret-replay-audit zincirini runtime import/callsite ve negatif testlerle denetle
+- [ ] P18-2 — Marketing consent/IYS/quiet-hours/push-token lifecycle ve unavailable-vs-empty davranışlarını denetle
+- [ ] P18-3 — MoveTrust/public profile, UGC PII/moderation/rating invariant, ödeme buyer/provider URL ve organization BOLA sınırlarını denetle
+- [ ] P18-4 — Kanıtlanmış açıkları minimal fail-closed değişiklikler ve hedefli negatif testlerle düzelt; Blok 1 staging kanıtı olmadan Blok 2’ye geçme
+- [ ] P18-5 — Clean validation/export ve madde-bazlı P18 residual doğrulama raporunu üret
