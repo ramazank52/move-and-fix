@@ -7,6 +7,8 @@
 
 **Safe next evidence:** track Expo/Metro release notes and the upstream advisory; when a fixed version exists, perform a bounded dependency change with `pnpm audit --audit-level=high`, Expo Doctor, TypeScript, lint, build, web/iOS/Android export and full regression. Until then, retain the high-risk release blocker and document dev-server exposure limits.
 
+**Weekly watch scheduling:** `BLOCKED_NOT_DEPLOYED`. The managed scheduler requires a deployed project, but the current user instruction prohibits publish/deploy. No schedule was created and no publish action was attempted. A weekly watch can be created only after an explicit deployment decision that does not contradict the release NO-GO posture, or the upstream status can be checked manually in future sessions.
+
 ## P0.2 — same-engine migration
 
 **Status:** `BLOCKED_STAGING_RUNTIME`  

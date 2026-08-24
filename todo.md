@@ -814,8 +814,12 @@
 - [ ] MASTER-P1.1 — Opportunity outbox atomic request-create enqueue ve revoke lifecycle davranışını additive/fail-closed tamamla
 - [ ] MASTER-P1.2 — Çoklu capability partial deactivation lifecycle ve UI/API kanıtını tamamla
 - [ ] MASTER-P1.3 — Concurrency, capacity, rematch audit ve fairness integration testlerini isolated TiDB gereksinimiyle hazırla
-- [ ] MASTER-P1.4 — Marketplace IDOR/BOLA, stale capability ve ownership negatif testlerini genişlet
+- [x] MASTER-P1.4 — Marketplace IDOR/BOLA, stale capability ve ownership negatif testlerini genişlet
 - [ ] MASTER-P1.5 — Dispute/settlement gerçek gateway-webhook bağımlılıklarını EXTERNAL_CONFIGURATION_REQUIRED bırakıp internal lifecycle eksiklerini denetle
 - [ ] MASTER-P1.6 — Payment webhook replay/race/currency negatif testlerini audit et ve uygulanabilir internal kapsamı tamamla
 - [ ] MASTER-P1.7 — MFA/session/re-auth ve suspicious-login rule set auditini tamamla
 - [ ] MASTER-P1.8 — Mandatory admin MFA ve critical-operation re-auth eksiklerini denetle ve uygulanabilir iç kapsamı tamamla
+
+## P1.4 Negative Security & Advisory Watch
+- [x] MASTER-P1.4-NEGATIVE — Marketplace offer/request/assignment yüzeylerinde IDOR/BOLA, stale capability ve unauthorized lifecycle negatif testlerini ekle
+- [ ] MASTER-P0.1-WATCH — image-size upstream advisory/Expo-Metro düzeltmesini haftalık salt-okunur izle; gerçek güvenli sürüm bulunursa raporla, otomatik dependency güncelleme yapma
