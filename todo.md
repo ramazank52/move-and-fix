@@ -780,6 +780,7 @@
 - [x] FINAL-2-EXPLORE — 02 Keşfet production JSX ağacını typed ortak view’a çıkar; wrapper tRPC/router davranışını koru ve fixture’da immutable sentetik props/no-op callback kullan
 - [ ] FINAL-2-EXPLORE-A11Y — 02 Keşfet common view için gerçek disabled/pressed/focused erişilebilirlik state’lerini, kontrastını ve owner fiziksel Dark/Light kanıtını tamamla
 - [x] FINAL-2-MOVEAI — 03 MoveAI shared-view fixture uygulanabilirliğini değerlendir; cihaz izinleri/medya/recorder/tRPC state machine sınırları nedeniyle sahte UI veya bypass olmadan BLOCKED_COMPONENT_NOT_ISOLATABLE bırak
+- [x] FINAL-2-CREATE-SERVICE — 04 Hizmet Talebi shared-view fixture uygulanabilirliğini değerlendir; konum/medya/route/fiyat/mutation state machine sınırları nedeniyle sahte UI veya bypass olmadan BLOCKED_COMPONENT_NOT_ISOLATABLE bırak
 - [ ] FINAL-3 — 74 rota tema/erişilebilirlik matrisini kanıt türü, Dark/Light ve state bazında dürüstçe güncelle
 - [ ] FINAL-4 — Kimlik, hesap, onboarding ve privacy akışlarının internal fail-closed/anti-enumeration/RBAC sözleşmelerini denetle
 - [ ] FINAL-5 — Müşteri ve hizmet sağlayıcı iş akışlarının ownership, capability, document, ledger ve safety sözleşmelerini denetle
