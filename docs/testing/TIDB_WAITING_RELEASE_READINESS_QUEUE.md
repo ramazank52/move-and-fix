@@ -14,4 +14,4 @@
 
 ## TiDB Handoff Checklist
 
-Supply only a private **isolated staging** declaration: `DATABASE_URL` target details through the secure environment mechanism, host class (`127.0.0.1` or private network), port, a database name containing `test`/`staging`, and written confirmation of zero production data. The migration candidate will be regenerated from the current schema; deleted historical 0090/0091 files will not be applied. No production connection, token, or real user data is acceptable.
+Supply only a private **isolated staging** declaration: `DATABASE_URL` target details through the secure environment mechanism, host class (`127.0.0.1` or private network), port, a database name containing `test`/`staging`, and written confirmation of zero production data. Reconcile the tracked 0090/0091/0092 candidates against the actual ledger and `SHOW CREATE TABLE` before selecting an additive sequence; do not apply 0090 automatically, do not use `db:push`, and never repair ledger/schema divergence by hand. No production connection, token, or real user data is acceptable. See `P17_MIGRATION_RECONCILIATION_AND_BLOCK1_RUNTIME_GATE.md`.
