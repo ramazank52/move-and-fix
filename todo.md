@@ -803,3 +803,19 @@
 - [x] RESIDUAL-3 — Messaging/translation/expense/tracking/wallet/MoveOS residual sözleşmelerini doğrula ve uygulanabilir eksikleri kapat (external/device/isolated DB evidence remains open)
 - [x] RESIDUAL-4 — Güncel kod üstünde bağımsız route/auth/RBAC/migration/security/supply-chain evidence gate’ini çalıştır
 - [x] RESIDUAL-5 — Üç talimat seti için final evidence package, checksum, blocker listesi ve A/B/C kararını oluştur
+
+## Immutable Audit Export — abf555f3
+- [x] AUDIT-EXPORT-ABF555F3 — Checkpoint sonrası kod/migration/credential/activation değiştirmeden dört talimatlık nihai kanıt paketini ZIP, manifest ve SHA-256 ile hazırla
+
+## MANUS Master Fix Directive Reconciliation
+- [x] MASTER-DIRECTIVE-0 — MANUSMASTERFIXDIRECTIVE.pdf maddelerini abf555f3 kanıtları, country/capability NO-GO, external credential, migration ve physical evidence sınırlarıyla salt-okunur uzlaştır
+- [ ] MASTER-P0.1 — image-size high advisory için Expo/upstream ve güvenli override uygulanabilirliğini araştır; audit high risk PASS olmadan kapatma
+- [ ] MASTER-P0.2 — İzole aynı-motor migration ortamı gelirse 0090/0091 backup/check/apply/regression/rollback prosedürünü çalıştır; mevcut ortamda BLOCKED_STAGING_RUNTIME bırak
+- [ ] MASTER-P1.1 — Opportunity outbox atomic request-create enqueue ve revoke lifecycle davranışını additive/fail-closed tamamla
+- [ ] MASTER-P1.2 — Çoklu capability partial deactivation lifecycle ve UI/API kanıtını tamamla
+- [ ] MASTER-P1.3 — Concurrency, capacity, rematch audit ve fairness integration testlerini isolated TiDB gereksinimiyle hazırla
+- [ ] MASTER-P1.4 — Marketplace IDOR/BOLA, stale capability ve ownership negatif testlerini genişlet
+- [ ] MASTER-P1.5 — Dispute/settlement gerçek gateway-webhook bağımlılıklarını EXTERNAL_CONFIGURATION_REQUIRED bırakıp internal lifecycle eksiklerini denetle
+- [ ] MASTER-P1.6 — Payment webhook replay/race/currency negatif testlerini audit et ve uygulanabilir internal kapsamı tamamla
+- [ ] MASTER-P1.7 — MFA/session/re-auth ve suspicious-login rule set auditini tamamla
+- [ ] MASTER-P1.8 — Mandatory admin MFA ve critical-operation re-auth eksiklerini denetle ve uygulanabilir iç kapsamı tamamla
