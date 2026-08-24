@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-08-24T06:22:28.741Z",
+  "sourceOfTruth": "live canonical catalog + TR-GOLD-2026-08-13-v1.0 research/legal-review pack",
+  "liveCategoryCount": 16,
+  "liveSubserviceCount": 62,
+  "mappedGoldMasterCoverageCount": 28,
+  "unmappedLiveSubserviceCount": 34,
+  "sourceStatus": "SOURCE_UNVERIFIED",
+  "legalApprovalStatus": "LEGAL_REVIEW_REQUIRED",
+  "productionAllowlist": [],
+  "releaseState": "READINESS_BLOCKED",
+  "packHash": "3f901161467c6ce2f8b9362de4d576f8d267dc3fdcbf281cbcf45af7f017175e",
+  "registryHash": "b23407320589806933bfb6b5057545d7f5c7d660296083b323f5d2b5cb4077c4"
+}

@@ -702,3 +702,10 @@
 - [x] TRC-P3 — Kapalı ülke için onboarding, activation, discovery, offer, booking, payment, payout ve notification bypasslarını engelle
 - [x] TRC-P4 — Türkiye readiness matrisi, production allowlist taslağı, diğer ülkeler INFRA_ONLY kanıtı ve rollback planını üret
 - [x] TRC-P5 — Yetki/bypass/transition regressionları ile kalite kapılarını çalıştır; report/evidence teslim edip yayın yapmadan dur
+
+## Türkiye Production Readiness — Hukuk, Connector ve Fiziksel Cihaz E2E
+- [x] TRR-A0 — Mevcut TR catalog/matrix, source, connector, legal approval, capability ve country-control durumunu salt-okunur denetle
+- [x] TRR-A1 — 16 aile/62 alt hizmet için SOURCE_UNVERIFIED/LEGAL_REVIEW_REQUIRED satır-bazlı hukuk ve counsel review paketini üret
+- [x] TRR-A2 — Resmî connector ve external credential register’ını izinli doğrulama yüzeyleriyle fail-closed sınıflandır
+- [x] TRR-B1 — Fiziksel iOS/Android cihaz E2E, gerçek credential ve store/DNS bağımlılıklarını BLOCKED_EXTERNAL_INPUT olarak kanıtla
+- [x] TRR-FINAL — Capability readiness sınıflandırması, allowlist/NO-GO, hashli evidence paketleri ve final report’u yayın yapmadan teslim et

@@ -1,0 +1,18 @@
+TR Physical Device E2E Results
+==============================
+Date: 2026-08-24
+Result classification: BLOCKED_PHYSICAL_E2E
+
+No real iOS or Android device, production signing account, store account, or live external test credentials were supplied in this task. Therefore no physical-device or production PASS is asserted.
+
+| Flow | Evidence available | Result |
+| Registration and identity verification | Unit/integration coverage only; no physical device | BLOCKED_PHYSICAL_E2E |
+| Document upload/reject/re-upload | Server tests only; no physical device or official issuer | BLOCKED_PHYSICAL_E2E / BLOCKED_CONNECTOR |
+| Service selection, search, offer, booking | Regression tests only; TR effective state READINESS_BLOCKED | BLOCKED_LEGAL_REVIEW |
+| Acceptance, cancellation, appeal | Regression tests only; no physical device | BLOCKED_PHYSICAL_E2E |
+| Payment/refund | Production provider credentials absent | BLOCKED_CREDENTIAL |
+| Country/VPN/client-country bypass | Server-side gate tests PASS; physical device VPN test not performed | BLOCKED_PHYSICAL_E2E |
+| Turkey safe shutdown | Server policy regression PASS; physical device validation not performed | BLOCKED_PHYSICAL_E2E |
+| Other five countries closed | Server/database assertions PASS; physical device validation not performed | BLOCKED_PHYSICAL_E2E |
+
+No mock, simulator, unit test or sandbox result is represented as a physical-device or production PASS.
