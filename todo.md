@@ -762,7 +762,7 @@
 - [x] THEME-OWNER-5 — Ana galeri ve 14 detail bağlantısında HTTP 200, previous/next navigation, production-build dışlama ve owner screenshot WAITING durumunu doğrula
 
 ## Home Presentational View Isolation Pilot
-- [ ] THEME-HOME-PILOT-1 — Değişiklik öncesi checkpoint al; yalnız 01 Ana Sayfa route/wrapper davranışını ve callback bağlarını envanterle
-- [ ] THEME-HOME-PILOT-2 — Production Ana Sayfa JSX ağacını typed props’lu ortak view bileşenine davranış değiştirmeden çıkar; wrapper’ın gerçek hook/callback bağlarını koru
-- [ ] THEME-HOME-PILOT-3 — Fixture 01’i aynı ortak view’a immutable bellek içi props ve no-op callback’lerle bağla; diğer 13 fixture’ı değiştirme
-- [ ] THEME-HOME-PILOT-4 — Hedefli callback/no-side-effect testleri, full regression, TypeScript, lint, build, HTTP 200 ve checkpoint kanıtını tamamla
+- [x] THEME-HOME-PILOT-1 — Değişiklik öncesi checkpoint al; yalnız 01 Ana Sayfa route/wrapper davranışını ve callback bağlarını envanterle
+- [x] THEME-HOME-PILOT-2 — Production Ana Sayfa JSX ağacını typed props’lu ortak view bileşenine davranış değiştirmeden çıkar; wrapper’ın gerçek hook/callback bağlarını koru
+- [x] THEME-HOME-PILOT-3 — Fixture 01’i aynı ortak view’a immutable bellek içi props ve no-op callback’lerle bağla; diğer 13 fixture’ı değiştirme
+- [x] THEME-HOME-PILOT-4 — Hedefli callback/no-side-effect testleri, full regression, TypeScript, lint, build, HTTP 200 ve checkpoint kanıtını tamamla

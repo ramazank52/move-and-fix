@@ -9,6 +9,7 @@
     "dev:metro": "cross-env EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo start --web --port ${EXPO_PORT:-8081}",
     "theme-preview": "node scripts/serve-theme-preview.mjs",
     "theme-preview:check": "vitest run tests/theme-preview-isolation.test.ts",
+    "home-fixture": "cross-env NODE_ENV=development HOME_FIXTURE_ROUTER_ROOT=1 EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo start --web --port ${HOME_FIXTURE_PORT:-8083}",
     "build": "esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",

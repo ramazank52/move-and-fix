@@ -24,6 +24,7 @@ const bundleId =
 const moveAndFixScheme = "moveandfix";
 // The actual Apple Pay merchant registration remains an external production gate.
 const stripeMerchantIdentifier = "merchant.com.moveandfix";
+const isHomeFixtureRouter = process.env.HOME_FIXTURE_ROUTER_ROOT === "1";
 
 const env = {
   // App branding is intentionally source-controlled rather than environment-dependent.
@@ -86,6 +87,7 @@ const config: ExpoConfig = {
   },
   extra: {
     privacyPolicyUrl: "https://moveandfix.app/privacy-policy",
+    ...(isHomeFixtureRouter ? { router: { root: "tests/home-fixture/app" } } : {}),
   },
   plugins: [
     "expo-router",
@@ -146,7 +148,7 @@ const config: ExpoConfig = {
     ],
   ],
   experiments: {
-    typedRoutes: true,
+    typedRoutes: !isHomeFixtureRouter,
     reactCompiler: true,
   },
 };
