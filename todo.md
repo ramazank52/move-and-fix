@@ -823,3 +823,7 @@
 ## P1.4 Negative Security & Advisory Watch
 - [x] MASTER-P1.4-NEGATIVE — Marketplace offer/request/assignment yüzeylerinde IDOR/BOLA, stale capability ve unauthorized lifecycle negatif testlerini ekle
 - [ ] MASTER-P0.1-WATCH — image-size upstream advisory/Expo-Metro düzeltmesini haftalık salt-okunur izle; gerçek güvenli sürüm bulunursa raporla, otomatik dependency güncelleme yapma
+
+## Isolated TiDB & Final Release Directive Reconciliation
+- [x] TIDB-RELEASE-DIRECTIVE-0 — İzole TiDB kurulum rehberi ve nihai yayın hazırlığı direktifini mevcut NO-GO/migration/credential/physical evidence sınırlarıyla salt-okunur uzlaştır
+- [ ] TIDB-PROVISION-1 — Owner doğrulanmış izole TiDB bağlantı deklarasyonunu sağladığında mevcut şemadan reviewed additive migration adayını üret, backup/checksum/preflight sonrası yalnız staging’de test et
