@@ -818,7 +818,7 @@
 - [ ] MASTER-P1.5 — Dispute/settlement gerçek gateway-webhook bağımlılıklarını EXTERNAL_CONFIGURATION_REQUIRED bırakıp internal lifecycle eksiklerini denetle
 - [ ] MASTER-P1.6 — Payment webhook replay/race/currency negatif testlerini audit et ve uygulanabilir internal kapsamı tamamla
 - [ ] MASTER-P1.7 — MFA/session/re-auth ve suspicious-login rule set auditini tamamla
-- [ ] MASTER-P1.8 — Mandatory admin MFA ve critical-operation re-auth eksiklerini denetle ve uygulanabilir iç kapsamı tamamla
+- [x] MASTER-P1.8 — Mandatory admin MFA ve critical-operation re-auth eksiklerini denetle ve uygulanabilir iç kapsamı tamamla
 
 ## P1.4 Negative Security & Advisory Watch
 - [x] MASTER-P1.4-NEGATIVE — Marketplace offer/request/assignment yüzeylerinde IDOR/BOLA, stale capability ve unauthorized lifecycle negatif testlerini ekle
@@ -827,3 +827,7 @@
 ## Isolated TiDB & Final Release Directive Reconciliation
 - [x] TIDB-RELEASE-DIRECTIVE-0 — İzole TiDB kurulum rehberi ve nihai yayın hazırlığı direktifini mevcut NO-GO/migration/credential/physical evidence sınırlarıyla salt-okunur uzlaştır
 - [ ] TIDB-PROVISION-1 — Owner doğrulanmış izole TiDB bağlantı deklarasyonunu sağladığında mevcut şemadan reviewed additive migration adayını üret, backup/checksum/preflight sonrası yalnız staging’de test et
+
+## Phase 4.2 Admin MFA Audit
+- [x] ADMIN-MFA-0 — Zorunlu admin MFA, oturum, re-auth ve kritik işlem korumalarını audit et; eksik internal kapsamı fail-closed tamamla
+- [x] ADMIN-MFA-1 — MFA bypass, second-factor replay, session revocation ve critical-operation re-auth negatif testlerini ekle
