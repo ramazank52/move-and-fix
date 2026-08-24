@@ -753,3 +753,8 @@
 
 - [x] THEME-PUBLIC-1 — Public/fixture kapsamını production ve TiDB preflight’inden ayrı sınıflandır; no-write blocker sonucunu belgeledi
 - [x] THEME-PUBLIC-4 — Secrets içermeyen taşınabilir harness .env.example/preflight/run/cleanup talimatını ekle (visual run BLOCKED)
+
+## Owner Physical Safari Theme Evidence Handoff
+- [x] THEME-OWNER-1 — TiDB’siz public UI rota bağlantılarını HTTP 200 ve owner fiziksel Dark/Light screenshot bekleme durumu ile hazırla
+- [x] THEME-OWNER-2 — Ağ/DB/auth kullanmayan 14 ekran development-only fixture gallery’sini sistem tema kaynağına bağlı olarak hazırla
+- [ ] THEME-OWNER-3 — Owner Dark/Light fiziksel screenshotları geldikten sonra yalnız ilgili rota/fixture satırlarını kanıt kapsamı kadar güncelle
