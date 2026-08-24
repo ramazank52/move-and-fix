@@ -831,3 +831,15 @@
 ## Phase 4.2 Admin MFA Audit
 - [x] ADMIN-MFA-0 — Zorunlu admin MFA, oturum, re-auth ve kritik işlem korumalarını audit et; eksik internal kapsamı fail-closed tamamla
 - [x] ADMIN-MFA-1 — MFA bypass, second-factor replay, session revocation ve critical-operation re-auth negatif testlerini ekle
+
+## Immutable Complete Source Export — abf555f3
+- [ ] COMPLETE-SOURCE-EXPORT-ABF555F3 — abf555f3 commitinden yeniden kurulabilir tam kaynak snapshotı, git bundle, restore belgeleri, TSV manifest, sensitive-scan ve SHA-256 ile salt-okunur teslim paketi üret
+
+## Master Closure — Pasted Content 13/15
+- [x] CLOSURE-0 — Talimatları mevcut country/capability NO-GO, source snapshot ve canonical code paths ile uzlaştır; Türkiye Blok 1 activation talebini fail-closed reddet
+- [ ] CLOSURE-1 — Opportunity outbox consumer/claim-lease/retry/dead-letter/revoke/in-app RBAC akışını additive uygula
+- [ ] CLOSURE-2 — Outbox PII/deep-link/idempotency/revoke/IDOR negatif testlerini ve gerçek in-app teslim kanıtını ekle
+- [ ] CLOSURE-3 — Migration-backed maxConcurrentJobs=1, canonical job lifecycle role matrix ve capability partial deactivation uygulamasını ekle
+- [ ] CLOSURE-4 — Marketplace concurrency/ownership/privacy/fairness negatif testlerini ve observability kanıtını ekle
+- [ ] CLOSURE-5 — FINAL-2 02–14 common-view/blocked gerekçe ve Explore accessibility kapsamını sırayla tamamla
+- [ ] CLOSURE-6 — .verification kanıtları, clean source export, residual blockers ve final release package’ını güncelle
