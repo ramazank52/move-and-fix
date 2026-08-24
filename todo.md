@@ -777,6 +777,8 @@
 - [x] FINAL-0 — Mevcut checkpoint, clean/dirty çalışma ağacı, route/role/backend/integration/feature-flag/country gate envanteri ve development-only build dışlama baseline’ını doğrula
 - [x] FINAL-1 — 01 Ana Sayfa fixture’da disabled/pressed/focused fiziksel kanıtını doğrula veya sadece kanıt türüne uygun PARTIAL/BLOCKED durumunu kaydet (disabled/pressed/focused physical proof pending; state-level component fixture evidence classified)
 - [ ] FINAL-2 — Kalan 02–14 ekran için gerçek ortak-view extraction uygulanabilirliğini sırayla değerlendir; güvenli değilse BLOCKED_COMPONENT_NOT_ISOLATABLE bırak
+- [x] FINAL-2-EXPLORE — 02 Keşfet production JSX ağacını typed ortak view’a çıkar; wrapper tRPC/router davranışını koru ve fixture’da immutable sentetik props/no-op callback kullan
+- [ ] FINAL-2-EXPLORE-A11Y — 02 Keşfet common view için gerçek disabled/pressed/focused erişilebilirlik state’lerini, kontrastını ve owner fiziksel Dark/Light kanıtını tamamla
 - [ ] FINAL-3 — 74 rota tema/erişilebilirlik matrisini kanıt türü, Dark/Light ve state bazında dürüstçe güncelle
 - [ ] FINAL-4 — Kimlik, hesap, onboarding ve privacy akışlarının internal fail-closed/anti-enumeration/RBAC sözleşmelerini denetle
 - [ ] FINAL-5 — Müşteri ve hizmet sağlayıcı iş akışlarının ownership, capability, document, ledger ve safety sözleşmelerini denetle
