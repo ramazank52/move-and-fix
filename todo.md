@@ -722,3 +722,19 @@
 - [x] LOGIN-THEME-4 — Safari kanıt checkpoint’ini kaydet; native iOS/Android fiziksel doğrulamasını WAITING FOR PHYSICAL DEVICE EVIDENCE olarak açık bırak
 - [ ] LOGIN-NATIVE-PHYSICAL — Native iOS ve Android uygulama build’i üzerinde dark/light, VoiceOver/TalkBack ve register yönlendirmesi fiziksel kanıtını tamamla
 - [ ] AUTH-EMAIL-DELIVERY — Gerçek SMTP/e-posta teslimatını credential ve canlı sağlayıcı kabulüyle ayrıca doğrula; enumeration korumasını delivery PASS sayma
+
+## Salt-Okunur Uygulama Geneli Tema ve Görünürlük Denetimi
+- [x] THEME-AUDIT-1 — Authoritative router/role ekran envanteri, semantic token/hard-coded renk taraması, dark/light görünürlük ve WCAG evidence matrisi üret; sorunları düzeltmeden raporla
+
+## Kontrollü Runtime Tema Doğrulama ve Minimal Remediasyon
+- [ ] THEME-RUNTIME-1 — İzole development/staging müşteri, provider ve owner/admin yüzeylerinde 61 user-facing rota için web dark/light runtime kanıtı topla
+- [ ] THEME-RUNTIME-2 — Her raw-color/opacity bulgusunu legitimate accent/status veya confirmed contrast defect olarak sınıflandır
+- [ ] THEME-RUNTIME-3 — Yalnız runtime’da doğrulanmış kontrast/tema kusurlarını minimal semantic token düzeltmeleriyle gider
+- [ ] THEME-RUNTIME-4 — Test/build/screenshot regresyonu, güncel matrix ve native blockerlarla checkpoint/report teslim et
+
+## Fail-Closed Dark/Light Runtime Harness
+- [ ] THEME-HARNESS-1 — Baseline checkpoint, non-production environment, hostname/database/credential preflight ve no-write failure path’ini doğrula
+- [ ] THEME-HARNESS-2 — Test-only run_id, sentetik fixture, scoped cleanup, TTL/crash recovery ve before/after/orphan kayıt raporunu uygula
+- [ ] THEME-HARNESS-3 — Public/customer/provider/owner-admin ekranlarında dark/light runtime screenshot, UI state ve contrast manifestini üret
+- [ ] THEME-HARNESS-4 — Doğrulanmış kusurları minimal semantic düzelt; grup bazlı test/build/screenshot regresyonu çalıştır
+- [ ] THEME-HARNESS-5 — Cleanup kanıtı, güncel 74 rota matrixi, BLOCKED nedenleri, checkpoint kimlikleri ve native/external blockerlarla teslim et
