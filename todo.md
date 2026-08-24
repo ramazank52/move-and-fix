@@ -766,3 +766,9 @@
 - [x] THEME-HOME-PILOT-2 — Production Ana Sayfa JSX ağacını typed props’lu ortak view bileşenine davranış değiştirmeden çıkar; wrapper’ın gerçek hook/callback bağlarını koru
 - [x] THEME-HOME-PILOT-3 — Fixture 01’i aynı ortak view’a immutable bellek içi props ve no-op callback’lerle bağla; diğer 13 fixture’ı değiştirme
 - [x] THEME-HOME-PILOT-4 — Hedefli callback/no-side-effect testleri, full regression, TypeScript, lint, build, HTTP 200 ve checkpoint kanıtını tamamla
+
+## Home Fixture Accessibility Completion
+- [x] THEME-HOME-PILOT-5 — Owner fiziksel iPhone Safari kanıtını kaydet: Dark normal, Light normal, loading ve empty PASS; visual full closure yok
+- [x] THEME-HOME-PILOT-6 — Ortak HomeScreenView içindeki gerçek disabled kontrolleri, accessibility disabled state’i, ayrışan görünüm ve kontrastını uygula
+- [x] THEME-HOME-PILOT-7 — Fixture no-op callback’lerinin disabled durumda çağrılmadığını; pressed ve keyboard/VoiceOver focused durumlarının ortak view üzerinde erişilebilir olduğunu test et
+- [x] THEME-HOME-PILOT-8 — 01-only kapsamda TypeScript/lint/build/hedefli/tam regresyon ve fiziki-kanıt durum güncellemesini tekrar tamamla

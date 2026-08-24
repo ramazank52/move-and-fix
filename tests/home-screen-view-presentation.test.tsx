@@ -13,6 +13,16 @@ const colors = {
   foreground: "#111827", muted: "#64748B", primary: "#4F46E5", surface: "#F8FAFC", warning: "#D97706",
 };
 
+function contrastRatio(foreground: string, background: string) {
+  const luminance = (hex: string) => {
+    const channels = hex.slice(1).match(/.{2}/g)!.map((channel) => parseInt(channel, 16) / 255);
+    const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
+  };
+  const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (lighter! + 0.05) / (darker! + 0.05);
+}
+
 vi.mock("react-native", () => ({
   ActivityIndicator: hostComponent("activity-indicator"), Pressable: hostComponent("pressable"), ScrollView: hostComponent("scroll-view"),
   Text: hostComponent("text"), TextInput: hostComponent("text-input"), View: hostComponent("view"),
@@ -57,6 +67,47 @@ describe("Home presentational-view fixture adapter", () => {
       if (state === "disabled") expect(renderer!.root.findAll((node) => String(node.type) === "pressable").every((node) => node.props.disabled)).toBe(true);
       if (state === "normal") expect(texts).toContain("Fixture Usta");
     }
+  });
+
+  it("disables real controls, preserves accessibility-disabled state and prevents every fixture callback", async () => {
+    const callbacks = {
+      onOpenMoveAI: vi.fn(), onOpenExplore: vi.fn(), onOpenJob: vi.fn(), onOpenProvider: vi.fn(),
+    };
+    const props = { ...createHomeFixtureProps(colors, "disabled"), ...callbacks };
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => { renderer = TestRenderer.create(<HomeScreenView {...props} />); });
+    const actions = renderer!.root.findAll((node) => String(node.type) === "pressable");
+    const inputs = renderer!.root.findAll((node) => String(node.type) === "text-input");
+    expect(actions.length).toBeGreaterThan(0);
+    expect(actions.every((node) => node.props.disabled && node.props.accessibilityState?.disabled)).toBe(true);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.props.editable).toBe(false);
+    expect(inputs[0]?.props.accessibilityState).toMatchObject({ disabled: true });
+    await act(async () => { actions.forEach((node) => node.props.onPress()); });
+    expect(callbacks.onOpenMoveAI).not.toHaveBeenCalled();
+    expect(callbacks.onOpenExplore).not.toHaveBeenCalled();
+    expect(callbacks.onOpenJob).not.toHaveBeenCalled();
+    expect(callbacks.onOpenProvider).not.toHaveBeenCalled();
+
+    const mergeStyle = (value: Record<string, unknown> | Record<string, unknown>[]) => Object.assign({}, ...(Array.isArray(value) ? value : [value]));
+    const disabledStyle = mergeStyle(actions[0]!.props.style({ pressed: false, focused: false }));
+    expect(disabledStyle).toMatchObject({ opacity: 1, borderWidth: 1.5, borderColor: colors.muted });
+    expect(contrastRatio(colors.foreground, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colors.muted, colors.surface)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("exposes pressed and focused feedback on the same common view without changing normal production styling", async () => {
+    const props = createHomeFixtureProps(colors, "normal");
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => { renderer = TestRenderer.create(<HomeScreenView {...props} />); });
+    const moveAI = renderer!.root.findAll((node) => String(node.type) === "pressable")[0]!;
+    const mergeStyle = (value: Record<string, unknown> | Record<string, unknown>[]) => Object.assign({}, ...(Array.isArray(value) ? value : [value]));
+    expect(mergeStyle(moveAI.props.style({ pressed: false, focused: false }))).toMatchObject({ opacity: 1 });
+    expect(mergeStyle(moveAI.props.style({ pressed: true, focused: false }))).toMatchObject({ opacity: 0.9 });
+    await act(async () => { moveAI.props.onFocus(); });
+    expect(mergeStyle(moveAI.props.style({ pressed: false }))).toMatchObject({ opacity: 1, borderWidth: 2, borderColor: colors.primary });
+    await act(async () => { moveAI.props.onBlur(); });
+    expect(mergeStyle(moveAI.props.style({ pressed: false }))).toMatchObject({ opacity: 1 });
   });
 
   it("keeps the fixture adapter outside auth, tRPC, database, network and external clients", () => {
