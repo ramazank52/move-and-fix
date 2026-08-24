@@ -738,3 +738,18 @@
 - [ ] THEME-HARNESS-3 — Public/customer/provider/owner-admin ekranlarında dark/light runtime screenshot, UI state ve contrast manifestini üret
 - [ ] THEME-HARNESS-4 — Doğrulanmış kusurları minimal semantic düzelt; grup bazlı test/build/screenshot regresyonu çalıştır
 - [ ] THEME-HARNESS-5 — Cleanup kanıtı, güncel 74 rota matrixi, BLOCKED nedenleri, checkpoint kimlikleri ve native/external blockerlarla teslim et
+
+## Yerel İzole Same-Engine Tema Denetim Ortamı
+- [x] THEME-LOCAL-1 — Mevcut DB motoru ile sandbox localhost üzerinde `theme_audit_<run_id>` test veritabanı ve browser altyapısı fizibilitesini no-write preflight ile doğrula (BLOCKED_TECHNICAL: local TiDB/MySQL server, localhost listener ve container runtime yok; yazım 0)
+- [ ] THEME-LOCAL-2 — Güvenli geçerse run-id fixture, network isolation, scoped cleanup/TTL/crash-recovery ve before/after/orphan kayıt modelini uygula
+- [ ] THEME-LOCAL-3 — Yerel public/role-gated rotalarda dark/light screenshot, contrast ve UI-state manifestini üret; erişilemeyen rotaları BLOCKED bırak
+- [ ] THEME-LOCAL-4 — Doğrulanmış kusurları minimal düzelt, kalite kapılarını çalıştır ve evidence/cleanup/checkpoint teslim et
+
+## TiDB’siz Public ve Component Fixture Tema Kanıtı
+- [x] THEME-PUBLIC-1 — Production DB olmadan erişilebilen public rotaları ve mevcut 14 ekran fixture’ını preflight ile ayır (Login PASS; 14 fixture DB-write nedeniyle BLOCKED; 51 role rota BLOCKED_TIDB_RUNTIME)
+- [ ] THEME-PUBLIC-2 — Public rota runtime ve 14 component fixture için ayrı Dark/Light screenshot, refresh/contrast/UI-state manifestini üret
+- [ ] THEME-PUBLIC-3 — Sadece yeniden üretilen kusurları minimal düzelt; tüm TiDB/role-gated rotaları BLOCKED_TIDB_RUNTIME bırak
+- [ ] THEME-PUBLIC-4 — Secrets içermeyen taşınabilir harness .env.example/preflight/run/cleanup talimatını ekle, kalite kapıları ve güncel 74 rota matrixiyle teslim et
+
+- [x] THEME-PUBLIC-1 — Public/fixture kapsamını production ve TiDB preflight’inden ayrı sınıflandır; no-write blocker sonucunu belgeledi
+- [x] THEME-PUBLIC-4 — Secrets içermeyen taşınabilir harness .env.example/preflight/run/cleanup talimatını ekle (visual run BLOCKED)
