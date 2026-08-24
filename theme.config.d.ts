@@ -5,6 +5,7 @@ export const themeColors: {
   surface: { light: string; dark: string };
   cardElevated: { light: string; dark: string };
   foreground: { light: string; dark: string };
+  authSignupText: { light: string; dark: string };
   muted: { light: string; dark: string };
   border: { light: string; dark: string };
   success: { light: string; dark: string };

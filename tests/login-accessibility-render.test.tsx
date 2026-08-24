@@ -24,7 +24,7 @@ vi.mock("@/constants/oauth", () => ({ startOAuthLogin: vi.fn() }));
 vi.mock("@/lib/_core/auth", () => ({ setSessionToken: vi.fn() }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/hooks/use-colors", () => ({
-  useColors: () => ({ primary: "#4F46E5", muted: "#64748B", card: "#FFFFFF", foreground: "#111827", border: "#E2E8F0", error: "#DC2626" }),
+  useColors: () => ({ primary: "#4F46E5", muted: "#64748B", card: "#FFFFFF", foreground: "#111827", authSignupText: "#FFFFFF", border: "#E2E8F0", error: "#DC2626" }),
 }));
 vi.mock("@/lib/trpc", () => ({
   trpc: { auth: { login: { useMutation: () => mutation } } },
@@ -62,5 +62,14 @@ describe("login screen accessibility render contract", () => {
     expect(oauthLogin?.props.accessibilityRole).toBe("button");
     expect(forgotPassword?.props.accessibilityRole).toBe("button");
     expect(register?.props.accessibilityRole).toBe("button");
+    expect(register?.props.accessibilityHint).toBe("Kayıt olma ekranını açar");
+    expect(register?.props.style({ pressed: false, focused: false })).toMatchObject({ opacity: 1 });
+    expect(register?.props.style({ pressed: true, focused: false })).toMatchObject({ opacity: 1 });
+    expect(register?.props.style({ pressed: false, focused: true })).toMatchObject({ opacity: 1, outlineWidth: 2 });
+
+    const signupTexts = renderer!.root.findAll((node) => String(node.type) === "text" && node.props.style?.color === "#FFFFFF");
+    expect(signupTexts.some((node) => node.props.style?.opacity === 1 && node.props.style?.fontSize === 14)).toBe(true);
+    await act(async () => { register?.props.onPress(); });
+    expect(router.push).toHaveBeenCalledWith("/register");
   });
 });

@@ -709,3 +709,8 @@
 - [x] TRR-A2 — Resmî connector ve external credential register’ını izinli doğrulama yüzeyleriyle fail-closed sınıflandır
 - [x] TRR-B1 — Fiziksel iOS/Android cihaz E2E, gerçek credential ve store/DNS bağımlılıklarını BLOCKED_EXTERNAL_INPUT olarak kanıtla
 - [x] TRR-FINAL — Capability readiness sınıflandırması, allowlist/NO-GO, hashli evidence paketleri ve final report’u yayın yapmadan teslim et
+
+## Login Signup Satırı Görünürlük Düzeltmesi
+- [x] LOGIN-SIGNUP-1 — “Hesabınız yok mu? Kayıt Ol” satırının mevcut tema, yönlendirme ve durum stillerini denetle
+- [x] LOGIN-SIGNUP-2 — Semantic tema tokenlarıyla dark/light, pressed/focused/disabled görünürlüğünü hedefli düzelt
+- [ ] LOGIN-SIGNUP-3 — Tema/kontrast/yönlendirme regresyonlarını ve iOS/Android görünüm kanıtını doğrula; yayın yapmadan teslim et

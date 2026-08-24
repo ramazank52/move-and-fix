@@ -9,6 +9,8 @@ const themeColors = {
   cardElevated: { light: '#FFFFFF', dark: '#24272A' },
   // Text
   foreground: { light: '#1A1A1A', dark: '#E5E7EB' },
+  // Login secondary action text: explicit high-contrast sign-up affordance.
+  authSignupText: { light: '#1A1A1A', dark: '#FFFFFF' },
   muted: { light: '#6B7280', dark: '#B4B9C1' },
   // Borders
   border: { light: '#E5E7EB', dark: '#24272A' },

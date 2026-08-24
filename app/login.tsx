@@ -154,15 +154,21 @@ export default function LoginScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Kayıt ekranına git"
+          accessibilityHint="Kayıt olma ekranını açar"
           onPress={() => router.push("/register")}
-          style={({ pressed }) => ({
+          style={({ pressed, focused }) => ({
             marginTop: 20,
             alignItems: "center",
-            opacity: pressed ? 0.65 : 1,
+            opacity: 1,
+            borderRadius: 6,
+            outlineStyle: focused ? "solid" : "none",
+            outlineWidth: focused ? 2 : 0,
+            outlineColor: focused ? colors.primary : "transparent",
+            ...(pressed ? { backgroundColor: `${colors.primary}18` } : null),
           })}
         >
-          <Text className="text-sm text-muted">
-            Hesabınız yok mu? <Text className="font-semibold text-primary">Kayıt Ol</Text>
+          <Text style={{ color: colors.authSignupText, fontSize: 14, opacity: 1 }}>
+            Hesabınız yok mu? <Text style={{ color: colors.authSignupText, fontWeight: "600", opacity: 1 }}>Kayıt Ol</Text>
           </Text>
         </Pressable>
       </View>
