@@ -8054,6 +8054,26 @@ export async function acceptOffer(offerId: number, userId: number) {
       .set({ status: "rejected" })
       .where(and(eq(offers.requestId, request.id), eq(offers.status, "pending")));
 
+    // The request is no longer an opportunity once an offer is accepted. This
+    // revoke is within the same transaction as assignment, so queued or leased
+    // in-app intents cannot remain eligible for other providers after commit.
+    await tx
+      .update(marketplaceOpportunityNotifications)
+      .set({
+        status: "revoked",
+        revokedAt: new Date(),
+        claimToken: null,
+        claimUntil: null,
+        reasonCode: "REQUEST_ASSIGNED",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(marketplaceOpportunityNotifications.requestId, request.id),
+          inArray(marketplaceOpportunityNotifications.status, ["queued", "processing"]),
+        ),
+      );
+
     const snapshot = JSON.stringify({
       version: 1,
       acceptedAt: new Date().toISOString(),

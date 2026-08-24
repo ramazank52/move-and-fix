@@ -13,13 +13,14 @@
 | Retry / backoff | IMPLEMENTED | Exponential retry with capped delay; after five attempts status becomes `dead_letter`. |
 | Revoke | IMPLEMENTED | Queued/processing rows may be marked `revoked` by request/provider with a reason code. |
 | PII minimisation | IMPLEMENTED | Generic Turkish title/body plus `{ requestId, deepLink }`; no customer contact or address field. |
-| Automatic worker | NOT ENABLED | No cron/process/scheduler is registered before reviewed migration and private staging runtime evidence. |
+| Automatic worker | IMPLEMENTED_FAIL_CLOSED | Server starts it only when `MARKETPLACE_OUTBOX_WORKER_ENABLED=true` and `MARKETPLACE_OUTBOX_RUNTIME=private_staging`; `SIGTERM`/`SIGINT` stop the interval. Default is off. |
 | Transactional request-create enqueue | PENDING | Requires same-engine migration/runtime to integrate safely into request transaction. |
+| Offer acceptance revoke | IMPLEMENTED | Accepted-offer transaction revokes queued/processing request intents with `REQUEST_ASSIGNED`. |
 | Cancel/suspend lifecycle wiring | PENDING | Requires DB-backed lifecycle integration and isolated tests. |
 
 ## Source Evidence
 
-Targeted policy/wiring/worker tests: **3 files / 7 tests PASS**. TypeScript (1792 MB), Drizzle check and `git diff --check` PASS. These are not DB transaction race, actual in-app inbox, route E2E, physical device or external-delivery PASS results.
+Targeted policy/wiring/worker tests: **3 files / 9 tests PASS**. TypeScript (1792 MB), lint, backend build, Drizzle check and `git diff --check` PASS. These are not DB transaction race, actual in-app inbox, route E2E, physical device or external-delivery PASS results.
 
 ## Apply Gate
 

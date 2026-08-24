@@ -36,6 +36,7 @@ import {
   verifyMediaScannerCallbackSignature,
 } from "../security/MediaScannerCallbackSecurity";
 import { dispatchOneMediaScannerJob } from "../security/MediaScannerDispatchService";
+import { startOpportunityOutboxWorker } from "../matching/OpportunityOutboxWorker";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -538,6 +539,12 @@ export async function createApp() {
 async function startServer() {
   const app = await createApp();
   const server = createServer(app);
+  const outboxWorker = startOpportunityOutboxWorker({
+    enabled: process.env.MARKETPLACE_OUTBOX_WORKER_ENABLED === "true",
+    runtime: process.env.MARKETPLACE_OUTBOX_RUNTIME,
+    intervalMs: Number.parseInt(process.env.MARKETPLACE_OUTBOX_WORKER_INTERVAL_MS ?? "15000", 10),
+    onError: (error) => console.error("[marketplace-outbox] batch failed", error),
+  });
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
 
@@ -548,6 +555,9 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
   });
+  const stopOutboxWorker = () => outboxWorker?.stop();
+  process.once("SIGTERM", stopOutboxWorker);
+  process.once("SIGINT", stopOutboxWorker);
 }
 
 if (process.env.VITEST !== "true") {

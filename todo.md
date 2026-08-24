@@ -843,3 +843,11 @@
 - [ ] CLOSURE-4 — Marketplace concurrency/ownership/privacy/fairness negatif testlerini ve observability kanıtını ekle
 - [ ] CLOSURE-5 — FINAL-2 02–14 common-view/blocked gerekçe ve Explore accessibility kapsamını sırayla tamamla
 - [ ] CLOSURE-6 — .verification kanıtları, clean source export, residual blockers ve final release package’ını güncelle
+
+## Completion Continuation — Pasted Content 16
+- [ ] CONTINUE-1 — 0092 migration’ı versioned/reviewed tut; TiDB bağlantısı yoksa EXTERNAL_RUNTIME_BLOCKER kaydet, SQLite kullanma
+- [ ] CONTINUE-2 — Outbox worker auto-start/safe shutdown, transactional request enqueue ve cancel/suspend/other-offer-accept revoke bağlantılarını tamamla
+- [ ] CONTINUE-3 — Outbox RBAC/IDOR/PII/idempotency/retry/revoke/concurrency testlerini tamamla; gerçek push teslimini CODE_READY_NOT_CONFIGURED bırak
+- [ ] CONTINUE-4 — Blok 2 capacity/state-machine/capability partial deactivation internal kapsamını uygula
+- [ ] CONTINUE-5 — Blok 3 common-view/Explore erişilebilirlik ve kalan güvenli component extraction kapsamını tamamla
+- [ ] CONTINUE-6 — Final test/build/export/secret scan ve MOVEFIX_COMPLETE_SOURCE_FINAL kanıt paketini üret

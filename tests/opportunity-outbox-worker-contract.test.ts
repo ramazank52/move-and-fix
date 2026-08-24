@@ -32,4 +32,19 @@ describe("opportunity outbox worker contract", () => {
     expect(dbSource).not.toContain("customerEmail");
     expect(dbSource).not.toContain("customerPhone");
   });
+
+  it("requires explicit private staging opt-in for automatic worker lifecycle", () => {
+    const serverSource = readFileSync(join(process.cwd(), "server/_core/index.ts"), "utf8");
+    expect(worker).toContain('input.runtime !== "private_staging"');
+    expect(serverSource).toContain('MARKETPLACE_OUTBOX_WORKER_ENABLED === "true"');
+    expect(serverSource).toContain("MARKETPLACE_OUTBOX_RUNTIME");
+    expect(serverSource).toContain('process.once("SIGTERM", stopOutboxWorker)');
+  });
+
+  it("revokes queued or leased opportunities in the offer acceptance transaction", () => {
+    const acceptance = dbSource.slice(dbSource.indexOf("export async function acceptOffer"), dbSource.indexOf("export async function rejectOffer"));
+    expect(acceptance).toContain("REQUEST_ASSIGNED");
+    expect(acceptance).toContain("marketplaceOpportunityNotifications");
+    expect(acceptance).toContain('["queued", "processing"]');
+  });
 });
