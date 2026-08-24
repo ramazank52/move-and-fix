@@ -1,0 +1,217 @@
+[
+  {
+    "tableName": "country_active_provider_transitions",
+    "constraintName": "fk_country_active_provider_transition_coverage",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_active_provider_transitions",
+    "constraintName": "fk_country_active_provider_transition_ledger",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_active_provider_transitions",
+    "constraintName": "fk_country_active_provider_transition_provider",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_active_provider_transitions",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_active_provider_transitions",
+    "constraintName": "country_active_provider_transition_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_coverage_bundle_bindings",
+    "constraintName": "fk_country_coverage_bundle_bundle",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_coverage_bundle_bindings",
+    "constraintName": "fk_country_coverage_bundle_coverage",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_coverage_bundle_bindings",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_coverage_bundle_bindings",
+    "constraintName": "country_coverage_bundle_binding_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_coverage_policy_decisions",
+    "constraintName": "fk_country_coverage_policy_coverage",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_coverage_policy_decisions",
+    "constraintName": "fk_country_coverage_policy_rule_pack",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_coverage_policy_decisions",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_coverage_policy_decisions",
+    "constraintName": "country_coverage_policy_decisions_coverage_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_coverage_policy_events",
+    "constraintName": "fk_country_coverage_policy_event_actor",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_coverage_policy_events",
+    "constraintName": "fk_country_coverage_policy_event_decision",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_coverage_policy_events",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_requirement_bundles",
+    "constraintName": "fk_country_requirement_bundle_deployment",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_requirement_bundles",
+    "constraintName": "fk_country_requirement_bundle_rule_pack",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_requirement_bundles",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_requirement_bundles",
+    "constraintName": "country_requirement_bundles_scope_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_requirement_source_bindings",
+    "constraintName": "fk_country_requirement_source_archive",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_requirement_source_bindings",
+    "constraintName": "fk_country_requirement_source_bundle",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_requirement_source_bindings",
+    "constraintName": "fk_country_requirement_source_source",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_requirement_source_bindings",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_requirement_source_bindings",
+    "constraintName": "country_requirement_source_binding_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_requirement_subject_bindings",
+    "constraintName": "fk_country_requirement_subject_bundle",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_requirement_subject_bindings",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_requirement_subject_bindings",
+    "constraintName": "country_requirement_subject_binding_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_rule_pack_versions",
+    "constraintName": "fk_country_rule_pack_deployment",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_rule_pack_versions",
+    "constraintName": "fk_country_rule_pack_jurisdiction",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_rule_pack_versions",
+    "constraintName": "fk_country_rule_pack_legal_ledger",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_rule_pack_versions",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_rule_pack_versions",
+    "constraintName": "country_rule_pack_versions_scope_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_service_coverage",
+    "constraintName": "fk_country_service_coverage_category",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_service_coverage",
+    "constraintName": "fk_country_service_coverage_deployment",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_service_coverage",
+    "constraintName": "fk_country_service_coverage_jurisdiction",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_service_coverage",
+    "constraintName": "fk_country_service_coverage_subcategory",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_service_coverage",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_service_coverage",
+    "constraintName": "country_service_coverage_research_row_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_service_coverage",
+    "constraintName": "country_service_coverage_scope_subservice_unique",
+    "constraintType": "UNIQUE"
+  },
+  {
+    "tableName": "country_source_archives",
+    "constraintName": "fk_country_source_archive_source",
+    "constraintType": "FOREIGN KEY"
+  },
+  {
+    "tableName": "country_source_archives",
+    "constraintName": "PRIMARY",
+    "constraintType": "PRIMARY KEY"
+  },
+  {
+    "tableName": "country_source_archives",
+    "constraintName": "country_source_archives_source_hash_unique",
+    "constraintType": "UNIQUE"
+  }
+]

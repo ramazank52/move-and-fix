@@ -1,0 +1,85 @@
+US/California/Los Angeles CHECKPOINT A — Change and Test Evidence
+==================================================================
+
+Audit-only export timestamp: 2026-08-24 (user timezone)
+US CHECKPOINT A checkpoint (full SHA): e7c2248287317232943b38b793f6e970b9d7c1d0
+US CHECKPOINT A checkpoint (short): e7c22482
+Baseline checkpoint before US block: 1af16777
+
+CHECKPOINT CODE DIFF (1af16777..e7c2248287317232943b38b793f6e970b9d7c1d0)
+------------------------------------------------------------------------
+27 files changed; 13,792 insertions; 3 deletions.
+
+Core runtime/schema changes:
+- drizzle/0087_us_ca_la_v2_default_off.sql
+- drizzle/0088_us_ca_la_v2_credential_shells.sql
+- drizzle/schema.ts and drizzle/meta/_journal.json
+- server/compliance/CountryDeploymentPolicy.ts
+- server/compliance/CountryComplianceRepository.ts
+- tests/us-ca-la-v2-policy.test.ts
+- tests/us-ca-la-v2-authorization.test.ts
+
+Audit/export documents and deterministic evidence scripts:
+- docs/compliance/FAZ0_US_CA_LA_V2_AUDIT.md
+- docs/compliance/US_CA_LA_CHECKPOINT_A_REPORT.md
+- docs/compliance/US_CA_LA_V2_AUTHORIZATION_BOUNDARY.md
+- docs/compliance/us-ca-la-v2-evidence/*
+- scripts/reconcile-us-ca-la-v2-research.ts
+- scripts/export-us-ca-la-checkpoint-a-evidence.ts
+- scripts/package-us-ca-la-checkpoint-a.sh
+
+TURKEY / BERLIN PROTECTED PATH DIFF CHECK
+------------------------------------------
+Command:
+git diff --name-only 1af16777..e7c2248287317232943b38b793f6e970b9d7c1d0 | grep -E 'TrGoldMasterCatalogMapping|approved-sources/TR|ProviderCapabilityProfilePolicy|ProviderOnboardingPolicy|faz8a-capability-profile|DE_BERLIN|CHECKPOINT_A_GERMANY' || echo 'NO_TR_BLOCK1_OR_BERLIN_PROTECTED_PATH_DIFF'
+
+Observed output:
+NO_TR_BLOCK1_OR_BERLIN_PROTECTED_PATH_DIFF
+
+MIGRATION / CONSTRAINT EVIDENCE
+--------------------------------
+0087 adds US-only country coverage, rule-pack, requirement bundle/binding, subject binding,
+source archive/binding, per-coverage policy/event, appeal/incident and active-provider transition
+tables/records. 0088 adds unclassified/extraction-disabled credential and UNVERIFIED issuer shells.
+
+Database information_schema export is delivered as US_CA_LA_CONSTRAINTS.json. It records named
+foreign-key, unique and table-constraint entries for all US coverage tables. Enforcement is fail-closed
+through database named FK/unique constraints plus server-side policy/repository checks. TiDB triggers are
+not used. Application-layer append-only behavior is evidenced by country_coverage_policy_events and
+the policy/router negative tests; no provider/client write surface for country evidence exists.
+
+ROLLBACK (NON-DESTRUCTIVE)
+--------------------------
+1. Keep the 0087/0088 forward schema and audit history; do not DROP tables.
+2. Keep US deployment/nodes SCAFFOLD_ONLY or set SUSPENDED through authorized server/owner control.
+3. Keep all US coverage policy rows BLOCKED, country feature flags 0 and transition rows at 0.
+4. Do not mutate Turkey Blok 1 or Berlin records during rollback.
+5. Production schema rollback requires an independent approved change record, backup/restore plan and
+   evidence; the managed TiDB environment remains ENVIRONMENT_SEPARATION_UNVERIFIED.
+
+QUALITY COMMANDS AND RESULTS
+----------------------------
+Targeted authorization/policy command:
+pnpm vitest run tests/us-ca-la-v2-policy.test.ts tests/us-ca-la-v2-authorization.test.ts tests/country-deployment-policy.test.ts tests/global-country-scaffold-contract.test.ts tests/country-launch-gate-contract.test.ts tests/faz8a-capability-profile.test.ts
+Result: 6 test files / 24 tests PASS.
+
+Full regression command:
+pnpm test
+Result after local API restart: 127 test files / 736 tests PASS.
+
+Additional commands:
+pnpm lint                                  => PASS
+pnpm build                                 => PASS
+pnpm drizzle-kit check                     => PASS (Everything's fine)
+pnpm supply:sca                            => PASS (4 advisories; 0 blocking release; 2 approved exceptions)
+git diff --check                           => PASS
+NODE_OPTIONS=--max-old-space-size=512 pnpm exec tsc --noEmit --skipLibCheck
+                                              => ENVIRONMENTAL OOM; NOT reported as PASS
+NODE_OPTIONS=--max-old-space-size=1792 pnpm exec tsc --noEmit --skipLibCheck
+                                              => PASS; no TypeScript errors
+
+The first full regression retry occurred while the local API had been intentionally stopped to free
+memory for the large-heap TypeScript check. Only HTTP E2E tests returned ECONNREFUSED. The API was
+restarted, and the complete 127/736 suite then passed. No test was deleted, skipped, or expectation-
+weakened to produce this outcome. The audit export ZIP's copied tests are excluded from Vitest discovery
+by the existing source-test-only configuration.

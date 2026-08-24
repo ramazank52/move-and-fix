@@ -1,0 +1,134 @@
+[
+  {
+    "documentKey": "US-CA-LA-APPEAL_NOTICE",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "appeal_notice",
+    "legalApprovalState": "PENDING",
+    "locale": "en-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-APPEAL_NOTICE",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "appeal_notice",
+    "legalApprovalState": "PENDING",
+    "locale": "es-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-CONSUMER_TERMS",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "consumer_terms",
+    "legalApprovalState": "PENDING",
+    "locale": "en-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-CONSUMER_TERMS",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "consumer_terms",
+    "legalApprovalState": "PENDING",
+    "locale": "es-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-COOKIE_NOTICE",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "cookie_notice",
+    "legalApprovalState": "PENDING",
+    "locale": "en-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-COOKIE_NOTICE",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "cookie_notice",
+    "legalApprovalState": "PENDING",
+    "locale": "es-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-INCIDENT_NOTICE",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "incident_notice",
+    "legalApprovalState": "PENDING",
+    "locale": "en-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-INCIDENT_NOTICE",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "incident_notice",
+    "legalApprovalState": "PENDING",
+    "locale": "es-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-PRIVACY_NOTICE",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "privacy_notice",
+    "legalApprovalState": "PENDING",
+    "locale": "en-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-PRIVACY_NOTICE",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "privacy_notice",
+    "legalApprovalState": "PENDING",
+    "locale": "es-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-PROVIDER_AGREEMENT",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "provider_agreement",
+    "legalApprovalState": "PENDING",
+    "locale": "en-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  },
+  {
+    "documentKey": "US-CA-LA-PROVIDER_AGREEMENT",
+    "documentVersion": "2.0.0-research-draft-machine",
+    "documentSurface": "provider_agreement",
+    "legalApprovalState": "PENDING",
+    "locale": "es-US",
+    "localizationState": "DRAFT_MACHINE",
+    "contentHash": null,
+    "contentStorageKey": null,
+    "runtimeSelectable": 0
+  }
+]

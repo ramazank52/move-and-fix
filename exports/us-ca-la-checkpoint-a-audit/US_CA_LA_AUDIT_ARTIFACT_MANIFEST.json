@@ -1,0 +1,42 @@
+[
+  {
+    "file": "US_CA_LA_AUDIT.json",
+    "sha256": "6ff23cd8358816293f69ca3b75dc85b962308fda715c40f7e47f848a233c27b4",
+    "bytes": 5359384
+  },
+  {
+    "file": "US_CA_LA_SERVICE_CREDENTIAL_MATRIX.csv",
+    "sha256": "3802287dc7a83b7f7f36622dd45cdbd6cc4826c75ec9fee4f4e07393c25c346a",
+    "bytes": 168762
+  },
+  {
+    "file": "US_CA_LA_SOURCE_REGISTER.csv",
+    "sha256": "ba9fc04d17af349bff03d10356e76b457e794268f945f5091db616a60870670c",
+    "bytes": 45039
+  },
+  {
+    "file": "US_CA_LA_REQUIREMENT_BUNDLE_MANIFEST.json",
+    "sha256": "10b59687c70235fc3c74726f9b4f35543db4650d7c9e2e46fe18c70e1aab4fc5",
+    "bytes": 156339
+  },
+  {
+    "file": "US_CA_LA_CONNECTOR_INVENTORY.json",
+    "sha256": "608affae59b0ce8004ac58aed98179fd040e099058ec80c3df08814296315f9b",
+    "bytes": 21044
+  },
+  {
+    "file": "US_CA_LA_LOCALE_REGISTER.json",
+    "sha256": "bbc4a5fbe3275e86e41daf24fa8a91842ca33db65fa90e92fed23fb6a354dc04",
+    "bytes": 4047
+  },
+  {
+    "file": "US_CA_LA_PROVIDER_IMPACT.json",
+    "sha256": "5a978901b816448d155a2dfa61d6df7e61bb489e49cbd25d6a2d30c5ea0be5ce",
+    "bytes": 150
+  },
+  {
+    "file": "US_CA_LA_CONSTRAINTS.json",
+    "sha256": "063ca74f1dcf78423f2ac8d6a32114fca0e19a13f370972f58f9cb31f747b067",
+    "bytes": 6547
+  }
+]

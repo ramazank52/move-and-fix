@@ -690,3 +690,6 @@
 - [x] G5V2-US-A2 — Tüm US requirement/source/connector/locale kayıtlarını additive, SOURCE_UNVERIFIED, PENDING ve DRAFT_MACHINE default-off olarak oluştur
 - [x] G5V2-US-A3 — Provider eligibility, transition-window ve Türkiye/Berlin izolasyonu için fail-closed politika/test kanıtlarını tamamla
 - [x] G5V2-US-CP-A — US/California/Los Angeles CHECKPOINT A kanıt paketini üret ve Rusya’ya başlamadan dur
+- [x] G5V2-US-EXPORT-1 — 62 coverage, 26 bundle, 28 source, connector, locale ve provider-impact satır-bazlı audit kanıtlarını genişlet
+- [x] G5V2-US-EXPORT-2 — Diff, migration/FK/unique/append-only/rollback, Türkiye-Berlin izolasyonu ve quality/OOM kanıtlarını derle
+- [x] G5V2-US-EXPORT-3 — İstenen adlarla salt-okunur US_CA_LA_CHECKPOINT_A_REVIEW paketini hash/manifest ile oluşturup teslim et ve dur

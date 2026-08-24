@@ -1,0 +1,4574 @@
+[
+  {
+    "id": 1,
+    "bundleKey": "GLOBAL-EVIDENCE-CHAIN",
+    "title": "Belge–veren kurum–sicil–kapsam doğrulama zinciri",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Her zorunlu credential",
+    "verificationDescription": "Yetkili API/sicil, issuer doğrulaması, kriptografik QR/imza veya yetkili manuel cevap",
+    "requiredEvidenceJson": [
+      "Belge sahibi",
+      "veren kurum",
+      "belge no",
+      "kapsam/sınıf",
+      "durum",
+      "son kullanma/askı/iptal",
+      "işletme-kişi-araç-site bağları"
+    ],
+    "subjectTypesJson": [
+      "PERSON",
+      "BUSINESS",
+      "VEHICLE",
+      "SITE",
+      "OPERATOR"
+    ],
+    "note": "Belge fotoğrafı, OCR ve fraud skoru AUTHORITY_VERIFIED üretemez.",
+    "researchHash": "13616f4c495b56be3c17a03e881120e6bbf3d2d649f2a67eaae44a8b4e75b47a",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "VEHICLE",
+        "required": true
+      },
+      {
+        "subjectType": "SITE",
+        "required": true
+      },
+      {
+        "subjectType": "OPERATOR",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 1,
+        "officialSourceId": 30002,
+        "sourceArchiveId": 2,
+        "requirementReference": "Bundle research source: G-W3C-VC"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 1,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 2,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 3,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 4,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 5,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 6,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 7,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 8,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 9,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 10,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 11,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 12,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 17,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 18,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 19,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 20,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 21,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 22,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 23,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 24,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 25,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 26,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 27,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 28,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 29,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 30,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 31,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 32,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 33,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 36,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 37,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 38,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 39,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 40,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 41,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 42,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 43,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 44,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 45,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 46,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 51,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 52,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 53,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 54,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 55,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 56,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 57,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 58,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 59,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 60,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 61,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 62,
+        "bundleId": 1,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:leak-repair",
+      "US-CA-LOS_ANGELES:plumbing:clogged-drain",
+      "US-CA-LOS_ANGELES:plumbing:faucet-installation",
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:electrical:fault-repair",
+      "US-CA-LOS_ANGELES:electrical:fixture-installation",
+      "US-CA-LOS_ANGELES:electrical:panel-renewal",
+      "US-CA-LOS_ANGELES:electrical:smart-home-electrical",
+      "US-CA-LOS_ANGELES:cleaning:home-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:office-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:move-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:deep-cleaning",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:locksmith:door-opening",
+      "US-CA-LOS_ANGELES:locksmith:lock-replacement",
+      "US-CA-LOS_ANGELES:locksmith:car-locksmith",
+      "US-CA-LOS_ANGELES:painting:interior-painting",
+      "US-CA-LOS_ANGELES:painting:exterior-painting",
+      "US-CA-LOS_ANGELES:painting:wallpaper",
+      "US-CA-LOS_ANGELES:painting:plastering",
+      "US-CA-LOS_ANGELES:gardening:garden-maintenance",
+      "US-CA-LOS_ANGELES:gardening:landscaping",
+      "US-CA-LOS_ANGELES:gardening:pruning",
+      "US-CA-LOS_ANGELES:gardening:irrigation",
+      "US-CA-LOS_ANGELES:moving:house-moving",
+      "US-CA-LOS_ANGELES:moving:office-moving",
+      "US-CA-LOS_ANGELES:moving:single-item-moving",
+      "US-CA-LOS_ANGELES:moving:intercity-moving",
+      "US-CA-LOS_ANGELES:appliance:washing-machine",
+      "US-CA-LOS_ANGELES:appliance:dishwasher",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker",
+      "US-CA-LOS_ANGELES:towing:breakdown-tow",
+      "US-CA-LOS_ANGELES:towing:accident-tow",
+      "US-CA-LOS_ANGELES:towing:vehicle-transport",
+      "US-CA-LOS_ANGELES:courier:document-courier",
+      "US-CA-LOS_ANGELES:courier:parcel-courier",
+      "US-CA-LOS_ANGELES:courier:moto-courier",
+      "US-CA-LOS_ANGELES:courier:scheduled-delivery",
+      "US-CA-LOS_ANGELES:roadside:battery-jump",
+      "US-CA-LOS_ANGELES:roadside:tire-change",
+      "US-CA-LOS_ANGELES:roadside:fuel-delivery",
+      "US-CA-LOS_ANGELES:roadside:minor-repair",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman",
+      "US-CA-LOS_ANGELES:automotive:vehicle-maintenance",
+      "US-CA-LOS_ANGELES:automotive:vehicle-diagnostics",
+      "US-CA-LOS_ANGELES:automotive:tire-service",
+      "US-CA-LOS_ANGELES:automotive:auto-detailing",
+      "US-CA-LOS_ANGELES:technology:computer-service",
+      "US-CA-LOS_ANGELES:technology:mobile-device-service",
+      "US-CA-LOS_ANGELES:technology:network-setup",
+      "US-CA-LOS_ANGELES:technology:smart-home-setup",
+      "US-CA-LOS_ANGELES:personal-care:hair-care",
+      "US-CA-LOS_ANGELES:personal-care:makeup",
+      "US-CA-LOS_ANGELES:personal-care:nail-care",
+      "US-CA-LOS_ANGELES:personal-care:massage"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 2,
+    "bundleKey": "GLOBAL-IDENTITY-ENTITY",
+    "title": "Kimlik, işletme ve vergi öznesi eşlemesi",
+    "riskLevel": "MEDIUM",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_BLOCKED",
+    "triggerDescription": "Her sağlayıcı",
+    "verificationDescription": "Kimlik/işletme sicili veya yetkili doğrulama; OCR yalnız alan çıkarır",
+    "requiredEvidenceJson": [
+      "Devlet kimliği veya yetkili dijital kimlik kanıtı",
+      "canlılık/selfie eşleşmesi",
+      "işletme/sole proprietor kaydı",
+      "vergi statüsü",
+      "yetkili temsilci bağı"
+    ],
+    "subjectTypesJson": [
+      "PERSON",
+      "BUSINESS"
+    ],
+    "note": "İşletme lisansı ile işi fiilen yapan kişinin kimliği ve rolü ayrı doğrulanır.",
+    "researchHash": "e4e25daa169ff1a2b43047ff3f79e02085c835aba49148b51ffbfd4740b1f684",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 2,
+        "officialSourceId": 30001,
+        "sourceArchiveId": 1,
+        "requirementReference": "Bundle research source: G-NIST-IAL"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 1,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 2,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 3,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 4,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 5,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 6,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 7,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 8,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 9,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 10,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 11,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 12,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 17,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 18,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 19,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 20,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 21,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 22,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 23,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 24,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 25,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 26,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 27,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 28,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 29,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 30,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 31,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 32,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 33,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 36,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 37,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 38,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 39,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 40,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 41,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 42,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 43,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 44,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 45,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 46,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 51,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 52,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 53,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 54,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 55,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 56,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 57,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 58,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 59,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 60,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 61,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 62,
+        "bundleId": 2,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:leak-repair",
+      "US-CA-LOS_ANGELES:plumbing:clogged-drain",
+      "US-CA-LOS_ANGELES:plumbing:faucet-installation",
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:electrical:fault-repair",
+      "US-CA-LOS_ANGELES:electrical:fixture-installation",
+      "US-CA-LOS_ANGELES:electrical:panel-renewal",
+      "US-CA-LOS_ANGELES:electrical:smart-home-electrical",
+      "US-CA-LOS_ANGELES:cleaning:home-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:office-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:move-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:deep-cleaning",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:locksmith:door-opening",
+      "US-CA-LOS_ANGELES:locksmith:lock-replacement",
+      "US-CA-LOS_ANGELES:locksmith:car-locksmith",
+      "US-CA-LOS_ANGELES:painting:interior-painting",
+      "US-CA-LOS_ANGELES:painting:exterior-painting",
+      "US-CA-LOS_ANGELES:painting:wallpaper",
+      "US-CA-LOS_ANGELES:painting:plastering",
+      "US-CA-LOS_ANGELES:gardening:garden-maintenance",
+      "US-CA-LOS_ANGELES:gardening:landscaping",
+      "US-CA-LOS_ANGELES:gardening:pruning",
+      "US-CA-LOS_ANGELES:gardening:irrigation",
+      "US-CA-LOS_ANGELES:moving:house-moving",
+      "US-CA-LOS_ANGELES:moving:office-moving",
+      "US-CA-LOS_ANGELES:moving:single-item-moving",
+      "US-CA-LOS_ANGELES:moving:intercity-moving",
+      "US-CA-LOS_ANGELES:appliance:washing-machine",
+      "US-CA-LOS_ANGELES:appliance:dishwasher",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker",
+      "US-CA-LOS_ANGELES:towing:breakdown-tow",
+      "US-CA-LOS_ANGELES:towing:accident-tow",
+      "US-CA-LOS_ANGELES:towing:vehicle-transport",
+      "US-CA-LOS_ANGELES:courier:document-courier",
+      "US-CA-LOS_ANGELES:courier:parcel-courier",
+      "US-CA-LOS_ANGELES:courier:moto-courier",
+      "US-CA-LOS_ANGELES:courier:scheduled-delivery",
+      "US-CA-LOS_ANGELES:roadside:battery-jump",
+      "US-CA-LOS_ANGELES:roadside:tire-change",
+      "US-CA-LOS_ANGELES:roadside:fuel-delivery",
+      "US-CA-LOS_ANGELES:roadside:minor-repair",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman",
+      "US-CA-LOS_ANGELES:automotive:vehicle-maintenance",
+      "US-CA-LOS_ANGELES:automotive:vehicle-diagnostics",
+      "US-CA-LOS_ANGELES:automotive:tire-service",
+      "US-CA-LOS_ANGELES:automotive:auto-detailing",
+      "US-CA-LOS_ANGELES:technology:computer-service",
+      "US-CA-LOS_ANGELES:technology:mobile-device-service",
+      "US-CA-LOS_ANGELES:technology:network-setup",
+      "US-CA-LOS_ANGELES:technology:smart-home-setup",
+      "US-CA-LOS_ANGELES:personal-care:hair-care",
+      "US-CA-LOS_ANGELES:personal-care:makeup",
+      "US-CA-LOS_ANGELES:personal-care:nail-care",
+      "US-CA-LOS_ANGELES:personal-care:massage"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 3,
+    "bundleKey": "GLOBAL-LOCAL-LAW-TEXT",
+    "title": "Yerel hukuk, dil ve yayın onayı",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Her rule-pack ve kullanıcı metni",
+    "verificationDescription": "İki ayrı onay kaydı; AI veya aynı kişi kendi çıktısını onaylayamaz",
+    "requiredEvidenceJson": [
+      "Madde/ek/istisna/tarih bazlı hukukçu onayı",
+      "bağımsız dil uzmanı onayı",
+      "sürüm/hash",
+      "etkinlik ve yürürlük tarihleri"
+    ],
+    "subjectTypesJson": [
+      "POLICY"
+    ],
+    "note": "Makine çevirisi DRAFT_MACHINE kalır ve production yüzeyine çıkamaz.",
+    "researchHash": "ffb44b425122796cb44135a67b157ab5d567b2cb45e73d4ccd0818ca37bf58e4",
+    "subjectBindings": [
+      {
+        "subjectType": "POLICY",
+        "required": true
+      }
+    ],
+    "sourceBindings": [],
+    "coverageBindings": [
+      {
+        "coverageId": 1,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 2,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 3,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 4,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 5,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 6,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 7,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 8,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 9,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 10,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 11,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 12,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 17,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 18,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 19,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 20,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 21,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 22,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 23,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 24,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 25,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 26,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 27,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 28,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 29,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 30,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 31,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 32,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 33,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 36,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 37,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 38,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 39,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 40,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 41,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 42,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 43,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 44,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 45,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 46,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 51,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 52,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 53,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 54,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 55,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 56,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 57,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 58,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 59,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 60,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 61,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 62,
+        "bundleId": 3,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:leak-repair",
+      "US-CA-LOS_ANGELES:plumbing:clogged-drain",
+      "US-CA-LOS_ANGELES:plumbing:faucet-installation",
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:electrical:fault-repair",
+      "US-CA-LOS_ANGELES:electrical:fixture-installation",
+      "US-CA-LOS_ANGELES:electrical:panel-renewal",
+      "US-CA-LOS_ANGELES:electrical:smart-home-electrical",
+      "US-CA-LOS_ANGELES:cleaning:home-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:office-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:move-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:deep-cleaning",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:locksmith:door-opening",
+      "US-CA-LOS_ANGELES:locksmith:lock-replacement",
+      "US-CA-LOS_ANGELES:locksmith:car-locksmith",
+      "US-CA-LOS_ANGELES:painting:interior-painting",
+      "US-CA-LOS_ANGELES:painting:exterior-painting",
+      "US-CA-LOS_ANGELES:painting:wallpaper",
+      "US-CA-LOS_ANGELES:painting:plastering",
+      "US-CA-LOS_ANGELES:gardening:garden-maintenance",
+      "US-CA-LOS_ANGELES:gardening:landscaping",
+      "US-CA-LOS_ANGELES:gardening:pruning",
+      "US-CA-LOS_ANGELES:gardening:irrigation",
+      "US-CA-LOS_ANGELES:moving:house-moving",
+      "US-CA-LOS_ANGELES:moving:office-moving",
+      "US-CA-LOS_ANGELES:moving:single-item-moving",
+      "US-CA-LOS_ANGELES:moving:intercity-moving",
+      "US-CA-LOS_ANGELES:appliance:washing-machine",
+      "US-CA-LOS_ANGELES:appliance:dishwasher",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker",
+      "US-CA-LOS_ANGELES:towing:breakdown-tow",
+      "US-CA-LOS_ANGELES:towing:accident-tow",
+      "US-CA-LOS_ANGELES:towing:vehicle-transport",
+      "US-CA-LOS_ANGELES:courier:document-courier",
+      "US-CA-LOS_ANGELES:courier:parcel-courier",
+      "US-CA-LOS_ANGELES:courier:moto-courier",
+      "US-CA-LOS_ANGELES:courier:scheduled-delivery",
+      "US-CA-LOS_ANGELES:roadside:battery-jump",
+      "US-CA-LOS_ANGELES:roadside:tire-change",
+      "US-CA-LOS_ANGELES:roadside:fuel-delivery",
+      "US-CA-LOS_ANGELES:roadside:minor-repair",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman",
+      "US-CA-LOS_ANGELES:automotive:vehicle-maintenance",
+      "US-CA-LOS_ANGELES:automotive:vehicle-diagnostics",
+      "US-CA-LOS_ANGELES:automotive:tire-service",
+      "US-CA-LOS_ANGELES:automotive:auto-detailing",
+      "US-CA-LOS_ANGELES:technology:computer-service",
+      "US-CA-LOS_ANGELES:technology:mobile-device-service",
+      "US-CA-LOS_ANGELES:technology:network-setup",
+      "US-CA-LOS_ANGELES:technology:smart-home-setup",
+      "US-CA-LOS_ANGELES:personal-care:hair-care",
+      "US-CA-LOS_ANGELES:personal-care:makeup",
+      "US-CA-LOS_ANGELES:personal-care:nail-care",
+      "US-CA-LOS_ANGELES:personal-care:massage"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30001,
+    "bundleKey": "US-CA-ALARM",
+    "title": "Alarm company/operator/agent paketi",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Güvenlik alarmını satma, kurma, izleme, servis veya yanıt",
+    "verificationDescription": "BSIS + CSLB resmî sorguları",
+    "requiredEvidenceJson": [
+      "Alarm Company Operator licence",
+      "Qualified Manager",
+      "Alarm Agent registration",
+      "gerekiyorsa C-7/C-10/C-28 CSLB sınıfı"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "PERSON"
+    ],
+    "note": "",
+    "researchHash": "b71bc9c8bac0cbc3e8d1016dec3dc6f09e8cedb140b26a68478f8d95f959c0b2",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30001,
+        "officialSourceId": 30010,
+        "sourceArchiveId": 10,
+        "requirementReference": "Bundle research source: US-BSIS-ALARM"
+      },
+      {
+        "bundleId": 30001,
+        "officialSourceId": 30012,
+        "sourceArchiveId": 12,
+        "requirementReference": "Bundle research source: US-BSIS-VERIFY"
+      },
+      {
+        "bundleId": 30001,
+        "officialSourceId": 30014,
+        "sourceArchiveId": 14,
+        "requirementReference": "Bundle research source: US-CSLB-CLASS"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 8,
+        "bundleId": 30001,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 17,
+        "bundleId": 30001,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 18,
+        "bundleId": 30001,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 19,
+        "bundleId": 30001,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 57,
+        "bundleId": 30001,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 58,
+        "bundleId": 30001,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:electrical:smart-home-electrical",
+      "US-CA-LOS_ANGELES:locksmith:door-opening",
+      "US-CA-LOS_ANGELES:locksmith:lock-replacement",
+      "US-CA-LOS_ANGELES:locksmith:car-locksmith",
+      "US-CA-LOS_ANGELES:technology:network-setup",
+      "US-CA-LOS_ANGELES:technology:smart-home-setup"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30002,
+    "bundleKey": "US-CA-APPLIANCE",
+    "title": "Appliance/Electronic Service Dealer",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Beyaz eşya, bilgisayar, telefon veya consumer electronic repair",
+    "verificationDescription": "BHGS lookup/status",
+    "requiredEvidenceJson": [
+      "Her service location için aktif Appliance Service Dealer veya Electronic Service Dealer registration"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "SITE"
+    ],
+    "note": "",
+    "researchHash": "4ba533e3af44e3cf6e9fd0e5d26372d653d12e349a20dfd22a20581c7fcb0ba0",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "SITE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30002,
+        "officialSourceId": 30008,
+        "sourceArchiveId": 8,
+        "requirementReference": "Bundle research source: US-BHGS-REPAIR"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 32,
+        "bundleId": 30002,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 33,
+        "bundleId": 30002,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 30002,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 30002,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 55,
+        "bundleId": 30002,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 56,
+        "bundleId": 30002,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 57,
+        "bundleId": 30002,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 58,
+        "bundleId": 30002,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:appliance:washing-machine",
+      "US-CA-LOS_ANGELES:appliance:dishwasher",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker",
+      "US-CA-LOS_ANGELES:technology:computer-service",
+      "US-CA-LOS_ANGELES:technology:mobile-device-service",
+      "US-CA-LOS_ANGELES:technology:network-setup",
+      "US-CA-LOS_ANGELES:technology:smart-home-setup"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30003,
+    "bundleKey": "US-CA-ARD",
+    "title": "Automotive Repair Dealer registration",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Ücretli diagnose, service veya repair; mobile/referral/sublet dahil",
+    "verificationDescription": "BAR resmî lookup/status/discipline",
+    "requiredEvidenceJson": [
+      "Aktif BAR ARD registration",
+      "mobil ise araç plakası ve mobile ARD kayıt bağı",
+      "işletme adı/numara/telefon reklam gösterimi"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "SITE",
+      "VEHICLE"
+    ],
+    "note": "",
+    "researchHash": "0b7507fad80112f59e5435e07a5dc91cba8106f2ce60b07ef1a89d77738c2175",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "VEHICLE",
+        "required": true
+      },
+      {
+        "subjectType": "SITE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30003,
+        "officialSourceId": 30003,
+        "sourceArchiveId": 3,
+        "requirementReference": "Bundle research source: US-BAR-ARD"
+      },
+      {
+        "bundleId": 30003,
+        "officialSourceId": 30004,
+        "sourceArchiveId": 4,
+        "requirementReference": "Bundle research source: US-BAR-LOOKUP"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 36,
+        "bundleId": 30003,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-ARD: Ücretli diagnose, service veya repair; mobile/referral/sublet dahil"
+      },
+      {
+        "coverageId": 37,
+        "bundleId": 30003,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-ARD: Ücretli diagnose, service veya repair; mobile/referral/sublet dahil"
+      },
+      {
+        "coverageId": 38,
+        "bundleId": 30003,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-ARD: Ücretli diagnose, service veya repair; mobile/referral/sublet dahil"
+      },
+      {
+        "coverageId": 44,
+        "bundleId": 30003,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 46,
+        "bundleId": 30003,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 51,
+        "bundleId": 30003,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 52,
+        "bundleId": 30003,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 53,
+        "bundleId": 30003,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 54,
+        "bundleId": 30003,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ARD: Ücretli diagnose, service veya repair; mobile/referral/sublet dahil"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:towing:breakdown-tow",
+      "US-CA-LOS_ANGELES:towing:accident-tow",
+      "US-CA-LOS_ANGELES:towing:vehicle-transport",
+      "US-CA-LOS_ANGELES:roadside:tire-change",
+      "US-CA-LOS_ANGELES:roadside:minor-repair",
+      "US-CA-LOS_ANGELES:automotive:vehicle-maintenance",
+      "US-CA-LOS_ANGELES:automotive:vehicle-diagnostics",
+      "US-CA-LOS_ANGELES:automotive:tire-service",
+      "US-CA-LOS_ANGELES:automotive:auto-detailing"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30004,
+    "bundleKey": "US-CA-ASBESTOS",
+    "title": "Asbestos contractor registration",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger",
+    "verificationDescription": "DIR/CSLB sicilleri ve proje dokümanı",
+    "requiredEvidenceJson": [
+      "California asbestos registration",
+      "uygun contractor classification",
+      "işçi eğitim/medical/safety kanıtları",
+      "survey ve iş miktarı"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "PERSON",
+      "SITE"
+    ],
+    "note": "",
+    "researchHash": "05f5dbccb69172d2f9899936dccc78134588f06910f5ab07e96f2a94a2d3c802",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "SITE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30004,
+        "officialSourceId": 30016,
+        "sourceArchiveId": 16,
+        "requirementReference": "Bundle research source: US-CSLB-VERIFY"
+      },
+      {
+        "bundleId": 30004,
+        "officialSourceId": 30018,
+        "sourceArchiveId": 18,
+        "requirementReference": "Bundle research source: US-DIR-ASBESTOS"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 9,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 10,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 11,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 12,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 20,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger"
+      },
+      {
+        "coverageId": 21,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger"
+      },
+      {
+        "coverageId": 22,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger"
+      },
+      {
+        "coverageId": 23,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger"
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 30004,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:cleaning:home-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:office-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:move-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:deep-cleaning",
+      "US-CA-LOS_ANGELES:painting:interior-painting",
+      "US-CA-LOS_ANGELES:painting:exterior-painting",
+      "US-CA-LOS_ANGELES:painting:wallpaper",
+      "US-CA-LOS_ANGELES:painting:plastering",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30005,
+    "bundleKey": "US-CA-C10",
+    "title": "C-10 Electrical Contractor",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Elektrik tesisatı/onarımı",
+    "verificationDescription": "CSLB registry class/status match",
+    "requiredEvidenceJson": [
+      "Aktif CSLB C-10"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "QUALIFIER"
+    ],
+    "note": "",
+    "researchHash": "44ad29b3bea1168b2c47fe62c0d86924708f12003333eccc6213832f8f48d862",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "QUALIFIER",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30005,
+        "officialSourceId": 30014,
+        "sourceArchiveId": 14,
+        "requirementReference": "Bundle research source: US-CSLB-CLASS"
+      },
+      {
+        "bundleId": 30005,
+        "officialSourceId": 30016,
+        "sourceArchiveId": 16,
+        "requirementReference": "Bundle research source: US-CSLB-VERIFY"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 4,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 5,
+        "bundleId": 30005,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 6,
+        "bundleId": 30005,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 7,
+        "bundleId": 30005,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 8,
+        "bundleId": 30005,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 27,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 32,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir"
+      },
+      {
+        "coverageId": 33,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir"
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 57,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 58,
+        "bundleId": 30005,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:electrical:fault-repair",
+      "US-CA-LOS_ANGELES:electrical:fixture-installation",
+      "US-CA-LOS_ANGELES:electrical:panel-renewal",
+      "US-CA-LOS_ANGELES:electrical:smart-home-electrical",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:gardening:irrigation",
+      "US-CA-LOS_ANGELES:appliance:washing-machine",
+      "US-CA-LOS_ANGELES:appliance:dishwasher",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman",
+      "US-CA-LOS_ANGELES:technology:network-setup",
+      "US-CA-LOS_ANGELES:technology:smart-home-setup"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30006,
+    "bundleKey": "US-CA-C20-C38",
+    "title": "C-20 HVAC / C-38 Refrigeration Contractor",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Klima, ısıtma veya refrigeration işi",
+    "verificationDescription": "CSLB registry class/status match",
+    "requiredEvidenceJson": [
+      "İş kapsamına uygun aktif C-20 ve/veya C-38"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "QUALIFIER"
+    ],
+    "note": "",
+    "researchHash": "22c938a3f6bec289e4a52f59fa6b7be671f799e0ffa39a6cd6ab011ab34b9c5f",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "QUALIFIER",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30006,
+        "officialSourceId": 30014,
+        "sourceArchiveId": 14,
+        "requirementReference": "Bundle research source: US-CSLB-CLASS"
+      },
+      {
+        "bundleId": 30006,
+        "officialSourceId": 30016,
+        "sourceArchiveId": 16,
+        "requirementReference": "Bundle research source: US-CSLB-VERIFY"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 4,
+        "bundleId": 30006,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 30006,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 30006,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 30006,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 30006,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 30006,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 30006,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30007,
+    "bundleKey": "US-CA-C36",
+    "title": "C-36 Plumbing Contractor",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Plumbing işinde contractor tetikleri veya platform ilanı",
+    "verificationDescription": "CSLB registry class/status match",
+    "requiredEvidenceJson": [
+      "Aktif CSLB C-36"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "QUALIFIER"
+    ],
+    "note": "",
+    "researchHash": "55e8c2c63d567b235149ca9d8b229544eb5c32c4c5d81eba933f5690b58cc403",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "QUALIFIER",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30007,
+        "officialSourceId": 30014,
+        "sourceArchiveId": 14,
+        "requirementReference": "Bundle research source: US-CSLB-CLASS"
+      },
+      {
+        "bundleId": 30007,
+        "officialSourceId": 30016,
+        "sourceArchiveId": 16,
+        "requirementReference": "Bundle research source: US-CSLB-VERIFY"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 1,
+        "bundleId": 30007,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 2,
+        "bundleId": 30007,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 3,
+        "bundleId": 30007,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 4,
+        "bundleId": 30007,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 27,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 32,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir"
+      },
+      {
+        "coverageId": 33,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir"
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 30007,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:leak-repair",
+      "US-CA-LOS_ANGELES:plumbing:clogged-drain",
+      "US-CA-LOS_ANGELES:plumbing:faucet-installation",
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:gardening:irrigation",
+      "US-CA-LOS_ANGELES:appliance:washing-machine",
+      "US-CA-LOS_ANGELES:appliance:dishwasher",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30008,
+    "bundleKey": "US-CA-CLEAN-ORDINARY",
+    "title": "Standart temizlik profili",
+    "riskLevel": "MEDIUM",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_BLOCKED",
+    "triggerDescription": "Yalnız standart ev/ofis/taşınma temizliği; biyosidal, asbestos, tehlikeli atık ve dış cephe hariç",
+    "verificationDescription": "İşletme/vergi kaydı; meslek belgesi uydurma yok",
+    "requiredEvidenceJson": [
+      "US-CA-LA-BASE kanıtları",
+      "çalışan varsa workers’ compensation/payroll yükümlülüğü"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS"
+    ],
+    "note": "",
+    "researchHash": "249745d2aabc5c76ab74bb65324bee4f425757198ea7311c59239c0cb0650bf3",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30008,
+        "officialSourceId": 30027,
+        "sourceArchiveId": 27,
+        "requirementReference": "Bundle research source: US-LA-BTRC"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 9,
+        "bundleId": 30008,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 10,
+        "bundleId": 30008,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 11,
+        "bundleId": 30008,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 12,
+        "bundleId": 30008,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:cleaning:home-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:office-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:move-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:deep-cleaning"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30009,
+    "bundleKey": "US-CA-CONTRACTOR-CLASS",
+    "title": "CSLB doğru contractor sınıfı",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir",
+    "verificationDescription": "CSLB resmî license check/data portal; ad, lisans, sınıf, durum, bond ve çalışan sigortası eşleşmesi",
+    "requiredEvidenceJson": [
+      "Aktif CSLB licence",
+      "işe uygun classification",
+      "qualifier bağı",
+      "25.000 USD contractor bond kaydı",
+      "workers’ compensation veya hukuken geçerli exemption"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "QUALIFIER"
+    ],
+    "note": "MoveFix reklam/listing modeli nedeniyle güvenli varsayılan lisans istemektir; daha dar minor-work istisnası yalnız California counsel’ın yazılı profile onayıyla açılır.",
+    "researchHash": "34654f229fcf5c26df0505ce136ff5520641e979efe4571f5e7762688ba81c5b",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "QUALIFIER",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30009,
+        "officialSourceId": 30009,
+        "sourceArchiveId": 9,
+        "requirementReference": "Bundle research source: US-BPC-7048"
+      },
+      {
+        "bundleId": 30009,
+        "officialSourceId": 30014,
+        "sourceArchiveId": 14,
+        "requirementReference": "Bundle research source: US-CSLB-CLASS"
+      },
+      {
+        "bundleId": 30009,
+        "officialSourceId": 30015,
+        "sourceArchiveId": 15,
+        "requirementReference": "Bundle research source: US-CSLB-TRIGGER"
+      },
+      {
+        "bundleId": 30009,
+        "officialSourceId": 30016,
+        "sourceArchiveId": 16,
+        "requirementReference": "Bundle research source: US-CSLB-VERIFY"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 1,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 2,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 3,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 4,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 5,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 6,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 7,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 8,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 17,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 18,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 19,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 20,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 21,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 22,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 23,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 24,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 25,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 26,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 27,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 32,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir"
+      },
+      {
+        "coverageId": 33,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir"
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 30009,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 57,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 58,
+        "bundleId": 30009,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:leak-repair",
+      "US-CA-LOS_ANGELES:plumbing:clogged-drain",
+      "US-CA-LOS_ANGELES:plumbing:faucet-installation",
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:electrical:fault-repair",
+      "US-CA-LOS_ANGELES:electrical:fixture-installation",
+      "US-CA-LOS_ANGELES:electrical:panel-renewal",
+      "US-CA-LOS_ANGELES:electrical:smart-home-electrical",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:locksmith:door-opening",
+      "US-CA-LOS_ANGELES:locksmith:lock-replacement",
+      "US-CA-LOS_ANGELES:locksmith:car-locksmith",
+      "US-CA-LOS_ANGELES:painting:interior-painting",
+      "US-CA-LOS_ANGELES:painting:exterior-painting",
+      "US-CA-LOS_ANGELES:painting:wallpaper",
+      "US-CA-LOS_ANGELES:painting:plastering",
+      "US-CA-LOS_ANGELES:gardening:garden-maintenance",
+      "US-CA-LOS_ANGELES:gardening:landscaping",
+      "US-CA-LOS_ANGELES:gardening:pruning",
+      "US-CA-LOS_ANGELES:gardening:irrigation",
+      "US-CA-LOS_ANGELES:appliance:washing-machine",
+      "US-CA-LOS_ANGELES:appliance:dishwasher",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman",
+      "US-CA-LOS_ANGELES:technology:network-setup",
+      "US-CA-LOS_ANGELES:technology:smart-home-setup"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30010,
+    "bundleKey": "US-CA-GARDEN",
+    "title": "Landscape/tree contractor ve pest-control paketleri",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Peyzaj, sulama, budama veya profesyonel pestisit uygulaması",
+    "verificationDescription": "CSLB + DPR resmî sicil eşleşmesi",
+    "requiredEvidenceJson": [
+      "C-27 landscaping/irrigation",
+      "C-49 tree and palm service, tetiklenirse",
+      "DPR pest-control business ve uygun Qualified Applicator, pestisit uygulanırsa"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "QUALIFIER",
+      "PERSON"
+    ],
+    "note": "",
+    "researchHash": "52e4ceafbec2afb92120194d991018b03d9d20ce4d4616f65613a608f7158925",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "QUALIFIER",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30010,
+        "officialSourceId": 30014,
+        "sourceArchiveId": 14,
+        "requirementReference": "Bundle research source: US-CSLB-CLASS"
+      },
+      {
+        "bundleId": 30010,
+        "officialSourceId": 30016,
+        "sourceArchiveId": 16,
+        "requirementReference": "Bundle research source: US-CSLB-VERIFY"
+      },
+      {
+        "bundleId": 30010,
+        "officialSourceId": 30022,
+        "sourceArchiveId": 22,
+        "requirementReference": "Bundle research source: US-DPR-PEST"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 9,
+        "bundleId": 30010,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 10,
+        "bundleId": 30010,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 11,
+        "bundleId": 30010,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 12,
+        "bundleId": 30010,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 24,
+        "bundleId": 30010,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 25,
+        "bundleId": 30010,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 26,
+        "bundleId": 30010,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 27,
+        "bundleId": 30010,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:cleaning:home-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:office-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:move-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:deep-cleaning",
+      "US-CA-LOS_ANGELES:gardening:garden-maintenance",
+      "US-CA-LOS_ANGELES:gardening:landscaping",
+      "US-CA-LOS_ANGELES:gardening:pruning",
+      "US-CA-LOS_ANGELES:gardening:irrigation"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30011,
+    "bundleKey": "US-CA-HHG-MOVER",
+    "title": "California intrastate household goods mover",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "California içinde household goods taşıma",
+    "verificationDescription": "BHGS resmî mover search + DMV/insurer yetkili doğrulama",
+    "requiredEvidenceJson": [
+      "Aktif BHGS household mover permit/licence",
+      "tarife/insurance kayıtları",
+      "uygun sürücü belgesi",
+      "araç tescil/insurance"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "VEHICLE",
+      "DRIVER"
+    ],
+    "note": "",
+    "researchHash": "185379bff4b5631b4cb5c52a4d1bdb4576e5508de664a105a76041c54fb408e8",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "DRIVER",
+        "required": true
+      },
+      {
+        "subjectType": "VEHICLE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30011,
+        "officialSourceId": 30007,
+        "sourceArchiveId": 7,
+        "requirementReference": "Bundle research source: US-BHGS-MOVER"
+      },
+      {
+        "bundleId": 30011,
+        "officialSourceId": 30019,
+        "sourceArchiveId": 19,
+        "requirementReference": "Bundle research source: US-DMV-CDL"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 28,
+        "bundleId": 30011,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 29,
+        "bundleId": 30011,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 30,
+        "bundleId": 30011,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 31,
+        "bundleId": 30011,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:moving:house-moving",
+      "US-CA-LOS_ANGELES:moving:office-moving",
+      "US-CA-LOS_ANGELES:moving:single-item-moving",
+      "US-CA-LOS_ANGELES:moving:intercity-moving"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30012,
+    "bundleKey": "US-CA-HOME-REPAIR",
+    "title": "Home repair doğru contractor classification",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Mobilya sabitleme/imalat, drywall, kapı-pencere veya general handyman işi contractor kapsamına giriyorsa",
+    "verificationDescription": "CSLB registry ve deterministic task-class mapping",
+    "requiredEvidenceJson": [
+      "İşe göre B/B-2, C-6, C-9, C-17 veya başka aktif CSLB classification"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "QUALIFIER"
+    ],
+    "note": "",
+    "researchHash": "c06f70119468623782db4b5f98c690ea3d178f70fa7ce631493dbda8ce0ce67d",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "QUALIFIER",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30012,
+        "officialSourceId": 30009,
+        "sourceArchiveId": 9,
+        "requirementReference": "Bundle research source: US-BPC-7048"
+      },
+      {
+        "bundleId": 30012,
+        "officialSourceId": 30014,
+        "sourceArchiveId": 14,
+        "requirementReference": "Bundle research source: US-CSLB-CLASS"
+      },
+      {
+        "bundleId": 30012,
+        "officialSourceId": 30015,
+        "sourceArchiveId": 15,
+        "requirementReference": "Bundle research source: US-CSLB-TRIGGER"
+      },
+      {
+        "bundleId": 30012,
+        "officialSourceId": 30016,
+        "sourceArchiveId": 16,
+        "requirementReference": "Bundle research source: US-CSLB-VERIFY"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 47,
+        "bundleId": 30012,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 30012,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 30012,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 30012,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30013,
+    "bundleKey": "US-CA-LA-BASE",
+    "title": "California/Los Angeles sağlayıcı tabanı",
+    "riskLevel": "MEDIUM",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_BLOCKED",
+    "triggerDescription": "Los Angeles’ta her ticari sağlayıcı",
+    "verificationDescription": "Kimlik ve resmî işletme/vergi kanalı; BTRC için şehir kaydı veya yetkili manuel teyit",
+    "requiredEvidenceJson": [
+      "Kimlik ve rol",
+      "W-9/TIN iş akışı için gerekli vergi bilgisi",
+      "işletme/DBA kaydı gerekiyorsa",
+      "Los Angeles BTRC",
+      "çalışan/bağımsız yüklenici sınıflandırma sonucu"
+    ],
+    "subjectTypesJson": [
+      "PERSON",
+      "BUSINESS"
+    ],
+    "note": "I-9, bağımsız yüklenici için evrensel bir onboarding belgesi değildir; çalışma modeli hukukçu tarafından sınıflandırılır.",
+    "researchHash": "a67dda3020284ef2544270d5b490a97cfb5434b7b7f5184eb86405257e9531e5",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30013,
+        "officialSourceId": 30027,
+        "sourceArchiveId": 27,
+        "requirementReference": "Bundle research source: US-LA-BTRC"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 1,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 2,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 3,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 4,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 5,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 6,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 7,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 8,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 9,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 10,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 11,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 12,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 17,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 18,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 19,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 20,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 21,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 22,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 23,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 24,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 25,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 26,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 27,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 28,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 29,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 30,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 31,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 32,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 33,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 35,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 36,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 37,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 38,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 39,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 40,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 41,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 42,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 43,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 44,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 45,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 46,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 51,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 52,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 53,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 54,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 55,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 56,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 57,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 58,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 59,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 60,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 61,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 62,
+        "bundleId": 30013,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:leak-repair",
+      "US-CA-LOS_ANGELES:plumbing:clogged-drain",
+      "US-CA-LOS_ANGELES:plumbing:faucet-installation",
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:electrical:fault-repair",
+      "US-CA-LOS_ANGELES:electrical:fixture-installation",
+      "US-CA-LOS_ANGELES:electrical:panel-renewal",
+      "US-CA-LOS_ANGELES:electrical:smart-home-electrical",
+      "US-CA-LOS_ANGELES:cleaning:home-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:office-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:move-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:deep-cleaning",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:locksmith:door-opening",
+      "US-CA-LOS_ANGELES:locksmith:lock-replacement",
+      "US-CA-LOS_ANGELES:locksmith:car-locksmith",
+      "US-CA-LOS_ANGELES:painting:interior-painting",
+      "US-CA-LOS_ANGELES:painting:exterior-painting",
+      "US-CA-LOS_ANGELES:painting:wallpaper",
+      "US-CA-LOS_ANGELES:painting:plastering",
+      "US-CA-LOS_ANGELES:gardening:garden-maintenance",
+      "US-CA-LOS_ANGELES:gardening:landscaping",
+      "US-CA-LOS_ANGELES:gardening:pruning",
+      "US-CA-LOS_ANGELES:gardening:irrigation",
+      "US-CA-LOS_ANGELES:moving:house-moving",
+      "US-CA-LOS_ANGELES:moving:office-moving",
+      "US-CA-LOS_ANGELES:moving:single-item-moving",
+      "US-CA-LOS_ANGELES:moving:intercity-moving",
+      "US-CA-LOS_ANGELES:appliance:washing-machine",
+      "US-CA-LOS_ANGELES:appliance:dishwasher",
+      "US-CA-LOS_ANGELES:appliance:refrigerator",
+      "US-CA-LOS_ANGELES:appliance:oven-cooker",
+      "US-CA-LOS_ANGELES:towing:breakdown-tow",
+      "US-CA-LOS_ANGELES:towing:accident-tow",
+      "US-CA-LOS_ANGELES:towing:vehicle-transport",
+      "US-CA-LOS_ANGELES:courier:document-courier",
+      "US-CA-LOS_ANGELES:courier:parcel-courier",
+      "US-CA-LOS_ANGELES:courier:moto-courier",
+      "US-CA-LOS_ANGELES:courier:scheduled-delivery",
+      "US-CA-LOS_ANGELES:roadside:battery-jump",
+      "US-CA-LOS_ANGELES:roadside:tire-change",
+      "US-CA-LOS_ANGELES:roadside:fuel-delivery",
+      "US-CA-LOS_ANGELES:roadside:minor-repair",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman",
+      "US-CA-LOS_ANGELES:automotive:vehicle-maintenance",
+      "US-CA-LOS_ANGELES:automotive:vehicle-diagnostics",
+      "US-CA-LOS_ANGELES:automotive:tire-service",
+      "US-CA-LOS_ANGELES:automotive:auto-detailing",
+      "US-CA-LOS_ANGELES:technology:computer-service",
+      "US-CA-LOS_ANGELES:technology:mobile-device-service",
+      "US-CA-LOS_ANGELES:technology:network-setup",
+      "US-CA-LOS_ANGELES:technology:smart-home-setup",
+      "US-CA-LOS_ANGELES:personal-care:hair-care",
+      "US-CA-LOS_ANGELES:personal-care:makeup",
+      "US-CA-LOS_ANGELES:personal-care:nail-care",
+      "US-CA-LOS_ANGELES:personal-care:massage"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30014,
+    "bundleKey": "US-CA-LOCKSMITH",
+    "title": "Locksmith company + employee registration",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Kapı/araç açma veya kilit işi",
+    "verificationDescription": "BSIS resmî sorgu + kimlik/işveren bağı + iş öncesi customer authority kanıtı",
+    "requiredEvidenceJson": [
+      "Aktif BSIS Locksmith Company licence",
+      "işi yapan kişi için Locksmith Employee registration",
+      "yerel business permit gerekiyorsa",
+      "müşterinin mülk/araç erişim yetkisi"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "PERSON",
+      "CUSTOMER_AUTHORITY"
+    ],
+    "note": "",
+    "researchHash": "128bb45761f63cb48cdb06d60f6955093424306648f45f3afbde085c3f1c907a",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "CUSTOMER_AUTHORITY",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30014,
+        "officialSourceId": 30011,
+        "sourceArchiveId": 11,
+        "requirementReference": "Bundle research source: US-BSIS-LOCK"
+      },
+      {
+        "bundleId": 30014,
+        "officialSourceId": 30012,
+        "sourceArchiveId": 12,
+        "requirementReference": "Bundle research source: US-BSIS-VERIFY"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 17,
+        "bundleId": 30014,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 18,
+        "bundleId": 30014,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 19,
+        "bundleId": 30014,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:locksmith:door-opening",
+      "US-CA-LOS_ANGELES:locksmith:lock-replacement",
+      "US-CA-LOS_ANGELES:locksmith:car-locksmith"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30015,
+    "bundleKey": "US-CA-MASSAGE",
+    "title": "California/Los Angeles masaj hukuki rota",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Massage/therapeutic bodywork",
+    "verificationDescription": "CAMTC + LAPD/yerel permit birimi yetkili teyidi",
+    "requiredEvidenceJson": [
+      "CAMTC certification veya Los Angeles’ın kabul ettiği bireysel massage permit rotası",
+      "massage establishment/business permit gerekiyorsa",
+      "kimlik ve işyeri bağı"
+    ],
+    "subjectTypesJson": [
+      "PERSON",
+      "BUSINESS",
+      "SITE"
+    ],
+    "note": "US-LA-TOW kaynağı LAPD permit yüzeyini temsil eder; exact massage permit URL/citation Los Angeles counsel tarafından SOURCE_VERIFIED yapılmadan açılmaz.",
+    "researchHash": "5de29d5447fd223a9275cc477b71c7cd23c9b3ca8d8d98696b8257650da7442f",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "SITE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30015,
+        "officialSourceId": 30013,
+        "sourceArchiveId": 13,
+        "requirementReference": "Bundle research source: US-CAMTC"
+      },
+      {
+        "bundleId": 30015,
+        "officialSourceId": 30028,
+        "sourceArchiveId": 28,
+        "requirementReference": "Bundle research source: US-LA-TOW"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 62,
+        "bundleId": 30015,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:personal-care:massage"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30016,
+    "bundleKey": "US-CA-MCP",
+    "title": "California for-hire property motor carrier",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil",
+    "verificationDescription": "DMV active carrier/MCP kanalı + insurer/DMV yetkili kontrolü",
+    "requiredEvidenceJson": [
+      "CA#",
+      "aktif Motor Carrier Permit",
+      "liability insurance",
+      "workers’ compensation/exemption",
+      "EPN requester/driver monitoring, tetiklenirse",
+      "uygun driver licence/endorsement",
+      "commercial vehicle registration"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "VEHICLE",
+      "DRIVER"
+    ],
+    "note": "",
+    "researchHash": "89a84871c19fb252623a311a74f87a4caf0579a7851ed0b508f23397b0b8d043",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "DRIVER",
+        "required": true
+      },
+      {
+        "subjectType": "VEHICLE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30016,
+        "officialSourceId": 30019,
+        "sourceArchiveId": 19,
+        "requirementReference": "Bundle research source: US-DMV-CDL"
+      },
+      {
+        "bundleId": 30016,
+        "officialSourceId": 30020,
+        "sourceArchiveId": 20,
+        "requirementReference": "Bundle research source: US-DMV-MCP"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 28,
+        "bundleId": 30016,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-MCP: Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil"
+      },
+      {
+        "coverageId": 29,
+        "bundleId": 30016,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-MCP: Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil"
+      },
+      {
+        "coverageId": 30,
+        "bundleId": 30016,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-MCP: Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil"
+      },
+      {
+        "coverageId": 31,
+        "bundleId": 30016,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-MCP: Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil"
+      },
+      {
+        "coverageId": 39,
+        "bundleId": 30016,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 40,
+        "bundleId": 30016,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 41,
+        "bundleId": 30016,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 42,
+        "bundleId": 30016,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:moving:house-moving",
+      "US-CA-LOS_ANGELES:moving:office-moving",
+      "US-CA-LOS_ANGELES:moving:single-item-moving",
+      "US-CA-LOS_ANGELES:moving:intercity-moving",
+      "US-CA-LOS_ANGELES:courier:document-courier",
+      "US-CA-LOS_ANGELES:courier:parcel-courier",
+      "US-CA-LOS_ANGELES:courier:moto-courier",
+      "US-CA-LOS_ANGELES:courier:scheduled-delivery"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30017,
+    "bundleKey": "US-CA-PAINT",
+    "title": "Painting/plaster/wall covering contractor sınıfları",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Boya, sıva veya duvar kaplama contractor işi",
+    "verificationDescription": "CSLB registry scope/status match",
+    "requiredEvidenceJson": [
+      "C-33 painting için aktif lisans",
+      "C-35 plastering için aktif lisans",
+      "wallpaper için işe uygun D-29 veya hukukçu onaylı classification"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "QUALIFIER"
+    ],
+    "note": "",
+    "researchHash": "d47cad47104d71af9e9feb70ed8944d84060283ecc9ee30562404cd45dfd7f65",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "QUALIFIER",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30017,
+        "officialSourceId": 30014,
+        "sourceArchiveId": 14,
+        "requirementReference": "Bundle research source: US-CSLB-CLASS"
+      },
+      {
+        "bundleId": 30017,
+        "officialSourceId": 30016,
+        "sourceArchiveId": 16,
+        "requirementReference": "Bundle research source: US-CSLB-VERIFY"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 20,
+        "bundleId": 30017,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 21,
+        "bundleId": 30017,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 22,
+        "bundleId": 30017,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 23,
+        "bundleId": 30017,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:painting:interior-painting",
+      "US-CA-LOS_ANGELES:painting:exterior-painting",
+      "US-CA-LOS_ANGELES:painting:wallpaper",
+      "US-CA-LOS_ANGELES:painting:plastering"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30018,
+    "bundleKey": "US-CA-PERSONAL",
+    "title": "California beauty person/establishment/offsite paketi",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Saç, makyaj, tırnak veya Board kapsamındaki beauty service",
+    "verificationDescription": "DCA/Board resmî licence search; licence category/scope/status/expiry match",
+    "requiredEvidenceJson": [
+      "Hizmete uygun aktif person licence: cosmetologist/hairstylist/esthetician/manicurist",
+      "işletme mekânı varsa establishment licence",
+      "müşteri evi/otel ise Personal Service Permit"
+    ],
+    "subjectTypesJson": [
+      "PERSON",
+      "BUSINESS",
+      "SITE"
+    ],
+    "note": "",
+    "researchHash": "95841156cc6c49af8ac5037731a1e30c1b9f91dfa8b5e1b36d368da187ddcce8",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "SITE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30018,
+        "officialSourceId": 30005,
+        "sourceArchiveId": 5,
+        "requirementReference": "Bundle research source: US-BC-LICENSE"
+      },
+      {
+        "bundleId": 30018,
+        "officialSourceId": 30006,
+        "sourceArchiveId": 6,
+        "requirementReference": "Bundle research source: US-BC-PSP"
+      },
+      {
+        "bundleId": 30018,
+        "officialSourceId": 30017,
+        "sourceArchiveId": 17,
+        "requirementReference": "Bundle research source: US-DCA-LOOKUP"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 59,
+        "bundleId": 30018,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 60,
+        "bundleId": 30018,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 61,
+        "bundleId": 30018,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:personal-care:hair-care",
+      "US-CA-LOS_ANGELES:personal-care:makeup",
+      "US-CA-LOS_ANGELES:personal-care:nail-care"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30019,
+    "bundleKey": "US-CA-ROAD-BASIC",
+    "title": "Yalnız repair olmayan yol yardımı",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Sadece jump-start, güvenli lastik değişimi veya sınırlı yakıt teslimi; teşhis/onarım/towing yok",
+    "verificationDescription": "DMV/insurer ve task declaration",
+    "requiredEvidenceJson": [
+      "US-CA-LA-BASE",
+      "sürücü belgesi",
+      "servis aracı tescil/sigorta",
+      "yakıt taşıma miktarı için hazmat sonucu"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "VEHICLE",
+      "DRIVER"
+    ],
+    "note": "Repair başlarsa ARD; tow başlarsa US-CA-TOW; tehlikeli madde eşiği varsa hazmat paketi AND ile eklenir.",
+    "researchHash": "774065f9e889226f30c4a91e5ab1740ee5845cb7d6585bdaef4c4b03df902a38",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "DRIVER",
+        "required": true
+      },
+      {
+        "subjectType": "VEHICLE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30019,
+        "officialSourceId": 30019,
+        "sourceArchiveId": 19,
+        "requirementReference": "Bundle research source: US-DMV-CDL"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 43,
+        "bundleId": 30019,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 44,
+        "bundleId": 30019,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 45,
+        "bundleId": 30019,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 46,
+        "bundleId": 30019,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:roadside:battery-jump",
+      "US-CA-LOS_ANGELES:roadside:tire-change",
+      "US-CA-LOS_ANGELES:roadside:fuel-delivery",
+      "US-CA-LOS_ANGELES:roadside:minor-repair"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30020,
+    "bundleKey": "US-CA-TOW",
+    "title": "California/Los Angeles towing paketi",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Ücretli towing/vehicle transport",
+    "verificationDescription": "DMV/CHP + LAPD permit birimi + insurer yetkili teyidi; belge fotoğrafı tek başına yetmez",
+    "requiredEvidenceJson": [
+      "CA#/MCP, kapsam gerektiriyorsa",
+      "uygun California DL/CDL",
+      "Tow Truck Driver Certificate/Clearance",
+      "çekici tescili ve sigortası",
+      "Los Angeles Tow Unit Operator police permit",
+      "işletme/tow permit; rotation/OPG ise ayrı onay"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "DRIVER",
+      "VEHICLE"
+    ],
+    "note": "",
+    "researchHash": "71448799562543cf6422a3ddbe377b681e0bfb5ac9c26f8b430d367987269409",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "DRIVER",
+        "required": true
+      },
+      {
+        "subjectType": "VEHICLE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30020,
+        "officialSourceId": 30019,
+        "sourceArchiveId": 19,
+        "requirementReference": "Bundle research source: US-DMV-CDL"
+      },
+      {
+        "bundleId": 30020,
+        "officialSourceId": 30020,
+        "sourceArchiveId": 20,
+        "requirementReference": "Bundle research source: US-DMV-MCP"
+      },
+      {
+        "bundleId": 30020,
+        "officialSourceId": 30021,
+        "sourceArchiveId": 21,
+        "requirementReference": "Bundle research source: US-DMV-TTD"
+      },
+      {
+        "bundleId": 30020,
+        "officialSourceId": 30028,
+        "sourceArchiveId": 28,
+        "requirementReference": "Bundle research source: US-LA-TOW"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 36,
+        "bundleId": 30020,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 37,
+        "bundleId": 30020,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 38,
+        "bundleId": 30020,
+        "bindingKind": "MANDATORY",
+        "conditionSummary": null
+      },
+      {
+        "coverageId": 43,
+        "bundleId": 30020,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-TOW: Ücretli towing/vehicle transport"
+      },
+      {
+        "coverageId": 44,
+        "bundleId": 30020,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-TOW: Ücretli towing/vehicle transport"
+      },
+      {
+        "coverageId": 45,
+        "bundleId": 30020,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-TOW: Ücretli towing/vehicle transport"
+      },
+      {
+        "coverageId": 46,
+        "bundleId": 30020,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-TOW: Ücretli towing/vehicle transport"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:towing:breakdown-tow",
+      "US-CA-LOS_ANGELES:towing:accident-tow",
+      "US-CA-LOS_ANGELES:towing:vehicle-transport",
+      "US-CA-LOS_ANGELES:roadside:battery-jump",
+      "US-CA-LOS_ANGELES:roadside:tire-change",
+      "US-CA-LOS_ANGELES:roadside:fuel-delivery",
+      "US-CA-LOS_ANGELES:roadside:minor-repair"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30021,
+    "bundleKey": "US-EPA-608",
+    "title": "EPA Section 608 kişi sertifikası",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal",
+    "verificationDescription": "Issuer kaydı/kriptografik kanıt veya yetkili manuel teyit; EPA’nın kendisi kart issuer’ı değildir",
+    "requiredEvidenceJson": [
+      "EPA-approved testing organization tarafından verilen uygun Type I/II/III/Universal sertifika"
+    ],
+    "subjectTypesJson": [
+      "PERSON"
+    ],
+    "note": "",
+    "researchHash": "9f975e4756bc26161f7731722b166277772c7c00c84b937d3394340eb6cd4081",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30021,
+        "officialSourceId": 30023,
+        "sourceArchiveId": 23,
+        "requirementReference": "Bundle research source: US-EPA-608"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 13,
+        "bundleId": 30021,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 30021,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 30021,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 30021,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 34,
+        "bundleId": 30021,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-CONTRACTOR-CLASS: İş permit gerektiriyorsa, çalışan kullanılıyorsa veya labor+materials toplamı $1.000+ ise; platformda contractor olarak reklam minor exemption’ı kaldırabilir | US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:appliance:refrigerator"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30022,
+    "bundleKey": "US-EPA-RRP",
+    "title": "EPA RRP firma + certified renovator",
+    "riskLevel": "HIGH",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır",
+    "verificationDescription": "EPA firm lookup ve training provider/credential teyidi",
+    "requiredEvidenceJson": [
+      "Aktif EPA-certified firm",
+      "certified renovator",
+      "bina yaşı ve yüzey bozma alanı kanıtı"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "PERSON",
+      "SITE"
+    ],
+    "note": "",
+    "researchHash": "c91c6efa450b839439e3f76bb58de7d87c607d6ffad291408a088be1d1844be5",
+    "subjectBindings": [
+      {
+        "subjectType": "PERSON",
+        "required": true
+      },
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "SITE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30022,
+        "officialSourceId": 30024,
+        "sourceArchiveId": 24,
+        "requirementReference": "Bundle research source: US-EPA-RRP"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 1,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır"
+      },
+      {
+        "coverageId": 2,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır"
+      },
+      {
+        "coverageId": 3,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır"
+      },
+      {
+        "coverageId": 4,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C20-C38: Klima, ısıtma veya refrigeration işi | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 5,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır"
+      },
+      {
+        "coverageId": 6,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır"
+      },
+      {
+        "coverageId": 7,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır"
+      },
+      {
+        "coverageId": 8,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ALARM: Güvenlik alarmını satma, kurma, izleme, servis veya yanıt"
+      },
+      {
+        "coverageId": 9,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 10,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 11,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 12,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-GARDEN: Peyzaj, sulama, budama veya profesyonel pestisit uygulaması"
+      },
+      {
+        "coverageId": 13,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 14,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 15,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 16,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-608: Soğutucu devreyi açma, dolum, geri kazanım, servis veya disposal | US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı | US-CA-C10: Elektrik tesisatı/onarımı"
+      },
+      {
+        "coverageId": 20,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger"
+      },
+      {
+        "coverageId": 21,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger"
+      },
+      {
+        "coverageId": 22,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger"
+      },
+      {
+        "coverageId": 23,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger"
+      },
+      {
+        "coverageId": 47,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 48,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 49,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      },
+      {
+        "coverageId": 50,
+        "bundleId": 30022,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-EPA-RRP: 1978 öncesi konut/child-occupied facility’de ücretli renovation ile boyalı yüzey bozma; federal eşik ve istisnalar uygulanır | US-CA-ASBESTOS: Asbestos >0.1% ve düzenlenen alan/iş eşiği veya diğer asbestos trigger | US-CA-C10: Elektrik tesisatı/onarımı | US-CA-C36: Plumbing işinde contractor tetikleri veya platform ilanı"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:plumbing:leak-repair",
+      "US-CA-LOS_ANGELES:plumbing:clogged-drain",
+      "US-CA-LOS_ANGELES:plumbing:faucet-installation",
+      "US-CA-LOS_ANGELES:plumbing:boiler-piping",
+      "US-CA-LOS_ANGELES:electrical:fault-repair",
+      "US-CA-LOS_ANGELES:electrical:fixture-installation",
+      "US-CA-LOS_ANGELES:electrical:panel-renewal",
+      "US-CA-LOS_ANGELES:electrical:smart-home-electrical",
+      "US-CA-LOS_ANGELES:cleaning:home-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:office-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:move-cleaning",
+      "US-CA-LOS_ANGELES:cleaning:deep-cleaning",
+      "US-CA-LOS_ANGELES:hvac:ac-installation",
+      "US-CA-LOS_ANGELES:hvac:ac-maintenance",
+      "US-CA-LOS_ANGELES:hvac:boiler-maintenance",
+      "US-CA-LOS_ANGELES:hvac:radiator-heating",
+      "US-CA-LOS_ANGELES:painting:interior-painting",
+      "US-CA-LOS_ANGELES:painting:exterior-painting",
+      "US-CA-LOS_ANGELES:painting:wallpaper",
+      "US-CA-LOS_ANGELES:painting:plastering",
+      "US-CA-LOS_ANGELES:home-repair:furniture-assembly",
+      "US-CA-LOS_ANGELES:home-repair:drywall-repair",
+      "US-CA-LOS_ANGELES:home-repair:door-window-repair",
+      "US-CA-LOS_ANGELES:home-repair:general-handyman"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  },
+  {
+    "id": 30023,
+    "bundleKey": "US-FMCSA-MOVER",
+    "title": "Interstate household goods mover",
+    "riskLevel": "CRITICAL",
+    "sourceState": "AI_RESEARCHED_UNVERIFIED",
+    "legalState": "NOT_REVIEWED",
+    "decisionIfMissing": "CAPABILITY_NO_GO",
+    "triggerDescription": "Eyaletler arası household goods taşıma",
+    "verificationDescription": "FMCSA Protect Your Move/SAFER + DMV/insurer doğrulaması",
+    "requiredEvidenceJson": [
+      "USDOT number",
+      "aktif FMCSA operating authority",
+      "insurance filing",
+      "uygun sürücü belgesi/medical card/CDL, araç profiline göre"
+    ],
+    "subjectTypesJson": [
+      "BUSINESS",
+      "VEHICLE",
+      "DRIVER"
+    ],
+    "note": "",
+    "researchHash": "2b09f9ad2b04d7a77851eb782d1be54baef89999581e112f30cf8d176343b6c6",
+    "subjectBindings": [
+      {
+        "subjectType": "BUSINESS",
+        "required": true
+      },
+      {
+        "subjectType": "DRIVER",
+        "required": true
+      },
+      {
+        "subjectType": "VEHICLE",
+        "required": true
+      }
+    ],
+    "sourceBindings": [
+      {
+        "bundleId": 30023,
+        "officialSourceId": 30019,
+        "sourceArchiveId": 19,
+        "requirementReference": "Bundle research source: US-DMV-CDL"
+      },
+      {
+        "bundleId": 30023,
+        "officialSourceId": 30025,
+        "sourceArchiveId": 25,
+        "requirementReference": "Bundle research source: US-FMCSA-AUTH"
+      },
+      {
+        "bundleId": 30023,
+        "officialSourceId": 30026,
+        "sourceArchiveId": 26,
+        "requirementReference": "Bundle research source: US-FMCSA-MOVER"
+      }
+    ],
+    "coverageBindings": [
+      {
+        "coverageId": 28,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-MCP: Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil"
+      },
+      {
+        "coverageId": 29,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-MCP: Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil"
+      },
+      {
+        "coverageId": 30,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-MCP: Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil"
+      },
+      {
+        "coverageId": 31,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-MCP: Ücret karşılığı müşteri malı taşıma; motorcycle courier dahil"
+      },
+      {
+        "coverageId": 36,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-ARD: Ücretli diagnose, service veya repair; mobile/referral/sublet dahil"
+      },
+      {
+        "coverageId": 37,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-ARD: Ücretli diagnose, service veya repair; mobile/referral/sublet dahil"
+      },
+      {
+        "coverageId": 38,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma | US-CA-ARD: Ücretli diagnose, service veya repair; mobile/referral/sublet dahil"
+      },
+      {
+        "coverageId": 39,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma"
+      },
+      {
+        "coverageId": 40,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma"
+      },
+      {
+        "coverageId": 41,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma"
+      },
+      {
+        "coverageId": 42,
+        "bundleId": 30023,
+        "bindingKind": "CONDITIONAL",
+        "conditionSummary": "US-FMCSA-MOVER: Eyaletler arası household goods taşıma"
+      }
+    ],
+    "boundCoverageRows": [
+      "US-CA-LOS_ANGELES:moving:house-moving",
+      "US-CA-LOS_ANGELES:moving:office-moving",
+      "US-CA-LOS_ANGELES:moving:single-item-moving",
+      "US-CA-LOS_ANGELES:moving:intercity-moving",
+      "US-CA-LOS_ANGELES:towing:breakdown-tow",
+      "US-CA-LOS_ANGELES:towing:accident-tow",
+      "US-CA-LOS_ANGELES:towing:vehicle-transport",
+      "US-CA-LOS_ANGELES:courier:document-courier",
+      "US-CA-LOS_ANGELES:courier:parcel-courier",
+      "US-CA-LOS_ANGELES:courier:moto-courier",
+      "US-CA-LOS_ANGELES:courier:scheduled-delivery"
+    ],
+    "orphan": false,
+    "ambiguousAlias": false
+  }
+]
