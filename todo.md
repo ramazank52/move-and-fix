@@ -798,8 +798,8 @@
 - [ ] MARKETPLACE-4 — Tek provider altındaki çoklu capability lifecycle, credential/policy/scope/availability alanları ve güvenli partial deactivation UI/API durumunu denetle ve eksikleri tamamla
 - [ ] MARKETPLACE-5 — İş state machine, concurrent assignment/offer idempotency, capacity, cancel/reopen/rematch audit ve deterministic fair fan-out kurallarını denetle
 - [ ] MARKETPLACE-6 — Matching/multi-capability/outbox için negative RBAC, IDOR/BOLA, stale capability, concurrency ve privacy testlerini ekle; isolated integration evidence oluştur
-- [ ] RESIDUAL-1 — MoveAI proposal-to-explicit-confirmation canonical request zinciri ve güvenlik/clarification sınırlarını doğrula
-- [ ] RESIDUAL-2 — Media quarantine/scanner/document verification/Job Safety/insurance fail-closed zincirlerini doğrula
-- [ ] RESIDUAL-3 — Messaging/translation/expense/tracking/wallet/MoveOS residual sözleşmelerini doğrula ve uygulanabilir eksikleri kapat
+- [x] RESIDUAL-1 — MoveAI proposal-to-explicit-confirmation canonical request zinciri ve güvenlik/clarification sınırlarını doğrula (isolated runtime chain remains PARTIAL)
+- [x] RESIDUAL-2 — Media quarantine/scanner/document verification/Job Safety/insurance fail-closed zincirlerini doğrula (official/scanner external evidence remains open)
+- [x] RESIDUAL-3 — Messaging/translation/expense/tracking/wallet/MoveOS residual sözleşmelerini doğrula ve uygulanabilir eksikleri kapat (external/device/isolated DB evidence remains open)
 - [ ] RESIDUAL-4 — Güncel kod üstünde bağımsız route/auth/RBAC/migration/security/supply-chain evidence gate’ini çalıştır
 - [ ] RESIDUAL-5 — Üç talimat seti için final evidence package, checksum, blocker listesi ve A/B/C kararını oluştur

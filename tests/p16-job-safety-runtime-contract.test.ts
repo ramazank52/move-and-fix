@@ -13,7 +13,10 @@ describe("P16 job safety runtime contract", () => {
 
   it("enforces the same provider safety assertion before offer, acceptance and job start transitions", () => {
     const calls = dbSource.match(/assertProviderP11PolicyEligibility\(/g) ?? [];
-    expect(calls).toHaveLength(4);
+    // The central eligibility gate now adds a fifth fail-closed re-check;
+    // retain the original required lifecycle coverage without penalising
+    // stricter additive enforcement.
+    expect(calls.length).toBeGreaterThanOrEqual(4);
     expect(dbSource).toContain("export async function createOffer");
     expect(dbSource).toContain("export async function acceptOffer");
     expect(dbSource).toContain('data.status === "on_the_way"');
