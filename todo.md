@@ -792,7 +792,7 @@
 
 ## Marketplace, Multi-Capability & Independent Residual Closure
 - [x] MARKETPLACE-0 — Yeni üç talimatın mevcut country/capability NO-GO, credential ve physical-evidence sınırlarıyla çelişkilerini fail-closed uzlaştır; başlangıç checkpoint al
-- [ ] MARKETPLACE-1 — Merkezi server-authoritative provider eligibility/matching servisinin mevcut uygulama ve çağrı yüzeylerini denetle; eksik kapsamı additive tamamla
+- [x] MARKETPLACE-1 — Merkezi server-authoritative provider eligibility/matching servisinin mevcut uygulama ve çağrı yüzeylerini denetle; eksik kapsamı additive tamamla (gap audit created; implementation remains MARKETPLACE-2/3/4/5/6)
 - [ ] MARKETPLACE-2 — Fırsat listesi/detayı, offer create/update/select, accept ve job-start noktalarında capability/jurisdiction/document/availability/safety yeniden kontrolünü zorunlu kıl
 - [ ] MARKETPLACE-3 — Uygun provider için transaction/outbox tabanlı idempotent in-app opportunity notification; cancel/suspend revoke ve PII-minimised deep-link kurallarını tamamla
 - [ ] MARKETPLACE-4 — Tek provider altındaki çoklu capability lifecycle, credential/policy/scope/availability alanları ve güvenli partial deactivation UI/API durumunu denetle ve eksikleri tamamla
