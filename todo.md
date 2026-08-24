@@ -787,5 +787,5 @@
 - [x] FINAL-5 — Müşteri ve hizmet sağlayıcı iş akışlarının ownership, capability, document, ledger ve safety sözleşmelerini denetle
 - [x] FINAL-6 — Önceki kritik bulgular, güvenlik/veri bütünlüğü, authorization ve supply-chain denetimlerini yeniden doğrula
 - [ ] FINAL-7 — Harici ödeme/SMS/e-posta/push/OAuth/scanner/storage entegrasyonlarını credential olmadan CODE_READY_NOT_CONFIGURED veya EXTERNAL_BLOCKER olarak doğrula
-- [ ] FINAL-8 — Web/native/store öncesi kalite, izin, deep-link, release preflight ve kanıt sınıfı kontrollerini tamamla
+- [x] FINAL-8 — Web/native/store öncesi kalite, izin, deep-link, release preflight ve kanıt sınıfı kontrollerini tamamla
 - [ ] FINAL-9 — Nihai evidence paketi, 74 rota matrisi, güvenlik/entegrasyon durumları, external blocker listesi ve A/B/C release kararını hazırla
