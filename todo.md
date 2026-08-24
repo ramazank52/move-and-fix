@@ -758,3 +758,5 @@
 - [x] THEME-OWNER-1 — TiDB’siz public UI rota bağlantılarını HTTP 200 ve owner fiziksel Dark/Light screenshot bekleme durumu ile hazırla
 - [x] THEME-OWNER-2 — Ağ/DB/auth kullanmayan 14 ekran development-only fixture gallery’sini sistem tema kaynağına bağlı olarak hazırla
 - [ ] THEME-OWNER-3 — Owner Dark/Light fiziksel screenshotları geldikten sonra yalnız ilgili rota/fixture satırlarını kanıt kapsamı kadar güncelle
+- [x] THEME-OWNER-4 — Fiziksel FAIL sonrası 14 kartı ayrı, tıklanabilir fixture detaylarına aç; gerçek ekran importu güvenli izole edilemediği için sahte UI yerine BLOCKED_COMPONENT_NOT_ISOLATABLE kaydı göster
+- [x] THEME-OWNER-5 — Ana galeri ve 14 detail bağlantısında HTTP 200, previous/next navigation, production-build dışlama ve owner screenshot WAITING durumunu doğrula

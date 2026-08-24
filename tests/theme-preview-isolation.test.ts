@@ -24,7 +24,7 @@ describe("development-only theme preview isolation", () => {
   it("does not import application routes, auth, database, network, or external service clients", () => {
     const gallerySources = [
       "scripts/serve-theme-preview.mjs",
-      "tests/theme-preview/static/index.html",
+      "scripts/theme-preview-fixtures.mjs",
       "tests/theme-preview/fixture-manifest.ts",
     ].map((relativePath) => readFileSync(resolve(root, relativePath), "utf8")).join("\n");
 
@@ -44,10 +44,12 @@ describe("development-only theme preview isolation", () => {
     }
   });
 
-  it("uses only CSS system color-scheme behavior and renders all 14 named fixture cards", () => {
-    const html = readFileSync(resolve(root, "tests/theme-preview/static/index.html"), "utf8");
-    expect(html).toContain("prefers-color-scheme: dark");
-    expect((html.match(/data-fixture-id=/g) ?? [])).toHaveLength(14);
-    expect(html).toContain("WAITING_FOR_OWNER_PHYSICAL_SCREENSHOTS");
+  it("creates a direct gallery/detail contract for 14 blocked fixture details without a hand-drawn substitute", () => {
+    const fixtures = readFileSync(resolve(root, "scripts/theme-preview-fixtures.mjs"), "utf8");
+    expect(fixtures).toContain("prefers-color-scheme: dark");
+    expect((fixtures.match(/^  \["\d{2}",/gm) ?? [])).toHaveLength(14);
+    expect(fixtures).toContain('isolationStatus: "BLOCKED_COMPONENT_NOT_ISOLATABLE"');
+    expect(fixtures).toContain("COMPONENT_FIXTURE — ROUTE E2E DEĞİLDİR");
+    expect(fixtures).toContain('href="/fixture/${fixture.id}"');
   });
 });
