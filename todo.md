@@ -733,7 +733,7 @@
 - [ ] THEME-RUNTIME-4 — Test/build/screenshot regresyonu, güncel matrix ve native blockerlarla checkpoint/report teslim et
 
 ## Fail-Closed Dark/Light Runtime Harness
-- [ ] THEME-HARNESS-1 — Baseline checkpoint, non-production environment, hostname/database/credential preflight ve no-write failure path’ini doğrula
+- [x] THEME-HARNESS-1 — Baseline checkpoint, non-production environment, hostname/database/credential preflight ve no-write failure path’ini doğrula (BLOCKED_PRECHECK; yazım yapılmadı)
 - [ ] THEME-HARNESS-2 — Test-only run_id, sentetik fixture, scoped cleanup, TTL/crash recovery ve before/after/orphan kayıt raporunu uygula
 - [ ] THEME-HARNESS-3 — Public/customer/provider/owner-admin ekranlarında dark/light runtime screenshot, UI state ve contrast manifestini üret
 - [ ] THEME-HARNESS-4 — Doğrulanmış kusurları minimal semantic düzelt; grup bazlı test/build/screenshot regresyonu çalıştır
