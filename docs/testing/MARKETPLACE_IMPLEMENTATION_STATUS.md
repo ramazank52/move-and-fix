@@ -7,7 +7,7 @@
 |---|---|---|
 | Single server eligibility decision | `IMPLEMENTED` | `ProviderEligibilityService` is fail-closed; `assertProviderMarketplaceEligibilityForRequest` derives country, request state, verification, availability, enforcement/suspension, capacity, capability, credential, scope, service-area and safety facts from server records. |
 | Opportunity exposure | `IMPLEMENTED` | `getNewJobsForProvider` no longer has a provider-category-only filter and calls the central decision per candidate. |
-| Offer create / accept re-check | `IMPLEMENTED` | Existing paths now invoke the same central decision immediately before their prior country/capability/credential controls. |
+| Offer create / accept / job start re-check | `IMPLEMENTED` | Existing paths now invoke the same central decision immediately before their prior country/capability/credential controls; provider lifecycle start/progress reuses the supported country acceptance gate plus existing detailed controls. |
 | Provider capacity | `IMPLEMENTED_PENDING_MIGRATION` | `providers.maxConcurrentActiveJobs` default 1 is additive in schema/0090; active assignments are counted against it. |
 | Opportunity outbox model | `IMPLEMENTED_PENDING_MIGRATION` | 0091 defines idempotent, in-app-only, PII-minimised notification intent rows; policy and db enqueue helper exist. |
 | Request-create atomic enqueue | `PENDING` | Requires wiring within the request transaction with a transaction-aware eligibility snapshot/outbox write; not claimed complete. |

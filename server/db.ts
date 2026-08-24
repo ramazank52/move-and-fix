@@ -1860,6 +1860,11 @@ export async function assertProviderMarketplaceEligibilityForRequest(input: {
       ? "OPPORTUNITY_EXPOSURE"
       : input.transition === "OFFER_ACCEPT"
         ? "OFFER_ACCEPTANCE"
+        : input.transition === "JOB_START"
+          // Country repository currently models activation through the
+          // accepted booking/offer gate; no separate JOB_START transition
+          // exists there, so reuse the stricter supported acceptance gate.
+          ? "OFFER_ACCEPTANCE"
         : "OFFER_SUBMIT";
     await assertCountryMarketplaceTransition({
       countryCode: request.serviceCountryCode,
@@ -6688,6 +6693,19 @@ export async function updateJobLifecycle(data: {
   }
   if (context.requestStatus !== "active" && context.requestStatus !== "completed") {
     throw new Error("Job lifecycle can only be updated for an active job");
+  }
+
+  if (
+    data.status === "on_the_way" ||
+    data.status === "arrived" ||
+    data.status === "in_progress"
+  ) {
+    if (context.assignedProviderId == null) throw new Error("COMPLIANCE_CONTEXT_NOT_CONFIGURED");
+    await assertProviderMarketplaceEligibilityForRequest({
+      providerId: context.assignedProviderId,
+      requestId: data.requestId,
+      transition: "JOB_START",
+    });
   }
 
   return db.transaction(async (tx) => {
