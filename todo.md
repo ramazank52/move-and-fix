@@ -789,3 +789,17 @@
 - [x] FINAL-7 — Harici ödeme/SMS/e-posta/push/OAuth/scanner/storage entegrasyonlarını credential olmadan CODE_READY_NOT_CONFIGURED veya EXTERNAL_BLOCKER olarak doğrula
 - [x] FINAL-8 — Web/native/store öncesi kalite, izin, deep-link, release preflight ve kanıt sınıfı kontrollerini tamamla
 - [x] FINAL-9 — Nihai evidence paketi, 74 rota matrisi, güvenlik/entegrasyon durumları, external blocker listesi ve A/B/C release kararını hazırla
+
+## Marketplace, Multi-Capability & Independent Residual Closure
+- [x] MARKETPLACE-0 — Yeni üç talimatın mevcut country/capability NO-GO, credential ve physical-evidence sınırlarıyla çelişkilerini fail-closed uzlaştır; başlangıç checkpoint al
+- [ ] MARKETPLACE-1 — Merkezi server-authoritative provider eligibility/matching servisinin mevcut uygulama ve çağrı yüzeylerini denetle; eksik kapsamı additive tamamla
+- [ ] MARKETPLACE-2 — Fırsat listesi/detayı, offer create/update/select, accept ve job-start noktalarında capability/jurisdiction/document/availability/safety yeniden kontrolünü zorunlu kıl
+- [ ] MARKETPLACE-3 — Uygun provider için transaction/outbox tabanlı idempotent in-app opportunity notification; cancel/suspend revoke ve PII-minimised deep-link kurallarını tamamla
+- [ ] MARKETPLACE-4 — Tek provider altındaki çoklu capability lifecycle, credential/policy/scope/availability alanları ve güvenli partial deactivation UI/API durumunu denetle ve eksikleri tamamla
+- [ ] MARKETPLACE-5 — İş state machine, concurrent assignment/offer idempotency, capacity, cancel/reopen/rematch audit ve deterministic fair fan-out kurallarını denetle
+- [ ] MARKETPLACE-6 — Matching/multi-capability/outbox için negative RBAC, IDOR/BOLA, stale capability, concurrency ve privacy testlerini ekle; isolated integration evidence oluştur
+- [ ] RESIDUAL-1 — MoveAI proposal-to-explicit-confirmation canonical request zinciri ve güvenlik/clarification sınırlarını doğrula
+- [ ] RESIDUAL-2 — Media quarantine/scanner/document verification/Job Safety/insurance fail-closed zincirlerini doğrula
+- [ ] RESIDUAL-3 — Messaging/translation/expense/tracking/wallet/MoveOS residual sözleşmelerini doğrula ve uygulanabilir eksikleri kapat
+- [ ] RESIDUAL-4 — Güncel kod üstünde bağımsız route/auth/RBAC/migration/security/supply-chain evidence gate’ini çalıştır
+- [ ] RESIDUAL-5 — Üç talimat seti için final evidence package, checksum, blocker listesi ve A/B/C kararını oluştur
