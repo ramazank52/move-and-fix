@@ -1967,7 +1967,10 @@ export async function assertProviderMarketplaceEligibilityForRequest(input: {
     providerIsVerified: provider.isVerified === 1 && provider.verificationStatus === "approved",
     providerIsAvailable: provider.isAvailable === 1,
     providerEnforcementClear,
-    providerCapacityAvailable: activeAssignments.length < provider.maxConcurrentActiveJobs,
+    // Capacity configuration is not yet migration-backed in every protected
+    // runtime. Until it is, any active assignment denies further matching
+    // rather than guessing a numeric capacity from client input.
+    providerCapacityAvailable: activeAssignments.length === 0,
     capabilityAllowed,
     credentialAllowed,
     scopeAllowed: capabilityStatus?.status !== "VERIFIED_LIMITED_SCOPE" || capabilityStatus.scopeConstraintsJson != null,

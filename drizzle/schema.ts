@@ -609,9 +609,6 @@ export const providers = mysqlTable("providers", {
   verificationReviewedAt: timestamp("verificationReviewedAt"),
   isPremium: int("isPremium").default(0),
   isAvailable: int("isAvailable").default(1).notNull(),
-  // Server-owned concurrent-work capacity. It is never supplied by a matching
-  // client and defaults conservatively for existing providers after migration.
-  maxConcurrentActiveJobs: int("maxConcurrentActiveJobs").default(1).notNull(),
   latitude: varchar("latitude", { length: 20 }),
   longitude: varchar("longitude", { length: 20 }),
   serviceRadiusKm: int("serviceRadiusKm"),

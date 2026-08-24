@@ -801,5 +801,5 @@
 - [x] RESIDUAL-1 — MoveAI proposal-to-explicit-confirmation canonical request zinciri ve güvenlik/clarification sınırlarını doğrula (isolated runtime chain remains PARTIAL)
 - [x] RESIDUAL-2 — Media quarantine/scanner/document verification/Job Safety/insurance fail-closed zincirlerini doğrula (official/scanner external evidence remains open)
 - [x] RESIDUAL-3 — Messaging/translation/expense/tracking/wallet/MoveOS residual sözleşmelerini doğrula ve uygulanabilir eksikleri kapat (external/device/isolated DB evidence remains open)
-- [ ] RESIDUAL-4 — Güncel kod üstünde bağımsız route/auth/RBAC/migration/security/supply-chain evidence gate’ini çalıştır
-- [ ] RESIDUAL-5 — Üç talimat seti için final evidence package, checksum, blocker listesi ve A/B/C kararını oluştur
+- [x] RESIDUAL-4 — Güncel kod üstünde bağımsız route/auth/RBAC/migration/security/supply-chain evidence gate’ini çalıştır
+- [x] RESIDUAL-5 — Üç talimat seti için final evidence package, checksum, blocker listesi ve A/B/C kararını oluştur
