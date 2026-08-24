@@ -1461,6 +1461,7 @@ import {
   payments,
   paymentWebhookEvents,
   serviceAgreements,
+  marketplaceOpportunityNotifications,
   settlementPolicies,
   jobChangeOrders,
   jobCancellationCases,
@@ -1550,6 +1551,11 @@ import {
   evaluateCredentialEligibility,
   type CredentialAssurance,
 } from "./compliance/CredentialEligibilityGuard";
+import {
+  assertProviderMarketplaceEligibility,
+  type MarketplaceTransition,
+} from "./matching/ProviderEligibilityService";
+import { buildOpportunityNotificationIntent } from "./matching/OpportunityNotificationPolicy";
 import { evaluateInsuranceCapability } from "./compliance/InsuranceCapabilityPolicy";
 import { evaluateWorkerClassification } from "./compliance/WorkerClassificationPolicy";
 import { evaluateJobSafety } from "./compliance/JobSafetyEngine";
@@ -1826,6 +1832,177 @@ export async function assertProviderP11PolicyEligibility(input: {
     classificationEligible: classification.allowed,
   });
   if (!safety.allowed) throw new Error(safety.reason);
+}
+
+/**
+ * Resolves the matching decision from database state immediately before a
+ * marketplace transition. Callers may not supply eligibility booleans.
+ */
+export async function assertProviderMarketplaceEligibilityForRequest(input: {
+  providerId: number;
+  requestId: number;
+  transition: MarketplaceTransition;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const [requestRows, providerRows] = await Promise.all([
+    database.select().from(serviceRequests).where(eq(serviceRequests.id, input.requestId)).limit(1),
+    database.select().from(providers).where(eq(providers.id, input.providerId)).limit(1),
+  ]);
+  const request = requestRows[0];
+  const provider = providerRows[0];
+  if (!request) throw new Error("SERVICE_REQUEST_NOT_FOUND");
+  if (!provider) throw new Error("PROVIDER_NOT_FOUND");
+
+  let countryTransitionAllowed = false;
+  try {
+    const countryTransition = input.transition === "OPPORTUNITY_EXPOSURE"
+      ? "OPPORTUNITY_EXPOSURE"
+      : input.transition === "OFFER_ACCEPT"
+        ? "OFFER_ACCEPTANCE"
+        : "OFFER_SUBMIT";
+    await assertCountryMarketplaceTransition({
+      countryCode: request.serviceCountryCode,
+      jurisdictionId: request.jurisdictionId,
+      transition: countryTransition,
+    });
+    countryTransitionAllowed = true;
+  } catch {
+    countryTransitionAllowed = false;
+  }
+
+  const [capabilityStatuses, providerCredentials, activeAssignments] = await Promise.all([
+    listProviderCapabilityStatuses(provider.id),
+    listProviderCredentialStatuses(provider.id),
+    database
+      .select({ id: serviceRequests.id })
+      .from(serviceRequests)
+      .where(and(eq(serviceRequests.assignedProviderId, provider.id), eq(serviceRequests.status, "active"))),
+  ]);
+  const providerType = await resolveVerifiedProviderRequirementType({
+    providerId: provider.id,
+    countryCode: request.serviceCountryCode,
+  });
+  const capabilityStatus = request.requiredCapabilityId == null || request.jurisdictionId == null
+    ? null
+    : capabilityStatuses.find((status) =>
+      status.capabilityId === request.requiredCapabilityId && status.jurisdictionId === request.jurisdictionId,
+    ) ?? null;
+  const capabilityAllowed = evaluateCapabilityTransition({
+    enforcementEnabled: true,
+    complianceRequirementState: request.complianceRequirementState,
+    requiredCapabilityId: request.requiredCapabilityId,
+    jurisdictionId: request.jurisdictionId,
+    providerCapabilityDecision: capabilityStatus?.status ?? null,
+    providerCapabilityExpiresAt: capabilityStatus?.expiresAt ?? null,
+  }).allowed;
+  const credentialAllowed = evaluateCredentialEligibility({
+    requiredCredentialType: request.requiredCredentialType,
+    minimumAssurance: request.requiredCredentialAssurance,
+    requiresHumanReview: request.requiresCredentialHumanReview == null ? null : request.requiresCredentialHumanReview === 1,
+    compliancePackageVersion: request.compliancePackageVersion,
+    jurisdictionId: request.jurisdictionId,
+    providerCredentials,
+  }).allowed;
+
+  let providerEnforcementClear = true;
+  if (request.requiredCapabilityId != null && request.serviceCountryCode) {
+    const capabilityRows = await database
+      .select({ key: serviceCapabilities.key })
+      .from(serviceCapabilities)
+      .where(eq(serviceCapabilities.id, request.requiredCapabilityId))
+      .limit(1);
+    const capabilityKey = capabilityRows[0]?.key;
+    if (!capabilityKey) {
+      providerEnforcementClear = false;
+    } else {
+      const profiles = await database
+        .select({
+          profileStatus: providerCapabilityProfiles.profileStatus,
+          enforcementState: providerCapabilityProfiles.enforcementState,
+          voluntarySuspensionState: providerCapabilityProfiles.voluntarySuspensionState,
+        })
+        .from(providerCapabilityProfiles)
+        .where(and(
+          eq(providerCapabilityProfiles.providerId, provider.id),
+          eq(providerCapabilityProfiles.capabilityKey, capabilityKey),
+          eq(providerCapabilityProfiles.jurisdictionCode, request.serviceCountryCode.toUpperCase()),
+        ))
+        .limit(1);
+      const profile = profiles[0];
+      // Legacy jurisdictions without a capability profile rely on the canonical
+      // status row above. Once a profile exists, its enforcement/suspension is
+      // authoritative and cannot be bypassed by a stale capability status.
+      providerEnforcementClear = !profile || (
+        profile.enforcementState === "clear" &&
+        profile.voluntarySuspensionState === "active" &&
+        profile.profileStatus === "active"
+      );
+    }
+  }
+
+  let safetyAllowed = true;
+  try {
+    await assertProviderP11PolicyEligibility({ providerId: provider.id, requestId: request.id });
+  } catch {
+    safetyAllowed = false;
+  }
+  const hasCoordinates = request.latitude !== null && request.longitude !== null;
+  const providerHasValidArea = provider.serviceRadiusKm != null && provider.serviceRadiusKm >= 1 && provider.serviceRadiusKm <= 500;
+  const serviceAreaAllowed = !hasCoordinates || (
+    providerHasValidArea && provider.latitude !== null && provider.longitude !== null
+  );
+  const isJobStart = input.transition === "JOB_START";
+  assertProviderMarketplaceEligibility({
+    transition: input.transition,
+    countryTransitionAllowed,
+    requestIsOpenAndUnassigned: isJobStart
+      ? request.status === "active" && request.assignedProviderId === provider.id
+      : request.status === "pending" && request.assignedProviderId === null,
+    providerIsVerified: provider.isVerified === 1 && provider.verificationStatus === "approved",
+    providerIsAvailable: provider.isAvailable === 1,
+    providerEnforcementClear,
+    providerCapacityAvailable: activeAssignments.length < provider.maxConcurrentActiveJobs,
+    capabilityAllowed,
+    credentialAllowed,
+    scopeAllowed: capabilityStatus?.status !== "VERIFIED_LIMITED_SCOPE" || capabilityStatus.scopeConstraintsJson != null,
+    serviceAreaAllowed,
+    safetyAllowed,
+  });
+}
+
+/**
+ * Stores an idempotent in-app opportunity delivery intent after a caller makes
+ * a fresh eligibility decision. It never contacts push, SMS or email services.
+ */
+export async function enqueueProviderOpportunityNotification(input: {
+  requestId: number;
+  providerId: number;
+  type: "opportunity_available" | "opportunity_revoked";
+  reasonCode: string;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  const intent = buildOpportunityNotificationIntent(input);
+  await database.insert(marketplaceOpportunityNotifications).values({
+    requestId: intent.requestId,
+    providerId: intent.providerId,
+    eventType: intent.type,
+    status: intent.type === "opportunity_revoked" ? "revoked" : "queued",
+    idempotencyKey: intent.idempotencyKey,
+    deepLink: intent.deepLink,
+    reasonCode: intent.reasonCode,
+    revokedAt: intent.type === "opportunity_revoked" ? new Date() : null,
+  }).onDuplicateKeyUpdate({
+    set: {
+      status: intent.type === "opportunity_revoked" ? "revoked" : "queued",
+      deepLink: intent.deepLink,
+      reasonCode: intent.reasonCode,
+      revokedAt: intent.type === "opportunity_revoked" ? new Date() : null,
+      updatedAt: new Date(),
+    },
+  });
+  return intent;
 }
 
 export async function upsertJobSafetyRule(input: {
@@ -3657,6 +3834,11 @@ export async function createOffer(data: {
     .limit(1);
   const request = requestRows[0];
   if (!request) throw new Error("SERVICE_REQUEST_NOT_FOUND");
+  await assertProviderMarketplaceEligibilityForRequest({
+    providerId: data.providerId,
+    requestId: data.requestId,
+    transition: "OFFER_CREATE",
+  });
   await assertCountryMarketplaceTransition({
     countryCode: request.serviceCountryCode,
     jurisdictionId: request.jurisdictionId,
@@ -7601,6 +7783,11 @@ export async function acceptOffer(offerId: number, userId: number) {
       .limit(1);
     const provider = providerRows[0];
     if (!provider) throw new Error("OFFER_ACCEPT_PROVIDER_NOT_FOUND");
+    await assertProviderMarketplaceEligibilityForRequest({
+      providerId: provider.id,
+      requestId: request.id,
+      transition: "OFFER_ACCEPT",
+    });
 
     const capabilityStatuses = await tx
       .select({
@@ -8633,7 +8820,9 @@ export async function getProviderBusinessCockpit(userId: number) {
   };
 }
 
-// Get new jobs for a provider (pending requests in their category)
+// Get new jobs for a provider. Candidate exposure is capability-aware; a legacy
+// single category on the provider record never authorizes or hides a distinct
+// verified capability.
 export async function getNewJobsForProvider(providerId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -8642,24 +8831,7 @@ export async function getNewJobsForProvider(providerId: number) {
   if (providerRows.length === 0) return [];
 
   const provider = providerRows[0];
-  const categoryId = provider.categoryId;
-  if (!categoryId || provider.isAvailable !== 1 || provider.isVerified !== 1 || provider.verificationStatus !== "approved") return [];
-
-  const onboardingRequirements = await getProviderRequirementsForCatalog(db, { categoryId });
-  // A category with no approved-source mapping may not receive work. This keeps
-  // UNKNOWN = BLOCK while still permitting the provider to access their documents.
-  if (!onboardingRequirements.sourceMatched) return [];
-
-  const capabilityStatuses = await db
-    .select({
-      capabilityId: providerCapabilityStatuses.capabilityId,
-      jurisdictionId: providerCapabilityStatuses.jurisdictionId,
-      status: providerCapabilityStatuses.status,
-      expiresAt: providerCapabilityStatuses.expiresAt,
-    })
-    .from(providerCapabilityStatuses)
-    .where(eq(providerCapabilityStatuses.providerId, provider.id));
-  const providerCredentialStatuses = await listProviderCredentialStatuses(provider.id);
+  if (provider.isAvailable !== 1 || provider.isVerified !== 1 || provider.verificationStatus !== "approved") return [];
 
   // Only unassigned pending requests in the provider's category are genuine
   // opportunities. Fetch a bounded candidate set, then apply deterministic
@@ -8670,7 +8842,6 @@ export async function getNewJobsForProvider(providerId: number) {
     .from(serviceRequests)
     .where(
       and(
-        eq(serviceRequests.categoryId, categoryId),
         eq(serviceRequests.status, "pending"),
         isNull(serviceRequests.assignedProviderId),
       ),
@@ -8678,51 +8849,20 @@ export async function getNewJobsForProvider(providerId: number) {
     .orderBy(desc(serviceRequests.createdAt))
     .limit(100);
 
-  const enabledCountries = new Set<string>();
-  for (const candidateCountryCode of [...new Set(candidates.map((candidate) => candidate.serviceCountryCode).filter((countryCode): countryCode is string => typeof countryCode === "string" && countryCode.length > 0))]) {
+  const eligibleCandidates: typeof candidates = [];
+  for (const candidate of candidates) {
     try {
-      await assertCountryMarketplaceTransition({
-        countryCode: candidateCountryCode,
+      await assertProviderMarketplaceEligibilityForRequest({
+        providerId: provider.id,
+        requestId: candidate.id,
         transition: "OPPORTUNITY_EXPOSURE",
       });
-      enabledCountries.add(candidateCountryCode);
+      eligibleCandidates.push(candidate);
     } catch {
-      // A disabled or unknown country must not expose a new opportunity. The
-      // candidate remains historically readable to customer and admin paths.
+      // Unknown country/capability, expired credential, safety, availability,
+      // scope or capacity state must not expose an opportunity.
     }
   }
-
-  const eligibleCandidates = candidates.filter((candidate) => {
-    if (!candidate.serviceCountryCode || !enabledCountries.has(candidate.serviceCountryCode)) return false;
-    const capabilityStatus =
-      candidate.requiredCapabilityId == null || candidate.jurisdictionId == null
-        ? null
-        : capabilityStatuses.find(
-            (status) =>
-              status.capabilityId === candidate.requiredCapabilityId &&
-              status.jurisdictionId === candidate.jurisdictionId,
-          ) ?? null;
-    const capabilityAllowed = evaluateCapabilityTransition({
-      enforcementEnabled: true,
-      complianceRequirementState: candidate.complianceRequirementState,
-      requiredCapabilityId: candidate.requiredCapabilityId,
-      jurisdictionId: candidate.jurisdictionId,
-      providerCapabilityDecision: capabilityStatus?.status ?? null,
-      providerCapabilityExpiresAt: capabilityStatus?.expiresAt ?? null,
-    }).allowed;
-    if (!capabilityAllowed) return false;
-    return evaluateCredentialEligibility({
-      requiredCredentialType: candidate.requiredCredentialType,
-      minimumAssurance: candidate.requiredCredentialAssurance,
-      requiresHumanReview:
-        candidate.requiresCredentialHumanReview == null
-          ? null
-          : candidate.requiresCredentialHumanReview === 1,
-      compliancePackageVersion: candidate.compliancePackageVersion,
-      jurisdictionId: candidate.jurisdictionId,
-      providerCredentials: providerCredentialStatuses,
-    }).allowed;
-  });
 
   const rankedCandidates = rankServiceOpportunitiesByLocation(
     eligibleCandidates,

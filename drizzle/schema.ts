@@ -609,6 +609,9 @@ export const providers = mysqlTable("providers", {
   verificationReviewedAt: timestamp("verificationReviewedAt"),
   isPremium: int("isPremium").default(0),
   isAvailable: int("isAvailable").default(1).notNull(),
+  // Server-owned concurrent-work capacity. It is never supplied by a matching
+  // client and defaults conservatively for existing providers after migration.
+  maxConcurrentActiveJobs: int("maxConcurrentActiveJobs").default(1).notNull(),
   latitude: varchar("latitude", { length: 20 }),
   longitude: varchar("longitude", { length: 20 }),
   serviceRadiusKm: int("serviceRadiusKm"),
@@ -2093,6 +2096,31 @@ export const offers = mysqlTable("offers", {
   status: mysqlEnum("status", ["pending", "accepted", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
+
+/** Durable, idempotent in-app opportunity delivery intent. It contains no
+ * customer contact data or address; detail access always re-checks eligibility. */
+export const marketplaceOpportunityNotifications = mysqlTable(
+  "marketplace_opportunity_notifications",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    providerId: int("providerId").notNull(),
+    eventType: mysqlEnum("eventType", ["opportunity_available", "opportunity_revoked"]).notNull(),
+    status: mysqlEnum("status", ["queued", "delivered", "revoked", "failed"]).default("queued").notNull(),
+    idempotencyKey: varchar("idempotencyKey", { length: 191 }).notNull(),
+    deepLink: varchar("deepLink", { length: 240 }).notNull(),
+    reasonCode: varchar("reasonCode", { length: 160 }).notNull(),
+    deliveredAt: timestamp("deliveredAt"),
+    revokedAt: timestamp("revokedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketplace_opportunity_notification_idempotency_unique").on(table.idempotencyKey),
+    index("marketplace_opportunity_notification_provider_idx").on(table.providerId, table.status, table.createdAt),
+    index("marketplace_opportunity_notification_request_idx").on(table.requestId, table.eventType, table.status),
+  ],
+);
 
 // Active-job lifecycle and the assigned provider's latest foreground location.
 export const jobTracking = mysqlTable(
