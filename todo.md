@@ -713,10 +713,12 @@
 ## Login Signup Satırı Görünürlük Düzeltmesi
 - [x] LOGIN-SIGNUP-1 — “Hesabınız yok mu? Kayıt Ol” satırının mevcut tema, yönlendirme ve durum stillerini denetle
 - [x] LOGIN-SIGNUP-2 — Semantic tema tokenlarıyla dark/light, pressed/focused/disabled görünürlüğünü hedefli düzelt
-- [ ] LOGIN-SIGNUP-3 — Tema/kontrast/yönlendirme regresyonlarını ve iOS/Android görünüm kanıtını doğrula; yayın yapmadan teslim et
+- [x] LOGIN-SIGNUP-3 — iPhone Safari dark/light tema, kontrast, tüm-satır yönlendirmesi ve VoiceOver fiziksel kanıtını doğrula; yayın yapmadan teslim et
 
 ## Login Safari Tema Regresyonu
 - [x] LOGIN-THEME-1 — Authoritative tema kaynağı, Safari prefers-color-scheme ve regresyon diffini denetle
 - [x] LOGIN-THEME-2 — Yalnız login ekranındaki foreground/muted semantic token ve canlı dark/light senkronunu düzelt
-- [ ] LOGIN-THEME-3 — Web dark/light canlı geçiş, refresh, kontrast ve register yönlendirmesi test/screenshot kanıtını üret
-- [ ] LOGIN-THEME-4 — Checkpoint al; native iOS/Android fiziksel doğrulamasını WAITING FOR PHYSICAL DEVICE EVIDENCE olarak açık bırak
+- [x] LOGIN-THEME-3 — iPhone Safari dark/light fiziksel kontrol, refresh/kontrast ve register yönlendirmesi kullanıcı kanıtıyla PASS
+- [x] LOGIN-THEME-4 — Safari kanıt checkpoint’ini kaydet; native iOS/Android fiziksel doğrulamasını WAITING FOR PHYSICAL DEVICE EVIDENCE olarak açık bırak
+- [ ] LOGIN-NATIVE-PHYSICAL — Native iOS ve Android uygulama build’i üzerinde dark/light, VoiceOver/TalkBack ve register yönlendirmesi fiziksel kanıtını tamamla
+- [ ] AUTH-EMAIL-DELIVERY — Gerçek SMTP/e-posta teslimatını credential ve canlı sağlayıcı kabulüyle ayrıca doğrula; enumeration korumasını delivery PASS sayma
