@@ -32,7 +32,12 @@ export type CountryDeploymentTransition =
   | "OPPORTUNITY_EXPOSURE"
   | "OFFER_SUBMIT"
   | "OFFER_ACCEPTANCE"
-  | "PAYMENT_INITIATION";
+  | "PAYMENT_INITIATION"
+  | "CAPABILITY_ACTIVATION"
+  | "VERIFIED_BADGE"
+  | "PAYOUT"
+  | "CAMPAIGN"
+  | "OPERATION_NOTIFICATION";
 
 export type LocalizedLegalRuntimeState =
   | "DRAFT_MACHINE"
@@ -67,6 +72,11 @@ const flagForTransition: Record<CountryDeploymentTransition, keyof CountryDeploy
   OFFER_SUBMIT: "bookingEnabled",
   OFFER_ACCEPTANCE: "bookingEnabled",
   PAYMENT_INITIATION: "paymentsEnabled",
+  CAPABILITY_ACTIVATION: "providerOnboardingEnabled",
+  VERIFIED_BADGE: "providerOnboardingEnabled",
+  PAYOUT: "paymentsEnabled",
+  CAMPAIGN: "supportEnabled",
+  OPERATION_NOTIFICATION: "supportEnabled",
 };
 
 /**

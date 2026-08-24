@@ -4,6 +4,7 @@ import {
   countryCoveragePolicyDecisions,
   countryServiceCoverage,
   countryDeployments,
+  countryMarketControls,
   jurisdictionNodes,
   jurisdictions,
   jurisdictionCompliancePackages,
@@ -25,6 +26,7 @@ import {
   countryDeploymentTransitionBlockReason,
   type CountryDeploymentTransition,
 } from "./CountryDeploymentPolicy";
+import { countryMarketTransitionBlockReason } from "./CountryMarketControlPolicy";
 
 export type CompliancePackageStatus = "draft" | "legal_review" | "approved" | "enabled" | "blocked" | "retired";
 export type OfficialSourceStatus = "draft" | "verified" | "superseded" | "revoked";
@@ -34,7 +36,12 @@ export type CountryMarketplaceTransition =
   | "OPPORTUNITY_EXPOSURE"
   | "OFFER_SUBMIT"
   | "OFFER_ACCEPTANCE"
-  | "PAYMENT_INITIATION";
+  | "PAYMENT_INITIATION"
+  | "CAPABILITY_ACTIVATION"
+  | "VERIFIED_BADGE"
+  | "PAYOUT"
+  | "CAMPAIGN"
+  | "OPERATION_NOTIFICATION";
 
 type CountryLaunchGateStatus = "blocked" | "review" | "ready" | "enabled" | "suspended" | null;
 
@@ -79,6 +86,20 @@ export async function assertCountryMarketplaceTransition(input: {
     : [];
   const deployment = deploymentRows.length === 1 ? deploymentRows[0]! : null;
   if (deployment) {
+    const marketControls = await db
+      .select()
+      .from(countryMarketControls)
+      .where(eq(countryMarketControls.countryDeploymentId, deployment.id))
+      .limit(2);
+    const marketControl = marketControls.length === 1 ? marketControls[0]! : null;
+    if (!marketControl) throw new Error(`COUNTRY_MARKET_BLOCKED:${input.transition}:MARKET_CONTROL_MISSING`);
+    const marketReason = countryMarketTransitionBlockReason({
+      countryCode: deployment.countryCode,
+      effectiveState: marketControl.effectiveState,
+      inAppProductionAllowlisted: marketControl.inAppProductionAllowlisted,
+      transition: input.transition,
+    });
+    if (marketReason) throw new Error(marketReason);
     const deploymentReason = countryDeploymentTransitionBlockReason({
       deployment,
       transition: input.transition as CountryDeploymentTransition,

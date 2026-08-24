@@ -59,6 +59,7 @@ import {
   reviewProviderOperatingModel,
   upsertJobSafetyRule,
   hasActiveCompletionDisputeReviewerPermission,
+  getValidAdminMfaGrantId,
 } from "../db";
 import {
   createCountryCompliancePackage,
@@ -69,6 +70,11 @@ import {
   saveCountryLaunchChecklist,
   transitionCountryCompliancePackage,
 } from "../compliance/CountryComplianceRepository";
+import {
+  listCountryMarketControlEvents,
+  listCountryMarketControlOverviews,
+  requestCountryMarketDesiredState,
+} from "../compliance/CountryMarketControlRepository";
 import { ENV } from "./env";
 import { STANDARD_COMMISSION_RATE_BPS } from "../payments/policy";
 import { adminMfaProcedure, adminProcedure, publicProcedure, router, superAdminMfaProcedure } from "./trpc";
@@ -103,6 +109,12 @@ function createSlug(name: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   return transliterated.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function assertPlatformOwner(ctx: { user: { id: number; openId: string } | null }) {
+  if (!ctx.user || !ENV.ownerOpenId || ctx.user.openId !== ENV.ownerOpenId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Bu ülke/pazar kontrolü yalnız platform owner tarafından yapılabilir" });
+  }
 }
 
 function adminAuthRequired() {
@@ -481,6 +493,39 @@ export const ownerRouter = router({
     })),
 
   countryCompliance: adminMfaProcedure.query(async () => listCountryComplianceOverviews()),
+
+  countryMarketControls: superAdminMfaProcedure.query(async ({ ctx }) => {
+    assertPlatformOwner(ctx);
+    return listCountryMarketControlOverviews();
+  }),
+
+  countryMarketControlEvents: superAdminMfaProcedure
+    .input(z.object({ countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/), limit: z.number().int().min(1).max(100).default(50) }))
+    .query(async ({ ctx, input }) => {
+      assertPlatformOwner(ctx);
+      return listCountryMarketControlEvents(input.countryCode, input.limit);
+    }),
+
+  requestCountryMarketDesiredState: superAdminMfaProcedure
+    .input(z.object({
+      countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/),
+      desiredState: z.enum(["INFRA_ONLY", "ACTIVE", "PAUSED", "EMERGENCY_DISABLED"]),
+      reason: z.string().trim().min(10).max(1200),
+      expectedStateVersion: z.number().int().positive(),
+      correlationId: z.string().uuid(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertPlatformOwner(ctx);
+      if (!ctx.sessionFingerprint) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "MFA oturum bağlamı bulunamadı" });
+      const mfaGrantId = await getValidAdminMfaGrantId({ userId: ctx.user!.id, sessionFingerprint: ctx.sessionFingerprint });
+      if (!mfaGrantId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Aktif MFA grant bulunamadı" });
+      return requestCountryMarketDesiredState({
+        ...input,
+        countryCode: input.countryCode.toUpperCase(),
+        actorUserId: ctx.user!.id,
+        mfaGrantId,
+      });
+    }),
 
   createCountryJurisdiction: adminMfaProcedure
     .input(z.object({ countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/), regionCode: z.string().trim().max(16).optional(), displayName: z.string().trim().min(2).max(120) }))

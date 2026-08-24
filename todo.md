@@ -694,3 +694,11 @@
 - [x] G5V2-US-EXPORT-2 — Diff, migration/FK/unique/append-only/rollback, Türkiye-Berlin izolasyonu ve quality/OOM kanıtlarını derle
 - [x] G5V2-US-EXPORT-3 — İstenen adlarla salt-okunur US_CA_LA_CHECKPOINT_A_REVIEW paketini hash/manifest ile oluşturup teslim et ve dur
 - [x] G5V2-US-EXPORT-4 — US_CA_LA_CONNECTOR_GAP_REPORT.md ve US_CA_LA_LEGAL_REVIEW_TEMPLATE.xlsx deliverable’larını üretip nihai pakete ekle
+
+## Türkiye-Only Production ve Owner Country Control
+- [x] TRC-P0 — Türkiye/diğer ülke state, gate, allowlist ve Berlin-US freeze başlangıç durumunu salt-okunur denetle
+- [x] TRC-P1 — Desired/effective country state, owner reason/MFA audit ve emergency kill-switch veri modelini additive kur
+- [x] TRC-P2 — Owner-only country ve pazar yönetimi API/panelini server-authoritative fail-closed uygula
+- [x] TRC-P3 — Kapalı ülke için onboarding, activation, discovery, offer, booking, payment, payout ve notification bypasslarını engelle
+- [x] TRC-P4 — Türkiye readiness matrisi, production allowlist taslağı, diğer ülkeler INFRA_ONLY kanıtı ve rollback planını üret
+- [x] TRC-P5 — Yetki/bypass/transition regressionları ile kalite kapılarını çalıştır; report/evidence teslim edip yayın yapmadan dur

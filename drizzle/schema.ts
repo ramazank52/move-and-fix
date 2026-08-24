@@ -958,6 +958,81 @@ export const countryDeployments = mysqlTable(
   ],
 );
 
+/**
+ * Owner intent is deliberately separate from the server-derived effective
+ * market state. A desired ACTIVE request never enables a market by itself.
+ */
+export const countryMarketControls = mysqlTable(
+  "country_market_controls",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryDeploymentId: int("countryDeploymentId").notNull(),
+    desiredState: mysqlEnum("desiredState", ["INFRA_ONLY", "ACTIVE", "PAUSED", "EMERGENCY_DISABLED"]).default("INFRA_ONLY").notNull(),
+    effectiveState: mysqlEnum("effectiveState", ["INFRA_ONLY", "READINESS_BLOCKED", "READY_PENDING_OWNER_APPROVAL", "ACTIVE", "PAUSED", "EMERGENCY_DISABLED", "INFRA_ONLY_NO_GO"]).default("INFRA_ONLY").notNull(),
+    storeDistributionState: mysqlEnum("storeDistributionState", ["TR_ONLY_PLANNED", "NOT_LISTED", "EXTERNAL_STORE_GATE_REQUIRED"]).default("NOT_LISTED").notNull(),
+    inAppProductionAllowlisted: int("inAppProductionAllowlisted").default(0).notNull(),
+    requiresRevalidation: int("requiresRevalidation").default(1).notNull(),
+    lastOwnerReason: text("lastOwnerReason"),
+    lastChangedByUserId: int("lastChangedByUserId"),
+    lastMfaGrantId: varchar("lastMfaGrantId", { length: 64 }),
+    lastGateSnapshotHash: varchar("lastGateSnapshotHash", { length: 128 }),
+    stateVersion: int("stateVersion").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("country_market_controls_deployment_unique").on(table.countryDeploymentId),
+    index("country_market_controls_effective_idx").on(table.effectiveState, table.inAppProductionAllowlisted),
+    foreignKey({ columns: [table.countryDeploymentId], foreignColumns: [countryDeployments.id], name: "fk_country_market_control_deployment" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+/** Application-layer append-only ledger; TiDB trigger support is not assumed. */
+export const countryMarketControlEvents = mysqlTable(
+  "country_market_control_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryMarketControlId: int("countryMarketControlId").notNull(),
+    eventType: mysqlEnum("eventType", ["DESIRED_STATE_REQUESTED", "EFFECTIVE_STATE_EVALUATED", "EMERGENCY_DISABLED", "REVALIDATION_REQUIRED", "RELEASE_RUN_BLOCKED", "ROLLBACK_APPLIED"]).notNull(),
+    previousDesiredState: varchar("previousDesiredState", { length: 48 }),
+    nextDesiredState: varchar("nextDesiredState", { length: 48 }),
+    previousEffectiveState: varchar("previousEffectiveState", { length: 48 }),
+    nextEffectiveState: varchar("nextEffectiveState", { length: 48 }).notNull(),
+    actorUserId: int("actorUserId"),
+    mfaGrantId: varchar("mfaGrantId", { length: 64 }),
+    reason: text("reason").notNull(),
+    gateSnapshotHash: varchar("gateSnapshotHash", { length: 128 }),
+    correlationId: varchar("correlationId", { length: 128 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("country_market_control_events_control_created_idx").on(table.countryMarketControlId, table.createdAt),
+    uniqueIndex("country_market_control_events_correlation_unique").on(table.correlationId),
+    foreignKey({ columns: [table.countryMarketControlId], foreignColumns: [countryMarketControls.id], name: "fk_country_market_event_control" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
+/** Deployment/release evidence is distinct from market state and remains blocked until real gates pass. */
+export const countryMarketReleaseRuns = mysqlTable(
+  "country_market_release_runs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    countryMarketControlId: int("countryMarketControlId").notNull(),
+    requestedDesiredState: varchar("requestedDesiredState", { length: 48 }).notNull(),
+    result: mysqlEnum("result", ["BLOCKED", "ABORTED", "ACTIVE"]).default("BLOCKED").notNull(),
+    stage: mysqlEnum("stage", ["PRECHECK", "DEPLOYMENT_HEALTH", "LEGACY_GATE", "COVERAGE_GATE", "OTHER_COUNTRY_ASSERTION", "ROLLED_BACK"]).default("PRECHECK").notNull(),
+    blockersJson: json("blockersJson").$type<string[]>().notNull(),
+    gateSnapshotHash: varchar("gateSnapshotHash", { length: 128 }).notNull(),
+    actorUserId: int("actorUserId"),
+    mfaGrantId: varchar("mfaGrantId", { length: 64 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("country_market_release_runs_control_created_idx").on(table.countryMarketControlId, table.createdAt),
+    foreignKey({ columns: [table.countryMarketControlId], foreignColumns: [countryMarketControls.id], name: "fk_country_market_release_control" }).onDelete("restrict").onUpdate("cascade"),
+  ],
+);
+
 /** Hierarchical country, regional and municipal deployment boundary. */
 export const jurisdictionNodes = mysqlTable(
   "jurisdiction_nodes",

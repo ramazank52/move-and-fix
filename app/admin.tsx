@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -24,13 +25,28 @@ export default function AdminDashboardScreen() {
   const dashboardQuery = trpc.owner.dashboard.useQuery(undefined, { staleTime: 30_000 });
   const categoriesQuery = trpc.owner.categories.useQuery(undefined, { staleTime: 60_000 });
   const reviewQueueQuery = trpc.owner.operationalReviewQueue.useQuery({ limit: 12 }, { staleTime: 20_000, retry: false });
+  const countryMarketQuery = trpc.owner.countryMarketControls.useQuery(undefined, { staleTime: 15_000, retry: false });
+  const [marketReason, setMarketReason] = useState("");
+  const countryMarketMutation = trpc.owner.requestCountryMarketDesiredState.useMutation({
+    onSuccess: () => {
+      setMarketReason("");
+      void countryMarketQuery.refetch();
+    },
+  });
   const dashboard = dashboardQuery.data;
   const categories = categoriesQuery.data ?? [];
   const isRefreshing = dashboardQuery.isRefetching || categoriesQuery.isRefetching;
   const error = dashboardQuery.error ?? categoriesQuery.error;
 
   const refresh = () => {
-    void Promise.all([dashboardQuery.refetch(), categoriesQuery.refetch(), reviewQueueQuery.refetch()]);
+    void Promise.all([dashboardQuery.refetch(), categoriesQuery.refetch(), reviewQueueQuery.refetch(), countryMarketQuery.refetch()]);
+  };
+
+  const requestSafeMarketState = (countryCode: string, desiredState: "PAUSED" | "EMERGENCY_DISABLED", expectedStateVersion: number) => {
+    const reason = marketReason.trim();
+    if (reason.length < 10) return;
+    const correlationId = `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, "0").slice(-12)}`;
+    countryMarketMutation.mutate({ countryCode, desiredState, reason, expectedStateVersion, correlationId });
   };
 
   const stats = dashboard
@@ -166,6 +182,37 @@ export default function AdminDashboardScreen() {
                 dashboard.risks.map((risk) => <Text key={risk} style={{ color: colors.warning, lineHeight: 20 }}>• {risk}</Text>)
               ) : (
                 <Text style={{ color: colors.muted }}>Bu özet için kaydedilmiş açık risk sinyali yok.</Text>
+              )}
+            </View>
+
+            <View style={{ marginTop: 20, backgroundColor: colors.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: colors.foreground, marginBottom: 4 }}>Ülke ve Pazar Kontrolü</Text>
+              <Text style={{ color: colors.muted, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>
+                Platform owner + MFA gerektirir. ACTIVE isteği tek başına market açılışı veya yayın oluşturmaz.
+              </Text>
+              {countryMarketQuery.error ? (
+                <Text style={{ color: colors.muted, lineHeight: 18 }}>Bu yüzey için platform owner ve aktif Super Admin MFA grant’i gereklidir.</Text>
+              ) : countryMarketQuery.isLoading ? (
+                <View style={{ paddingVertical: 8, flexDirection: "row", gap: 8, alignItems: "center" }}><ActivityIndicator size="small" color={colors.primary} /><Text style={{ color: colors.muted }}>Pazar durumları yükleniyor…</Text></View>
+              ) : (
+                <>
+                  <TextInput value={marketReason} onChangeText={setMarketReason} placeholder="Pause / emergency gerekçesi (en az 10 karakter)" placeholderTextColor={colors.muted} multiline style={{ color: colors.foreground, minHeight: 54, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, marginBottom: 10, textAlignVertical: "top" }} accessibilityLabel="Pazar durumu değişikliği gerekçesi" />
+                  {(countryMarketQuery.data ?? []).map(({ deployment, control }) => {
+                    const trCandidate = deployment.countryCode === "TR";
+                    const isBlocked = control.effectiveState !== "ACTIVE";
+                    const disabled = countryMarketMutation.isPending || marketReason.trim().length < 10;
+                    return (
+                      <View key={control.id} style={{ borderTopWidth: 0.5, borderColor: colors.border, paddingTop: 10, marginTop: 10 }}>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}><Text style={{ color: colors.foreground, fontWeight: "700" }}>{deployment.displayName} · {deployment.countryCode}</Text><Text style={{ color: isBlocked ? colors.warning : colors.success, fontSize: 12, fontWeight: "700" }}>{control.effectiveState}</Text></View>
+                        <Text style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>Desired: {control.desiredState} · Runtime allowlist: {control.inAppProductionAllowlisted === 1 ? "TR-only candidate" : "closed"}</Text>
+                        {trCandidate ? <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+                          <Pressable disabled={disabled} onPress={() => requestSafeMarketState("TR", "PAUSED", control.stateVersion)} style={{ opacity: disabled ? 0.45 : 1, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.warning }} accessibilityRole="button" accessibilityLabel="Türkiye pazarını duraklat"><Text style={{ color: "#111827", fontWeight: "700", fontSize: 12 }}>PAUSE</Text></Pressable>
+                          <Pressable disabled={disabled} onPress={() => requestSafeMarketState("TR", "EMERGENCY_DISABLED", control.stateVersion)} style={{ opacity: disabled ? 0.45 : 1, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.error }} accessibilityRole="button" accessibilityLabel="Türkiye pazarını acil kapat"><Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}>EMERGENCY DISABLE</Text></Pressable>
+                        </View> : null}
+                      </View>
+                    );
+                  })}
+                </>
               )}
             </View>
 

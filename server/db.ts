@@ -784,6 +784,24 @@ export async function hasValidAdminMfaGrant(data: { userId: number; sessionFinge
   return Boolean(rows[0]);
 }
 
+export async function getValidAdminMfaGrantId(data: { userId: number; sessionFingerprint: string; now?: Date }) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({ id: adminMfaGrants.id })
+    .from(adminMfaGrants)
+    .where(
+      and(
+        eq(adminMfaGrants.userId, data.userId),
+        eq(adminMfaGrants.sessionFingerprint, data.sessionFingerprint),
+        isNull(adminMfaGrants.revokedAt),
+        gte(adminMfaGrants.expiresAt, data.now ?? new Date()),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
 export async function revokeAdminMfaGrantsForSession(data: { userId: number; sessionFingerprint: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
