@@ -693,3 +693,4 @@
 - [x] G5V2-US-EXPORT-1 — 62 coverage, 26 bundle, 28 source, connector, locale ve provider-impact satır-bazlı audit kanıtlarını genişlet
 - [x] G5V2-US-EXPORT-2 — Diff, migration/FK/unique/append-only/rollback, Türkiye-Berlin izolasyonu ve quality/OOM kanıtlarını derle
 - [x] G5V2-US-EXPORT-3 — İstenen adlarla salt-okunur US_CA_LA_CHECKPOINT_A_REVIEW paketini hash/manifest ile oluşturup teslim et ve dur
+- [x] G5V2-US-EXPORT-4 — US_CA_LA_CONNECTOR_GAP_REPORT.md ve US_CA_LA_LEGAL_REVIEW_TEMPLATE.xlsx deliverable’larını üretip nihai pakete ekle

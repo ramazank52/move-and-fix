@@ -79,6 +79,60 @@ def main() -> None:
     write_sheet(source_book, "28 Source Register", source_headers, [[row.get(header, "") for header in source_headers] for row in source_rows])
     source_book.save(EXPORTS / "US_CA_LA_SOURCE_REGISTER.xlsx")
 
+    review_book = Workbook()
+    review_book.remove(review_book.active)
+    write_sheet(
+        review_book,
+        "Review Instructions",
+        ["field", "value"],
+        [
+            ["status", "CHECKPOINT_A_REVIEW_REQUIRED"],
+            ["rule", "No SOURCE_VERIFIED, LEGAL_APPROVED, connector authorization or product release decision may be entered without independent authorized evidence."],
+            ["required_counsel_evidence", "Official title, section/classification/exception, effective date, jurisdiction applicability, decision, reviewer identity/role, dated evidence hash and immutable approval reference."],
+            ["runtime", "All US capability coverage remains BLOCKED; this workbook is not an approval instrument by itself."],
+        ],
+    )
+    coverage_review_headers = [
+        "research_row_id", "canonical_family", "canonical_subservice", "exact_task_profile", "risk_level", "mandatory_bundles", "conditional_bundles", "subject_bindings", "current_policy_decision", "current_source_state", "current_legal_state", "counsel_decision_blank", "counsel_effective_date_blank", "counsel_exception_blank", "counsel_reviewer_identity_blank", "counsel_role_scope_blank", "counsel_evidence_hash_blank", "immutable_approval_ledger_ref_blank",
+    ]
+    coverage_review_rows = [[
+        row.get("research_row_id", ""), row.get("canonical_family_slug", ""), row.get("canonical_subservice_slug", ""), row.get("exact_task_profile", ""),
+        row.get("risk_level", ""), row.get("mandatory_bundles", ""), row.get("conditional_bundles", ""), row.get("subject_bindings", ""),
+        row.get("policy_decision", ""), row.get("source_state", ""), row.get("legal_state", ""), "", "", "", "", "", "", "",
+    ] for row in matrix_rows]
+    write_sheet(review_book, "62 Coverage Review", coverage_review_headers, coverage_review_rows)
+    source_review_headers = [
+        "source_key", "authority_issuer", "law_or_regulation_title_as_captured", "section_article_class_exception", "effective_date_text", "official_url", "archive_reference", "archive_file_sha256", "current_source_status", "bound_requirement_bundles", "counsel_verified_title_blank", "counsel_verified_section_blank", "counsel_verified_effective_date_blank", "counsel_verified_exception_blank", "counsel_reviewer_identity_blank", "counsel_evidence_hash_blank", "immutable_source_approval_ref_blank",
+    ]
+    source_review_rows = [[
+        row.get("source_key", ""), row.get("authority_issuer", ""), row.get("law_or_regulation_title_as_captured", ""), row.get("section_article_class_exception", ""),
+        row.get("effective_date_text", ""), row.get("official_url", ""), row.get("archive_reference", ""), row.get("archive_file_sha256", ""),
+        row.get("source_status", ""), row.get("bound_requirement_bundles", ""), "", "", "", "", "", "", "",
+    ] for row in source_rows]
+    write_sheet(review_book, "28 Source Review", source_review_headers, source_review_rows)
+    review_book.save(EXPORTS / "US_CA_LA_LEGAL_REVIEW_TEMPLATE.xlsx")
+
+    connector_lines = [
+        "# US-CA-LOS_ANGELES Connector Gap Report",
+        "",
+        "**Status:** 28/28 connector routes are `NOT_CONFIGURED` or otherwise non-operational. This report does not claim an official API, contract, permission or authority verification route.",
+        "",
+        "| Connector | Target registry/API | Current status | Permission/evidence | Returned fields | Expiry/revocation | NO-GO reason |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for connector in connectors:
+        connector_lines.append(
+            "| {key} | {target} | {status} / {assurance} | {permission} | {fields} | {expiry} | {reason} |".format(
+                key=connector.get("connectorKey", ""), target=connector.get("targetRegistryOrApi", ""), status=connector.get("status", ""), assurance=connector.get("assuranceLevel", ""),
+                permission=connector.get("accessPermissionRequirement", ""), fields=connector.get("returnedFields", ""), expiry=connector.get("expirySuspensionRevocationCheck", ""), reason=connector.get("noGoReason", "").replace("|", "/"),
+            )
+        )
+    connector_lines.extend([
+        "",
+        "> Public webpages, OCR and AI extraction are not official verification connectors. `forbiddenScraping=1` remains in force for every route until an authorized integration is independently evidenced.",
+    ])
+    (EXPORTS / "US_CA_LA_CONNECTOR_GAP_REPORT.md").write_text("\n".join(connector_lines) + "\n", encoding="utf-8")
+
 
 if __name__ == "__main__":
     main()

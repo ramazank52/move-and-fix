@@ -1,0 +1,36 @@
+# US-CA-LOS_ANGELES Connector Gap Report
+
+**Status:** 28/28 connector routes are `NOT_CONFIGURED` or otherwise non-operational. This report does not claim an official API, contract, permission or authority verification route.
+
+| Connector | Target registry/API | Current status | Permission/evidence | Returned fields | Expiry/revocation | NO-GO reason |
+|---|---|---|---|---|---|---|
+| US_V2_CANDIDATE_G-NIST-IAL | G-NIST-IAL | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_G-W3C-VC | G-W3C-VC | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BAR-ARD | US-BAR-ARD | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BAR-LOOKUP | US-BAR-LOOKUP | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BC-LICENSE | US-BC-LICENSE | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BC-PSP | US-BC-PSP | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BHGS-MOVER | US-BHGS-MOVER | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BHGS-REPAIR | US-BHGS-REPAIR | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BPC-7048 | US-BPC-7048 | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BSIS-ALARM | US-BSIS-ALARM | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BSIS-LOCK | US-BSIS-LOCK | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-BSIS-VERIFY | US-BSIS-VERIFY | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-CAMTC | US-CAMTC | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-CSLB-CLASS | US-CSLB-CLASS | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-CSLB-TRIGGER | US-CSLB-TRIGGER | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-CSLB-VERIFY | US-CSLB-VERIFY | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-DCA-LOOKUP | US-DCA-LOOKUP | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-DIR-ASBESTOS | US-DIR-ASBESTOS | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-DMV-CDL | US-DMV-CDL | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-DMV-MCP | US-DMV-MCP | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-DMV-TTD | US-DMV-TTD | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-DPR-PEST | US-DPR-PEST | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-EPA-608 | US-EPA-608 | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-EPA-RRP | US-EPA-RRP | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-FMCSA-AUTH | US-FMCSA-AUTH | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-FMCSA-MOVER | US-FMCSA-MOVER | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-LA-BTRC | US-LA-BTRC | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+| US_V2_CANDIDATE_US-LA-TOW | US-LA-TOW | NOT_CONFIGURED / NONE | NO_AUTHORIZATION_EVIDENCE | NOT_CONFIGURED | NOT_CONFIGURED | Connector is not authorized/operational; public webpage and OCR/AI output are not authority verification. |
+
+> Public webpages, OCR and AI extraction are not official verification connectors. `forbiddenScraping=1` remains in force for every route until an authorized integration is independently evidenced.
