@@ -772,3 +772,15 @@
 - [x] THEME-HOME-PILOT-6 — Ortak HomeScreenView içindeki gerçek disabled kontrolleri, accessibility disabled state’i, ayrışan görünüm ve kontrastını uygula
 - [x] THEME-HOME-PILOT-7 — Fixture no-op callback’lerinin disabled durumda çağrılmadığını; pressed ve keyboard/VoiceOver focused durumlarının ortak view üzerinde erişilebilir olduğunu test et
 - [x] THEME-HOME-PILOT-8 — 01-only kapsamda TypeScript/lint/build/hedefli/tam regresyon ve fiziki-kanıt durum güncellemesini tekrar tamamla
+
+## Final Completion & Release-Readiness Command
+- [ ] FINAL-0 — Mevcut checkpoint, clean/dirty çalışma ağacı, route/role/backend/integration/feature-flag/country gate envanteri ve development-only build dışlama baseline’ını doğrula
+- [ ] FINAL-1 — 01 Ana Sayfa fixture’da disabled/pressed/focused fiziksel kanıtını doğrula veya sadece kanıt türüne uygun PARTIAL/BLOCKED durumunu kaydet
+- [ ] FINAL-2 — Kalan 02–14 ekran için gerçek ortak-view extraction uygulanabilirliğini sırayla değerlendir; güvenli değilse BLOCKED_COMPONENT_NOT_ISOLATABLE bırak
+- [ ] FINAL-3 — 74 rota tema/erişilebilirlik matrisini kanıt türü, Dark/Light ve state bazında dürüstçe güncelle
+- [ ] FINAL-4 — Kimlik, hesap, onboarding ve privacy akışlarının internal fail-closed/anti-enumeration/RBAC sözleşmelerini denetle
+- [ ] FINAL-5 — Müşteri ve hizmet sağlayıcı iş akışlarının ownership, capability, document, ledger ve safety sözleşmelerini denetle
+- [ ] FINAL-6 — Önceki kritik bulgular, güvenlik/veri bütünlüğü, authorization ve supply-chain denetimlerini yeniden doğrula
+- [ ] FINAL-7 — Harici ödeme/SMS/e-posta/push/OAuth/scanner/storage entegrasyonlarını credential olmadan CODE_READY_NOT_CONFIGURED veya EXTERNAL_BLOCKER olarak doğrula
+- [ ] FINAL-8 — Web/native/store öncesi kalite, izin, deep-link, release preflight ve kanıt sınıfı kontrollerini tamamla
+- [ ] FINAL-9 — Nihai evidence paketi, 74 rota matrisi, güvenlik/entegrasyon durumları, external blocker listesi ve A/B/C release kararını hazırla
