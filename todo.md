@@ -775,7 +775,7 @@
 
 ## Final Completion & Release-Readiness Command
 - [x] FINAL-0 — Mevcut checkpoint, clean/dirty çalışma ağacı, route/role/backend/integration/feature-flag/country gate envanteri ve development-only build dışlama baseline’ını doğrula
-- [ ] FINAL-1 — 01 Ana Sayfa fixture’da disabled/pressed/focused fiziksel kanıtını doğrula veya sadece kanıt türüne uygun PARTIAL/BLOCKED durumunu kaydet
+- [x] FINAL-1 — 01 Ana Sayfa fixture’da disabled/pressed/focused fiziksel kanıtını doğrula veya sadece kanıt türüne uygun PARTIAL/BLOCKED durumunu kaydet (disabled/pressed/focused physical proof pending; state-level component fixture evidence classified)
 - [ ] FINAL-2 — Kalan 02–14 ekran için gerçek ortak-view extraction uygulanabilirliğini sırayla değerlendir; güvenli değilse BLOCKED_COMPONENT_NOT_ISOLATABLE bırak
 - [ ] FINAL-3 — 74 rota tema/erişilebilirlik matrisini kanıt türü, Dark/Light ve state bazında dürüstçe güncelle
 - [ ] FINAL-4 — Kimlik, hesap, onboarding ve privacy akışlarının internal fail-closed/anti-enumeration/RBAC sözleşmelerini denetle
