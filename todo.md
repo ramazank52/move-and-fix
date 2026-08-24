@@ -851,3 +851,6 @@
 - [ ] CONTINUE-4 — Blok 2 capacity/state-machine/capability partial deactivation internal kapsamını uygula
 - [ ] CONTINUE-5 — Blok 3 common-view/Explore erişilebilirlik ve kalan güvenli component extraction kapsamını tamamla
 - [ ] CONTINUE-6 — Final test/build/export/secret scan ve MOVEFIX_COMPLETE_SOURCE_FINAL kanıt paketini üret
+
+## P17 Private-Staging Salt-Okunur Preflight
+- [x] P17-PREFLIGHT-1 — Mevcut secret/config içinde private staging TiDB bağlantısını değer açıklamadan denetle; verified connection bulunmadığı için fail-closed kurulum gereksinimlerini raporla; ledger/schema preflightı çalıştırılmadı
