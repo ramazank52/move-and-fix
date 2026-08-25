@@ -21,6 +21,12 @@ import {
   operationalEvents,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import {
+  AREA_MEASUREMENT_VERSION,
+  calculateAreaMeasurement,
+  type AreaMeasurementUnit,
+  type VersionedAreaMeasurementDraft,
+} from "../shared/area-measurement";
 import { resolveProviderDocumentRequirements } from "./compliance/ProviderDocumentRequirementsPolicy";
 import {
   resolveApprovedSourceService,
@@ -1455,6 +1461,7 @@ import {
   capabilityJurisdictionRules,
   serviceRequests,
   serviceRequestDetails,
+  serviceRequestMeasurements,
   serviceRequestMedia,
   providers,
   offers,
@@ -3700,7 +3707,73 @@ export type ServiceRequestDetailsInput = {
   destinationHasElevator?: boolean;
   distanceKm?: number;
   attributes: Record<string, string | number | boolean | null>;
+  measurement?: VersionedAreaMeasurementDraft;
 };
+
+type PersistableAreaMeasurement = {
+  method: "manual_rectangle" | "manual_polygon" | "ar_depth" | "ar_plane";
+  unit: "m" | "cm";
+  areaSquareCentimeters: number;
+  geometryJson: string;
+  capabilityClass: "manual" | "ar_depth" | "ar_plane";
+  qualityWarning?: "estimated" | "tracking_lost" | "low_confidence";
+  idempotencyKey: string;
+};
+
+function isMeasurementMigrationMissing(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string } | null;
+  return candidate?.code === "ER_NO_SUCH_TABLE"
+    || /service_request_measurements.*(?:doesn't exist|does not exist|not found)/i.test(candidate?.message ?? "");
+}
+
+function isDuplicateMeasurementIdempotency(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string } | null;
+  return candidate?.code === "ER_DUP_ENTRY"
+    && /service_request_measurements_owner_idempotency_unique|ownerUserId.*idempotencyKey/i.test(candidate?.message ?? "");
+}
+
+function canonicalMeasurementUnit(unit: AreaMeasurementUnit): "m" | "cm" {
+  return unit === "m" || unit === "m2" ? "m" : "cm";
+}
+
+/**
+ * Treat client geometry as an estimate only. The authoritative server derives
+ * the stored value and accepts no camera frames, EXIF, raw depth mesh or
+ * pricing fields. A compact idempotency key is scoped by the request owner.
+ */
+function prepareAreaMeasurementForPersistence(draft: VersionedAreaMeasurementDraft): PersistableAreaMeasurement {
+  if (draft.version !== AREA_MEASUREMENT_VERSION) throw new Error("AREA_MEASUREMENT_VERSION_UNSUPPORTED");
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{15,95}$/.test(draft.idempotencyKey)) {
+    throw new Error("AREA_MEASUREMENT_IDEMPOTENCY_INVALID");
+  }
+  if (
+    (draft.capabilityClass === "manual" && !draft.method.startsWith("manual_"))
+    || (draft.capabilityClass === "ar_depth" && draft.method !== "ar_depth")
+    || (draft.capabilityClass === "ar_plane" && draft.method !== "ar_plane")
+  ) {
+    throw new Error("AREA_MEASUREMENT_CAPABILITY_MISMATCH");
+  }
+
+  const calculated = calculateAreaMeasurement(draft);
+  const areaSquareCentimeters = Math.round(calculated.squareMeters * 10_000);
+  if (!Number.isSafeInteger(areaSquareCentimeters) || areaSquareCentimeters <= 0 || areaSquareCentimeters > 1_000_000_000) {
+    throw new Error("AREA_MEASUREMENT_OUT_OF_RANGE");
+  }
+
+  const geometry = draft.method === "manual_polygon"
+    ? { points: draft.points ?? [] }
+    : { width: draft.width, height: draft.height, confidence: calculated.confidence };
+
+  return {
+    method: draft.method,
+    unit: canonicalMeasurementUnit(draft.unit),
+    areaSquareCentimeters,
+    geometryJson: JSON.stringify(geometry),
+    capabilityClass: draft.capabilityClass,
+    qualityWarning: draft.qualityWarning,
+    idempotencyKey: draft.idempotencyKey,
+  };
+}
 
 export async function createServiceRequest(data: {
   userId: number;
@@ -3744,30 +3817,161 @@ export async function createServiceRequest(data: {
     transition: "REQUEST_CREATION",
   });
   const { details, countryCode: _countryCode, ...requestData } = data;
-  return db.transaction(async (tx) => {
-    const result = await tx.insert(serviceRequests).values({ ...requestData, ...complianceContext });
-    const requestId = result[0].insertId;
-    if (details) {
-      await tx.insert(serviceRequestDetails).values({
-        requestId,
-        subcategoryId: details.subcategoryId,
-        serviceType: details.serviceType,
-        pickupAddress: details.pickupAddress,
-        destinationAddress: details.destinationAddress,
-        pickupLatitude: details.pickupLatitude,
-        pickupLongitude: details.pickupLongitude,
-        destinationLatitude: details.destinationLatitude,
-        destinationLongitude: details.destinationLongitude,
-        pickupFloor: details.pickupFloor,
-        destinationFloor: details.destinationFloor,
-        pickupHasElevator: details.pickupHasElevator == null ? undefined : Number(details.pickupHasElevator),
-        destinationHasElevator:
-          details.destinationHasElevator == null ? undefined : Number(details.destinationHasElevator),
-        distanceKm: details.distanceKm,
-        attributesJson: JSON.stringify(details.attributes),
-      });
+  const measurement = details?.measurement ? prepareAreaMeasurementForPersistence(details.measurement) : undefined;
+  if (measurement) {
+    const existing = await db
+      .select({ requestId: serviceRequestMeasurements.requestId })
+      .from(serviceRequestMeasurements)
+      .where(and(
+        eq(serviceRequestMeasurements.ownerUserId, data.userId),
+        eq(serviceRequestMeasurements.idempotencyKey, measurement.idempotencyKey),
+      ))
+      .limit(1);
+    if (existing[0]) return existing[0].requestId;
+  }
+  try {
+    return await db.transaction(async (tx) => {
+      const result = await tx.insert(serviceRequests).values({ ...requestData, ...complianceContext });
+      const requestId = result[0].insertId;
+      if (details) {
+        await tx.insert(serviceRequestDetails).values({
+          requestId,
+          subcategoryId: details.subcategoryId,
+          serviceType: details.serviceType,
+          pickupAddress: details.pickupAddress,
+          destinationAddress: details.destinationAddress,
+          pickupLatitude: details.pickupLatitude,
+          pickupLongitude: details.pickupLongitude,
+          destinationLatitude: details.destinationLatitude,
+          destinationLongitude: details.destinationLongitude,
+          pickupFloor: details.pickupFloor,
+          destinationFloor: details.destinationFloor,
+          pickupHasElevator: details.pickupHasElevator == null ? undefined : Number(details.pickupHasElevator),
+          destinationHasElevator:
+            details.destinationHasElevator == null ? undefined : Number(details.destinationHasElevator),
+          distanceKm: details.distanceKm,
+          attributesJson: JSON.stringify(details.attributes),
+        });
+      }
+      if (measurement) {
+        await tx.insert(serviceRequestMeasurements).values({
+          requestId,
+          ownerUserId: data.userId,
+          version: AREA_MEASUREMENT_VERSION,
+          ...measurement,
+        });
+      }
+      return requestId;
+    });
+  } catch (error) {
+    if (measurement && isMeasurementMigrationMissing(error)) throw new Error("MIGRATION_REQUIRED_AREA_MEASUREMENT");
+    if (measurement && isDuplicateMeasurementIdempotency(error)) {
+      const existing = await db
+        .select({ requestId: serviceRequestMeasurements.requestId })
+        .from(serviceRequestMeasurements)
+        .where(and(
+          eq(serviceRequestMeasurements.ownerUserId, data.userId),
+          eq(serviceRequestMeasurements.idempotencyKey, measurement.idempotencyKey),
+        ))
+        .limit(1);
+      if (existing[0]) return existing[0].requestId;
     }
-    return requestId;
+    throw error;
+  }
+}
+
+export async function getServiceRequestMeasurementForOwner(input: { requestId: number; ownerUserId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const ownedRequest = await db
+    .select({ id: serviceRequests.id })
+    .from(serviceRequests)
+    .where(and(eq(serviceRequests.id, input.requestId), eq(serviceRequests.userId, input.ownerUserId)))
+    .limit(1);
+  if (!ownedRequest[0]) throw new Error("AREA_MEASUREMENT_FORBIDDEN");
+  const rows = await db
+    .select()
+    .from(serviceRequestMeasurements)
+    .where(and(eq(serviceRequestMeasurements.requestId, input.requestId), isNull(serviceRequestMeasurements.deletedAt)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function replaceServiceRequestMeasurementForOwner(input: {
+  requestId: number;
+  ownerUserId: number;
+  measurement: VersionedAreaMeasurementDraft;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const measurement = prepareAreaMeasurementForPersistence(input.measurement);
+  return db.transaction(async (tx) => {
+    const ownedRequest = await tx
+      .select({ id: serviceRequests.id, status: serviceRequests.status })
+      .from(serviceRequests)
+      .where(and(eq(serviceRequests.id, input.requestId), eq(serviceRequests.userId, input.ownerUserId)))
+      .limit(1);
+    if (!ownedRequest[0]) throw new Error("AREA_MEASUREMENT_FORBIDDEN");
+    if (ownedRequest[0].status !== "pending") throw new Error("AREA_MEASUREMENT_REQUEST_NOT_EDITABLE");
+
+    const sameKey = await tx
+      .select()
+      .from(serviceRequestMeasurements)
+      .where(and(
+        eq(serviceRequestMeasurements.ownerUserId, input.ownerUserId),
+        eq(serviceRequestMeasurements.idempotencyKey, measurement.idempotencyKey),
+      ))
+      .limit(1);
+    if (sameKey[0]) {
+      if (sameKey[0].requestId === input.requestId) return { id: sameKey[0].id, idempotent: true as const };
+      throw new Error("AREA_MEASUREMENT_IDEMPOTENCY_CONFLICT");
+    }
+
+    const current = await tx
+      .select()
+      .from(serviceRequestMeasurements)
+      .where(eq(serviceRequestMeasurements.requestId, input.requestId))
+      .limit(1);
+    if (current[0]) {
+      await tx.update(serviceRequestMeasurements).set({
+        ...measurement,
+        version: current[0].version + 1,
+        deletedAt: null,
+      }).where(eq(serviceRequestMeasurements.id, current[0].id));
+      return { id: current[0].id, idempotent: false as const };
+    }
+    const created = await tx.insert(serviceRequestMeasurements).values({
+      requestId: input.requestId,
+      ownerUserId: input.ownerUserId,
+      version: AREA_MEASUREMENT_VERSION,
+      ...measurement,
+    });
+    return { id: created[0].insertId, idempotent: false as const };
+  }).catch((error) => {
+    if (isMeasurementMigrationMissing(error)) throw new Error("MIGRATION_REQUIRED_AREA_MEASUREMENT");
+    throw error;
+  });
+}
+
+export async function deleteServiceRequestMeasurementForOwner(input: { requestId: number; ownerUserId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(async (tx) => {
+    const ownedRequest = await tx
+      .select({ id: serviceRequests.id, status: serviceRequests.status })
+      .from(serviceRequests)
+      .where(and(eq(serviceRequests.id, input.requestId), eq(serviceRequests.userId, input.ownerUserId)))
+      .limit(1);
+    if (!ownedRequest[0]) throw new Error("AREA_MEASUREMENT_FORBIDDEN");
+    if (ownedRequest[0].status !== "pending") throw new Error("AREA_MEASUREMENT_REQUEST_NOT_EDITABLE");
+    const updated = await tx.update(serviceRequestMeasurements)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(serviceRequestMeasurements.requestId, input.requestId), isNull(serviceRequestMeasurements.deletedAt)));
+    if (updated[0].affectedRows === 0) throw new Error("AREA_MEASUREMENT_NOT_FOUND");
+    return { deleted: true as const };
+  }).catch((error) => {
+    if (isMeasurementMigrationMissing(error)) throw new Error("MIGRATION_REQUIRED_AREA_MEASUREMENT");
+    throw error;
   });
 }
 

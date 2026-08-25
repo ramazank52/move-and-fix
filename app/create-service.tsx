@@ -15,12 +15,14 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { File } from "expo-file-system";
 import { ScreenContainer } from "@/components/screen-container";
+import { AreaMeasurementForm } from "@/components/area-measurement-form";
 import { RequestRouteMap } from "@/components/request-route-map";
 import type { RequestRouteCoordinate } from "@/components/request-route-map.types";
 import { useColors } from "@/hooks/use-colors";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { trpc } from "@/lib/trpc";
 import { useTranslation } from "@/lib/i18n";
+import type { VersionedAreaMeasurementDraft } from "@/shared/area-measurement";
 
 type ServiceType =
   | "generic"
@@ -189,6 +191,7 @@ export default function CreateServiceScreen() {
   const [destinationCoordinate, setDestinationCoordinate] = useState<RequestRouteCoordinate | null>(null);
   const [isResolvingRoute, setIsResolvingRoute] = useState(false);
   const [attributes, setAttributes] = useState<Record<string, RequestAttributeValue>>({});
+  const [areaMeasurement, setAreaMeasurement] = useState<VersionedAreaMeasurementDraft | undefined>();
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const categoriesQuery = trpc.categories.list.useQuery();
   const countryRegistryQuery = trpc.countryRegistry.list.useQuery(undefined, { refetchOnMount: true });
@@ -221,6 +224,7 @@ export default function CreateServiceScreen() {
   useEffect(() => {
     setSubcategoryId(undefined);
     setAttributes({});
+    setAreaMeasurement(undefined);
   }, [categoryId]);
 
   const uploadMediaMutation = trpc.requests.uploadMedia.useMutation();
@@ -451,6 +455,7 @@ export default function CreateServiceScreen() {
         destinationHasElevator: serviceType === "moving" ? destinationHasElevator : undefined,
         distanceKm: parseOptionalInteger(distanceKm),
         attributes: normalizedAttributes,
+        measurement: areaMeasurement,
       },
     });
   };
@@ -766,18 +771,8 @@ export default function CreateServiceScreen() {
               {serviceType === "painting" ? (
                 <View style={{ gap: 12 }}>
                   <Text style={{ fontSize: 14, fontWeight: "800", color: colors.foreground, textAlign: isRTL ? "right" : "left" }}>{t("request.details.painting")}</Text>
+                  <AreaMeasurementForm value={areaMeasurement} onChange={setAreaMeasurement} />
                   <View style={{ flexDirection: "row", gap: 12 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.details.area")}</Text>
-                      <TextInput
-                        value={attributes.areaSqm == null ? "" : String(attributes.areaSqm)}
-                        onChangeText={(value) => updateAttribute("areaSqm", parseOptionalInteger(value) ?? null)}
-                        placeholder={t("request.details.areaPlaceholder")}
-                        placeholderTextColor={colors.muted}
-                        keyboardType="numeric"
-                        style={{ backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, color: colors.foreground, borderWidth: 0.5, borderColor: colors.border }}
-                      />
-                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: "600", color: colors.muted, marginBottom: 6 }}>{t("request.details.roomCount")}</Text>
                       <TextInput

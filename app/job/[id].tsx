@@ -1,10 +1,14 @@
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
+import { AreaMeasurementForm } from "@/components/area-measurement-form";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
+import type { VersionedAreaMeasurementDraft } from "@/shared/area-measurement";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Teklif Bekliyor",
@@ -18,13 +22,43 @@ function displayRating(value: number | null) {
   return (value > 5 ? value / 10 : value).toFixed(1);
 }
 
+function measurementRowToDraft(measurement: {
+  idempotencyKey: string;
+  method: "manual_rectangle" | "manual_polygon" | "ar_depth" | "ar_plane";
+  unit: "m" | "cm";
+  geometryJson: string;
+  capabilityClass: "manual" | "ar_depth" | "ar_plane";
+  qualityWarning: "estimated" | "tracking_lost" | "low_confidence" | null;
+}): VersionedAreaMeasurementDraft | undefined {
+  try {
+    const geometry = JSON.parse(measurement.geometryJson) as { width?: number; height?: number; points?: { x: number; y: number }[]; confidence?: number | null };
+    return {
+      version: 1,
+      idempotencyKey: measurement.idempotencyKey,
+      method: measurement.method,
+      unit: measurement.unit,
+      width: geometry.width,
+      height: geometry.height,
+      points: geometry.points,
+      confidence: geometry.confidence ?? undefined,
+      capabilityClass: measurement.capabilityClass,
+      qualityWarning: measurement.qualityWarning ?? undefined,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export default function JobDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const colors = useColors();
   const router = useRouter();
+  const { user } = useAuth();
   const utils = trpc.useUtils();
   const requestId = Number(params.id);
   const isValidId = Number.isInteger(requestId) && requestId > 0;
+  const [isMeasurementEditorOpen, setMeasurementEditorOpen] = useState(false);
+  const [editedMeasurement, setEditedMeasurement] = useState<VersionedAreaMeasurementDraft | undefined>();
 
   const requestQuery = trpc.requests.get.useQuery(
     { id: requestId },
@@ -34,6 +68,27 @@ export default function JobDetailScreen() {
     { requestId },
     { enabled: isValidId },
   );
+  const isRequestOwner = requestQuery.data?.userId === user?.id;
+  const measurementQuery = trpc.requests.getMeasurement.useQuery(
+    { requestId },
+    { enabled: isValidId && isRequestOwner },
+  );
+  const replaceMeasurement = trpc.requests.replaceMeasurement.useMutation({
+    onSuccess: async () => {
+      setMeasurementEditorOpen(false);
+      setEditedMeasurement(undefined);
+      await utils.requests.getMeasurement.invalidate({ requestId });
+    },
+    onError: (error) => Alert.alert("Alan ölçümü güncellenemedi", error.message || "Lütfen manuel ölçümü gözden geçirip tekrar deneyin."),
+  });
+  const deleteMeasurement = trpc.requests.deleteMeasurement.useMutation({
+    onSuccess: async () => {
+      setMeasurementEditorOpen(false);
+      setEditedMeasurement(undefined);
+      await utils.requests.getMeasurement.invalidate({ requestId });
+    },
+    onError: (error) => Alert.alert("Alan ölçümü silinemedi", error.message || "Lütfen tekrar deneyin."),
+  });
   const acceptOffer = trpc.offers.accept.useMutation({
     onSuccess: async (_, variables) => {
       const accepted = offersQuery.data?.find((offer) => offer.id === variables.offerId);
@@ -158,6 +213,54 @@ export default function JobDetailScreen() {
             </View>
           ) : null}
         </View>
+
+        {isRequestOwner && request.status === "pending" ? (
+          <View style={{ marginTop: 14, borderRadius: 18, backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.border, padding: 14 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontWeight: "800" }}>Tahmini Alan Ölçümü</Text>
+                <Text style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>Teklif veya fiyat kararı değildir; işi tarif etmek için tahmini bilgidir.</Text>
+              </View>
+              {measurementQuery.isLoading ? <ActivityIndicator color={colors.primary} size="small" /> : null}
+            </View>
+            {measurementQuery.data ? (
+              <View style={{ marginTop: 12, borderRadius: 12, backgroundColor: `${colors.primary}12`, padding: 12 }}>
+                <Text style={{ color: colors.primary, fontWeight: "800" }}>{(measurementQuery.data.areaSquareCentimeters / 10_000).toLocaleString(undefined, { maximumFractionDigits: 2 })} m²</Text>
+                <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>{measurementQuery.data.method === "manual_polygon" ? "Manuel çokgen" : "Manuel dikdörtgen"}</Text>
+              </View>
+            ) : !measurementQuery.isLoading && !measurementQuery.isError ? (
+              <Text style={{ color: colors.muted, fontSize: 12, marginTop: 12 }}>Bu talep için henüz tahmini alan ölçümü eklenmedi.</Text>
+            ) : null}
+            {measurementQuery.isError ? <Text style={{ color: colors.error, fontSize: 12, marginTop: 12 }}>Alan ölçümü şu anda alınamadı. Lütfen tekrar deneyin.</Text> : null}
+            {isMeasurementEditorOpen ? (
+              <View style={{ marginTop: 12, gap: 10 }}>
+                <AreaMeasurementForm value={measurementQuery.data ? measurementRowToDraft(measurementQuery.data) : undefined} onChange={setEditedMeasurement} />
+                <Pressable
+                  disabled={!editedMeasurement || replaceMeasurement.isPending}
+                  onPress={() => editedMeasurement && replaceMeasurement.mutate({ requestId, measurement: editedMeasurement })}
+                  style={({ pressed }) => ({ borderRadius: 12, paddingVertical: 12, alignItems: "center", backgroundColor: !editedMeasurement || replaceMeasurement.isPending ? colors.muted : colors.primary, opacity: pressed ? 0.8 : 1 })}
+                >
+                  <Text style={{ color: "#FFFFFF", fontWeight: "800" }}>{replaceMeasurement.isPending ? "Kaydediliyor…" : "Ölçümü Kaydet"}</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <Pressable onPress={() => setMeasurementEditorOpen(true)} style={({ pressed }) => ({ flex: 1, borderRadius: 12, paddingVertical: 11, alignItems: "center", borderWidth: 1, borderColor: colors.primary, opacity: pressed ? 0.75 : 1 })}>
+                  <Text style={{ color: colors.primary, fontWeight: "800" }}>{measurementQuery.data ? "Düzenle / Yeniden Ölç" : "Tahmini Ölçüm Ekle"}</Text>
+                </Pressable>
+                {measurementQuery.data ? (
+                  <Pressable
+                    disabled={deleteMeasurement.isPending}
+                    onPress={() => Alert.alert("Ölçümü Sil", "Bu tahmini alan ölçümü silinsin mi?", [{ text: "Vazgeç", style: "cancel" }, { text: "Sil", style: "destructive", onPress: () => deleteMeasurement.mutate({ requestId }) }])}
+                    style={({ pressed }) => ({ borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, alignItems: "center", borderWidth: 1, borderColor: colors.error, opacity: pressed ? 0.75 : 1 })}
+                  >
+                    <Text style={{ color: colors.error, fontWeight: "800" }}>Sil</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            )}
+          </View>
+        ) : null}
 
         {request.status === "active" && acceptedOffer ? (
           <View style={{ marginTop: 18, borderRadius: 20, backgroundColor: `${colors.success}0D`, borderWidth: 1, borderColor: `${colors.success}30`, padding: 18 }}>

@@ -3,15 +3,37 @@ export type MeasurementPoint = {
   y: number;
 };
 
-export type AreaMeasurementUnit = "m2" | "cm2";
+/**
+ * `m` and `cm` are the canonical units for measured edges. The `m2` / `cm2`
+ * aliases remain accepted only to preserve P28 clients that supplied the unit
+ * as the resulting square-area unit.
+ */
+export type AreaMeasurementUnit = "m" | "cm" | "m2" | "cm2";
+
+export type AreaMeasurementMethod = "manual_rectangle" | "manual_polygon" | "ar_depth" | "ar_plane";
+
+export const AREA_MEASUREMENT_VERSION = 1 as const;
 
 export type AreaMeasurementDraft = {
-  method: "manual_rectangle" | "manual_polygon" | "ar_depth";
+  method: AreaMeasurementMethod;
   unit: AreaMeasurementUnit;
   points?: MeasurementPoint[];
   width?: number;
   height?: number;
   confidence?: number;
+};
+
+/**
+ * Bounded, image-free draft sent with a service request. The server recomputes
+ * areaM2 from the geometry and never treats a client field as a pricing or
+ * lifecycle authority. AR mesh, camera frames, EXIF and raw sensor data are
+ * intentionally excluded.
+ */
+export type VersionedAreaMeasurementDraft = AreaMeasurementDraft & {
+  version: typeof AREA_MEASUREMENT_VERSION;
+  idempotencyKey: string;
+  capabilityClass: "manual" | "ar_depth" | "ar_plane";
+  qualityWarning?: "estimated" | "tracking_lost" | "low_confidence";
 };
 
 export type AreaMeasurementResult = {
@@ -27,7 +49,7 @@ function isFiniteNonNegative(value: number): boolean {
 }
 
 function toMeters(value: number, unit: AreaMeasurementUnit): number {
-  return unit === "m2" ? value : value / 10_000;
+  return unit === "m" || unit === "m2" ? value : value / 10_000;
 }
 
 export function calculatePolygonArea(points: MeasurementPoint[], unit: AreaMeasurementUnit): number {

@@ -1956,6 +1956,38 @@ export const serviceRequestDetails = mysqlTable(
   ],
 );
 
+/**
+ * A user-confirmed, non-authoritative area estimate attached to one canonical
+ * service request. Raw camera frames, EXIF, AR meshes and sensor samples are
+ * deliberately not persisted. The server stores normalized square centimetres
+ * so area can be represented exactly to 0.0001 m² without floating-point
+ * pricing or lifecycle authority.
+ */
+export const serviceRequestMeasurements = mysqlTable(
+  "service_request_measurements",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    requestId: int("requestId").notNull(),
+    ownerUserId: int("ownerUserId").notNull(),
+    version: int("version").default(1).notNull(),
+    idempotencyKey: varchar("idempotencyKey", { length: 96 }).notNull(),
+    method: mysqlEnum("method", ["manual_rectangle", "manual_polygon", "ar_depth", "ar_plane"]).notNull(),
+    unit: mysqlEnum("unit", ["m", "cm"]).notNull(),
+    areaSquareCentimeters: int("areaSquareCentimeters").notNull(),
+    geometryJson: text("geometryJson").notNull(),
+    capabilityClass: mysqlEnum("capabilityClass", ["manual", "ar_depth", "ar_plane"]).notNull(),
+    qualityWarning: mysqlEnum("qualityWarning", ["estimated", "tracking_lost", "low_confidence"]),
+    deletedAt: timestamp("deletedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("service_request_measurements_request_unique").on(table.requestId),
+    uniqueIndex("service_request_measurements_owner_idempotency_unique").on(table.ownerUserId, table.idempotencyKey),
+    index("service_request_measurements_owner_request_idx").on(table.ownerUserId, table.requestId),
+  ],
+);
+
 // Immutable metadata for request images/videos uploaded through the authenticated API.
 export const serviceRequestMedia = mysqlTable(
   "service_request_media",

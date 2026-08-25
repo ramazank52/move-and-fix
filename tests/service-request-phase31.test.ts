@@ -15,6 +15,9 @@ vi.mock("../server/db", () => ({
   getServiceRequestById: vi.fn(),
   getServiceRequestDetails: vi.fn(),
   getServiceRequestMedia: vi.fn(),
+  getServiceRequestMeasurementForOwner: vi.fn(),
+  replaceServiceRequestMeasurementForOwner: vi.fn(),
+  deleteServiceRequestMeasurementForOwner: vi.fn(),
   getUserServiceRequests: vi.fn(),
 }));
 

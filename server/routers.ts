@@ -81,6 +81,43 @@ const agreementEvidenceMediaIdsSchema = z
   .max(8)
   .refine((ids) => new Set(ids).size === ids.length, "Kanıt dosyası tekrar edemez");
 
+const areaMeasurementPointSchema = z.object({
+  x: z.number().finite().min(0).max(100_000),
+  y: z.number().finite().min(0).max(100_000),
+}).strict();
+
+const areaMeasurementSchema = z.object({
+  version: z.literal(1),
+  idempotencyKey: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{15,95}$/, "Geçersiz ölçüm idempotency anahtarı"),
+  method: z.enum(["manual_rectangle", "manual_polygon", "ar_depth", "ar_plane"]),
+  unit: z.enum(["m", "cm", "m2", "cm2"]),
+  width: z.number().finite().positive().max(100_000).optional(),
+  height: z.number().finite().positive().max(100_000).optional(),
+  points: z.array(areaMeasurementPointSchema).min(3).max(100).optional(),
+  confidence: z.number().finite().min(0).max(1).optional(),
+  capabilityClass: z.enum(["manual", "ar_depth", "ar_plane"]),
+  qualityWarning: z.enum(["estimated", "tracking_lost", "low_confidence"]).optional(),
+}).strict().superRefine((measurement, ctx) => {
+  if (measurement.method === "manual_rectangle" || measurement.method === "ar_depth" || measurement.method === "ar_plane") {
+    if (measurement.width == null || measurement.height == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ölçüm genişlik ve yükseklik içermelidir" });
+    }
+  }
+  if (measurement.method === "manual_polygon" && !measurement.points) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Çokgen ölçüm en az üç nokta içermelidir" });
+  }
+  if ((measurement.method === "ar_depth" || measurement.method === "ar_plane") && measurement.confidence == null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "AR ölçümü güven skoru içermelidir" });
+  }
+  if (
+    (measurement.capabilityClass === "manual" && !measurement.method.startsWith("manual_"))
+    || (measurement.capabilityClass === "ar_depth" && measurement.method !== "ar_depth")
+    || (measurement.capabilityClass === "ar_plane" && measurement.method !== "ar_plane")
+  ) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ölçüm capability sınıfı yöntemle uyuşmuyor" });
+  }
+});
+
 const serviceRequestDetailsSchema = z.object({
   subcategoryId: z.number().int().positive().optional(),
   serviceType: serviceRequestTypeSchema,
@@ -98,6 +135,7 @@ const serviceRequestDetailsSchema = z.object({
   attributes: z
     .record(z.string().trim().min(1).max(80), requestAttributeValueSchema)
     .refine((attributes) => Object.keys(attributes).length <= 30, "En fazla 30 hizmet alanı gönderilebilir"),
+  measurement: areaMeasurementSchema.optional(),
 });
 
 const allowedRequestMedia = {
@@ -233,6 +271,26 @@ function mapPhaseDError(error: unknown): never {
     message.includes("CURRENCY_NOT_SUPPORTED")
   ) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Gönderilen veri veya işlem durumu geçersiz" });
+  }
+  throw error;
+}
+
+function mapAreaMeasurementError(error: unknown): never {
+  const message = error instanceof Error ? error.message : "AREA_MEASUREMENT_OPERATION_FAILED";
+  if (message === "AREA_MEASUREMENT_FORBIDDEN") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Bu alan ölçümüne erişim yetkiniz yok" });
+  }
+  if (message === "AREA_MEASUREMENT_NOT_FOUND") {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Alan ölçümü bulunamadı" });
+  }
+  if (message === "AREA_MEASUREMENT_REQUEST_NOT_EDITABLE" || message === "AREA_MEASUREMENT_IDEMPOTENCY_CONFLICT") {
+    throw new TRPCError({ code: "CONFLICT", message: "Talebin mevcut durumu alan ölçümünü değiştirmeye uygun değil" });
+  }
+  if (message === "MIGRATION_REQUIRED_AREA_MEASUREMENT") {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Tahmini alan ölçümü altyapısı henüz yapılandırılmadı" });
+  }
+  if (message.startsWith("AREA_MEASUREMENT_") || message.startsWith("MEASUREMENT_")) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Tahmini alan ölçümü geçersiz" });
   }
   throw error;
 }
@@ -1054,6 +1112,37 @@ export const appRouter = router({
         ]);
         return { ...request, details, media };
       }),
+    getMeasurement: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        try {
+          return await db.getServiceRequestMeasurementForOwner({ requestId: input.requestId, ownerUserId: ctx.user.id });
+        } catch (error) {
+          return mapAreaMeasurementError(error);
+        }
+      }),
+    replaceMeasurement: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive(), measurement: areaMeasurementSchema }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.replaceServiceRequestMeasurementForOwner({
+            requestId: input.requestId,
+            ownerUserId: ctx.user.id,
+            measurement: input.measurement,
+          });
+        } catch (error) {
+          return mapAreaMeasurementError(error);
+        }
+      }),
+    deleteMeasurement: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await db.deleteServiceRequestMeasurementForOwner({ requestId: input.requestId, ownerUserId: ctx.user.id });
+        } catch (error) {
+          return mapAreaMeasurementError(error);
+        }
+      }),
     create: protectedProcedure
       .input(z.object({
         categoryId: z.number().int().positive(),
@@ -1093,6 +1182,12 @@ export const appRouter = router({
         }
 
         if (input.details) {
+          if (input.details.measurement && ["ar_depth", "ar_plane"].includes(input.details.measurement.method)) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Doğrulanmış native AR ölçüm adapterı yapılandırılmadı; manuel ölçüm kullanın",
+            });
+          }
           try {
             await db.assertServiceRequestDetailCatalog({
               categoryId: category.id,
@@ -1121,6 +1216,15 @@ export const appRouter = router({
               code: "PRECONDITION_FAILED",
               message: "Hizmet ülkesi ve uyum gereksinimleri doğrulanmadan talep oluşturulamaz",
             });
+          }
+          if (message === "MIGRATION_REQUIRED_AREA_MEASUREMENT") {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Tahmini alan ölçümü altyapısı henüz yapılandırılmadı; ölçümle birlikte talep güvenle oluşturulamaz",
+            });
+          }
+          if (message.startsWith("AREA_MEASUREMENT_") || message.startsWith("MEASUREMENT_")) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Tahmini alan ölçümü geçersiz" });
           }
           throw error;
         }
