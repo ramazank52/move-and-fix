@@ -942,10 +942,10 @@
 - [x] P31P33-1 — Versioned alan ölçümünü gerçek service-request create/edit controller’ına owner-scoped, idempotent, BOLA-korumalı ve manuel rectangle/polygon fallback ile bağla
 - [ ] P31P33-2 — Area measurement UI’da tahmini ölçüm özeti, düzelt/sil/yeniden ölç, permission/tracking/error/unsupported durumları ve server limitleri için testleri tamamla
 - [ ] P31P33-3 — Native AR adapter/config/prebuild capability sınırını doğrulanmış Expo uyumluluğuyla kod-hazır yap; fiziksel iOS/Android doğruluk kanıtını EXTERNAL_BLOCKER tut
-- [ ] P31P33-4 — Review + pending moderation atomic writer testlerini rollback/idempotency/concurrency bakımından genişlet; approved-only rating persistence ve aggregate akışını tamamla
-- [ ] P31P33-5 — Rating reconciliation apply yolunu MFA/RBAC, dry-run varsayılanı, plan hash/schema drift, batch/checkpoint/resume/idempotency ve PII-minimal audit ile kod-hazır yap
-- [ ] P31P33-6 — 0090 capacity adayını migration-first sözleşme ile doğrula; maxConcurrentJobs fail-closed default 1, admin-only değişim, atomic winner/capacity guard ve kaynak yarış testlerini uygula
-- [ ] P31P33-7 — Outbox request create/cancel/provider suspension enqueue-revoke lifecycle, worker lease/retry/dead-letter/duplicate-send kaynak testlerini migration/credential uygulanmadan tamamla
+- [x] P31P33-4 — Review + pending moderation atomic writer testlerini rollback/idempotency/concurrency bakımından genişlet; approved-only rating persistence ve aggregate akışını tamamla
+- [x] P31P33-5 — Rating reconciliation apply yolunu MFA/RBAC, dry-run varsayılanı, plan hash/schema drift, batch/checkpoint/resume/idempotency ve PII-minimal audit ile kod-hazır yap
+- [x] P31P33-6 — 0090 capacity adayını migration-first sözleşme ile doğrula; maxConcurrentJobs fail-closed default 1, admin-only değişim, atomic winner/capacity guard ve kaynak yarış testlerini uygula
+- [x] P31P33-7 — Outbox request create/cancel/provider suspension enqueue-revoke lifecycle, worker lease/retry/dead-letter/duplicate-send kaynak testlerini migration/credential uygulanmadan tamamla
 - [ ] P31P33-8 — Shared view’ın gerçek runtime controller tarafından navigation, mutation, loading/error/empty/offline ve role/lifecycle state’leriyle kullanıldığını doğrula; sahte fixture paraleli oluşturma
 - [ ] P31P33-9 — Payment/maps/push/sound/SMS-email/MoveAI/document/media/camera-AR için server-owned AVAILABLE/NOT_CONFIGURED/NOT_SUPPORTED/TEMPORARILY_UNAVAILABLE/PERMISSION_REQUIRED/OFFLINE/UNAUTHORIZED UI ayrımını gerçek ekranlara bağla
 - [ ] P31P33-10 — Route/control residual audit, migration runbook, full quality gates, clean install/extract verification, complete-source ZIP, manifest/SHA, final reports ve yalnız gerçek external blocker’ları tamamla

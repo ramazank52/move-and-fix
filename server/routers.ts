@@ -2957,6 +2957,75 @@ Do not infer unavailable categories. If no candidate is exact enough, use "gener
             revokedByUserId: actorId,
           }),
         };
+    }),
+  }),
+
+  ratingReconciliation: router({
+    plan: superAdminMfaProcedure.query(async () => {
+      try {
+        const plan = await db.planApprovedRatingReconciliation();
+        return {
+          planHash: plan.planHash,
+          schemaFingerprint: plan.schemaFingerprint,
+          aggregateCount: plan.aggregateCount,
+          mode: "dry_run" as const,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "RATING_RECONCILIATION_PLAN_FAILED";
+        if (message === "MIGRATION_REQUIRED_RATING_RECONCILIATION") {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Rating reconciliation migrationı henüz uygulanmadı" });
+        }
+        throw error;
+      }
+    }),
+    applyRun: superAdminMfaProcedure
+      .input(z.object({
+        runKey: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{15,95}$/),
+        expectedPlanHash: z.string().regex(/^[a-f0-9]{64}$/i),
+        expectedSchemaFingerprint: z.string().regex(/^[a-f0-9]{64}$/i),
+        batchSize: z.number().int().min(1).max(500).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const actorUserId = ctx.user?.id;
+        if (!actorUserId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        try {
+          return await db.applyApprovedRatingReconciliation({ actorUserId, ...input });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "RATING_RECONCILIATION_APPLY_FAILED";
+          if (["RATING_RECONCILIATION_APPLY_NOT_CONFIGURED", "MIGRATION_REQUIRED_RATING_RECONCILIATION"].includes(message)) {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Rating reconciliation apply yalnız doğrulanmış private staging ortamında etkinleştirilebilir" });
+          }
+          if (["RATING_RECONCILIATION_PLAN_STALE", "RATING_RECONCILIATION_RUN_CONFLICT"].includes(message)) {
+            throw new TRPCError({ code: "CONFLICT", message: "Rating reconciliation planı güncel değil veya run key başka bir planla bağlı" });
+          }
+          if (message.startsWith("RATING_RECONCILIATION_RUN_KEY_") || message.startsWith("RATING_RECONCILIATION_PLAN_HASH_") || message === "RATING_RECONCILIATION_BATCH_INVALID") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Rating reconciliation apply girdisi geçersiz" });
+          }
+          throw error;
+        }
+      }),
+  }),
+
+  providerCapacity: router({
+    setMaxConcurrentActiveJobs: superAdminMfaProcedure
+      .input(z.object({
+        providerId: z.number().int().positive(),
+        maxConcurrentActiveJobs: z.number().int().min(1).max(10),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const actorUserId = ctx.user?.id;
+        if (!actorUserId) throw new TRPCError({ code: "UNAUTHORIZED" });
+        try {
+          return await db.setProviderMaxConcurrentActiveJobs({ actorUserId, ...input });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "PROVIDER_CAPACITY_UPDATE_FAILED";
+          if (message === "MIGRATION_REQUIRED_PROVIDER_CAPACITY") {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Provider capacity migrationı henüz uygulanmadı" });
+          }
+          if (message === "PROVIDER_NOT_FOUND") throw new TRPCError({ code: "NOT_FOUND", message: "Profesyonel bulunamadı" });
+          if (message.startsWith("PROVIDER_CAPACITY_")) throw new TRPCError({ code: "BAD_REQUEST", message: "Geçersiz provider capacity değeri" });
+          throw error;
+        }
       }),
   }),
 

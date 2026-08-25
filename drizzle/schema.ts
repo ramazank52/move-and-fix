@@ -620,6 +620,58 @@ export const providers = mysqlTable("providers", {
 });
 
 /**
+ * Persisted view of approved reviews only. `averageRatingTenths` mirrors the
+ * legacy provider.rating display convention (45 means 4.5), while the source
+ * hash binds the aggregate to an explicit reconciliation plan.
+ */
+export const providerRatingAggregates = mysqlTable(
+  "provider_rating_aggregates",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    providerId: int("providerId").notNull(),
+    approvedReviewCount: int("approvedReviewCount").notNull(),
+    averageRatingTenths: int("averageRatingTenths").notNull(),
+    sourcePlanHash: varchar("sourcePlanHash", { length: 64 }).notNull(),
+    reconciledAt: timestamp("reconciledAt").defaultNow().notNull(),
+    reconciledByUserId: int("reconciledByUserId").notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("provider_rating_aggregates_provider_unique").on(table.providerId),
+    index("provider_rating_aggregates_plan_idx").on(table.sourcePlanHash, table.reconciledAt),
+  ],
+);
+
+/**
+ * Append-only plan/apply ledger. It contains no review text, reviewer identity,
+ * email, phone, address or raw ratings; only run-level hashes/counts and a
+ * monotonic provider checkpoint for safe private-staging resume.
+ */
+export const ratingReconciliationRuns = mysqlTable(
+  "rating_reconciliation_runs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    runKey: varchar("runKey", { length: 96 }).notNull(),
+    mode: mysqlEnum("mode", ["dry_run", "apply"]).notNull(),
+    status: mysqlEnum("status", ["planned", "applying", "applied", "failed"]).notNull(),
+    actorUserId: int("actorUserId").notNull(),
+    planHash: varchar("planHash", { length: 64 }).notNull(),
+    schemaFingerprint: varchar("schemaFingerprint", { length: 64 }).notNull(),
+    batchSize: int("batchSize").notNull(),
+    checkpointProviderId: int("checkpointProviderId").default(0).notNull(),
+    appliedProviderCount: int("appliedProviderCount").default(0).notNull(),
+    failureCode: varchar("failureCode", { length: 96 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    finishedAt: timestamp("finishedAt"),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("rating_reconciliation_runs_key_unique").on(table.runKey),
+    index("rating_reconciliation_runs_status_created_idx").on(table.status, table.createdAt),
+  ],
+);
+
+/**
  * Provider-entered operating context for one exact canonical capability in one
  * jurisdiction. This is intentionally distinct from providerCapabilityStatuses:
  * the latter reflects credential evaluation; this record retains the declared

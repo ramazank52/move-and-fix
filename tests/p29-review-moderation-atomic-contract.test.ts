@@ -7,7 +7,7 @@ const reviewSection = dbSource.slice(dbSource.indexOf("// Reviews"), dbSource.in
 
 describe("P29 review + moderation atomic writer contract", () => {
   it("uses one transaction to create a review and a pending canonical moderation record", () => {
-    expect(reviewSection).toContain("return db.transaction(async (tx) => {");
+    expect(reviewSection).toContain("return await db.transaction(async (tx) => {");
     expect(reviewSection).toContain("await tx.insert(reviews).values");
     expect(reviewSection).toContain("await tx.insert(userContentModerationRecords).values");
     expect(reviewSection).toContain('surface: "review"');
@@ -22,5 +22,15 @@ describe("P29 review + moderation atomic writer contract", () => {
     expect(reviewSection).toContain("idempotent: true");
     expect(reviewSection).toContain('contentHash: createHash("sha256")');
     expect(reviewSection).not.toContain("auditComment");
+  });
+
+  it("fails closed for absent moderation schema and recovers only a same-owner/provider duplicate-request race", () => {
+    expect(reviewSection).toContain("isReviewModerationMigrationMissing");
+    expect(reviewSection).toContain("MIGRATION_REQUIRED_REVIEW_MODERATION");
+    expect(reviewSection).toContain("isDuplicateReviewRequest");
+    expect(reviewSection).toContain("REVIEW_IDEMPOTENCY_CONFLICT");
+    expect(reviewSection).toContain("existing[0].userId !== data.userId");
+    expect(reviewSection).toContain("existing[0].providerId !== data.providerId");
+    expect(reviewSection).toContain("moderationStatus: moderation[0].status");
   });
 });

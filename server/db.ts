@@ -37,6 +37,7 @@ import {
 import { assertCountryMarketplaceTransition } from "./compliance/CountryComplianceRepository";
 import { decideProviderOnboardingActivation } from "./compliance/ProviderOnboardingPolicy";
 import { evaluateUserGeneratedContent } from "./moderation/UserContentModerationPolicy";
+import { buildRatingReconciliationPlan, type RatingReconciliationPlan } from "./reviews/RatingReconciliation";
 import { getApmConfigurationStatus } from "./_core/observability";
 import {
   assertPaymentStatusTransition,
@@ -1464,6 +1465,8 @@ import {
   serviceRequestMeasurements,
   serviceRequestMedia,
   providers,
+  providerRatingAggregates,
+  ratingReconciliationRuns,
   offers,
   messages,
   payments,
@@ -1569,6 +1572,7 @@ import {
   assertProviderMarketplaceEligibility,
   type MarketplaceTransition,
 } from "./matching/ProviderEligibilityService";
+import { assertProviderCapacityAvailable, decideProviderCapacity } from "./matching/ProviderCapacityPolicy";
 import { buildOpportunityNotificationIntent } from "./matching/OpportunityNotificationPolicy";
 import { evaluateInsuranceCapability } from "./compliance/InsuranceCapabilityPolicy";
 import { evaluateWorkerClassification } from "./compliance/WorkerClassificationPolicy";
@@ -1972,6 +1976,14 @@ export async function assertProviderMarketplaceEligibilityForRequest(input: {
     providerHasValidArea && provider.latitude !== null && provider.longitude !== null
   );
   const isJobStart = input.transition === "JOB_START";
+  const providerCapacity = decideProviderCapacity({
+    // 0090 is deliberately unapplied in the current canonical runtime. Until
+    // a verified same-engine migration preflight exposes this server-owned
+    // column, capacity must remain the conservative default rather than a
+    // client/admin claim or an unsafe implicit unlimited value.
+    configuredMaxConcurrentActiveJobs: undefined,
+    activeJobCount: activeAssignments.length,
+  });
   assertProviderMarketplaceEligibility({
     transition: input.transition,
     countryTransitionAllowed,
@@ -1981,16 +1993,46 @@ export async function assertProviderMarketplaceEligibilityForRequest(input: {
     providerIsVerified: provider.isVerified === 1 && provider.verificationStatus === "approved",
     providerIsAvailable: provider.isAvailable === 1,
     providerEnforcementClear,
-    // Capacity configuration is not yet migration-backed in every protected
-    // runtime. Until it is, any active assignment denies further matching
-    // rather than guessing a numeric capacity from client input.
-    providerCapacityAvailable: activeAssignments.length === 0,
+    providerCapacityAvailable: providerCapacity.available,
     capabilityAllowed,
     credentialAllowed,
     scopeAllowed: capabilityStatus?.status !== "VERIFIED_LIMITED_SCOPE" || capabilityStatus.scopeConstraintsJson != null,
     serviceAreaAllowed,
     safetyAllowed,
   });
+}
+
+export async function setProviderMaxConcurrentActiveJobs(input: {
+  providerId: number;
+  maxConcurrentActiveJobs: number;
+  actorUserId: number;
+}) {
+  const database = await getDb();
+  if (!database) throw new Error("DATABASE_NOT_AVAILABLE");
+  if (!Number.isInteger(input.actorUserId) || input.actorUserId <= 0) throw new Error("PROVIDER_CAPACITY_ACTOR_INVALID");
+  const normalized = decideProviderCapacity({ configuredMaxConcurrentActiveJobs: input.maxConcurrentActiveJobs, activeJobCount: 0 });
+  if (normalized.usedFallback || normalized.maxConcurrentActiveJobs !== input.maxConcurrentActiveJobs) {
+    throw new Error("PROVIDER_CAPACITY_VALUE_INVALID");
+  }
+  try {
+    const provider = await database.select({ id: providers.id }).from(providers).where(eq(providers.id, input.providerId)).limit(1);
+    if (!provider[0]) throw new Error("PROVIDER_NOT_FOUND");
+    await database.execute(sql`
+      UPDATE providers
+      SET maxConcurrentActiveJobs = ${normalized.maxConcurrentActiveJobs}
+      WHERE id = ${input.providerId}
+    `);
+    await database.insert(operationalEvents).values({
+      eventType: "provider_capacity_changed",
+      severity: "info",
+      actorUserId: input.actorUserId,
+      metadataJson: { providerId: input.providerId, maxConcurrentActiveJobs: normalized.maxConcurrentActiveJobs },
+    });
+    return { providerId: input.providerId, maxConcurrentActiveJobs: normalized.maxConcurrentActiveJobs };
+  } catch (error) {
+    if (isUnknownProviderCapacityColumn(error)) throw new Error("MIGRATION_REQUIRED_PROVIDER_CAPACITY");
+    throw error;
+  }
 }
 
 /**
@@ -2093,6 +2135,35 @@ export async function deliverMarketplaceOpportunityInApp(input: ClaimedOpportuni
     .where(eq(providers.id, input.providerId))
     .limit(1);
   if (!provider) throw new Error("OPPORTUNITY_OUTBOX_PROVIDER_NOT_FOUND");
+  try {
+    const [request] = await database
+      .select({ id: serviceRequests.id, status: serviceRequests.status, assignedProviderId: serviceRequests.assignedProviderId })
+      .from(serviceRequests)
+      .where(eq(serviceRequests.id, input.requestId))
+      .limit(1);
+    if (!request || request.status !== "pending" || request.assignedProviderId !== null) {
+      throw new Error("OPPORTUNITY_OUTBOX_REQUEST_NOT_ELIGIBLE");
+    }
+    await assertProviderMarketplaceEligibilityForRequest({
+      providerId: input.providerId,
+      requestId: input.requestId,
+      transition: "OPPORTUNITY_EXPOSURE",
+    });
+  } catch {
+    await database.update(marketplaceOpportunityNotifications).set({
+      status: "revoked",
+      revokedAt: new Date(),
+      claimToken: null,
+      claimUntil: null,
+      reasonCode: "DELIVERY_ELIGIBILITY_RECHECK_FAILED",
+      updatedAt: new Date(),
+    }).where(and(
+      eq(marketplaceOpportunityNotifications.id, input.id),
+      eq(marketplaceOpportunityNotifications.claimToken, input.claimToken),
+      eq(marketplaceOpportunityNotifications.status, "processing"),
+    ));
+    return null;
+  }
   const [preferenceRow] = await database.select({ channelsJson: userNotificationPreferences.channelsJson })
     .from(userNotificationPreferences)
     .where(eq(userNotificationPreferences.userId, provider.userId))
@@ -3816,6 +3887,16 @@ export async function createServiceRequest(data: {
     jurisdictionId: complianceContext.jurisdictionId,
     transition: "REQUEST_CREATION",
   });
+  const outboxEnqueueEnabled = process.env.MARKETPLACE_OUTBOX_RUNTIME === "private_staging"
+    && process.env.MARKETPLACE_OUTBOX_ENQUEUE_ENABLED === "true";
+  const opportunityCandidateIds = outboxEnqueueEnabled
+    ? (await db.select({ id: providers.id }).from(providers).where(and(
+      eq(providers.categoryId, data.categoryId),
+      eq(providers.isAvailable, 1),
+      eq(providers.isVerified, 1),
+      eq(providers.verificationStatus, "approved"),
+    )).limit(100)).map((provider) => provider.id)
+    : [];
   const { details, countryCode: _countryCode, ...requestData } = data;
   const measurement = details?.measurement ? prepareAreaMeasurementForPersistence(details.measurement) : undefined;
   if (measurement) {
@@ -3860,6 +3941,37 @@ export async function createServiceRequest(data: {
           version: AREA_MEASUREMENT_VERSION,
           ...measurement,
         });
+      }
+      if (outboxEnqueueEnabled) {
+        for (const providerId of opportunityCandidateIds) {
+          const intent = buildOpportunityNotificationIntent({
+            requestId,
+            providerId,
+            type: "opportunity_available",
+            reasonCode: "REQUEST_CREATED",
+          });
+          await tx.insert(marketplaceOpportunityNotifications).values({
+            requestId: intent.requestId,
+            providerId: intent.providerId,
+            eventType: intent.type,
+            status: "queued",
+            idempotencyKey: intent.idempotencyKey,
+            deepLink: intent.deepLink,
+            reasonCode: intent.reasonCode,
+            nextAttemptAt: new Date(),
+          }).onDuplicateKeyUpdate({
+            set: {
+              status: "queued",
+              reasonCode: intent.reasonCode,
+              nextAttemptAt: new Date(),
+              claimToken: null,
+              claimedAt: null,
+              claimUntil: null,
+              lastErrorCode: null,
+              updatedAt: new Date(),
+            },
+          });
+        }
       }
       return requestId;
     });
@@ -6143,6 +6255,13 @@ export async function recordProviderCapabilityEnforcementEvent(input: {
   assertAuthorizedCapabilityProfileActor("enforcement", input.actorRole);
   if (!/^[a-f0-9]{64}$/i.test(input.evidenceHash)) throw new Error("CAPABILITY_PROFILE_EVIDENCE_HASH_INVALID");
   return db.transaction(async (tx) => {
+    const profileRows = await tx
+      .select({ providerId: providerCapabilityProfiles.providerId })
+      .from(providerCapabilityProfiles)
+      .where(eq(providerCapabilityProfiles.id, input.profileId))
+      .limit(1);
+    const profile = profileRows[0];
+    if (!profile) throw new Error("CAPABILITY_PROFILE_STALE_WRITE");
     const enforcementState = input.action === "release" ? "clear" : input.action === "block" ? "blocked" : "suspended";
     const updated = await tx.update(providerCapabilityProfiles).set({
       enforcementState,
@@ -6163,6 +6282,19 @@ export async function recordProviderCapabilityEnforcementEvent(input: {
       actorRole: input.actorRole,
       evidenceHash: input.evidenceHash,
     });
+    if (input.action !== "release") {
+      await tx.update(marketplaceOpportunityNotifications).set({
+        status: "revoked",
+        revokedAt: new Date(),
+        claimToken: null,
+        claimUntil: null,
+        reasonCode: `PROVIDER_ENFORCEMENT_${input.action.toUpperCase()}`,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(marketplaceOpportunityNotifications.providerId, profile.providerId),
+        inArray(marketplaceOpportunityNotifications.status, ["queued", "processing"]),
+      ));
+    }
     return { profileId: input.profileId, enforcementState };
   });
 }
@@ -8183,6 +8315,31 @@ export async function acceptOffer(offerId: number, userId: number) {
       .limit(1);
     const provider = providerRows[0];
     if (!provider) throw new Error("OFFER_ACCEPT_PROVIDER_NOT_FOUND");
+
+    let configuredMaxConcurrentActiveJobs: unknown;
+    try {
+      const capacityResult = await tx.execute(sql`
+        SELECT maxConcurrentActiveJobs
+        FROM providers
+        WHERE id = ${provider.id}
+        FOR UPDATE
+      `);
+      configuredMaxConcurrentActiveJobs = rawFirstRow(capacityResult)?.maxConcurrentActiveJobs;
+    } catch (capacityError) {
+      if (!isUnknownProviderCapacityColumn(capacityError)) throw capacityError;
+      // 0090 has not been applied in the current canonical runtime. Lock the
+      // provider row anyway, then apply the conservative policy default.
+      await tx.execute(sql`SELECT id FROM providers WHERE id = ${provider.id} FOR UPDATE`);
+      configuredMaxConcurrentActiveJobs = undefined;
+    }
+    const lockedActiveJobs = await tx
+      .select({ id: serviceRequests.id })
+      .from(serviceRequests)
+      .where(and(eq(serviceRequests.assignedProviderId, provider.id), eq(serviceRequests.status, "active")));
+    assertProviderCapacityAvailable({
+      configuredMaxConcurrentActiveJobs,
+      activeJobCount: lockedActiveJobs.length,
+    });
     await assertProviderMarketplaceEligibilityForRequest({
       providerId: provider.id,
       requestId: request.id,
@@ -8826,6 +8983,17 @@ export async function reviewJobCancellationForAdmin(data: {
           ),
         );
       if ((requestResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REQUEST_UPDATE_CONFLICT");
+      await tx.update(marketplaceOpportunityNotifications).set({
+        status: "revoked",
+        revokedAt: now,
+        claimToken: null,
+        claimUntil: null,
+        reasonCode: "REQUEST_CANCELLED",
+        updatedAt: now,
+      }).where(and(
+        eq(marketplaceOpportunityNotifications.requestId, data.requestId),
+        inArray(marketplaceOpportunityNotifications.status, ["queued", "processing"]),
+      ));
     } else {
       if (!payment || payment.status !== "held") {
         throw new Error("CANCELLATION_SETTLEMENT_REQUIRES_HELD_PAYMENT");
@@ -8911,6 +9079,17 @@ async function resolveRefundCancellationInTransaction(
     .set({ status: "cancelled" })
     .where(and(eq(serviceRequests.id, payment.requestId), eq(serviceRequests.status, "active")));
   if ((requestResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REQUEST_UPDATE_CONFLICT");
+  await tx.update(marketplaceOpportunityNotifications).set({
+    status: "revoked",
+    revokedAt: now,
+    claimToken: null,
+    claimUntil: null,
+    reasonCode: "REQUEST_CANCELLED_REFUND",
+    updatedAt: now,
+  }).where(and(
+    eq(marketplaceOpportunityNotifications.requestId, payment.requestId),
+    inArray(marketplaceOpportunityNotifications.status, ["queued", "processing"]),
+  ));
   return true;
 }
 
@@ -9011,6 +9190,17 @@ async function resolvePartialRefundCancellationInTransaction(
     .set({ status: "cancelled" })
     .where(and(eq(serviceRequests.id, payment.requestId), eq(serviceRequests.status, "active")));
   if ((requestResult[0]?.affectedRows ?? 0) !== 1) throw new Error("CANCELLATION_REQUEST_UPDATE_CONFLICT");
+  await tx.update(marketplaceOpportunityNotifications).set({
+    status: "revoked",
+    revokedAt: now,
+    claimToken: null,
+    claimUntil: null,
+    reasonCode: "REQUEST_CANCELLED_PARTIAL_REFUND",
+    updatedAt: now,
+  }).where(and(
+    eq(marketplaceOpportunityNotifications.requestId, payment.requestId),
+    inArray(marketplaceOpportunityNotifications.status, ["queued", "processing"]),
+  ));
   return true;
 }
 
@@ -9084,6 +9274,31 @@ export async function completeJob(requestId: number, userId: number) {
 }
 
 // Reviews
+function isReviewModerationMigrationMissing(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string } | null;
+  return candidate?.code === "ER_NO_SUCH_TABLE"
+    || /user_content_moderation_records.*(?:doesn't exist|does not exist|not found)/i.test(candidate?.message ?? "");
+}
+
+function isDuplicateReviewRequest(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string } | null;
+  return candidate?.code === "ER_DUP_ENTRY"
+    && /reviews.*requestId|requestId.*reviews/i.test(candidate?.message ?? "");
+}
+
+function isUnknownProviderCapacityColumn(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string } | null;
+  return candidate?.code === "ER_BAD_FIELD_ERROR"
+    || /maxConcurrentActiveJobs.*(?:unknown column|doesn't exist|does not exist)/i.test(candidate?.message ?? "");
+}
+
+function rawFirstRow(value: unknown): Record<string, unknown> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const rows = Array.isArray(value[0]) ? value[0] : value;
+  const row = rows[0];
+  return row != null && typeof row === "object" && !Array.isArray(row) ? row as Record<string, unknown> : undefined;
+}
+
 export async function createReview(data: {
   requestId: number;
   userId: number;
@@ -9103,7 +9318,8 @@ export async function createReview(data: {
     }
   }
 
-  return db.transaction(async (tx) => {
+  try {
+    return await db.transaction(async (tx) => {
     const requestRows = await tx
       .select()
       .from(serviceRequests)
@@ -9162,8 +9378,37 @@ export async function createReview(data: {
       reasonCode: policy.reasonCode,
     });
 
-    return { success: true, reviewId, moderationStatus: "pending", idempotent: false };
-  });
+      return { success: true, reviewId, moderationStatus: "pending", idempotent: false };
+    });
+  } catch (error) {
+    if (isReviewModerationMigrationMissing(error)) throw new Error("MIGRATION_REQUIRED_REVIEW_MODERATION");
+    if (isDuplicateReviewRequest(error)) {
+      const existing = await db
+        .select({ id: reviews.id, userId: reviews.userId, providerId: reviews.providerId })
+        .from(reviews)
+        .where(eq(reviews.requestId, data.requestId))
+        .limit(1);
+      if (!existing[0] || existing[0].userId !== data.userId || existing[0].providerId !== data.providerId) {
+        throw new Error("REVIEW_IDEMPOTENCY_CONFLICT");
+      }
+      try {
+        const moderation = await db
+          .select({ status: userContentModerationRecords.status })
+          .from(userContentModerationRecords)
+          .where(and(
+            eq(userContentModerationRecords.surface, "review"),
+            eq(userContentModerationRecords.contentReference, `review:${existing[0].id}`),
+          ))
+          .limit(1);
+        if (!moderation[0]) throw new Error("MIGRATION_REQUIRED_REVIEW_MODERATION");
+        return { success: true, reviewId: existing[0].id, moderationStatus: moderation[0].status, idempotent: true };
+      } catch (recoveryError) {
+        if (isReviewModerationMigrationMissing(recoveryError)) throw new Error("MIGRATION_REQUIRED_REVIEW_MODERATION");
+        throw recoveryError;
+      }
+    }
+    throw error;
+  }
 }
 
 export async function getProviderReviews(providerId: number, limit = 50, offset = 0) {
@@ -9203,6 +9448,159 @@ export async function getProviderReviews(providerId: number, limit = 50, offset 
     // A public endpoint must never treat an absent moderation table as approval.
     console.warn("[moderation] public review visibility unavailable", { providerId, error: error instanceof Error ? error.name : "unknown" });
     return [];
+  }
+}
+
+const RATING_RECONCILIATION_SCHEMA_FINGERPRINT = createHash("sha256")
+  .update("provider_rating_aggregates:v1|rating_reconciliation_runs:v1|approved_review_moderation:v1")
+  .digest("hex");
+
+function isRatingReconciliationMigrationMissing(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string } | null;
+  return candidate?.code === "ER_NO_SUCH_TABLE"
+    || /(?:provider_rating_aggregates|rating_reconciliation_runs|user_content_moderation_records).*(?:doesn't exist|does not exist|not found)/i.test(candidate?.message ?? "");
+}
+
+function ratingReconciliationFailureCode(error: unknown): string {
+  const candidate = error as { code?: string; message?: string } | null;
+  if (candidate?.code && /^[A-Z0-9_]{1,96}$/.test(candidate.code)) return candidate.code;
+  const normalized = (candidate?.message ?? "RATING_RECONCILIATION_FAILED").replace(/[^A-Z0-9_]/gi, "_").toUpperCase();
+  return normalized.slice(0, 96) || "RATING_RECONCILIATION_FAILED";
+}
+
+export async function planApprovedRatingReconciliation(): Promise<RatingReconciliationPlan> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  try {
+    const approvedRows = await db
+      .select({ providerId: reviews.providerId, rating: reviews.rating })
+      .from(reviews)
+      .innerJoin(userContentModerationRecords, and(
+        eq(userContentModerationRecords.surface, "review"),
+        eq(userContentModerationRecords.status, "approved"),
+        sql`${userContentModerationRecords.contentReference} = CONCAT('review:', ${reviews.id})`,
+      ));
+    return buildRatingReconciliationPlan({
+      approvedRatings: approvedRows.map((row) => ({ providerId: row.providerId, rating: row.rating })),
+      schemaFingerprint: RATING_RECONCILIATION_SCHEMA_FINGERPRINT,
+    });
+  } catch (error) {
+    if (isRatingReconciliationMigrationMissing(error)) throw new Error("MIGRATION_REQUIRED_RATING_RECONCILIATION");
+    throw error;
+  }
+}
+
+export async function applyApprovedRatingReconciliation(input: {
+  actorUserId: number;
+  runKey: string;
+  expectedPlanHash: string;
+  expectedSchemaFingerprint: string;
+  batchSize?: number;
+}) {
+  if (process.env.RATING_RECONCILIATION_RUNTIME !== "private_staging") {
+    throw new Error("RATING_RECONCILIATION_APPLY_NOT_CONFIGURED");
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{15,95}$/.test(input.runKey)) throw new Error("RATING_RECONCILIATION_RUN_KEY_INVALID");
+  if (!/^[a-f0-9]{64}$/i.test(input.expectedPlanHash) || !/^[a-f0-9]{64}$/i.test(input.expectedSchemaFingerprint)) {
+    throw new Error("RATING_RECONCILIATION_PLAN_HASH_INVALID");
+  }
+  const batchSize = input.batchSize ?? 100;
+  if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 500) throw new Error("RATING_RECONCILIATION_BATCH_INVALID");
+
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const plan = await planApprovedRatingReconciliation();
+  if (plan.planHash !== input.expectedPlanHash.toLowerCase() || plan.schemaFingerprint !== input.expectedSchemaFingerprint.toLowerCase()) {
+    throw new Error("RATING_RECONCILIATION_PLAN_STALE");
+  }
+
+  try {
+    let run = (await db.select().from(ratingReconciliationRuns).where(eq(ratingReconciliationRuns.runKey, input.runKey)).limit(1))[0];
+    if (run) {
+      if (run.actorUserId !== input.actorUserId || run.planHash !== plan.planHash || run.schemaFingerprint !== plan.schemaFingerprint || run.mode !== "apply") {
+        throw new Error("RATING_RECONCILIATION_RUN_CONFLICT");
+      }
+      if (run.status === "applied") {
+        return { runKey: run.runKey, planHash: plan.planHash, appliedProviderCount: run.appliedProviderCount, idempotent: true as const, resumed: false as const };
+      }
+    } else {
+      await db.insert(ratingReconciliationRuns).values({
+        runKey: input.runKey,
+        mode: "apply",
+        status: "applying",
+        actorUserId: input.actorUserId,
+        planHash: plan.planHash,
+        schemaFingerprint: plan.schemaFingerprint,
+        batchSize,
+      });
+      run = (await db.select().from(ratingReconciliationRuns).where(eq(ratingReconciliationRuns.runKey, input.runKey)).limit(1))[0];
+    }
+    if (!run) throw new Error("RATING_RECONCILIATION_RUN_UNAVAILABLE");
+
+    let checkpoint = run.checkpointProviderId;
+    let appliedProviderCount = run.appliedProviderCount;
+    const resumed = checkpoint > 0 || run.status === "failed";
+    while (true) {
+      const batch = plan.aggregates.filter((aggregate) => aggregate.providerId > checkpoint).slice(0, batchSize);
+      if (batch.length === 0) {
+        await db.update(ratingReconciliationRuns).set({
+          status: "applied",
+          appliedProviderCount,
+          finishedAt: new Date(),
+          failureCode: null,
+        }).where(eq(ratingReconciliationRuns.id, run.id));
+        return { runKey: input.runKey, planHash: plan.planHash, appliedProviderCount, idempotent: false as const, resumed };
+      }
+
+      const nextCheckpoint = batch[batch.length - 1].providerId;
+      const nextCount = appliedProviderCount + batch.length;
+      await db.transaction(async (tx) => {
+        for (const aggregate of batch) {
+          const averageRatingTenths = Math.round(aggregate.averageRating * 10);
+          await tx.insert(providerRatingAggregates).values({
+            providerId: aggregate.providerId,
+            approvedReviewCount: aggregate.approvedReviewCount,
+            averageRatingTenths,
+            sourcePlanHash: plan.planHash,
+            reconciledByUserId: input.actorUserId,
+          }).onDuplicateKeyUpdate({
+            set: {
+              approvedReviewCount: aggregate.approvedReviewCount,
+              averageRatingTenths,
+              sourcePlanHash: plan.planHash,
+              reconciledByUserId: input.actorUserId,
+              reconciledAt: new Date(),
+            },
+          });
+          await tx.update(providers).set({ rating: averageRatingTenths }).where(eq(providers.id, aggregate.providerId));
+        }
+        await tx.update(ratingReconciliationRuns).set({
+          status: "applying",
+          checkpointProviderId: nextCheckpoint,
+          appliedProviderCount: nextCount,
+          failureCode: null,
+        }).where(eq(ratingReconciliationRuns.id, run.id));
+        await tx.insert(operationalEvents).values({
+          eventType: "rating_reconciliation_batch_applied",
+          severity: "info",
+          requestId: input.runKey,
+          actorUserId: input.actorUserId,
+          metadataJson: {
+            planHash: plan.planHash,
+            schemaFingerprint: plan.schemaFingerprint,
+            batchProviderCount: batch.length,
+            appliedProviderCount: nextCount,
+          },
+        });
+      });
+      checkpoint = nextCheckpoint;
+      appliedProviderCount = nextCount;
+    }
+  } catch (error) {
+    if (isRatingReconciliationMigrationMissing(error)) throw new Error("MIGRATION_REQUIRED_RATING_RECONCILIATION");
+    const failureCode = ratingReconciliationFailureCode(error);
+    await db.update(ratingReconciliationRuns).set({ status: "failed", failureCode }).where(eq(ratingReconciliationRuns.runKey, input.runKey)).catch(() => undefined);
+    throw error;
   }
 }
 
