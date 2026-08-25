@@ -1,0 +1,1 @@
+ALTER TABLE `user_content_moderation_records` ADD `version` int DEFAULT 1 NOT NULL;

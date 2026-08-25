@@ -60,6 +60,8 @@ import {
   upsertJobSafetyRule,
   hasActiveCompletionDisputeReviewerPermission,
   getValidAdminMfaGrantId,
+  listModerationReviewQueue,
+  decideModerationRecord,
 } from "../db";
 import {
   createCountryCompliancePackage,
@@ -272,6 +274,28 @@ export const ownerRouter = router({
   operationsControl: superAdminMfaProcedure
     .input(z.object({ eventLimit: z.number().int().min(1).max(100).default(25), caseLimit: z.number().int().min(1).max(100).default(25) }).default({ eventLimit: 25, caseLimit: 25 }))
     .query(async ({ input }) => getOperationsControlSnapshot(input)),
+
+  moderationReviewQueue: superAdminMfaProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(50) }).default({ limit: 50 }))
+    .query(({ ctx, input }) => listModerationReviewQueue({ reviewerUserId: ctx.user!.id, limit: input.limit })),
+
+  decideModeration: superAdminMfaProcedure
+    .input(z.object({
+      moderationRecordId: z.number().int().positive(),
+      expectedVersion: z.number().int().positive(),
+      decision: z.enum(["approved", "rejected", "quarantined", "review_required"]),
+      reasonCode: z.enum(["CONTENT_SAFE", "DIRECT_CONTACT_PII", "POLICY_VIOLATION", "MANUAL_REVIEW_REQUIRED", "LEGAL_REVIEW_REQUIRED"]),
+      idempotencyKey: z.string().uuid(),
+    }).strict())
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await decideModerationRecord({ ...input, reviewerUserId: ctx.user!.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "MODERATION_DECISION_FAILED";
+        const code = message === "MODERATION_RECORD_NOT_FOUND" ? "NOT_FOUND" : message === "MODERATION_REVIEWER_REQUIRED" || message === "MODERATION_SELF_REVIEW_FORBIDDEN" ? "FORBIDDEN" : "PRECONDITION_FAILED";
+        throw new TRPCError({ code, message });
+      }
+    }),
 
   privacyRights: superAdminMfaProcedure
     .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }).default({ limit: 100 }))

@@ -892,3 +892,10 @@
 - [ ] P23-4 — Home/Explore/provider dashboard/MoveTrust/review/notification preference unavailable-unknown state, retry ve controller testlerini uygula
 - [ ] P23-5 — 0093 metadata/preflight/rollback kanıtını güncelle; private TiDB yoksa CODE_READY_NOT_APPLIED / EXTERNAL_BLOCKER olarak kaydet
 - [ ] P23-6 — Backend kalite kapanışı ardından MOVEFIX_MANUS_FUNCTIONAL_E2E_CLOSURE_ADDENDUM.md dosyasını aynı tree’de uygula
+
+## P24 Moderation and Rating Closure
+- [ ] P24-1 — Reviewer RBAC/BOLA, state machine, optimistic concurrency, idempotency ve PII-minimized audit lifecycle’ını canonical 0094 modeline bağla
+- [ ] P24-2 — Repository/service katmanında approved-only public UGC/review filtreleri, owner/reviewer ayrımı ve cache-safe invalidation uygula
+- [ ] P24-3 — Canonical review/rating aggregate, moderation-aware count, concurrency guard ve dry-run reconciliation/backfill planını uygula
+- [ ] P24-4 — Server-owned not-configured/unavailable durumlarıyla ilgili UI disabled/retry/error ayrımını uygula
+- [ ] P24-5 — 0094 checksum/journal/snapshot, preflight/rollback/lock-risk kanıtı ve negatif/concurrency/full kalite testlerini tamamla

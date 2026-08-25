@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { drizzle } from "drizzle-orm/mysql2";
 import { getRequiredRegistrationConsentDocuments } from "../lib/data/legal";
@@ -1527,6 +1527,8 @@ import {
   mediaScannerManualReviews,
   contactVerificationStates,
   contactChangeEvents,
+  userContentModerationRecords,
+  userContentModerationDecisions,
 } from "../drizzle/schema";
 import {
   containsDirectContactData,
@@ -10795,6 +10797,98 @@ export async function logOperationEvent(input: {
     // safety transition. The structured console error remains observable.
     console.error("[Operations] Failed to persist event", { eventType, error });
   }
+}
+
+const MODERATION_DECISION_REASON_CODES = new Set([
+  "CONTENT_SAFE",
+  "DIRECT_CONTACT_PII",
+  "POLICY_VIOLATION",
+  "MANUAL_REVIEW_REQUIRED",
+  "LEGAL_REVIEW_REQUIRED",
+]);
+
+export type ModerationReviewerDecision = "approved" | "rejected" | "quarantined" | "review_required";
+
+export async function listModerationReviewQueue(input: { reviewerUserId: number; limit?: number }) {
+  if (!(await hasActiveSuperAdminRole(input.reviewerUserId))) throw new Error("MODERATION_REVIEWER_REQUIRED");
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database
+    .select({
+      id: userContentModerationRecords.id,
+      ownerUserId: userContentModerationRecords.ownerUserId,
+      surface: userContentModerationRecords.surface,
+      contentReference: userContentModerationRecords.contentReference,
+      status: userContentModerationRecords.status,
+      reasonCode: userContentModerationRecords.reasonCode,
+      version: userContentModerationRecords.version,
+      createdAt: userContentModerationRecords.createdAt,
+    })
+    .from(userContentModerationRecords)
+    .where(and(
+      inArray(userContentModerationRecords.status, ["pending", "review_required"]),
+      ne(userContentModerationRecords.ownerUserId, input.reviewerUserId),
+    ))
+    .orderBy(asc(userContentModerationRecords.createdAt))
+    .limit(Math.min(Math.max(input.limit ?? 50, 1), 100));
+}
+
+export async function decideModerationRecord(input: {
+  reviewerUserId: number;
+  moderationRecordId: number;
+  expectedVersion: number;
+  decision: ModerationReviewerDecision;
+  reasonCode: string;
+  idempotencyKey: string;
+}) {
+  if (!(await hasActiveSuperAdminRole(input.reviewerUserId))) throw new Error("MODERATION_REVIEWER_REQUIRED");
+  if (!MODERATION_DECISION_REASON_CODES.has(input.reasonCode)) throw new Error("MODERATION_REASON_CODE_INVALID");
+  const database = await getDb();
+  if (!database) throw new Error("Database not available");
+  return database.transaction(async (tx) => {
+    const existingDecision = await tx
+      .select()
+      .from(userContentModerationDecisions)
+      .where(eq(userContentModerationDecisions.idempotencyKey, input.idempotencyKey))
+      .limit(1);
+    if (existingDecision[0]) {
+      const decision = existingDecision[0];
+      if (decision.reviewerUserId !== input.reviewerUserId || decision.moderationRecordId !== input.moderationRecordId || decision.decision !== input.decision || decision.reasonCode !== input.reasonCode) {
+        throw new Error("MODERATION_IDEMPOTENCY_CONFLICT");
+      }
+      return { moderationRecordId: input.moderationRecordId, idempotent: true };
+    }
+    const record = await tx
+      .select()
+      .from(userContentModerationRecords)
+      .where(eq(userContentModerationRecords.id, input.moderationRecordId))
+      .limit(1);
+    const current = record[0];
+    if (!current) throw new Error("MODERATION_RECORD_NOT_FOUND");
+    if (current.ownerUserId === input.reviewerUserId) throw new Error("MODERATION_SELF_REVIEW_FORBIDDEN");
+    if (current.version !== input.expectedVersion) throw new Error("MODERATION_STALE_VERSION");
+    if (current.status !== "pending" && current.status !== "review_required") throw new Error("MODERATION_STATE_TRANSITION_FORBIDDEN");
+    const transition = await tx
+      .update(userContentModerationRecords)
+      .set({ status: input.decision, reasonCode: input.reasonCode, reviewerUserId: input.reviewerUserId, decidedAt: new Date(), version: current.version + 1 })
+      .where(and(eq(userContentModerationRecords.id, current.id), eq(userContentModerationRecords.version, input.expectedVersion)));
+    if (transition[0].affectedRows !== 1) throw new Error("MODERATION_CONCURRENT_UPDATE");
+    await tx.insert(userContentModerationDecisions).values({
+      moderationRecordId: current.id,
+      reviewerUserId: input.reviewerUserId,
+      decision: input.decision,
+      reasonCode: input.reasonCode,
+      idempotencyKey: input.idempotencyKey,
+    });
+    await tx.insert(operationalEvents).values({
+      eventType: "ugc_moderation_decided",
+      severity: "info",
+      requestId: String(current.id),
+      actorUserId: input.reviewerUserId,
+      metadataJson: { moderationRecordId: current.id, decision: input.decision, reasonCode: input.reasonCode },
+    });
+    return { moderationRecordId: current.id, idempotent: false };
+  });
 }
 
 type PhaseDRequestParticipant = {

@@ -2972,6 +2972,7 @@ export const userContentModerationRecords = mysqlTable(
     reasonCode: varchar("reasonCode", { length: 96 }).notNull(),
     reviewerUserId: int("reviewerUserId"),
     decidedAt: timestamp("decidedAt"),
+    version: int("version").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
