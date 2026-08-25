@@ -2955,6 +2955,53 @@ export const reviews = mysqlTable("reviews", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+// Canonical moderation state stores an opaque content reference and digest only.
+// Raw user-generated text remains in its source table and is never copied into
+// moderation/audit evidence. A record begins pending and only a separate,
+// server-authorized reviewer decision may transition it to a public state.
+export const userContentModerationRecords = mysqlTable(
+  "user_content_moderation_records",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerUserId: int("ownerUserId").notNull(),
+    surface: mysqlEnum("surface", ["service_request", "provider_bio", "review", "expense_note", "support_ticket"]).notNull(),
+    contentReference: varchar("contentReference", { length: 191 }).notNull(),
+    contentHash: varchar("contentHash", { length: 128 }).notNull(),
+    policyVersion: varchar("policyVersion", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["pending", "approved", "rejected", "quarantined", "review_required"]).default("pending").notNull(),
+    reasonCode: varchar("reasonCode", { length: 96 }).notNull(),
+    reviewerUserId: int("reviewerUserId"),
+    decidedAt: timestamp("decidedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("ugc_moderation_surface_reference_unique").on(table.surface, table.contentReference),
+    index("ugc_moderation_owner_status_idx").on(table.ownerUserId, table.status),
+    index("ugc_moderation_reviewer_status_idx").on(table.reviewerUserId, table.status),
+  ],
+);
+
+// Immutable decision evidence supports reviewer attribution, idempotency and
+// later audit without copying the underlying content or direct-contact PII.
+export const userContentModerationDecisions = mysqlTable(
+  "user_content_moderation_decisions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    moderationRecordId: int("moderationRecordId").notNull(),
+    reviewerUserId: int("reviewerUserId").notNull(),
+    decision: mysqlEnum("decision", ["approved", "rejected", "quarantined", "review_required"]).notNull(),
+    reasonCode: varchar("reasonCode", { length: 96 }).notNull(),
+    idempotencyKey: varchar("idempotencyKey", { length: 128 }).notNull(),
+    decidedAt: timestamp("decidedAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("ugc_moderation_decision_idempotency_unique").on(table.idempotencyKey),
+    index("ugc_moderation_decision_record_idx").on(table.moderationRecordId, table.decidedAt),
+    index("ugc_moderation_decision_reviewer_idx").on(table.reviewerUserId, table.decidedAt),
+  ],
+);
+
 // User wallet balances — amounts are stored as whole TRY major units, matching the payment domain contract.
 export const walletAccounts = mysqlTable("wallet_accounts", {
   id: int("id").autoincrement().primaryKey(),

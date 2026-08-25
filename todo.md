@@ -884,3 +884,11 @@
 - [ ] P21-3 — Home, Explore, provider dashboard, MoveTrust, review ve notification preference yüzeylerinde unavailable/unknown/loading/empty ayrımını gerçek retry state’iyle uygula
 - [ ] P21-4 — 0093 pending migration preflight, rollback yaklaşımı ve external TiDB blocker kanıtını güncelle; migration uygulama
 - [ ] P21-5 — Hedefli moderation/rating/unavailable testlerini, tam regresyon ve P21/P22 kanıt raporunu tamamla
+
+## P23 Backend and Functional E2E Closure
+- [ ] P23-1 — Canonical moderation persistence/audit tablosu, reviewer RBAC/BOLA ve atomik/idempotent karar lifecycle’ını uygula
+- [ ] P23-2 — Public görünürlük filtresi ve moderation karar negative/concurrency testlerini uygula
+- [ ] P23-3 — Completed-assignment review/rating invariantları, DB unique, aggregate atomikliği ve dry-run reconciliation’ı uygula
+- [ ] P23-4 — Home/Explore/provider dashboard/MoveTrust/review/notification preference unavailable-unknown state, retry ve controller testlerini uygula
+- [ ] P23-5 — 0093 metadata/preflight/rollback kanıtını güncelle; private TiDB yoksa CODE_READY_NOT_APPLIED / EXTERNAL_BLOCKER olarak kaydet
+- [ ] P23-6 — Backend kalite kapanışı ardından MOVEFIX_MANUS_FUNCTIONAL_E2E_CLOSURE_ADDENDUM.md dosyasını aynı tree’de uygula
