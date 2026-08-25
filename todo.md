@@ -877,3 +877,10 @@
 - [ ] P20-4 — Repository-wide unavailable-vs-empty kontratlarını ve client error/retry/offline UI’yı uygula
 - [ ] P20-5 — Organization/admin residual negative tests ile exact-engine isolated TiDB uygulanabilirliğini doğrula; yoksa EXTERNAL_INFRA_REQUIRED kaydet
 - [ ] P20-6 — P18 closure matrix, clean validation, canonical source ZIP, manifest/SHA ve final residual blocker raporunu üret
+
+## P21/P22 Functional and Data-Integrity Closure
+- [ ] P21-1 — Tüm public/pre-job UGC yüzeylerini ve mevcut PII/audit/reviewer yapılarını envanterle; canonical moderation lifecycle’ını duplicate model oluşturmadan uygula
+- [ ] P21-2 — Review ownership/lifecycle/unique/aggregate concurrency invariantlarını ve dry-run reconciliation preflightını uygula
+- [ ] P21-3 — Home, Explore, provider dashboard, MoveTrust, review ve notification preference yüzeylerinde unavailable/unknown/loading/empty ayrımını gerçek retry state’iyle uygula
+- [ ] P21-4 — 0093 pending migration preflight, rollback yaklaşımı ve external TiDB blocker kanıtını güncelle; migration uygulama
+- [ ] P21-5 — Hedefli moderation/rating/unavailable testlerini, tam regresyon ve P21/P22 kanıt raporunu tamamla

@@ -9,7 +9,9 @@ const PHONE_PATTERN = /(?<!\w)(?:\+?90\s?)?(?:0?5\d{2}|0?\d{3})[\s().-]*\d{3}[\s
 
 export function containsDirectContactData(content: string): boolean {
   const normalized = content.normalize("NFKC").replace(/[\s._()\-–—]/g, "");
+  const spacedEmail = /(?:[\p{L}\d._%+-]\s*){2,}@\s*(?:[\p{L}\d-]\s*){2,}\.\s*(?:[\p{L}]\s*){2,}/iu;
   return /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(content)
+    || spacedEmail.test(content.normalize("NFKC"))
     || /(?<!\w)(?:\+?90\s?)?(?:0?5\d{2}|0?\d{3})[\s().-]*\d{3}[\s.-]*\d{2}[\s.-]*\d{2}(?!\w)/.test(content)
     || /(?:https?:\/\/|www\.)/i.test(content)
     || /(?:\+?90)?0?5\d{8,9}/.test(normalized);
