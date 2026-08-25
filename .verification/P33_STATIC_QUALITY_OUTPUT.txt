@@ -1,0 +1,6 @@
+### TYPESCRIPT
+### DRIZZLE
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/ubuntu/move-and-fix/drizzle.config.ts'
+Everything's fine 🐶🔥
+### DIFF

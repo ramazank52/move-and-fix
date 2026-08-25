@@ -1,0 +1,14 @@
+### LINT
+
+> move-and-fix@1.0.0 lint /home/ubuntu/move-and-fix
+> expo lint
+
+### BACKEND_BUILD
+
+> move-and-fix@1.0.0 build /home/ubuntu/move-and-fix
+> esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+
+  dist/index.js  1.2mb ⚠️
+
+⚡ Done in 67ms

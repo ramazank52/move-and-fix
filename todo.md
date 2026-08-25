@@ -938,7 +938,7 @@
 - [ ] P30-6 — Clean complete-source ZIP, manifest, SHA256SUMS, final implementation/test/blocker raporları ve source archive integrity doğrulamasını üret
 
 ## P31–P33 Final Production Closure (canonical: latest source tree)
-- [ ] P31P33-0 — P31/P32 geniş kapanış maddelerini P33 öncelikleri, mevcut canonical checkpoint ve Türkiye-only/default-off kapılarıyla source-of-truth temelli uzlaştır
+- [x] P31P33-0 — P31/P32 geniş kapanış maddelerini P33 öncelikleri, mevcut canonical checkpoint ve Türkiye-only/default-off kapılarıyla source-of-truth temelli uzlaştır
 - [x] P31P33-1 — Versioned alan ölçümünü gerçek service-request create/edit controller’ına owner-scoped, idempotent, BOLA-korumalı ve manuel rectangle/polygon fallback ile bağla
 - [ ] P31P33-2 — Area measurement UI’da tahmini ölçüm özeti, düzelt/sil/yeniden ölç, permission/tracking/error/unsupported durumları ve server limitleri için testleri tamamla
 - [ ] P31P33-3 — Native AR adapter/config/prebuild capability sınırını doğrulanmış Expo uyumluluğuyla kod-hazır yap; fiziksel iOS/Android doğruluk kanıtını EXTERNAL_BLOCKER tut

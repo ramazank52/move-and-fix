@@ -1,0 +1,33 @@
+MOVE&FIX P33 FINAL TEST RESULTS
+===============================
+
+Full regression command:
+pnpm test
+
+Result:
+Test Files  157 passed (157)
+Tests       833 passed (833)
+Duration    23.10s
+
+Static quality command:
+NODE_OPTIONS=--max-old-space-size=1792 pnpm exec tsc --noEmit --skipLibCheck
+pnpm drizzle-kit check
+git diff --check
+
+Result: PASS / PASS / PASS
+
+Lint and backend build:
+pnpm lint
+pnpm build
+
+Result: PASS / PASS
+
+SCA:
+pnpm supply:sca
+SCA_GATE=PASS
+SCA_ADVISORIES=4
+SCA_BLOCKING_RELEASE=0
+SCA_APPROVED_EXCEPTIONS=2
+
+Important evidence boundary:
+These are repository source/unit/component/router and build quality results. They are not isolated-TiDB migration/race proof, authenticated role route E2E, physical iOS/Android evidence, or external delivery evidence.
