@@ -18,6 +18,7 @@ export type SessionUser = Omit<
   | "pendingPhoneChange"
   | "pendingPhoneToken"
   | "pendingPhoneTokenExpiry"
+  | "notificationTimeZone"
 >;
 
 export type TrpcContext = {

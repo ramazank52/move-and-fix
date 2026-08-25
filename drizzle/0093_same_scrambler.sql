@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `notificationTimeZone` varchar(64) DEFAULT 'Europe/Istanbul' NOT NULL;

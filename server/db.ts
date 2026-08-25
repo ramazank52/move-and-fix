@@ -1479,6 +1479,7 @@ import {
   financialReconciliationAlerts,
   financialReconciliationRuns,
   inAppNotifications,
+  userNotificationPreferences,
   providerCapabilityAppeals,
   providerCapabilityReviews,
   providerCapabilityStatuses,
@@ -1532,6 +1533,7 @@ import {
   type MaskedCommunicationChannel,
   sanitizeMaskedMessageContent,
 } from "./communications/MaskedCommunicationService";
+import { decideQuietHours, type QuietHours } from "./notifications/QuietHoursPolicy";
 import {
   decidePaymentProviderOperationalStatus,
   type PaymentProviderId,
@@ -2076,8 +2078,62 @@ export async function deliverMarketplaceOpportunityInApp(input: ClaimedOpportuni
     .where(and(eq(marketplaceOpportunityNotifications.id, input.id), eq(marketplaceOpportunityNotifications.claimToken, input.claimToken), eq(marketplaceOpportunityNotifications.status, "processing")))
     .limit(1);
   if (!current[0]) throw new Error("OPPORTUNITY_OUTBOX_CLAIM_LOST");
+  const [provider] = await database.select({ userId: providers.userId })
+    .from(providers)
+    .where(eq(providers.id, input.providerId))
+    .limit(1);
+  if (!provider) throw new Error("OPPORTUNITY_OUTBOX_PROVIDER_NOT_FOUND");
+  const [preferenceRow] = await database.select({ channelsJson: userNotificationPreferences.channelsJson })
+    .from(userNotificationPreferences)
+    .where(eq(userNotificationPreferences.userId, provider.userId))
+    .limit(1);
+  if (preferenceRow) {
+    try {
+      const raw = JSON.parse(preferenceRow.channelsJson) as { timeZone?: unknown; channels?: Record<string, { quietHours?: QuietHours }> } | Record<string, { quietHours?: QuietHours }>;
+      const wrapped = raw as { timeZone?: unknown; channels?: Record<string, { quietHours?: QuietHours }> };
+      const channels = wrapped.channels ?? raw as Record<string, { quietHours?: QuietHours }>;
+      const decision = decideQuietHours({
+        now: new Date(),
+        timeZone: typeof wrapped.timeZone === "string" ? wrapped.timeZone : undefined,
+        quietHours: channels.in_app?.quietHours,
+        notificationType: input.eventType,
+        marketing: false,
+      });
+      if (decision.deferred && decision.deliverAfter) {
+        await database.update(marketplaceOpportunityNotifications).set({
+          status: "queued",
+          nextAttemptAt: decision.deliverAfter,
+          claimToken: null,
+          claimedAt: null,
+          claimUntil: null,
+          lastErrorCode: "QUIET_HOURS_DEFERRED",
+          updatedAt: new Date(),
+        }).where(and(
+          eq(marketplaceOpportunityNotifications.id, input.id),
+          eq(marketplaceOpportunityNotifications.claimToken, input.claimToken),
+          eq(marketplaceOpportunityNotifications.status, "processing"),
+        ));
+        return null;
+      }
+    } catch {
+      await database.update(marketplaceOpportunityNotifications).set({
+        status: "queued",
+        nextAttemptAt: new Date(Date.now() + 15 * 60 * 1_000),
+        claimToken: null,
+        claimedAt: null,
+        claimUntil: null,
+        lastErrorCode: "NOTIFICATION_PREFERENCES_CORRUPTED",
+        updatedAt: new Date(),
+      }).where(and(
+        eq(marketplaceOpportunityNotifications.id, input.id),
+        eq(marketplaceOpportunityNotifications.claimToken, input.claimToken),
+        eq(marketplaceOpportunityNotifications.status, "processing"),
+      ));
+      return null;
+    }
+  }
   const inApp = await database.insert(inAppNotifications).values({
-    userId: input.providerId,
+    userId: provider.userId,
     type: input.eventType === "opportunity_available" ? "opportunity_available" : "opportunity_revoked",
     title: input.eventType === "opportunity_available" ? "Yeni iş fırsatı" : "İş fırsatı güncellendi",
     body: input.eventType === "opportunity_available" ? "Uygun olduğunuz yeni bir iş fırsatı var." : "Bir iş fırsatının uygunluk durumu değişti.",

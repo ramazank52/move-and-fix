@@ -2891,6 +2891,7 @@ Do not infer unavailable categories. If no candidate is exact enough, use "gener
       notificationService.getUserPreferences(String(ctx.user.id))),
     updatePreferences: protectedProcedure
       .input(z.object({
+        timeZone: z.string().trim().min(1).max(64).optional(),
         channels: z.partialRecord(z.nativeEnum(NotificationChannel), z.object({
           enabled: z.boolean(),
           quietHours: z.object({
@@ -2902,7 +2903,7 @@ Do not infer unavailable categories. If no candidate is exact enough, use "gener
           enabled: z.boolean(),
           channels: z.array(z.nativeEnum(NotificationChannel)).min(1).optional(),
         })).optional(),
-      }).refine((input) => input.channels || input.notificationTypes, {
+      }).refine((input) => input.timeZone || input.channels || input.notificationTypes, {
         message: "En az bir bildirim tercihi gönderin",
       }))
       .mutation(({ ctx, input }) => notificationService.updateUserPreferences(String(ctx.user.id), input)),

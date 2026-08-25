@@ -28,6 +28,9 @@ export const users = mysqlTable("users", {
   phoneVerifiedAt: timestamp("phoneVerifiedAt"),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  // IANA timezone used by server-side notification scheduling. The migration
+  // default preserves safe, deterministic behavior for legacy Türkiye users.
+  notificationTimeZone: varchar("notificationTimeZone", { length: 64 }).default("Europe/Istanbul").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

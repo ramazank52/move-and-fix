@@ -6,6 +6,7 @@ import { getDb } from "../db";
 export type PushPlatform = "ios" | "android";
 
 export type StoredNotificationPreferences = {
+  timeZone?: string;
   channels: Record<string, { enabled: boolean; quietHours?: { start: string; end: string } }>;
   notificationTypes: Record<string, { enabled: boolean; channels?: string[] }>;
 };
@@ -17,8 +18,18 @@ export async function getStoredNotificationPreferences(userId: number) {
     .where(eq(userNotificationPreferences.userId, userId)).limit(1);
   if (!row) return null;
   try {
+    const channelsPayload = JSON.parse(row.channelsJson) as
+      | StoredNotificationPreferences["channels"]
+      | { version?: number; timeZone?: unknown; channels?: StoredNotificationPreferences["channels"] };
+    const wrapped = channelsPayload as { version?: number; timeZone?: unknown; channels?: StoredNotificationPreferences["channels"] };
+    const channels = wrapped.channels
+      ? wrapped.channels
+      : channelsPayload as StoredNotificationPreferences["channels"];
     return {
-      channels: JSON.parse(row.channelsJson) as StoredNotificationPreferences["channels"],
+      timeZone: typeof wrapped.timeZone === "string"
+        ? wrapped.timeZone
+        : undefined,
+      channels,
       notificationTypes: JSON.parse(row.notificationTypesJson) as StoredNotificationPreferences["notificationTypes"],
     } satisfies StoredNotificationPreferences;
   } catch {
@@ -34,7 +45,11 @@ export async function saveNotificationPreferences(input: {
   if (!db) throw new Error("DATABASE_UNAVAILABLE");
   const values = {
     userId: input.userId,
-    channelsJson: JSON.stringify(input.preferences.channels),
+    channelsJson: JSON.stringify({
+      version: 2,
+      timeZone: input.preferences.timeZone,
+      channels: input.preferences.channels,
+    }),
     notificationTypesJson: JSON.stringify(input.preferences.notificationTypes),
   };
   await db.insert(userNotificationPreferences).values(values).onDuplicateKeyUpdate({

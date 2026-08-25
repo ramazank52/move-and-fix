@@ -309,6 +309,15 @@ export class NotificationServiceV2 {
     data: Record<string, unknown>,
     overrideChannels?: NotificationChannel[]
   ): Promise<Notification> {
+    // Generic V2 delivery had an in-memory queue and local-clock quiet-hours
+    // branch. It is intentionally disabled until it is migrated to the
+    // canonical durable NotificationService/outbox lifecycle.
+    void userId;
+    void type;
+    void data;
+    void overrideChannels;
+    throw new Error("NOTIFICATION_V2_GENERIC_DISPATCH_DISABLED");
+    /*
     try {
       // Kullanıcı tercihlerini getir
       const preferences = await this.getUserPreferences(userId);
@@ -365,6 +374,7 @@ export class NotificationServiceV2 {
       console.error('Bildirim gönderme hatası:', notificationError);
       throw notificationError;
     }
+    */
   }
 
   /**

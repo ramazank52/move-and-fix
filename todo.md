@@ -869,3 +869,11 @@
 - [ ] P19-3 — UGC PII/moderation, MoveTrust public DTO ve review/rating invariant’larını uygula
 - [ ] P19-4 — Organization BOLA/role DTO, admin critical action ve unavailable-state açıklarını kapat
 - [ ] P19-5 — Repository-wide scan, clean validation, source export, manifest/SHA ve P18/P19 final raporunu üret
+
+## P20 Final Internal Completion
+- [ ] P20-1 — Migration-backed IANA user timezone ve overnight/DST-safe quiet-hours policy uygula; durable outbox deliver-after/urgent exception testlerini ekle
+- [ ] P20-2 — Canonical UGC moderation schema/audit/idempotency ve tüm public/pre-job metin callsite’larında PII pipeline uygula
+- [ ] P20-3 — Review concurrency/rating integrity, reconciliation preflight ve public visibility/inclusion policy’sini sertleştir
+- [ ] P20-4 — Repository-wide unavailable-vs-empty kontratlarını ve client error/retry/offline UI’yı uygula
+- [ ] P20-5 — Organization/admin residual negative tests ile exact-engine isolated TiDB uygulanabilirliğini doğrula; yoksa EXTERNAL_INFRA_REQUIRED kaydet
+- [ ] P20-6 — P18 closure matrix, clean validation, canonical source ZIP, manifest/SHA ve final residual blocker raporunu üret

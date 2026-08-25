@@ -23,6 +23,7 @@ import {
 } from '../_core/errors';
 import { ENV } from "../_core/env";
 import { getMarketingConsentPreference, getUserById, setMarketingConsentPreference } from "../db";
+import { DEFAULT_NOTIFICATION_TIME_ZONE, resolveNotificationTimeZone } from "../notifications/QuietHoursPolicy";
 import {
   deactivatePushToken,
   getActivePushTokens,
@@ -63,6 +64,7 @@ export enum NotificationType {
 
 export interface NotificationPreference {
   userId: string;
+  timeZone: string;
   channels: {
     [key in NotificationChannel]?: {
       enabled: boolean;
@@ -377,6 +379,7 @@ export class NotificationService {
     }
     const defaults: NotificationPreference = {
       userId,
+      timeZone: DEFAULT_NOTIFICATION_TIME_ZONE,
       channels: {
         [NotificationChannel.PUSH]: { enabled: true },
         [NotificationChannel.SMS]: { enabled: true, quietHours: { start: '22:00', end: '08:00' } },
@@ -393,6 +396,7 @@ export class NotificationService {
     if (!stored) return defaults;
     return {
       userId,
+      timeZone: resolveNotificationTimeZone(stored.timeZone).timeZone,
       channels: { ...defaults.channels, ...stored.channels },
       notificationTypes: { ...defaults.notificationTypes, ...stored.notificationTypes },
     } as NotificationPreference;
@@ -404,6 +408,7 @@ export class NotificationService {
   async updateUserPreferences(
     userId: string,
     preferences: {
+      timeZone?: string;
       channels?: Partial<Record<NotificationChannel, { enabled: boolean; quietHours?: { start: string; end: string } }>>;
       notificationTypes?: Partial<Record<NotificationType, { enabled: boolean; channels?: NotificationChannel[] }>>;
     }
@@ -415,6 +420,7 @@ export class NotificationService {
     const current = await this.getUserPreferences(userId);
     const updated: NotificationPreference = {
       userId,
+      timeZone: preferences.timeZone == null ? current.timeZone : resolveNotificationTimeZone(preferences.timeZone).timeZone,
       channels: { ...current.channels, ...preferences.channels },
       notificationTypes: { ...current.notificationTypes, ...preferences.notificationTypes },
     };
@@ -429,6 +435,7 @@ export class NotificationService {
     await saveNotificationPreferences({
       userId: numericUserId,
       preferences: {
+        timeZone: updated.timeZone,
         channels: updated.channels,
         notificationTypes: updated.notificationTypes,
       },
