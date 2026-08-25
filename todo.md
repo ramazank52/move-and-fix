@@ -949,3 +949,9 @@
 - [ ] P31P33-8 — Shared view’ın gerçek runtime controller tarafından navigation, mutation, loading/error/empty/offline ve role/lifecycle state’leriyle kullanıldığını doğrula; sahte fixture paraleli oluşturma
 - [x] P31P33-9 — Payment/maps/push/sound/SMS-email/MoveAI/document/media/camera-AR için server-owned AVAILABLE/NOT_CONFIGURED/NOT_SUPPORTED/TEMPORARILY_UNAVAILABLE/PERMISSION_REQUIRED/OFFLINE/UNAUTHORIZED UI ayrımını gerçek ekranlara bağla
 - [x] P31P33-10 — Route/control residual audit, migration runbook, full quality gates, clean install/extract verification, complete-source ZIP, manifest/SHA, final reports ve yalnız gerçek external blocker’ları tamamla
+
+## P35 Automated Code and Security Scan
+- [x] P35-1 — Tracked source üzerinde static stub/TODO/error-handling, authorization/ownership, input validation ve PII/logging taramasını çalıştır
+- [x] P35-2 — Dependency/SCA, secret/source-integrity, security headers and fail-closed external integration sözleşmelerini yeniden doğrula
+- [x] P35-3 — Yalnız yeniden üretilebilen gerçek bulguları küçük, mimariyi koruyan kod/test düzeltmeleriyle kapat
+- [x] P35-4 — Full regression, TypeScript, lint, build, Drizzle metadata ve diff quality gates’i yeniden çalıştır; residual dış blocker’ları raporla

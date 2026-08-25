@@ -37,7 +37,8 @@ import {
 function normalizeTurkishPhone(destination?: string | null): string | null {
   if (!destination) return null;
   const digits = destination.replace(/\D/g, "");
-  const domesticNumber = digits.startsWith("90") ? digits.slice(2) : digits;
+  const countryNormalized = digits.startsWith("90") ? digits.slice(2) : digits;
+  const domesticNumber = countryNormalized.startsWith("0") ? countryNormalized.slice(1) : countryNormalized;
   return /^5\d{9}$/.test(domesticNumber) ? domesticNumber : null;
 }
 
@@ -316,7 +317,7 @@ export class NotificationService {
       throw new Error("SMS_PROVIDER_NOT_CONFIGURED");
     }
     const credentials = Buffer.from(`${ENV.twilioAccountSid}:${ENV.twilioAuthToken}`).toString("base64");
-    const form = new URLSearchParams({ To: user.phone!, From: ENV.twilioFromNumber, Body: body });
+    const form = new URLSearchParams({ To: `+90${recipient}`, From: ENV.twilioFromNumber, Body: body });
     const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${ENV.twilioAccountSid}/Messages.json`, {
       method: "POST",
       headers: { authorization: `Basic ${credentials}`, "content-type": "application/x-www-form-urlencoded" },

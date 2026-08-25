@@ -1,0 +1,280 @@
+### AUTH_STORAGE
+[35mlib/_core/auth.ts[m[36m:[m[32m25[m[36m:[m    const [1;31mtoken = await SecureStore[m.getItemAsync(SESSION_TOKEN_KEY);
+[35mlib/_core/auth.ts[m[36m:[m[32m40[m[36m:[m    await [1;31mSecureStore.setItemAsync(SESSION_TOKEN_KEY, token[m);
+[35mlib/_core/auth.ts[m[36m:[m[32m63[m[36m:[m      // [1;31mlocalStorage after session[m expiry, revoke, logout or account switching.
+[35mlib/_core/auth.ts[m[36m:[m[32m67[m[36m:[m    // Native uses [1;31mSecureStore only after a token-bound session[m check.
+[35mlib/_core/auth.ts[m[36m:[m[32m108[m[36m:[m    await [1;31mSecureStore.setItemAsync(USER_INFO_KEY, JSON.stringify(user[m));
+### AUTHORIZATION_MARKERS
+[35mserver/routers.ts[m[36m:[m[32m19[m[36m:[mimport { adminMfaProcedure, publicProcedure, [1;31mprotectedProcedure[m, router, [1;31msuperAdminMfaProcedure[m } from "./_core/trpc";
+[35mserver/routers.ts[m[36m:[m[32m562[m[36m:[m    me: [1;31mpublicProcedure.query[m((opts) => opts.ctx.user),
+[35mserver/routers.ts[m[36m:[m[32m563[m[36m:[m    legalDocumentManifest: [1;31mpublicProcedure.query[m(() => ({
+[35mserver/routers.ts[m[36m:[m[32m567[m[36m:[m    pendingLegalConsents: [1;31mprotectedProcedure[m.query(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m570[m[36m:[m    confirmCurrentLegalConsents: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m594[m[36m:[m    marketingConsent: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m597[m[36m:[m    setMarketingConsent: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m604[m[36m:[m    updateProfile: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m741[m[36m:[m    requestVerification: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m758[m[36m:[m    getContactVerificationStatus: [1;31mprotectedProcedure[m.query(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m763[m[36m:[m    getStagedContactChangeStatus: [1;31mprotectedProcedure[m.query(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m768[m[36m:[m    sessions: [1;31mprotectedProcedure[m.query(({ ctx }) =>
+[35mserver/routers.ts[m[36m:[m[32m771[m[36m:[m    revokeSession: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m782[m[36m:[m    revokeOtherSessions: [1;31mprotectedProcedure[m.mutation(({ ctx }) =>
+[35mserver/routers.ts[m[36m:[m[32m789[m[36m:[m    verifyCode: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m857[m[36m:[m    logout: [1;31mpublicProcedure.mutation[m(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m870[m[36m:[m    list: [1;31mprotectedProcedure[m.query(({ ctx }) => db.listOrganizationsForUser(ctx.user.id)),
+[35mserver/routers.ts[m[36m:[m[32m871[m[36m:[m    invitations: [1;31mprotectedProcedure[m.query(({ ctx }) => db.listOrganizationInvitations(ctx.user.id)),
+[35mserver/routers.ts[m[36m:[m[32m872[m[36m:[m    create: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m887[m[36m:[m    members: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m896[m[36m:[m    invite: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m911[m[36m:[m    acceptInvitation: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m920[m[36m:[m    setMemberRole: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m935[m[36m:[m    archive: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m944[m[36m:[m    sites: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m947[m[36m:[m    createSite: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m962[m[36m:[m    assets: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m965[m[36m:[m    createAsset: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m981[m[36m:[m    maintenanceSchedules: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m984[m[36m:[m    createMaintenanceSchedule: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1002[m[36m:[m    requestApprovals: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1005[m[36m:[m    createRequestApproval: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1014[m[36m:[m    decideRequestApproval: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1027[m[36m:[m    requestBatches: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1036[m[36m:[m    createRequestBatch: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1052[m[36m:[m    addRequestToBatch: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1061[m[36m:[m    submitRequestBatch: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1070[m[36m:[m    invoices: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1079[m[36m:[m    issueInvoice: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1092[m[36m:[m    list: [1;31mprotectedProcedure[m.query(({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m1095[m[36m:[m    get: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1116[m[36m:[m    getMeasurement: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1125[m[36m:[m    replaceMeasurement: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1138[m[36m:[m    deleteMeasurement: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1147[m[36m:[m    create: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1233[m[36m:[m    uploadMedia: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1324[m[36m:[m    mediaAccess: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1344[m[36m:[m    forRequest: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1360[m[36m:[m    create: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1396[m[36m:[m    accept: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1417[m[36m:[m    reject: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1426[m[36m:[m    updateStatus: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1434[m[36m:[m    complete: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1439[m[36m:[m    review: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1460[m[36m:[m    changeOrders: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1465[m[36m:[m    createChangeOrder: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1478[m[36m:[m    respondToChangeOrder: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1488[m[36m:[m    withdrawChangeOrder: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1493[m[36m:[m    expenses: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1498[m[36m:[m    createExpense: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1523[m[36m:[m    submitExpenseRefund: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1532[m[36m:[m    expenseRefunds: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1537[m[36m:[m    resolveExpenseRefund: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1546[m[36m:[m    cancellation: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1551[m[36m:[m    openCancellation: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1563[m[36m:[m    withdrawCancellation: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1572[m[36m:[m    get: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1577[m[36m:[m    setLocationSharing: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1607[m[36m:[m    publishLocation: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1628[m[36m:[m    updateLifecycle: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1649[m[36m:[m    create: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1658[m[36m:[m    mine: [1;31mprotectedProcedure[m.query(({ ctx }) => db.listOwnSupportTickets(ctx.user.id)),
+[35mserver/routers.ts[m[36m:[m[32m1659[m[36m:[m    detail: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1665[m[36m:[m    create: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1675[m[36m:[m    mine: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1683[m[36m:[m    workflow: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1688[m[36m:[m    submitProof: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1776[m[36m:[m    approve: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1781[m[36m:[m    dispute: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1796[m[36m:[m    list: [1;31mpublicProcedure.query[m(() => db.getActiveServiceCategories()),
+[35mserver/routers.ts[m[36m:[m[32m1807[m[36m:[m    list: [1;31mprotectedProcedure[m.query(({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m1810[m[36m:[m    participant: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1824[m[36m:[m    conversation: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1838[m[36m:[m    voiceAccess: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1860[m[36m:[m    translate: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1935[m[36m:[m    getTranslationPreference: [1;31mprotectedProcedure[m.query(({ ctx }) =>
+[35mserver/routers.ts[m[36m:[m[32m1938[m[36m:[m    setTranslationPreference: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1946[m[36m:[m    hideForMe: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1957[m[36m:[m    send: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m1992[m[36m:[m    sendVoice: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2032[m[36m:[m    markRead: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2042[m[36m:[m    delete: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2050[m[36m:[m    status: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2058[m[36m:[m    create: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2069[m[36m:[m    release: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2079[m[36m:[m    list: [1;31mprotectedProcedure[m.query(({ ctx }) => db.listOwnPrivacyRightsRequests(ctx.user.id)),
+[35mserver/routers.ts[m[36m:[m[32m2080[m[36m:[m    submit: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2120[m[36m:[m    businessCockpit: [1;31mprotectedProcedure[m.query(({ ctx }) => db.getProviderBusinessCockpit(ctx.user.id)),
+[35mserver/routers.ts[m[36m:[m[32m2132[m[36m:[m    favoriteList: [1;31mprotectedProcedure[m.query(({ ctx }) => db.getFavoriteProviders(ctx.user.id)),
+[35mserver/routers.ts[m[36m:[m[32m2133[m[36m:[m    favoriteStatus: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2136[m[36m:[m    favoriteAdd: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2139[m[36m:[m    favoriteRemove: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2142[m[36m:[m    myProfile: [1;31mprotectedProcedure[m.query(({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2145[m[36m:[m    updateAvailability: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2157[m[36m:[m    uploadDocument: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2209[m[36m:[m    getDocuments: [1;31mprotectedProcedure[m.query(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2218[m[36m:[m    getDocumentAccess: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2252[m[36m:[m    getDocumentRequirements: [1;31mprotectedProcedure[m.query(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2259[m[36m:[m    getCapabilityProfile: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2272[m[36m:[m    setCapabilityProfile: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2311[m[36m:[m    getOnboardingStatus: [1;31mprotectedProcedure[m.query(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2318[m[36m:[m    getOnboardingCatalog: [1;31mprotectedProcedure[m.query(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2325[m[36m:[m    configureOnboarding: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2348[m[36m:[m    getInsurancePolicies: [1;31mprotectedProcedure[m.query(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2353[m[36m:[m    submitInsurancePolicy: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2384[m[36m:[m    getOperatingModel: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2391[m[36m:[m    submitOperatingModel: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2407[m[36m:[m    myJobs: [1;31mprotectedProcedure[m.query(({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2410[m[36m:[m    myEarnings: [1;31mprotectedProcedure[m.query(({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2413[m[36m:[m    newJobs: [1;31mprotectedProcedure[m.query(({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2430[m[36m:[m    list: [1;31mprotectedProcedure[m.query(async () => {
+[35mserver/routers.ts[m[36m:[m[32m2444[m[36m:[m    professionalPreflight: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2474[m[36m:[m    stageMedia: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2511[m[36m:[m    command: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2631[m[36m:[m    getDraft: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2634[m[36m:[m    confirmDraft: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2654[m[36m:[m    list: [1;31mprotectedProcedure[m.query(({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m2657[m[36m:[m    quote: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2673[m[36m:[m    create: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2698[m[36m:[m    initializeGateway: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2808[m[36m:[m    release: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2831[m[36m:[m    refund: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2922[m[36m:[m    grantPermission: [1;31msuperAdminMfaProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2930[m[36m:[m    revokePermission: [1;31msuperAdminMfaProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2942[m[36m:[m    grantPermission: [1;31msuperAdminMfaProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2950[m[36m:[m    revokePermission: [1;31msuperAdminMfaProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m2965[m[36m:[m    plan: [1;31msuperAdminMfaProcedure[m.query(async () => {
+[35mserver/routers.ts[m[36m:[m[32m2982[m[36m:[m    applyRun: [1;31msuperAdminMfaProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3011[m[36m:[m    setMaxConcurrentActiveJobs: [1;31msuperAdminMfaProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3034[m[36m:[m    get: [1;31mprotectedProcedure[m.query(async () => ({
+[35mserver/routers.ts[m[36m:[m[32m3041[m[36m:[m    resolve: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3058[m[36m:[m    registerPushToken: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3068[m[36m:[m    list: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3071[m[36m:[m    preferences: [1;31mprotectedProcedure[m.query(({ ctx }) =>
+[35mserver/routers.ts[m[36m:[m[32m3073[m[36m:[m    updatePreferences: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3091[m[36m:[m    markRead: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3100[m[36m:[m    configureCompletionAutoRelease: [1;31mprotectedProcedure[m.mutation(async ({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m3128[m[36m:[m    reviewProviderDocument: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3159[m[36m:[m    resolveCompletionDispute: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3202[m[36m:[m    passport: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3213[m[36m:[m    get: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3224[m[36m:[m    guarantee: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3233[m[36m:[m    estimate: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3275[m[36m:[m    trustedContacts: [1;31mprotectedProcedure[m.query(({ ctx }) => db.listSafetyTrustedContacts(ctx.user.id)),
+[35mserver/routers.ts[m[36m:[m[32m3276[m[36m:[m    createTrustedContact: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3285[m[36m:[m    revokeTrustedContact: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3295[m[36m:[m      create: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3304[m[36m:[m      acknowledge: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3315[m[36m:[m      listMine: [1;31mprotectedProcedure[m.query(({ ctx }) => db.listMySafetyIncidents(ctx.user.id)),
+[35mserver/routers.ts[m[36m:[m[32m3316[m[36m:[m      report: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3334[m[36m:[m    summary: [1;31mprotectedProcedure[m.query(({ ctx }) => {
+[35mserver/routers.ts[m[36m:[m[32m3337[m[36m:[m    transactions: [1;31mprotectedProcedure[m
+[35mserver/routers.ts[m[36m:[m[32m3345[m[36m:[m    withdraw: [1;31mprotectedProcedure[m
+### RAW_ERROR_TO_CLIENT
+[35mserver/_core/dataMasking.ts[m[36m:[m[32m270[m[36m:[mexport function safeConsoleError([1;31mmessage: string, error[m?: unknown): void {
+[35mserver/_core/errorHandler.ts[m[36m:[m[32m169[m[36m:[m      [1;31mmessage: error[mLog.message,
+[35mserver/_core/errorHandler.ts[m[36m:[m[32m266[m[36m:[m        [1;31mmessage: error[mLog.userMessage,
+[35mserver/_core/errors.ts[m[36m:[m[32m208[m[36m:[m    return [1;31merror.message[m;
+[35mserver/_core/errors.ts[m[36m:[m[32m212[m[36m:[m    return [1;31merror.message[m;
+[35mserver/_core/health.ts[m[36m:[m[32m68[m[36m:[m        [1;31mmessage: getErrorMessage(error[m, 'Database health check failed'),
+[35mserver/_core/health.ts[m[36m:[m[32m91[m[36m:[m        [1;31mmessage: getErrorMessage(error[m, 'Redis health check failed'),
+[35mserver/_core/heartbeat.ts[m[36m:[m[32m47[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/heartbeat.ts[m[36m:[m[32m53[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/heartbeat.ts[m[36m:[m[32m89[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/heartbeat.ts[m[36m:[m[32m91[m[36m:[m      [1;31mmessage: `Heartbeat ${rpc} network error: ${String(error[m)}`,
+[35mserver/_core/heartbeat.ts[m[36m:[m[32m129[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/index.ts[m[36m:[m[32m262[m[36m:[m      if (error instanceof Error && [1;31merror.message[m === "MEDIA_SCANNER_WATCHDOG_LIMIT_INVALID") {
+[35mserver/_core/index.ts[m[36m:[m[32m263[m[36m:[m        res.status(400).json({ error: [1;31merror.message[m });
+[35mserver/_core/notification.ts[m[36m:[m[32m23[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/notification.ts[m[36m:[m[32m29[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/notification.ts[m[36m:[m[32m39[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/notification.ts[m[36m:[m[32m46[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/notification.ts[m[36m:[m[32m65[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/notification.ts[m[36m:[m[32m72[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/notificationRetry.ts[m[36m:[m[32m125[m[36m:[m      const errorMessage = error instanceof Error ? [1;31merror.message[m : 'Unknown error';
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m103[m[36m:[m  const message = error instanceof Error ? [1;31merror.message[m : fallback;
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m118[m[36m:[m    [1;31mthrow new TRPCError[m({ code: "FORBIDDEN", message: "Bu ülke/pazar kontrolü yalnız platform owner tarafından yapılabilir" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m123[m[36m:[m  [1;31mthrow new TRPCError[m({
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m189[m[36m:[m    [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "MFA güvenlik yapılandırması eksik" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m196[m[36m:[m    [1;31mthrow new TRPCError[m({
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m217[m[36m:[m      [1;31mthrow new TRPCError[m({
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m238[m[36m:[m      [1;31mthrow new TRPCError[m({
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m250[m[36m:[m      [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "Geçerli bir MFA kodu isteyin" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m257[m[36m:[m      [1;31mthrow new TRPCError[m({ code: "UNAUTHORIZED", message: "MFA kodu geçersiz veya süresi dolmuş" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m294[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "MODERATION_DECISION_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m296[m[36m:[m        [1;31mthrow new TRPCError[m({ code, message });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m312[m[36m:[m        if (!ctx.user) [1;31mthrow new TRPCError[m({ code: "UNAUTHORIZED", message: "Oturum gerekli" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m315[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "PRIVACY_REQUEST_REVIEW_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m316[m[36m:[m        [1;31mthrow new TRPCError[m({ code: message === "PRIVACY_REQUEST_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m327[m[36m:[m      if (!ctx.user) [1;31mthrow new TRPCError[m({ code: "UNAUTHORIZED", message: "Oturum gerekli" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m331[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "PRIVACY_LEGAL_HOLD_CREATE_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m332[m[36m:[m        [1;31mthrow new TRPCError[m({ code: message === "PRIVACY_HOLD_USER_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m339[m[36m:[m      if (!ctx.user) [1;31mthrow new TRPCError[m({ code: "UNAUTHORIZED", message: "Oturum gerekli" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m343[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "PRIVACY_LEGAL_HOLD_RELEASE_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m344[m[36m:[m        [1;31mthrow new TRPCError[m({ code: message === "PRIVACY_LEGAL_HOLD_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m362[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "SUPPORT_TICKET_REVIEW_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m363[m[36m:[m        [1;31mthrow new TRPCError[m({ code: message === "SUPPORT_TICKET_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m381[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "INSURANCE_CLAIM_REVIEW_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m382[m[36m:[m        [1;31mthrow new TRPCError[m({ code: message === "INSURANCE_CLAIM_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m419[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "SUPER_ADMIN_GRANT_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m421[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "NOT_FOUND", message: "Yönetici kullanıcı bulunamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m424[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "Super Admin atanacak kullanıcı önce yönetici rolüne sahip olmalıdır" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m436[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "SUPER_ADMIN_REVOKE_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m438[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "BAD_REQUEST", message: "Kendi Super Admin erişiminizi bu oturumda kaldıramazsınız" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m441[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "NOT_FOUND", message: "Aktif Super Admin ataması bulunamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m481[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "INSURANCE_POLICY_REVIEW_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m482[m[36m:[m        [1;31mthrow new TRPCError[m({ code: message === "INSURANCE_POLICY_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m497[m[36m:[m        const message = error instanceof Error ? [1;31merror.message[m : "OPERATING_MODEL_REVIEW_FAILED";
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m498[m[36m:[m        [1;31mthrow new TRPCError[m({ code: message === "OPERATING_MODEL_NOT_FOUND" ? "NOT_FOUND" : "PRECONDITION_FAILED", message });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m543[m[36m:[m      if (!ctx.sessionFingerprint) [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "MFA oturum bağlamı bulunamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m545[m[36m:[m      if (!mfaGrantId) [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "Aktif MFA grant bulunamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m582[m[36m:[m          ([1;31merror.message[m === "COUNTRY_PROFESSIONAL_MARKETPLACE_BLOCKED" ||
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m583[m[36m:[m            [1;31merror.message[m === "COUNTRY_PAYMENT_PROVIDER_NOT_READY")
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m585[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "Ülke açma kapısı tamamlanmadan profesyonel pazaryeri etkinleştirilemez" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m601[m[36m:[m        if (error instanceof Error && [1;31merror.message[m.startsWith("SETTLEMENT_POLICY_")) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m602[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "BAD_REQUEST", message: "Settlement policy alanları geçersiz" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m614[m[36m:[m        if (error instanceof Error && [1;31merror.message[m === "SETTLEMENT_POLICY_NOT_RETIRABLE") {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m615[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "Policy bulunamadı veya zaten emekliye ayrıldı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m637[m[36m:[m      if (!reviewerId) [1;31mthrow new TRPCError[m({ code: "UNAUTHORIZED" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m639[m[36m:[m        [1;31mthrow new TRPCError[m({
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m664[m[36m:[m        if (error instanceof Error && [1;31merror.message[m.startsWith("CANCELLATION_")) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m665[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "İptal kaydı mevcut ödeme ve durum koşullarıyla çözümlenemiyor" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m687[m[36m:[m        if (error instanceof Error && [1;31merror.message[m === "RISK_FLAG_NOT_ACTIONABLE") {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m688[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "Risk kaydı bulunamadı veya artık incelemeye uygun değil" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m713[m[36m:[m        if (error instanceof Error && [1;31merror.message[m.startsWith("FEATURE_FLAG_")) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m714[m[36m:[m          [1;31mthrow new TRPCError[m({ code: "BAD_REQUEST", message: "Feature flag ayarları geçersiz" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m733[m[36m:[m      if (!user) [1;31mthrow new TRPCError[m({ code: "NOT_FOUND", message: "Kullanıcı bulunamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m748[m[36m:[m        [1;31mthrow new TRPCError[m({ code: "UNAUTHORIZED", message: "Geçerli bir yönetici oturumu gerekli" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m751[m[36m:[m        [1;31mthrow new TRPCError[m({ code: "FORBIDDEN", message: "Yönetici kendi yönetici yetkisini kaldıramaz" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m754[m[36m:[m      if (!updated) [1;31mthrow new TRPCError[m({ code: "NOT_FOUND", message: "Kullanıcı bulunamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m768[m[36m:[m    if (!slug) [1;31mthrow new TRPCError[m({ code: "BAD_REQUEST", message: "Geçerli kategori adı gerekli" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m770[m[36m:[m    if (!category) [1;31mthrow new TRPCError[m({ code: "INTERNAL_SERVER_ERROR", message: "Kategori oluşturulamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m779[m[36m:[m        [1;31mthrow new TRPCError[m({ code: "BAD_REQUEST", message: "Güncellenecek kategori alanı gerekli" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m788[m[36m:[m      if (!category) [1;31mthrow new TRPCError[m({ code: "NOT_FOUND", message: "Kategori bulunamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m796[m[36m:[m      if (!category) [1;31mthrow new TRPCError[m({ code: "NOT_FOUND", message: "Kategori bulunamadı" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m827[m[36m:[m      [1;31mthrow new TRPCError[m({
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m837[m[36m:[m        [1;31mthrow new TRPCError[m({ code: "BAD_REQUEST", message: "Başlangıç tarihi bitiş tarihinden sonra olamaz" });
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m858[m[36m:[m      if (!service) [1;31mthrow new TRPCError[m({ code: "NOT_FOUND", message: "Hizmet talebi bulunamadı" });
+[35mserver/_core/trpc.ts[m[36m:[m[32m41[m[36m:[m      [1;31mthrow new TRPCError[m({
+[35mserver/_core/trpc.ts[m[36m:[m[32m43[m[36m:[m        [1;31mmessage: error[m.message,
+[35mserver/_core/trpc.ts[m[36m:[m[32m58[m[36m:[m    [1;31mthrow new TRPCError[m({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+[35mserver/_core/trpc.ts[m[36m:[m[32m76[m[36m:[m      [1;31mthrow new TRPCError[m({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+[35mserver/_core/trpc.ts[m[36m:[m[32m92[m[36m:[m      [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "MoveOS için bu oturumda ikinci faktör doğrulaması gerekli" });
+[35mserver/_core/trpc.ts[m[36m:[m[32m96[m[36m:[m      [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "MoveOS için ikinci faktör doğrulaması gerekli" });
+[35mserver/_core/trpc.ts[m[36m:[m[32m106[m[36m:[m      [1;31mthrow new TRPCError[m({ code: "FORBIDDEN", message: "Bu MoveOS işlemi için Super Admin yetkisi gerekli" });
+[35mserver/_core/voiceTranscription.ts[m[36m:[m[32m127[m[36m:[m        details: error instanceof Error ? [1;31merror.message[m : "Unknown error",
+[35mserver/_core/voiceTranscription.ts[m[36m:[m[32m191[m[36m:[m      details: error instanceof Error ? [1;31merror.message[m : "An unexpected error occurred",
+[35mserver/_core/voiceTranscription.ts[m[36m:[m[32m262[m[36m:[m *         [1;31mthrow new TRPCError[m({
+[35mserver/_core/voiceTranscription.ts[m[36m:[m[32m264[m[36m:[m *           [1;31mmessage: result.error[m,
+[35mserver/compliance/router.ts[m[36m:[m[32m16[m[36m:[m    if (!provider) [1;31mthrow new TRPCError[m({ code: "FORBIDDEN", message: "Capability doğrulaması yalnız profesyonel hesaplara açıktır" });
+[35mserver/compliance/router.ts[m[36m:[m[32m22[m[36m:[m    if (!provider) [1;31mthrow new TRPCError[m({ code: "FORBIDDEN", message: "Capability itirazı yalnız profesyonel hesaplara açıktır" });
+[35mserver/compliance/router.ts[m[36m:[m[32m26[m[36m:[m      const reason = error instanceof Error ? [1;31merror.message[m : "PROVIDER_CAPABILITY_APPEAL_FAILED";
+[35mserver/compliance/router.ts[m[36m:[m[32m28[m[36m:[m        [1;31mthrow new TRPCError[m({ code: "NOT_FOUND", message: "Capability kaydı bulunamadı" });
+[35mserver/compliance/router.ts[m[36m:[m[32m31[m[36m:[m        [1;31mthrow new TRPCError[m({ code: "PRECONDITION_FAILED", message: "Bu capability sonucu için itiraz açılamaz" });
+[35mserver/matching/OpportunityOutboxWorker.ts[m[36m:[m[32m22[m[36m:[m      const code = error instanceof Error ? [1;31merror.message[m : "OPPORTUNITY_OUTBOX_DELIVERY_FAILED";
+[35mserver/payments/FinancialReconciliationService.ts[m[36m:[m[32m96[m[36m:[m      error instanceof Error ? `Stripe ödeme sorgusu başarısız: ${[1;31merror.message[m}` : "Stripe ödeme sorgusu başarısız",
+[35mserver/payments/FinancialReconciliationService.ts[m[36m:[m[32m177[m[36m:[m      error: error instanceof Error ? [1;31merror.message[m : String(error),
+[35mserver/payments/IyzicoCheckoutCallbackService.ts[m[36m:[m[32m152[m[36m:[m      if (error instanceof Error && [1;31merror.message[m === "PAYMENT_NOT_FOUND") {
+[35mserver/payments/PaymentWebhookProcessor.ts[m[36m:[m[32m184[m[36m:[m    if (error instanceof Error && [1;31merror.message[m === "PAYMENT_WEBHOOK_PAYLOAD_MISMATCH") {
+[35mserver/payments/PaymentWebhookProcessor.ts[m[36m:[m[32m248[m[36m:[m    const safeError = error instanceof Error ? [1;31merror.message[m : "PAYMENT_WEBHOOK_PROCESSING_FAILED";
+[35mserver/payments/registerPaymentWebhookRoutes.ts[m[36m:[m[32m55[m[36m:[m        error: error instanceof Error ? [1;31merror.message[m : "unknown",
+[35mserver/payments/registerPaymentWebhookRoutes.ts[m[36m:[m[32m111[m[36m:[m          error: error instanceof Error ? [1;31merror.message[m : "unknown",
+### CONTACT_PII_SURFACES

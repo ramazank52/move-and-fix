@@ -1,0 +1,922 @@
+
+> move-and-fix@1.0.0 test /home/ubuntu/move-and-fix
+> vitest run
+
+
+ RUN  v3.2.6 /home/ubuntu/move-and-fix
+
+ ✓ tests/services.test.ts (29 tests) 29ms
+ ✓ tests/localization-contract.test.ts (20 tests) 68ms
+ ✓ tests/moveos-router-contract.test.ts (43 tests) 116ms
+ ✓ tests/payment-webhook-processor.test.ts (10 tests) 16ms
+stdout | tests/auth-local-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/provider-document-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/message-router-security.test.ts
+[OAuth] Initialized with baseURL: [90mundefined[39m
+
+stderr | tests/message-router-security.test.ts
+[OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable.
+
+stdout | tests/service-request-phase31.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/provider-document-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/message-router-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/auth-local-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/provider-document-security.test.ts (12 tests) 45ms
+stdout | tests/service-request-phase31.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/auth-local-security.test.ts (17 tests) 124ms
+ ✓ tests/message-router-security.test.ts (25 tests) 203ms
+ ✓ tests/service-request-phase31.test.ts (8 tests) 34ms
+stdout | tests/completion-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/completion-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/faz8a-capability-profile.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/phase-c-organizations.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/agreement-router-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/completion-security.test.ts (8 tests) 18ms
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > renders the production shared view with immutable fixture props and side-effect-free callbacks
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > renders all required fixture states through the same HomeScreenView tree
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > renders all required fixture states through the same HomeScreenView tree
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > renders all required fixture states through the same HomeScreenView tree
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > renders all required fixture states through the same HomeScreenView tree
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > disables real controls, preserves accessibility-disabled state and prevents every fixture callback
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > exposes pressed and focused feedback on the same common view without changing normal production styling
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > exposes pressed and focused feedback on the same common view without changing normal production styling
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-presentation.test.tsx > Home presentational-view fixture adapter > exposes pressed and focused feedback on the same common view without changing normal production styling
+The current testing environment is not configured to support act(...)
+
+ ✓ tests/home-screen-view-presentation.test.tsx (6 tests) 90ms
+stdout | tests/faz8a-capability-profile.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/phase-c-organizations.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/agreement-router-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/faz8a-capability-profile.test.ts (7 tests) 15ms
+stdout | tests/payment-router-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/phase-c-organizations.test.ts (10 tests) 49ms
+ ✓ tests/agreement-router-security.test.ts (6 tests) 31ms
+ ✓ tests/malware-scanning-lifecycle.test.ts (14 tests) 10ms
+stdout | tests/payment-router-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/p33-area-measurement-request-contract.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/payment-router-security.test.ts (11 tests) 24ms
+stdout | tests/tracking-router-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/provider-document-reviewer-router.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/payment-withdrawal-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/payment-withdrawal-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/p33-area-measurement-request-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/capability-transition-guard.test.ts (8 tests) 8ms
+stdout | tests/tracking-router-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/provider-document-reviewer-router.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/payment-withdrawal-security.test.ts (8 tests) 208ms
+ ✓ tests/p33-area-measurement-request-contract.test.ts (8 tests) 27ms
+ ✓ tests/tracking-router-security.test.ts (8 tests) 22ms
+ ✓ tests/provider-document-reviewer-router.test.ts (6 tests) 15ms
+ ✓ tests/p11-insurance-classification-safety.test.ts (5 tests) 7ms
+ ✓ tests/p11-payment-resolution.test.ts (7 tests) 8ms
+ ✓ tests/iyzico-checkout-callback.test.ts (5 tests) 18ms
+stderr | tests/master-phase-a-security.test.ts > Master Phase A P0 security contracts > fails closed if an unreferenced legacy payment or wallet class is invoked
+Kart ekleme başarısız: PaymentError: Payment error: Legacy PaymentGatewayService is disabled; use GatewayCheckoutService and verified callbacks
+    at asPaymentOperationError [90m(/home/ubuntu/move-and-fix/[39mserver/services/PaymentGatewayService.ts:121:10[90m)[39m
+    at PaymentGatewayService.addCard [90m(/home/ubuntu/move-and-fix/[39mserver/services/PaymentGatewayService.ts:455:28[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m {
+  code: [32m'PAYMENT_ERROR'[39m,
+  statusCode: [33m402[39m,
+  category: [32m'payment'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { operation: [32m'Kart ekleme'[39m },
+  cause: Error: Legacy PaymentGatewayService is disabled; use GatewayCheckoutService and verified callbacks
+      at PaymentGatewayService.legacyServiceDisabled [90m(/home/ubuntu/move-and-fix/[39mserver/services/PaymentGatewayService.ts:135:11[90m)[39m
+      at PaymentGatewayService.addCardToIyzico [90m(/home/ubuntu/move-and-fix/[39mserver/services/PaymentGatewayService.ts:472:17[90m)[39m
+      at PaymentGatewayService.addCard [90m(/home/ubuntu/move-and-fix/[39mserver/services/PaymentGatewayService.ts:415:37[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/master-phase-a-security.test.ts:86:27
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:155:11
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:26
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:1897:20
+      at new Promise (<anonymous>)
+      at runWithTimeout [90m(file:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:1863:10[90m)[39m
+      at runTest [90m(file:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:1574:12[90m)[39m
+}
+
+ ✓ tests/master-phase-a-security.test.ts (11 tests) 25ms
+ ✓ tests/encryption-key-rotation.test.ts (8 tests) 11ms
+stdout | tests/offer-router-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/financial-ledger-contract.test.ts (7 tests) 10ms
+stdout | tests/price-guarantee-router-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/offer-router-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/price-guarantee-router-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/offer-router-security.test.ts (5 tests) 27ms
+ ✓ tests/price-guarantee-router-security.test.ts (6 tests) 17ms
+ ✓ tests/service-interfaces.test.ts (12 tests) 8ms
+stdout | tests/all-media-classes-quarantine.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/all-media-classes-quarantine.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/provider-onboarding-router.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/e2e.test.ts (12 tests) 2645ms
+   ✓ E2E: Complete User Journey > 9. tRPC Public Endpoints > should return nearby providers  2538ms
+ ✓ tests/e2e-user-scenarios.test.ts (16 tests) 1608ms
+   ✓ E2E HTTP: Ortak oturumlu MoveOS > Genel HTTP altyapısı > genel auth.me ve yakın profesyoneller prosedürlerini erişilebilir tutar  1525ms
+stdout | tests/all-media-classes-quarantine.test.ts > media scanner HTTP callback fail-closed contract
+[MoveOS REST] Registered shared-session /api/owner/* routes
+✅ Swagger documentation available at /api-docs/ui
+
+stdout | tests/p33-rating-reconciliation-admin-contract.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/all-media-classes-quarantine.test.ts > media scanner HTTP callback fail-closed contract > rejects scanner callbacks while no dedicated scanner secret is configured
+{"timestamp":"2026-08-25T20:40:48.798Z","level":"info","message":"http.request.completed","requestId":"a25f3af4-8e76-4f34-8d7a-feda527bfa4f","context":{"method":"POST","endpoint":"/api/webhooks/media-scanner","statusCode":503,"responseTime":14,"userId":"undefined"}}
+
+stdout | tests/all-media-classes-quarantine.test.ts > media scanner HTTP callback fail-closed contract > does not expose scanner dispatch or watchdog while the separate scanner cron secret is not configured
+{"timestamp":"2026-08-25T20:40:48.810Z","level":"info","message":"http.request.completed","requestId":"ee71645b-4171-421e-a842-2d6f30bddf53","context":{"method":"POST","endpoint":"/api/scheduled/media-scanner-dispatch","statusCode":503,"responseTime":1,"userId":"undefined"}}
+
+stdout | tests/all-media-classes-quarantine.test.ts > media scanner HTTP callback fail-closed contract > does not expose scanner dispatch or watchdog while the separate scanner cron secret is not configured
+{"timestamp":"2026-08-25T20:40:48.814Z","level":"info","message":"http.request.completed","requestId":"ef2e6cee-51c4-4e86-b64d-c9432ac484e3","context":{"method":"POST","endpoint":"/api/scheduled/media-scanner-watchdog","statusCode":503,"responseTime":1,"userId":"undefined"}}
+
+ ✓ tests/all-media-classes-quarantine.test.ts (11 tests) 89ms
+stdout | tests/p33-rating-reconciliation-admin-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/provider-document-requirements-policy.test.ts (4 tests) 9ms
+stdout | tests/provider-onboarding-router.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/provider-onboarding-router.test.ts (3 tests) 14ms
+ ✓ tests/p33-rating-reconciliation-admin-contract.test.ts (5 tests) 13ms
+ ✓ tests/tr-gold-master-approved-seed.test.ts (5 tests) 13ms
+stdout | tests/safety-router-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/safety-router-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stderr | tests/login-accessibility-render.test.tsx > login screen accessibility render contract > renders named credential fields and named, stateful critical actions
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+ ✓ tests/p15-authorization-resilience-matrix.test.ts (4 tests) 7ms
+ ✓ tests/login-accessibility-render.test.tsx (1 test) 26ms
+stderr | tests/notification-delivery-contract.test.ts > çok kanallı bildirim teslimatı sözleşmesi > Expo kabulü ve uygulama içi kayıt varken credential'sız e-postayı teslim edildi diye saymaz
+email gönderimi başarısız: AppError: EMAIL_PROVIDER_NOT_CONFIGURED
+    at normalizeError [90m(/home/ubuntu/move-and-fix/[39mserver/_core/errors.ts:230:10[90m)[39m
+    at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:239:30[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:61:20
+    at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20 {
+  code: [32m'NOTIFICATION_CHANNEL_ERROR'[39m,
+  statusCode: [33m500[39m,
+  category: [32m'external_service'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { userId: [32m'7'[39m, type: [32m'order_completed'[39m, channel: [32m'email'[39m },
+  cause: Error: EMAIL_PROVIDER_NOT_CONFIGURED
+      at NotificationService.sendEmail [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:335:13[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+      at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:231:13[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:61:20
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20
+}
+
+stderr | tests/notification-delivery-contract.test.ts > çok kanallı bildirim teslimatı sözleşmesi > tüm canlı kanallar yapılandırılmamışsa bildirimi başarısız durumunda döndürür
+push gönderimi başarısız: AppError: PUSH_TOKEN_NOT_REGISTERED
+    at normalizeError [90m(/home/ubuntu/move-and-fix/[39mserver/_core/errors.ts:230:10[90m)[39m
+    at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:239:30[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+    at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20 {
+  code: [32m'NOTIFICATION_CHANNEL_ERROR'[39m,
+  statusCode: [33m500[39m,
+  category: [32m'external_service'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { userId: [32m'7'[39m, type: [32m'payment_received'[39m, channel: [32m'push'[39m },
+  cause: Error: PUSH_TOKEN_NOT_REGISTERED
+      at NotificationService.sendPushNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:263:36[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+      at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:225:13[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20
+}
+
+stderr | tests/notification-delivery-contract.test.ts > çok kanallı bildirim teslimatı sözleşmesi > tüm canlı kanallar yapılandırılmamışsa bildirimi başarısız durumunda döndürür
+sms gönderimi başarısız: AppError: SMS_PROVIDER_NOT_CONFIGURED
+    at normalizeError [90m(/home/ubuntu/move-and-fix/[39mserver/_core/errors.ts:230:10[90m)[39m
+    at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:239:30[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+    at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20 {
+  code: [32m'NOTIFICATION_CHANNEL_ERROR'[39m,
+  statusCode: [33m500[39m,
+  category: [32m'external_service'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { userId: [32m'7'[39m, type: [32m'payment_received'[39m, channel: [32m'sms'[39m },
+  cause: Error: SMS_PROVIDER_NOT_CONFIGURED
+      at NotificationService.sendSMS [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:317:13[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+      at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:228:13[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20
+}
+
+stderr | tests/notification-delivery-contract.test.ts > çok kanallı bildirim teslimatı sözleşmesi > tüm canlı kanallar yapılandırılmamışsa bildirimi başarısız durumunda döndürür
+email gönderimi başarısız: AppError: EMAIL_PROVIDER_NOT_CONFIGURED
+    at normalizeError [90m(/home/ubuntu/move-and-fix/[39mserver/_core/errors.ts:230:10[90m)[39m
+    at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:239:30[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+    at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20 {
+  code: [32m'NOTIFICATION_CHANNEL_ERROR'[39m,
+  statusCode: [33m500[39m,
+  category: [32m'external_service'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { userId: [32m'7'[39m, type: [32m'payment_received'[39m, channel: [32m'email'[39m },
+  cause: Error: EMAIL_PROVIDER_NOT_CONFIGURED
+      at NotificationService.sendEmail [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:335:13[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+      at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:231:13[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20
+}
+
+ ✓ tests/notification-delivery-contract.test.ts (3 tests) 48ms
+ ✓ tests/safety-router-security.test.ts (4 tests) 14ms
+stdout | tests/p17-moveai-canonical-router.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/environment-contract.test.ts (5 tests) 21ms
+stdout | tests/provider-availability-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stderr | tests/home-screen-view-pilot.test.tsx > Home presentational-view isolation pilot > keeps the production wrapper's live callback routing when values are passed to the shared view
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/home-screen-view-pilot.test.tsx > Home presentational-view isolation pilot > passes the real nearby-provider query error state and central error label to the shared view
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+ ✓ tests/home-screen-view-pilot.test.tsx (2 tests) 41ms
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should open after reaching failure threshold
+[CircuitBreaker:test-service] Circuit opened after 3 failures
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should reject calls when open
+[CircuitBreaker:test-service] Circuit opened after 3 failures
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should transition to half_open after reset timeout
+[CircuitBreaker:test-service] Circuit opened after 3 failures
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should transition to half_open after reset timeout
+[CircuitBreaker:test-service] Transitioning to half_open
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should close after enough successes in half_open
+[CircuitBreaker:test-service] Circuit opened after 3 failures
+
+stdout | tests/p17-moveai-canonical-router.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should close after enough successes in half_open
+[CircuitBreaker:test-service] Transitioning to half_open
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should close after enough successes in half_open
+[CircuitBreaker:test-service] Circuit closed — service recovered
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should re-open if failure occurs in half_open
+[CircuitBreaker:test-service] Circuit opened after 3 failures
+
+ ✓ tests/media-scanner-durable-job.test.ts (7 tests) 13ms
+ ✓ tests/credential-requirement-catalog.test.ts (5 tests) 6ms
+stdout | tests/provider-availability-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should re-open if failure occurs in half_open
+[CircuitBreaker:test-service] Transitioning to half_open
+
+stdout | tests/circuit-breaker.test.ts > Circuit Breaker > should re-open if failure occurs in half_open
+[CircuitBreaker:test-service] Re-opening circuit from half_open
+
+ ✓ tests/circuit-breaker.test.ts (10 tests) 492ms
+ ✓ tests/p17-moveai-canonical-router.test.ts (3 tests) 14ms
+ ✓ tests/provider-availability-security.test.ts (6 tests) 15ms
+ ✓ tests/p16-moveai-country-catalog-contract.test.ts (4 tests) 11ms
+ ✓ tests/p16-staged-contact-lifecycle-contract.test.ts (4 tests) 5ms
+ ✓ tests/sql-injection-protection.test.ts (6 tests) 12ms
+ ✓ tests/p33-outbox-lifecycle-contract.test.ts (4 tests) 6ms
+ ✓ tests/api-key-manager.test.ts (8 tests) 9ms
+ ✓ tests/credential-eligibility-guard.test.ts (5 tests) 33ms
+stdout | tests/p6-support-claim-router.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/global-country-scaffold-contract.test.ts (7 tests) 6ms
+ ✓ tests/central-errors.test.ts (9 tests) 10ms
+stdout | tests/p6-support-claim-router.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/hsts-security-headers.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/accessibility-critical-flows.test.ts (2 tests) 5ms
+ ✓ tests/financial-reconciliation-contract.test.ts (3 tests) 17ms
+stdout | tests/hsts-security-headers.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/p6-support-claim-router.test.ts (4 tests) 24ms
+stdout | tests/hsts-security-headers.test.ts > production HSTS response contract
+[MoveOS REST] Registered shared-session /api/owner/* routes
+✅ Swagger documentation available at /api-docs/ui
+
+stdout | tests/hsts-security-headers.test.ts > production HSTS response contract > returns the exact HSTS policy for a production HTTPS request through the trusted proxy
+{"timestamp":"2026-08-25T20:40:54.563Z","level":"info","message":"http.request.completed","requestId":"e6c9acfc-3208-4359-b927-897c0745f917","context":{"method":"GET","endpoint":"/api/health","statusCode":200,"responseTime":7,"userId":"undefined"}}
+
+ ✓ tests/country-launch-gate-contract.test.ts (3 tests) 6ms
+stdout | tests/hsts-security-headers.test.ts > production HSTS response contract > does not return HSTS for an HTTP request, even when the server is in production mode
+{"timestamp":"2026-08-25T20:40:54.575Z","level":"info","message":"http.request.completed","requestId":"7da4dca0-e603-4f44-b243-a4c5b3870d73","context":{"method":"GET","endpoint":"/api/health","statusCode":200,"responseTime":2,"userId":"undefined"}}
+
+stdout | tests/hsts-security-headers.test.ts > development HSTS response contract
+[MoveOS REST] Registered shared-session /api/owner/* routes
+✅ Swagger documentation available at /api-docs/ui
+
+stdout | tests/hsts-security-headers.test.ts > development HSTS response contract > does not return HSTS for a localhost development request claiming HTTPS
+{"timestamp":"2026-08-25T20:40:54.639Z","level":"info","message":"http.request.completed","requestId":"b4d2f29f-c366-4482-a10d-b4c5f86dd7e4","context":{"method":"GET","endpoint":"/api/health","statusCode":200,"responseTime":1,"userId":"undefined"}}
+
+ ✓ tests/hsts-security-headers.test.ts (4 tests) 126ms
+stdout | tests/p17-expense-evidence-router.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/profile-edit-mutation.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/settlement-policy-contract.test.ts (4 tests) 6ms
+stdout | tests/profile-edit-mutation.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/legal-consent-preferences-router.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/legal-consent-preferences-router.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/p17-expense-evidence-router.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/profile-edit-mutation.test.ts (4 tests) 24ms
+ ✓ tests/legal-consent-preferences-router.test.ts (4 tests) 29ms
+ ✓ tests/opportunity-outbox-worker-contract.test.ts (5 tests) 6ms
+stdout | tests/notification-preferences-router.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/p17-expense-evidence-router.test.ts (3 tests) 24ms
+stdout | tests/notification-preferences-router.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/country-deployment-policy.test.ts (3 tests) 5ms
+ ✓ tests/on-demand-message-translation.test.ts (4 tests) 7ms
+stdout | tests/provider-favorites-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/production-route-hygiene.test.ts (2 tests) 21ms
+ ✓ tests/notification-preferences-router.test.ts (3 tests) 18ms
+ ✓ tests/expense-evidence-limits.test.ts (4 tests) 5ms
+ ✓ tests/completion-evidence-analysis.test.ts (3 tests) 7ms
+ ✓ tests/country-market-control-policy.test.ts (4 tests) 11ms
+stdout | tests/provider-favorites-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/circular-dependency.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/circular-dependency.test.ts > circular dependency resolution (Critical 3) > EventService accepts injected notification sender
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+🔔 Event tetiklendi: order.created
+
+ ✓ tests/provider-favorites-security.test.ts (3 tests) 13ms
+ ✓ tests/csrf-rate-limit.test.ts (7 tests) 7ms
+stdout | tests/netgsm-provider-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/rating-reconciliation.test.ts (5 tests) 7ms
+stdout | tests/auth.logout.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/netgsm-provider-contract.test.ts (3 tests) 65ms
+stdout | tests/auth.logout.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/circular-dependency.test.ts > circular dependency resolution (Critical 3) > EventService accepts injected notification sender
+📦 Sipariş oluşturuldu: test-1
+
+stdout | tests/circular-dependency.test.ts > circular dependency resolution (Critical 3) > EventService accepts injected notification sender
+✅ Event işlendi: order.created → LISTENER-1787690457974-dpn8p6c5d
+
+ ✓ tests/auth.logout.test.ts (3 tests) 8ms
+ ✓ tests/master-p14-marketplace-negative-security.test.ts (3 tests) 6ms
+ ✓ tests/p16-provider-onboarding-mobile-contract.test.ts (3 tests) 4ms
+stdout | tests/http-payload-size-limit.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/http-payload-size-limit.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stderr | tests/explore-screen-view-presentation.test.tsx > Explore presentational-view fixture > renders normal, loading, empty and error through the same production view without external imports
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/explore-screen-view-presentation.test.tsx > Explore presentational-view fixture > renders normal, loading, empty and error through the same production view without external imports
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/explore-screen-view-presentation.test.tsx > Explore presentational-view fixture > renders normal, loading, empty and error through the same production view without external imports
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+stderr | tests/explore-screen-view-presentation.test.tsx > Explore presentational-view fixture > renders normal, loading, empty and error through the same production view without external imports
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+ ✓ tests/explore-screen-view-presentation.test.tsx (1 test) 52ms
+ ✓ tests/circular-dependency.test.ts (4 tests) 2103ms
+   ✓ circular dependency resolution (Critical 3) > EventService accepts injected notification sender  1504ms
+   ✓ circular dependency resolution (Critical 3) > services can be wired without circular import errors  595ms
+stdout | tests/http-payload-size-limit.test.ts > HTTP request body size limit
+[MoveOS REST] Registered shared-session /api/owner/* routes
+✅ Swagger documentation available at /api-docs/ui
+
+ ✓ tests/price-intelligence-narrative.test.ts (3 tests) 7ms
+stdout | tests/http-payload-size-limit.test.ts > HTTP request body size limit > returns an explicit 413 JSON response before routing an oversized JSON upload
+{"timestamp":"2026-08-25T20:41:00.388Z","level":"info","message":"http.request.completed","requestId":"942949c1-3d66-4c5f-b6b5-5251d4c1d328","context":{"method":"POST","endpoint":"/api/health","statusCode":413,"responseTime":249,"userId":"undefined"}}
+
+stderr | tests/http-payload-size-limit.test.ts > HTTP request body size limit > returns an explicit 413 JSON response before routing an oversized JSON upload
+{"timestamp":"2026-08-25T20:41:00.384Z","level":"warn","message":"http.request.payload_too_large","requestId":"942949c1-3d66-4c5f-b6b5-5251d4c1d328","context":{"endpoint":"/api/health","method":"POST"}}
+
+ ✓ tests/http-payload-size-limit.test.ts (1 test) 332ms
+stdout | tests/critical-type-safety.test.ts > Critical #1: type-safe notification retry timer > starts and stops the batch processor without leaking an interval
+[RETRY] Starting batch retry processor (interval: 1000ms)
+[RETRY] Batch retry processor stopped
+
+stdout | tests/critical-type-safety.test.ts > Critical #1: type-safe notification retry timer > keeps notification payloads as runtime-validated unknown data
+[RETRY] Notification notification-1 queued for retry in 1000ms (attempt 1/5)
+
+ ✓ tests/critical-type-safety.test.ts (4 tests) 8ms
+ ✓ tests/route-manifest.test.ts (51 tests) 13ms
+ ✓ tests/p16-media-scanner-watchdog-contract.test.ts (3 tests) 9ms
+ ✓ tests/theme-preview-isolation.test.ts (4 tests) 7ms
+ ✓ tests/media-scanner-adapter.test.ts (3 tests) 67ms
+ ✓ tests/observability-contract.test.ts (4 tests) 8ms
+stderr | tests/explore-screen-view-pilot.test.tsx > Explore presentational-view pilot > keeps live tRPC values and production router/refetch callbacks in the wrapper
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+The current testing environment is not configured to support act(...)
+
+ ✓ tests/explore-screen-view-pilot.test.tsx (1 test) 12ms
+ ✓ tests/us-ca-la-v2-policy.test.ts (3 tests) 7ms
+ ✓ tests/p16-expense-evidence-chat-contract.test.ts (2 tests) 10ms
+ ✓ tests/auth.storage.test.ts (2 tests) 7ms
+ ✓ tests/quiet-hours-policy.test.ts (4 tests) 678ms
+ ✓ tests/turkey-payment-launch-policy.test.ts (4 tests) 8ms
+ ✓ tests/p29-review-moderation-atomic-contract.test.ts (3 tests) 4ms
+ ✓ tests/move-ai-response-policy.test.ts (5 tests) 7ms
+ ✓ tests/payment-policy.test.ts (9 tests) 10ms
+ ✓ tests/cancellation-settlement-policy.test.ts (5 tests) 13ms
+ ✓ tests/country-market-control-authorization-contract.test.ts (3 tests) 6ms
+ ✓ tests/p33-runtime-capability-status.test.ts (3 tests) 6ms
+ ✓ tests/p16-production-seed-hygiene.test.ts (4 tests) 11ms
+ ✓ tests/provider-onboarding-policy.test.ts (4 tests) 4ms
+ ✓ tests/p17-privacy-data-scope.test.ts (1 test) 8ms
+ ✓ tests/provider-location-matching.test.ts (4 tests) 5ms
+ ✓ tests/theme-runtime-harness-preflight.test.ts (3 tests) 6ms
+ ✓ tests/provider-marketplace-eligibility.test.ts (3 tests) 5ms
+ ✓ tests/area-measurement.test.ts (5 tests) 6ms
+stdout | tests/professional-ai-router-contract.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/professional-ai-router-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/capability-policy-contract.test.ts (5 tests) 5ms
+ ✓ tests/payment-provider-operational-policy.test.ts (3 tests) 5ms
+ ✓ tests/professional-ai-router-contract.test.ts (3 tests) 28ms
+stdout | tests/p18-production-exposure-contract.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/compliance-reverification-contract.test.ts (4 tests) 6ms
+stdout | tests/p18-production-exposure-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/professional-ai-boundary.test.ts (3 tests) 5ms
+ ✓ tests/provider-document-review-access-policy.test.ts (3 tests) 4ms
+stdout | tests/p18-production-exposure-contract.test.ts > P18 production public-exposure contract
+[MoveOS REST] Registered shared-session /api/owner/* routes
+✅ Swagger documentation available at /api-docs/ui
+
+ ✓ tests/currency-policy.test.ts (4 tests) 6ms
+stdout | tests/p18-production-exposure-contract.test.ts > P18 production public-exposure contract > keeps public liveness minimal and closes detailed diagnostics
+{"timestamp":"2026-08-25T20:41:05.022Z","level":"info","message":"http.request.completed","requestId":"7c1b94ef-b7ea-4015-995f-85f65ee95692","context":{"method":"GET","endpoint":"/api/health","statusCode":200,"responseTime":11,"userId":"undefined"}}
+
+stdout | tests/p18-production-exposure-contract.test.ts > P18 production public-exposure contract > keeps public liveness minimal and closes detailed diagnostics
+{"timestamp":"2026-08-25T20:41:05.037Z","level":"info","message":"http.request.completed","requestId":"2d8d7729-6df3-4ca3-8d63-b017d6586aa2","context":{"method":"GET","endpoint":"/api/health/detailed","statusCode":404,"responseTime":1,"userId":"undefined"}}
+
+ ✓ tests/login-signup-theme-token.test.ts (2 tests) 4ms
+stdout | tests/p18-production-exposure-contract.test.ts > P18 production public-exposure contract > closes OpenAPI and interactive docs in production without redirecting to a CDN
+{"timestamp":"2026-08-25T20:41:05.101Z","level":"info","message":"http.request.completed","requestId":"aa57f117-8907-47b3-ad6f-0433794ffc60","context":{"method":"GET","endpoint":"/api-docs","statusCode":404,"responseTime":1,"userId":"undefined"}}
+
+stdout | tests/p18-production-exposure-contract.test.ts > P18 production public-exposure contract > closes OpenAPI and interactive docs in production without redirecting to a CDN
+{"timestamp":"2026-08-25T20:41:05.105Z","level":"info","message":"http.request.completed","requestId":"a26706c9-348e-4f0c-9fcf-2759b74857f7","context":{"method":"GET","endpoint":"/api-docs/ui","statusCode":404,"responseTime":1,"userId":"undefined"}}
+
+ ✓ tests/p18-production-exposure-contract.test.ts (2 tests) 193ms
+stderr | tests/service-error-contract.test.ts > service error contract > uses PaymentError for insufficient withdrawal balance
+Para çekme isteği başarısız: PaymentError: Payment error: Yetersiz bakiye
+    at PaymentGatewayService.requestWithdrawal [90m(/home/ubuntu/move-and-fix/[39mserver/services/PaymentGatewayService.ts:254:15[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m {
+  code: [32m'PAYMENT_ERROR'[39m,
+  statusCode: [33m402[39m,
+  category: [32m'payment'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mfalse[39m,
+  context: { userId: [32m'provider-1'[39m, requestedAmount: [33m6000[39m },
+  cause: [90mundefined[39m
+}
+
+ ✓ tests/service-error-contract.test.ts (5 tests) 28ms
+ ✓ tests/p35-notification-sms-contract.test.ts (1 test) 12ms
+ ✓ tests/master-p18-admin-mfa-security.test.ts (3 tests) 4ms
+ ✓ tests/auth.web-storage.test.ts (1 test) 5ms
+ ✓ tests/legal-document-catalog.test.ts (3 tests) 8ms
+ ✓ tests/capability-scope-constraint-matcher.test.ts (2 tests) 5ms
+ ✓ tests/feature-flag-contract.test.ts (4 tests) 4ms
+ ✓ tests/p35-trpc-error-redaction.test.ts (2 tests) 17ms
+stdout | tests/feature-flag-router-contract.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/p11-media-quarantine-security.test.ts (2 tests) 45ms
+ ✓ tests/media-scanner-callback-rotation.test.ts (2 tests) 5ms
+ ✓ tests/p17-media-scanner-attempt-correlation.test.ts (2 tests) 4ms
+stdout | tests/notification-provider-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/notification-provider-contract.test.ts (2 tests) 4ms
+stdout | tests/feature-flag-router-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/p33-capacity-offer-contract.test.ts (2 tests) 3ms
+ ✓ tests/login-safari-theme-regression.test.ts (2 tests) 4ms
+ ✓ tests/p16-job-safety-runtime-contract.test.ts (2 tests) 10ms
+ ✓ tests/feature-flag-router-contract.test.ts (2 tests) 12ms
+ ✓ tests/provider-capacity-policy.test.ts (3 tests) 7ms
+ ✓ tests/profile-and-email-client-contract.test.ts (2 tests) 4ms
+ ✓ tests/partial-settlement-downstream.test.ts (2 tests) 7ms
+ ✓ tests/navigation-entry.test.ts (4 tests) 4ms
+ ✓ tests/trust-policy.test.ts (2 tests) 12ms
+ ✓ tests/marketplace-eligibility-wiring.test.ts (2 tests) 6ms
+ ✓ tests/masked-communication-service.test.ts (3 tests) 16ms
+ ✓ tests/opportunity-notification-policy.test.ts (2 tests) 5ms
+ ✓ tests/media-upload-limits.test.ts (2 tests) 4ms
+ ✓ tests/move-ai-client-fallback.test.ts (6 tests) 6ms
+ ✓ tests/move-ai-media-policy.test.ts (3 tests) 5ms
+ ✓ tests/job-capsule-lifecycle.test.ts (2 tests) 5ms
+ ✓ tests/area-measurement-capability.test.ts (2 tests) 4ms
+ ✓ tests/privacy-policy-catalog.test.ts (2 tests) 6ms
+ ✓ tests/user-content-moderation-policy.test.ts (3 tests) 13ms
+ ✓ tests/p16-completion-dispute-moveos-ui.test.ts (1 test) 9ms
+ ✓ tests/package-sample-hygiene.test.ts (2 tests) 4ms
+ ✓ tests/turkey-vat-policy.test.ts (2 tests) 13ms
+ ✓ tests/completion-auto-release-response.test.ts (1 test) 4ms
+ ✓ tests/auth-cookie-contract.test.ts (1 test) 6ms
+ ✓ tests/completion-auto-release-secret.test.ts (1 test) 102ms
+ ✓ tests/payment-money-policy.test.ts (2 tests) 5ms
+stdout | tests/move-ai-media-router-contract.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/move-ai-media-router-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/phone-verification-route.test.ts (1 test) 3ms
+ ✓ tests/move-ai-media-router-contract.test.ts (1 test) 9ms
+ ✓ tests/health-contract.test.ts (2 tests) 4ms
+stdout | tests/us-ca-la-v2-authorization.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/us-ca-la-v2-authorization.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/us-ca-la-v2-authorization.test.ts (1 test) 4ms
+
+ Test Files  159 passed (159)
+      Tests  836 passed (836)
+   Start at  20:40:40
+   Duration  31.09s (transform 3.37s, setup 0ms, collect 66.50s, tests 11.02s, environment 53ms, prepare 17.94s)
+

@@ -11,6 +11,8 @@ const t = initTRPC.context<TrpcContext>().create({
 
 export const router = t.router;
 
+const GENERIC_INTERNAL_ERROR_MESSAGE = "İşlem şu anda tamamlanamadı. Lütfen daha sonra tekrar deneyin.";
+
 function toTRPCCode(statusCode: number) {
   switch (statusCode) {
     case 400:
@@ -33,16 +35,31 @@ function toTRPCCode(statusCode: number) {
   }
 }
 
+function toSafeClientMessage(error: AppError) {
+  if (error.statusCode >= 500 || error.category === "external_service" || error.category === "database" || error.category === "payment" || error.category === "unknown") {
+    return GENERIC_INTERNAL_ERROR_MESSAGE;
+  }
+  return error.message;
+}
+
+function toSafeTRPCError(error: AppError) {
+  return new TRPCError({
+    code: toTRPCCode(error.statusCode),
+    message: toSafeClientMessage(error),
+    cause: error,
+  });
+}
+
 const mapAppErrors = t.middleware(async ({ next }) => {
   try {
-    return await next();
+    const result = await next();
+    if (!result.ok && result.error.cause instanceof AppError) {
+      throw toSafeTRPCError(result.error.cause);
+    }
+    return result;
   } catch (error: unknown) {
     if (error instanceof AppError) {
-      throw new TRPCError({
-        code: toTRPCCode(error.statusCode),
-        message: error.message,
-        cause: error,
-      });
+      throw toSafeTRPCError(error);
     }
 
     throw error;

@@ -1,0 +1,11 @@
+### SCA
+
+> move-and-fix@1.0.0 supply:sca /home/ubuntu/move-and-fix
+> node scripts/sca-gate.mjs
+
+SCA_GATE=PASS
+SCA_ADVISORIES=4
+SCA_BLOCKING_RELEASE=0
+SCA_APPROVED_EXCEPTIONS=2
+### TRACKED_SECRET_HEURISTICS
+### HIGH_RISK_SOURCE_PATTERNS

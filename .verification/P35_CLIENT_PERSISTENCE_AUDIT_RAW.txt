@@ -1,0 +1,226 @@
+### LOCAL_STORAGE
+[35mlib/_core/auth.ts[m[36m:[m[32m63[m[36m:[m      // [1;31mlocalStorage[m after session expiry, revoke, logout or account switching.
+[35mlib/_core/auth.ts[m[36m:[m[32m103[m[36m:[m      window.[1;31mlocalStorage[m.removeItem(USER_INFO_KEY);
+[35mlib/_core/auth.ts[m[36m:[m[32m116[m[36m:[m      // Use [1;31mlocalStorage[m for web
+[35mlib/_core/auth.ts[m[36m:[m[32m117[m[36m:[m      window.[1;31mlocalStorage[m.removeItem(USER_INFO_KEY);
+### EMPTY_CATCH_CANDIDATES
+[35mapp/_layout.tsx[m[36m:[m[32m44[m[36m:[m    })().[1;31mcatch([m() => {
+[35mapp/ai-assistant.tsx[m[36m:[m[32m182[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/claims/new.tsx[m[36m:[m[32m57[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/create-service.tsx[m[36m:[m[32m274[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/create-service.tsx[m[36m:[m[32m306[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/expenses/[requestId].tsx[m[36m:[m[32m208[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/login.tsx[m[36m:[m[32m36[m[36m:[m    } [1;31mcatch ([mloginError) {
+[35mapp/oauth/callback.tsx[m[36m:[m[32m49[m[36m:[m            } [1;31mcatch ([merr) {
+[35mapp/oauth/callback.tsx[m[36m:[m[32m176[m[36m:[m      } [1;31mcatch ([merror) {
+[35mapp/payment/checkout.tsx[m[36m:[m[32m243[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/provider-onboarding.tsx[m[36m:[m[32m74[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/provider-onboarding.tsx[m[36m:[m[32m86[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/tracking/live.tsx[m[36m:[m[32m257[m[36m:[m      void setLocationSharing.mutateAsync({ requestId, enabled: false }).[1;31mcatch([m() => undefined);
+[35mapp/tracking/live.tsx[m[36m:[m[32m312[m[36m:[m          } [1;31mcatch ([merror) {
+[35mapp/tracking/live.tsx[m[36m:[m[32m323[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/tracking/live.tsx[m[36m:[m[32m338[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/tracking/live.tsx[m[36m:[m[32m409[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/tracking/live.tsx[m[36m:[m[32m418[m[36m:[m    } [1;31mcatch ([merror) {
+[35mapp/tracking/live.tsx[m[36m:[m[32m435[m[36m:[m    } [1;31mcatch ([merror) {
+[35mlib/_core/api.ts[m[36m:[m[32m60[m[36m:[m  } [1;31mcatch ([merror: unknown) {
+[35mlib/_core/auth.ts[m[36m:[m[32m41[m[36m:[m  } [1;31mcatch ([merror) {
+[35mlib/chat-notifications.ts[m[36m:[m[32m65[m[36m:[m  } [1;31mcatch ([merror) {
+[35mlib/notification-sounds.ts[m[36m:[m[32m107[m[36m:[m  } [1;31mcatch ([me) {
+[35mlib/trpc.ts[m[36m:[m[32m21[m[36m:[m    .[1;31mcatch([m() => null);
+[35mserver/_core/circuitBreaker.ts[m[36m:[m[32m62[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/context.ts[m[36m:[m[32m69[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/_core/dataApi.ts[m[36m:[m[32m49[m[36m:[m    const detail = await response.text().[1;31mcatch([m() => "");
+[35mserver/_core/dataApi.ts[m[36m:[m[32m55[m[36m:[m  const payload = await response.json().[1;31mcatch([m() => ({}));
+[35mserver/_core/emailUnsubscribe.ts[m[36m:[m[32m290[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/emailUnsubscribe.ts[m[36m:[m[32m327[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/health.ts[m[36m:[m[32m64[m[36m:[m    } [1;31mcatch ([merror: unknown) {
+[35mserver/_core/health.ts[m[36m:[m[32m87[m[36m:[m    } [1;31mcatch ([merror: unknown) {
+[35mserver/_core/heartbeat.ts[m[36m:[m[32m88[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/_core/heartbeat.ts[m[36m:[m[32m96[m[36m:[m    const detail = await response.text().[1;31mcatch([m() => "");
+[35mserver/_core/imageGeneration.ts[m[36m:[m[32m75[m[36m:[m    const detail = await response.text().[1;31mcatch([m() => "");
+[35mserver/_core/imageGeneration.ts[m[36m:[m[32m135[m[36m:[m    const detail = await response.text().[1;31mcatch([m() => "");
+[35mserver/_core/index.ts[m[36m:[m[32m205[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/index.ts[m[36m:[m[32m233[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/index.ts[m[36m:[m[32m261[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/index.ts[m[36m:[m[32m305[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/index.ts[m[36m:[m[32m344[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/index.ts[m[36m:[m[32m391[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/index.ts[m[36m:[m[32m437[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/index.ts[m[36m:[m[32m502[m[36m:[m    } [1;31mcatch ([merr: unknown) {
+[35mserver/_core/index.ts[m[36m:[m[32m547[m[36m:[m  startServer().[1;31mcatch([mconsole.error);
+[35mserver/_core/llm.ts[m[36m:[m[32m305[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/notification.ts[m[36m:[m[32m93[m[36m:[m      const detail = await response.text().[1;31mcatch([m() => "");
+[35mserver/_core/notification.ts[m[36m:[m[32m103[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/_core/notificationRetry.ts[m[36m:[m[32m124[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/notificationRetry.ts[m[36m:[m[32m281[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/_core/oauth.ts[m[36m:[m[32m102[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/oauth.ts[m[36m:[m[32m134[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/oauth.ts[m[36m:[m[32m156[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/oauth.ts[m[36m:[m[32m167[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/oauth.ts[m[36m:[m[32m195[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m127[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m137[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m147[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m157[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m172[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m188[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m198[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m213[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m233[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m243[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m258[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m272[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m282[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m292[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m302[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m318[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m328[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m338[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m354[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m370[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m386[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m401[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m416[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m430[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m445[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m459[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m469[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m483[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m498[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m508[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m518[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m528[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m538[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m548[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m558[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m568[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRestAdapter.ts[m[36m:[m[32m578[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m293[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m314[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m330[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m342[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m361[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m380[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m418[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m435[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m480[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m496[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m579[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m600[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m613[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m663[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m686[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/ownerRouter.ts[m[36m:[m[32m712[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/sdk.ts[m[36m:[m[32m206[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/sdk.ts[m[36m:[m[32m275[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/_core/trpc.ts[m[36m:[m[32m60[m[36m:[m  } [1;31mcatch ([merror: unknown) {
+[35mserver/_core/voiceTranscription.ts[m[36m:[m[32m123[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/_core/voiceTranscription.ts[m[36m:[m[32m165[m[36m:[m      const errorText = await response.text().[1;31mcatch([m() => "");
+[35mserver/_core/voiceTranscription.ts[m[36m:[m[32m186[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/compliance/router.ts[m[36m:[m[32m25[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m82[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m143[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m2032[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m2622[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m3978[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m4062[m[36m:[m  }).[1;31mcatch([m(error) => {
+[35mserver/db.ts[m[36m:[m[32m4084[m[36m:[m  }).[1;31mcatch([m(error) => {
+[35mserver/db.ts[m[36m:[m[32m5323[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m8270[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m8328[m[36m:[m    } [1;31mcatch ([mcapacityError) {
+[35mserver/db.ts[m[36m:[m[32m9383[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m9405[m[36m:[m      } [1;31mcatch ([mrecoveryError) {
+[35mserver/db.ts[m[36m:[m[32m9446[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m9487[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m9599[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m9602[m[36m:[m    await db.update(ratingReconciliationRuns).set({ status: "failed", failureCode }).where(eq(ratingReconciliationRuns.runKey, input.runKey)).[1;31mcatch([m() => undefined);
+[35mserver/db.ts[m[36m:[m[32m9992[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m10457[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m11325[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m11442[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/db.ts[m[36m:[m[32m12233[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/matching/OpportunityOutboxWorker.ts[m[36m:[m[32m21[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/matching/OpportunityOutboxWorker.ts[m[36m:[m[32m55[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/payments/FinancialReconciliationService.ts[m[36m:[m[32m93[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/payments/FinancialReconciliationService.ts[m[36m:[m[32m172[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/payments/GatewayCheckoutService.ts[m[36m:[m[32m258[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/payments/GatewayCheckoutService.ts[m[36m:[m[32m371[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/payments/IyzicoCheckoutCallbackService.ts[m[36m:[m[32m151[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/payments/IyzicoCheckoutCallbackService.ts[m[36m:[m[32m181[m[36m:[m    ).[1;31mcatch([m(error: unknown) => {
+[35mserver/payments/PaymentWebhookProcessor.ts[m[36m:[m[32m183[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/payments/PaymentWebhookProcessor.ts[m[36m:[m[32m247[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/payments/registerPaymentWebhookRoutes.ts[m[36m:[m[32m48[m[36m:[m    } [1;31mcatch ([merror) {
+[35mserver/payments/registerPaymentWebhookRoutes.ts[m[36m:[m[32m100[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m429[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m455[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m483[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m515[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m540[m[36m:[m  } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m633[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m693[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m704[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m806[m[36m:[m          } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m883[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m892[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m907[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m916[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m931[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m940[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m958[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m977[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m998[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1010[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1023[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1032[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1048[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1057[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1066[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1075[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1084[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1121[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1134[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1143[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1198[m[36m:[m          } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1213[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1389[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1413[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m1449[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2150[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2303[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2340[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2433[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2504[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2617[m[36m:[m        } [1;31mcatch ([merror: unknown) {
+[35mserver/routers.ts[m[36m:[m[32m2639[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2662[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2681[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2770[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2818[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2915[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2974[m[36m:[m      } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m2994[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3021[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3207[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3218[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3229[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3269[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3281[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3290[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3300[m[36m:[m          } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3309[m[36m:[m          } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3326[m[36m:[m          } [1;31mcatch ([merror) {
+[35mserver/routers.ts[m[36m:[m[32m3379[m[36m:[m        } [1;31mcatch ([merror) {
+[35mserver/security/MediaScannerAdapter.ts[m[36m:[m[32m68[m[36m:[m        const payload = await response.json().[1;31mcatch([m() => ({})) as { scannerReference?: unknown };
+[35mserver/services/EventService.ts[m[36m:[m[32m245[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/EventService.ts[m[36m:[m[32m285[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/EventService.ts[m[36m:[m[32m308[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/EventService.ts[m[36m:[m[32m330[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/EventService.ts[m[36m:[m[32m355[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/EventService.ts[m[36m:[m[32m377[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/EventService.ts[m[36m:[m[32m399[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/EventService.ts[m[36m:[m[32m421[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/NotificationService.ts[m[36m:[m[32m238[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/NotificationService.ts[m[36m:[m[32m311[m[36m:[m      const result = await response.json().[1;31mcatch([m() => null) as { code?: string } | null;
+[35mserver/services/NotificationService.ts[m[36m:[m[32m550[m[36m:[m      } [1;31mcatch ([merror: unknown) {
+[35mserver/services/NotificationServiceV2.ts[m[36m:[m[32m372[m[36m:[m    } [1;31mcatch ([merror: unknown) {
