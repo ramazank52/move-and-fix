@@ -8911,11 +8911,25 @@ export async function createReview(data: {
     if (request.assignedProviderId !== data.providerId) throw new Error("Bu profesyonel ilgili işe atanmamış");
 
     const existing = await tx
-      .select({ id: reviews.id })
+      .select({ id: reviews.id, userId: reviews.userId, providerId: reviews.providerId })
       .from(reviews)
       .where(eq(reviews.requestId, data.requestId))
       .limit(1);
-    if (existing[0]) throw new Error("Bu iş daha önce değerlendirildi");
+    if (existing[0]) {
+      if (existing[0].userId !== data.userId || existing[0].providerId !== data.providerId) {
+        throw new Error("Bu iş daha önce değerlendirildi");
+      }
+      const moderation = await tx
+        .select({ id: userContentModerationRecords.id, status: userContentModerationRecords.status })
+        .from(userContentModerationRecords)
+        .where(and(
+          eq(userContentModerationRecords.surface, "review"),
+          eq(userContentModerationRecords.contentReference, `review:${existing[0].id}`),
+        ))
+        .limit(1);
+      if (!moderation[0]) throw new Error("MIGRATION_REQUIRED_REVIEW_MODERATION");
+      return { success: true, reviewId: existing[0].id, moderationStatus: moderation[0].status, idempotent: true };
+    }
 
     const providerRows = await tx
       .select()
@@ -8925,14 +8939,6 @@ export async function createReview(data: {
     const provider = providerRows[0];
     if (!provider) throw new Error("Profesyonel bulunamadı");
 
-    const countRows = await tx
-      .select({ count: sql<number>`count(*)` })
-      .from(reviews)
-      .where(eq(reviews.providerId, data.providerId));
-    const reviewCount = Number(countRows[0]?.count ?? 0);
-    const currentRating = Number(provider.rating ?? 0);
-    const newRating = Math.round((currentRating * reviewCount + data.rating) / (reviewCount + 1));
-
     const result = await tx.insert(reviews).values({
       requestId: data.requestId,
       userId: data.userId,
@@ -8940,9 +8946,19 @@ export async function createReview(data: {
       rating: data.rating,
       comment: data.comment?.trim() || null,
     });
-    await tx.update(providers).set({ rating: newRating }).where(eq(providers.id, data.providerId));
+    const reviewId = Number(result[0].insertId);
+    const policy = evaluateUserGeneratedContent({ kind: "review_comment", text: data.comment });
+    await tx.insert(userContentModerationRecords).values({
+      ownerUserId: data.userId,
+      surface: "review",
+      contentReference: `review:${reviewId}`,
+      contentHash: createHash("sha256").update(data.comment?.normalize("NFKC").trim() || `rating:${data.rating}`).digest("hex"),
+      policyVersion: "ugc-policy-v1",
+      status: "pending",
+      reasonCode: policy.reasonCode,
+    });
 
-    return { success: true, reviewId: result[0].insertId };
+    return { success: true, reviewId, moderationStatus: "pending", idempotent: false };
   });
 }
 

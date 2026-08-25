@@ -920,3 +920,11 @@
 - [ ] P28-3 — Service request measurement UI, izin akışı, vertex/rectangle/manual giriş, düzenle/sil/onayla ve accessible NOT_SUPPORTED durumlarını uygula
 - [ ] P28-4 — Geometri, controller, owner isolation, retry/idempotency, payload validation ve mevcut request lifecycle testlerini ekle
 - [ ] P28-5 — Kamera/medya privacy documentation, physical-device accuracy blocker, lifecycle/notification/message/review bağımsız açıkları ve final quality/export paketini tamamla
+
+## P29 Atomic Reviews and Request-Scoped Measurement
+- [ ] P29-1 — Review + PENDING moderation kaydını canonical transaction içinde atomik/idempotent yaz; migration yokken dürüst MIGRATION_REQUIRED dön
+- [ ] P29-2 — Moderation-aware rating aggregate, dry-run reconciliation, drift/duplicate/concurrency ve owner/tenant güvenlik sınırlarını uygula
+- [ ] P29-3 — Versioned request measurement draft/attachment persistence, owner-scoped CRUD, payload limits, idempotency ve provider-minimized result sözleşmesini uygula
+- [ ] P29-4 — Measurement controller/UI state machine: manual rectangle/polygon, capability/permission/tracking/error/retry/interruption ve safe return durumlarını uygula
+- [ ] P29-5 — Native AR adapter/config/prebuild/privacy/capability durumlarını ve physical-device test matrixini hazırla; fiziksel doğruluğu BLOCKED tut
+- [ ] P29-6 — Tam route/control/quality/export, clean install/build, secret/SCA/SBOM ve final evidence paketini tamamla
