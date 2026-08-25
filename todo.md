@@ -906,3 +906,10 @@
 - [ ] P25-3 — Server-owned capability status API/modeli ile payment/wallet/refund/premium, map/location, push, SMS/email, MoveAI, document/media ve external support UI durumlarını uygula
 - [ ] P25-4 — Moderation/rating/capability negatif ve concurrency testlerini; full regression, typecheck, lint, build, Drizzle/secret/diff kontrollerini tamamla
 - [ ] P25-5 — P25 kanıt raporu ve checkpointte COMPLETED_AND_VERIFIED, CODE_READY_NOT_CONFIGURED, EXTERNAL_BLOCKER, FAILED/REMAINING ayrımını yayınla
+
+## P27 Binding Final Closure
+- [ ] P27-1 — Baseline/dirty-tree/lockfile/scripts/DB/journal/quality kanıtı ve route-control matrix oluştur
+- [ ] P27-2 — Auth, katalog/konum, talep/lifecycle, notification/message/media, moderation/review ve operasyon davranışlarını repository çapında denetleyip bağımsız açıkları kapat
+- [ ] P27-3 — Onboarding/documents, finansal/capability/NOT_CONFIGURED UI ve Türkiye-only kapsam doğruluğunu denetleyip bağımsız açıkları kapat
+- [ ] P27-4 — 0093–0095 migration-ready preflight/rollback/runbook ve external blockers ayrımını güncelle
+- [ ] P27-5 — Full quality, SCA/SBOM/license/secret scans, canonical complete-source ZIP, manifest/SHA, USER_ACTIONS_ONLY ve final raporları üret

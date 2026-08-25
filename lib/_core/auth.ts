@@ -58,14 +58,14 @@ export async function removeSessionToken(): Promise<void> {
 
 export async function getUserInfo(): Promise<User | null> {
   try {
-    let info: string | null = null;
     if (Platform.OS === "web") {
-      // Use localStorage for web
-      info = window.localStorage.getItem(USER_INFO_KEY);
-    } else {
-      // Use SecureStore for native
-      info = await SecureStore.getItemAsync(USER_INFO_KEY);
+      // Web authentication is cookie-backed. Never resurrect an identity from
+      // localStorage after session expiry, revoke, logout or account switching.
+      return null;
     }
+
+    // Native uses SecureStore only after a token-bound session check.
+    const info = await SecureStore.getItemAsync(USER_INFO_KEY);
 
     if (!info) {
       return null;
@@ -98,8 +98,9 @@ export async function getUserInfo(): Promise<User | null> {
 export async function setUserInfo(user: User): Promise<void> {
   try {
     if (Platform.OS === "web") {
-      // Use localStorage for web
-      window.localStorage.setItem(USER_INFO_KEY, JSON.stringify(user));
+      // Do not persist user, role, phone or email snapshots in web storage.
+      // Remove any legacy cache so it cannot survive account changes.
+      window.localStorage.removeItem(USER_INFO_KEY);
       return;
     }
 

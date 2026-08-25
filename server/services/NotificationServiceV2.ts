@@ -525,9 +525,10 @@ export class NotificationServiceV2 {
    * Uygulama içi bildirim gönder
    */
   private async sendInAppNotification(notification: Notification): Promise<void> {
-    console.log(`📲 Uygulama içi bildirim gönderiliyor: ${notification.userId}`);
-    // Veritabanına kaydet, uygulama açıldığında göster
-    // await db.saveInAppNotification(notification);
+    void notification;
+    throw new Error(
+      "NOT_CONFIGURED: NotificationServiceV2 cannot persist in-app notifications; use the canonical persistent NotificationService path.",
+    );
   }
 
   /**
