@@ -22,6 +22,16 @@ pnpm build
 
 Result: PASS / PASS
 
+Clean extract verification:
+Archive was extracted into a separate clean directory.
+pnpm install --frozen-lockfile --offline
+pnpm test
+
+Result:
+Test Files  157 passed (157)
+Tests       833 passed (833)
+Duration    23.22s
+
 SCA:
 pnpm supply:sca
 SCA_GATE=PASS
