@@ -913,3 +913,10 @@
 - [ ] P27-3 — Onboarding/documents, finansal/capability/NOT_CONFIGURED UI ve Türkiye-only kapsam doğruluğunu denetleyip bağımsız açıkları kapat
 - [ ] P27-4 — 0093–0095 migration-ready preflight/rollback/runbook ve external blockers ayrımını güncelle
 - [ ] P27-5 — Full quality, SCA/SBOM/license/secret scans, canonical complete-source ZIP, manifest/SHA, USER_ACTIONS_ONLY ve final raporları üret
+
+## P28 Camera Measurement and Final Closure
+- [ ] P28-1 — Versioned measurement draft/schema, canonical geometry/unit engine, MANUAL fallback ve service-request owner-scoped attachment lifecycle’ını uygula
+- [ ] P28-2 — iOS/Android/web capability, camera permission, unsupported/tracking/low-confidence/background/error durumları için fail-closed adapter kontratını uygula
+- [ ] P28-3 — Service request measurement UI, izin akışı, vertex/rectangle/manual giriş, düzenle/sil/onayla ve accessible NOT_SUPPORTED durumlarını uygula
+- [ ] P28-4 — Geometri, controller, owner isolation, retry/idempotency, payload validation ve mevcut request lifecycle testlerini ekle
+- [ ] P28-5 — Kamera/medya privacy documentation, physical-device accuracy blocker, lifecycle/notification/message/review bağımsız açıkları ve final quality/export paketini tamamla
