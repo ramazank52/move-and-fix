@@ -12,6 +12,11 @@ const colors = {
   foreground: "#111827", muted: "#64748B", primary: "#4F46E5", surface: "#F8FAFC", warning: "#D97706",
 };
 let capturedProductionProps: Record<string, unknown> | undefined;
+let nearbyQueryState: { data?: unknown[]; isLoading: boolean; isError: boolean } = {
+  data: [{ id: 7, displayName: "Pilot Usta", isVerified: true, rating: 4.8 }],
+  isLoading: false,
+  isError: false,
+};
 
 vi.mock("react-native", () => ({
   ActivityIndicator: hostComponent("activity-indicator"), Pressable: hostComponent("pressable"), ScrollView: hostComponent("scroll-view"),
@@ -27,14 +32,18 @@ vi.mock("@/lib/i18n", () => ({ useTranslation: () => ({ t: (key: string, values?
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     requests: { list: { useQuery: () => ({ data: [{ id: 77, status: "active" }] }) } },
-    provider: { nearby: { useQuery: () => ({ data: [{ id: 7, displayName: "Pilot Usta", isVerified: true, rating: 4.8 }], isLoading: false }) } },
+    provider: { nearby: { useQuery: () => nearbyQueryState } },
   },
 }));
 
 import ProductionHomeScreen from "../app/(tabs)/index";
 
 describe("Home presentational-view isolation pilot", () => {
-  beforeEach(() => { vi.clearAllMocks(); capturedProductionProps = undefined; });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedProductionProps = undefined;
+    nearbyQueryState = { data: [{ id: 7, displayName: "Pilot Usta", isVerified: true, rating: 4.8 }], isLoading: false, isError: false };
+  });
 
   it("keeps the production wrapper's live callback routing when values are passed to the shared view", async () => {
     await act(async () => { TestRenderer.create(<ProductionHomeScreen />); });
@@ -51,6 +60,16 @@ describe("Home presentational-view isolation pilot", () => {
     expect(router.push).toHaveBeenNthCalledWith(2, "/explore");
     expect(router.push).toHaveBeenNthCalledWith(3, "/job/77");
     expect(router.push).toHaveBeenNthCalledWith(4, "/provider/7");
+  });
+
+  it("passes the real nearby-provider query error state and central error label to the shared view", async () => {
+    nearbyQueryState = { isLoading: false, isError: true };
+    await act(async () => { TestRenderer.create(<ProductionHomeScreen />); });
+    expect(capturedProductionProps).toMatchObject({
+      providersLoading: false,
+      providersError: true,
+      nearbyProvidersErrorLabel: "opportunities.errorBody",
+    });
   });
 
 });

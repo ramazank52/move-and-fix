@@ -49,6 +49,7 @@ export type HomeScreenViewProps = {
   popularServicesTitle: string;
   seeAllLabel: string;
   noNearbyProvidersLabel: string;
+  nearbyProvidersErrorLabel: string;
   activeJobLabel: string;
   serviceCount: (count: number) => string;
   quickAccess: readonly HomeQuickAccessItem[];
@@ -56,6 +57,7 @@ export type HomeScreenViewProps = {
   activeJob?: { id: number | string };
   nearbyProviders?: readonly HomeNearbyProvider[];
   providersLoading: boolean;
+  providersError: boolean;
   interactionsDisabled: boolean;
   onOpenMoveAI: () => void;
   onOpenExplore: () => void;
@@ -79,6 +81,7 @@ export function HomeScreenView({
   popularServicesTitle,
   seeAllLabel,
   noNearbyProvidersLabel,
+  nearbyProvidersErrorLabel,
   activeJobLabel,
   serviceCount,
   quickAccess,
@@ -86,6 +89,7 @@ export function HomeScreenView({
   activeJob,
   nearbyProviders,
   providersLoading,
+  providersError,
   interactionsDisabled,
   onOpenMoveAI,
   onOpenExplore,
@@ -148,7 +152,7 @@ export function HomeScreenView({
 
         <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>{nearbyProvidersTitle}</Text><Pressable accessibilityRole="button" accessibilityState={accessibilityState} accessibilityLabel={`${nearbyProvidersTitle} ${seeAllLabel}`} disabled={interactionsDisabled} onFocus={() => setFocusedControl("nearby-see-all")} onBlur={() => setFocusedControl(null)} onPress={runIfEnabled(onOpenExplore)} style={({ pressed }) => interactionStateStyle(pressed, "nearby-see-all", 0.75)}><Text style={{ fontSize: 12, color: interactionsDisabled ? colors.muted : colors.primary, fontWeight: "700" }}>{seeAllLabel}</Text></Pressable></View>
-          {providersLoading ? <View style={{ alignItems: "center", paddingVertical: 20 }}><ActivityIndicator color={colors.primary} size="small" /></View> : nearbyProviders && nearbyProviders.length > 0 ? <View style={{ gap: 10 }}>{nearbyProviders.slice(0, 3).map((provider) => <Pressable key={provider.id} accessibilityRole="button" accessibilityState={accessibilityState} accessibilityLabel={provider.displayName} disabled={interactionsDisabled} onFocus={() => setFocusedControl(`provider-${provider.id}`)} onBlur={() => setFocusedControl(null)} onPress={runWithIdIfEnabled(onOpenProvider, provider.id)} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 14, padding: 12, backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.border }, interactionStateStyle(pressed, `provider-${provider.id}`, 0.9)]}><View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}><View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: interactionsDisabled ? colors.border : colors.primary + "15", alignItems: "center", justifyContent: "center" }}><IconSymbol size={20} name="person.fill" color={interactionsDisabled ? colors.muted : colors.primary} /></View><View style={{ marginLeft: 12, flex: 1 }}><View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><Text style={{ fontSize: 13, fontWeight: "700", color: interactionsDisabled ? colors.muted : colors.foreground }}>{provider.displayName}</Text>{provider.isVerified ? <IconSymbol size={12} name="checkmark.seal.fill" color={interactionsDisabled ? colors.muted : colors.accentBlue} /> : null}</View><View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}><View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}><IconSymbol size={10} name="star.fill" color={interactionsDisabled ? colors.muted : colors.warning} /><Text style={{ fontSize: 11, color: colors.muted }}>{provider.rating || 0}</Text></View><Text style={{ fontSize: 11, color: colors.muted }}>• Yakında</Text></View></View></View><View style={{ alignItems: "flex-end" }}><Text style={{ fontSize: 12, fontWeight: "700", color: interactionsDisabled ? colors.muted : colors.primary }}>₺6.500</Text><Text style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>Başlangıç</Text></View></Pressable>)}</View> : <View style={{ alignItems: "center", paddingVertical: 20 }}><Text style={{ fontSize: 14, color: colors.muted }}>{noNearbyProvidersLabel}</Text></View>}
+          {providersLoading ? <View style={{ alignItems: "center", paddingVertical: 20 }}><ActivityIndicator color={colors.primary} size="small" /></View> : providersError ? <View accessibilityRole="alert" style={{ alignItems: "center", paddingVertical: 20 }}><Text style={{ fontSize: 14, color: colors.error, textAlign: "center" }}>{nearbyProvidersErrorLabel}</Text></View> : nearbyProviders && nearbyProviders.length > 0 ? <View style={{ gap: 10 }}>{nearbyProviders.slice(0, 3).map((provider) => <Pressable key={provider.id} accessibilityRole="button" accessibilityState={accessibilityState} accessibilityLabel={provider.displayName} disabled={interactionsDisabled} onFocus={() => setFocusedControl(`provider-${provider.id}`)} onBlur={() => setFocusedControl(null)} onPress={runWithIdIfEnabled(onOpenProvider, provider.id)} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 14, padding: 12, backgroundColor: colors.surface, borderWidth: 0.5, borderColor: colors.border }, interactionStateStyle(pressed, `provider-${provider.id}`, 0.9)]}><View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}><View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: interactionsDisabled ? colors.border : colors.primary + "15", alignItems: "center", justifyContent: "center" }}><IconSymbol size={20} name="person.fill" color={interactionsDisabled ? colors.muted : colors.primary} /></View><View style={{ marginLeft: 12, flex: 1 }}><View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><Text style={{ fontSize: 13, fontWeight: "700", color: interactionsDisabled ? colors.muted : colors.foreground }}>{provider.displayName}</Text>{provider.isVerified ? <IconSymbol size={12} name="checkmark.seal.fill" color={interactionsDisabled ? colors.muted : colors.accentBlue} /> : null}</View><View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}><View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}><IconSymbol size={10} name="star.fill" color={interactionsDisabled ? colors.muted : colors.warning} /><Text style={{ fontSize: 11, color: colors.muted }}>{provider.rating || 0}</Text></View><Text style={{ fontSize: 11, color: colors.muted }}>• Yakında</Text></View></View></View><View style={{ alignItems: "flex-end" }}><Text style={{ fontSize: 12, fontWeight: "700", color: interactionsDisabled ? colors.muted : colors.primary }}>₺6.500</Text><Text style={{ fontSize: 10, color: colors.muted, marginTop: 2 }}>Başlangıç</Text></View></Pressable>)}</View> : <View style={{ alignItems: "center", paddingVertical: 20 }}><Text style={{ fontSize: 14, color: colors.muted }}>{noNearbyProvidersLabel}</Text></View>}
         </View>
 
         <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>

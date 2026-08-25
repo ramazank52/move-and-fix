@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
 import { useLocalization } from "@/lib/i18n";
 import { useThemeContext } from "@/lib/theme-provider";
+import { trpc } from "@/lib/trpc";
+import { RuntimeCapabilityStatusCard } from "@/components/runtime-capability-status-card";
 
 export default function GeneralSettingsScreen() {
   const colors = useColors();
@@ -16,6 +18,7 @@ export default function GeneralSettingsScreen() {
   const { logout } = useAuth();
   const { colorScheme, setColorScheme } = useThemeContext();
   const { language, currency, setCurrency, translate } = useLocalization();
+  const runtimeCapabilities = trpc.runtimeCapabilities.get.useQuery();
   const [notifications, setNotifications] = useState(true);
 
   const handleLogout = () => {
@@ -97,6 +100,12 @@ export default function GeneralSettingsScreen() {
           <LinkRow label={translate("privacy.center.title" as never)} onPress={() => router.push("/privacy-center" as never)} styles={styles} colors={colors} />
           <LinkRow label={translate("terms")} onPress={() => router.push("/legal" as never)} styles={styles} colors={colors} isLast />
         </View>
+
+        <RuntimeCapabilityStatusCard
+          capabilities={runtimeCapabilities.data?.capabilities}
+          isLoading={runtimeCapabilities.isLoading}
+          isError={runtimeCapabilities.isError}
+        />
 
         <Pressable
           accessibilityRole="button"

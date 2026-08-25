@@ -17,7 +17,7 @@ export default function HomeScreen() {
     enabled: !!user,
   });
 
-  const { data: nearbyProviders, isLoading: providersLoading } = trpc.provider.nearby.useQuery(
+  const { data: nearbyProviders, isLoading: providersLoading, isError: providersError } = trpc.provider.nearby.useQuery(
     { lat: "41.0082", lng: "28.9784" },
     { enabled: !!user }
   );
@@ -53,6 +53,7 @@ export default function HomeScreen() {
     popularServicesTitle={t("home.popularServices")}
     seeAllLabel={t("common.seeAll")}
     noNearbyProvidersLabel={t("home.noNearbyProviders")}
+    nearbyProvidersErrorLabel={t("opportunities.errorBody")}
     activeJobLabel={t("home.activeJob")}
     serviceCount={(count) => t("home.serviceCount", { count })}
     quickAccess={quickAccess}
@@ -60,6 +61,7 @@ export default function HomeScreen() {
     activeJob={activeJob}
     nearbyProviders={nearbyProviders}
     providersLoading={providersLoading}
+    providersError={providersError}
     interactionsDisabled={false}
     onOpenMoveAI={() => router.push("/ai-assistant" as any)}
     onOpenExplore={() => router.push("/explore" as any)}

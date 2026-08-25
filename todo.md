@@ -947,5 +947,5 @@
 - [x] P31P33-6 — 0090 capacity adayını migration-first sözleşme ile doğrula; maxConcurrentJobs fail-closed default 1, admin-only değişim, atomic winner/capacity guard ve kaynak yarış testlerini uygula
 - [x] P31P33-7 — Outbox request create/cancel/provider suspension enqueue-revoke lifecycle, worker lease/retry/dead-letter/duplicate-send kaynak testlerini migration/credential uygulanmadan tamamla
 - [ ] P31P33-8 — Shared view’ın gerçek runtime controller tarafından navigation, mutation, loading/error/empty/offline ve role/lifecycle state’leriyle kullanıldığını doğrula; sahte fixture paraleli oluşturma
-- [ ] P31P33-9 — Payment/maps/push/sound/SMS-email/MoveAI/document/media/camera-AR için server-owned AVAILABLE/NOT_CONFIGURED/NOT_SUPPORTED/TEMPORARILY_UNAVAILABLE/PERMISSION_REQUIRED/OFFLINE/UNAUTHORIZED UI ayrımını gerçek ekranlara bağla
+- [x] P31P33-9 — Payment/maps/push/sound/SMS-email/MoveAI/document/media/camera-AR için server-owned AVAILABLE/NOT_CONFIGURED/NOT_SUPPORTED/TEMPORARILY_UNAVAILABLE/PERMISSION_REQUIRED/OFFLINE/UNAUTHORIZED UI ayrımını gerçek ekranlara bağla
 - [ ] P31P33-10 — Route/control residual audit, migration runbook, full quality gates, clean install/extract verification, complete-source ZIP, manifest/SHA, final reports ve yalnız gerçek external blocker’ları tamamla

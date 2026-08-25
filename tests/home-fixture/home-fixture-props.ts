@@ -1,6 +1,6 @@
 import type { HomeScreenViewProps } from "@/components/home-screen-view";
 
-type FixtureState = "normal" | "loading" | "empty" | "disabled";
+type FixtureState = "normal" | "loading" | "empty" | "error" | "disabled";
 
 const noOp = () => undefined;
 const noOpWithId = (_id: number | string) => undefined;
@@ -22,6 +22,7 @@ export function createHomeFixtureProps(
     popularServicesTitle: "Popüler Hizmetler",
     seeAllLabel: "Tümünü Gör",
     noNearbyProvidersLabel: "Yakında müsait usta bulunamadı.",
+    nearbyProvidersErrorLabel: "Yakındaki profesyoneller şu anda alınamadı.",
     activeJobLabel: "Aktif İş",
     serviceCount: (count) => `${count} hizmet`,
     quickAccess: [
@@ -39,6 +40,7 @@ export function createHomeFixtureProps(
     activeJob: state === "normal" ? { id: "fixture-active-job-01" } : undefined,
     nearbyProviders: providers,
     providersLoading: state === "loading",
+    providersError: state === "error",
     interactionsDisabled: state === "disabled",
     onOpenMoveAI: noOp,
     onOpenExplore: noOp,

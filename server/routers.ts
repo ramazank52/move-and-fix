@@ -37,6 +37,7 @@ import {
   GatewayCheckoutError,
 } from "./payments/GatewayCheckoutService";
 import { getMaskedCommunicationReadiness } from "./communications/MaskedCommunicationService";
+import { resolveRuntimeCapabilityStatuses } from "./capabilities/RuntimeCapabilityStatus";
 import { createPriceIntelligenceNarrative } from "./services/PriceIntelligenceNarrativeService";
 import { createPolicyBoundMoveAiResponse, resolveMoveAiCategory } from "./ai/MoveAiResponsePolicy";
 import { translateMessageOnDemand } from "./ai/OnDemandMessageTranslation";
@@ -3027,6 +3028,13 @@ Do not infer unavailable categories. If no candidate is exact enough, use "gener
           throw error;
         }
       }),
+  }),
+
+  runtimeCapabilities: router({
+    get: protectedProcedure.query(async () => ({
+      capabilities: resolveRuntimeCapabilityStatuses(),
+      generatedAt: new Date().toISOString(),
+    })),
   }),
 
   featureFlags: router({
