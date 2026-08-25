@@ -950,6 +950,13 @@
 - [x] P31P33-9 — Payment/maps/push/sound/SMS-email/MoveAI/document/media/camera-AR için server-owned AVAILABLE/NOT_CONFIGURED/NOT_SUPPORTED/TEMPORARILY_UNAVAILABLE/PERMISSION_REQUIRED/OFFLINE/UNAUTHORIZED UI ayrımını gerçek ekranlara bağla
 - [x] P31P33-10 — Route/control residual audit, migration runbook, full quality gates, clean install/extract verification, complete-source ZIP, manifest/SHA, final reports ve yalnız gerçek external blocker’ları tamamla
 
+## P34 Code Audit and Error-Only Fix Round
+- [x] P34-1 — Server/lib/app/components altında gerçek TODO/stub/boş hata yakalama/yetersiz branch bulgularını statik olarak envanterle ve yalnız kanıtlanmış hataları izole biçimde düzelt
+- [x] P34-2 — Native AR boundary, outbox/capacity, review/rating ve provider-document-security router/test sözleşmelerini gerçek kaynakla karşılaştır; fark varsa davranışı koruyarak düzelt
+- [x] P34-3 — Ödeme, SMS/e-posta/push, medya tarama ve OAuth dış çağrı hata haritalama/retry/idempotency yollarındaki kodla testlenebilir eksikleri kapat
+- [x] P34-4 — React test renderer uyarısını üretim koduna dokunmadan güvenle modern test altyapısına taşımanın uygulanabilirliğini denetle; yalnız doğrulanmış, mimariyi bozmayan test değişikliği uygula
+- [x] P34-5 — Her izole düzeltme sonrası tam test, TypeScript, lint, build, Drizzle check ve kanıta dayalı P34 raporu/checkpoint oluştur
+
 ## P35 Automated Code and Security Scan
 - [x] P35-1 — Tracked source üzerinde static stub/TODO/error-handling, authorization/ownership, input validation ve PII/logging taramasını çalıştır
 - [x] P35-2 — Dependency/SCA, secret/source-integrity, security headers and fail-closed external integration sözleşmelerini yeniden doğrula

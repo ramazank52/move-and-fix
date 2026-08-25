@@ -1,0 +1,45 @@
+=== FETCH_AXIOS_CALLS ===
+[35mserver/_core/emailUnsubscribe.ts[m[36m:[m[32m328[m[36m:[m      console.error('Error [1;31mfetch[ming preferences', error);
+[35mserver/_core/emailUnsubscribe.ts[m[36m:[m[32m331[m[36m:[m        message: 'Failed to [1;31mfetch[m preferences'
+[35mserver/_core/notification.ts[m[36m:[m[32m81[m[36m:[m    const response = await [1;31mfetch[m(endpoint, {
+[35mserver/security/MediaScannerAdapter.ts[m[36m:[m[32m24[m[36m:[m  [1;31mfetch[mImpl?: typeof [1;31mfetch[m;
+[35mserver/security/MediaScannerAdapter.ts[m[36m:[m[32m38[m[36m:[m  const [1;31mfetch[mImpl = config.[1;31mfetch[mImpl ?? [1;31mfetch[m;
+[35mserver/security/MediaScannerAdapter.ts[m[36m:[m[32m45[m[36m:[m        const response = await [1;31mfetch[mImpl(submissionUrl, {
+[35mserver/services/NotificationService.ts[m[36m:[m[32m264[m[36m:[m    const response = await [1;31mfetch[m("https://exp.host/--/api/v2/push/send", {
+[35mserver/services/NotificationService.ts[m[36m:[m[32m299[m[36m:[m      const response = await [1;31mfetch[m("https://api.netgsm.com.tr/sms/rest/v2/send", {
+[35mserver/services/NotificationService.ts[m[36m:[m[32m320[m[36m:[m    const response = await [1;31mfetch[m(`https://api.twilio.com/2010-04-01/Accounts/${ENV.twilioAccountSid}/Messages.json`, {
+[35mserver/services/NotificationService.ts[m[36m:[m[32m336[m[36m:[m    const response = await [1;31mfetch[m("https://api.sendgrid.com/v3/mail/send", {
+[35mserver/services/NotificationServiceV2.ts[m[36m:[m[32m166[m[36m:[m      const response = await [1;31mfetch[m('https://api.sendgrid.com/v3/mail/send', {
+[35mserver/services/NotificationServiceV2.ts[m[36m:[m[32m196[m[36m:[m      const response = await [1;31mfetch[m('https://api.netgsm.com.tr/sms/rest/v2/send', {
+[35mserver/services/NotificationServiceV2.ts[m[36m:[m[32m231[m[36m:[m    const response = await [1;31mfetch[m(
+[35mserver/services/NotificationServiceV2.ts[m[36m:[m[32m493[m[36m:[m    // await [1;31mfetch[m('https://exp.host/--/api/v2/push/send', { ... });
+=== EMPTY_OR_SILENT_CATCHES ===
+[35mserver/_core/emailUnsubscribe.ts[m[36m:[m[32m290[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/_core/emailUnsubscribe.ts[m[36m:[m[32m327[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/_core/notification.ts[m[36m:[m[32m103[m[36m:[m  } [1;31mcatch (error) {[m
+[35mserver/_core/notificationRetry.ts[m[36m:[m[32m124[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/_core/notificationRetry.ts[m[36m:[m[32m281[m[36m:[m        } [1;31mcatch (error) {[m
+[35mserver/_core/oauth.ts[m[36m:[m[32m102[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/_core/oauth.ts[m[36m:[m[32m134[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/_core/oauth.ts[m[36m:[m[32m156[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/_core/oauth.ts[m[36m:[m[32m167[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/_core/oauth.ts[m[36m:[m[32m195[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/payments/FinancialReconciliationService.ts[m[36m:[m[32m93[m[36m:[m  } [1;31mcatch (error) {[m
+[35mserver/payments/FinancialReconciliationService.ts[m[36m:[m[32m172[m[36m:[m  } [1;31mcatch (error) {[m
+[35mserver/payments/GatewayCheckoutService.ts[m[36m:[m[32m258[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/payments/GatewayCheckoutService.ts[m[36m:[m[32m371[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/payments/IyzicoCheckoutCallbackService.ts[m[36m:[m[32m151[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/payments/PaymentWebhookProcessor.ts[m[36m:[m[32m183[m[36m:[m  } [1;31mcatch (error) {[m
+[35mserver/payments/PaymentWebhookProcessor.ts[m[36m:[m[32m247[m[36m:[m  } [1;31mcatch (error) {[m
+[35mserver/payments/registerPaymentWebhookRoutes.ts[m[36m:[m[32m48[m[36m:[m    } [1;31mcatch (error) {[m
+[35mserver/payments/registerPaymentWebhookRoutes.ts[m[36m:[m[32m100[m[36m:[m      } [1;31mcatch (error) {[m
+[35mserver/services/NotificationService.ts[m[36m:[m[32m237[m[36m:[m      } [1;31mcatch (error: unknown) {[m
+[35mserver/services/NotificationService.ts[m[36m:[m[32m549[m[36m:[m      } [1;31mcatch (error: unknown) {[m
+[35mserver/services/NotificationServiceV2.ts[m[36m:[m[32m372[m[36m:[m    } [1;31mcatch (error: unknown) {[m
+[35mserver/services/NotificationServiceV2.ts[m[36m:[m[32m415[m[36m:[m        } [1;31mcatch (error: unknown) {[m
+[35mserver/services/NotificationServiceV2.ts[m[36m:[m[32m453[m[36m:[m    } [1;31mcatch (error: unknown) {[m
+[35mserver/services/PaymentGatewayService.ts[m[36m:[m[32m210[m[36m:[m    } [1;31mcatch (error: unknown) {[m
+[35mserver/services/PaymentGatewayService.ts[m[36m:[m[32m302[m[36m:[m    } [1;31mcatch (error: unknown) {[m
+[35mserver/services/PaymentGatewayService.ts[m[36m:[m[32m355[m[36m:[m    } [1;31mcatch (error: unknown) {[m
+[35mserver/services/PaymentGatewayService.ts[m[36m:[m[32m387[m[36m:[m    } [1;31mcatch (error: unknown) {[m
+[35mserver/services/PaymentGatewayService.ts[m[36m:[m[32m454[m[36m:[m    } [1;31mcatch (error: unknown) {[m

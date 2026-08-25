@@ -1,0 +1,5 @@
+=== GIT STATUS ===
+ [31mM[m todo.md
+[31m??[m .verification/P34_STATIC_AUDIT_RAW.txt
+=== STATIC FINDINGS ===
+[35mserver/compliance/CountryDeploymentPolicy.ts[m[36m:[m[32m149[m[36m:[m  connectorState: "[1;31mNOT_IMPLEMENTED[m_OR_NOT_AUTHORIZED" | "PENDING" | "AUTHORIZED" | "OPERATIONAL" | "REVOKED";

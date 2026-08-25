@@ -1,0 +1,20 @@
+### TYPESCRIPT
+### LINT
+
+> move-and-fix@1.0.0 lint /home/ubuntu/move-and-fix
+> expo lint
+
+### BUILD
+
+> move-and-fix@1.0.0 build /home/ubuntu/move-and-fix
+> esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+
+  dist/index.js  1.2mb ⚠️
+
+⚡ Done in 54ms
+### DRIZZLE
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/ubuntu/move-and-fix/drizzle.config.ts'
+Everything's fine 🐶🔥
+### DIFF
