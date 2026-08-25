@@ -55,6 +55,14 @@ export async function upsertPushToken(input: {
   const db = await getDb();
   if (!db) throw new Error("DATABASE_UNAVAILABLE");
 
+  const [existing] = await db.select({ userId: userPushTokens.userId })
+    .from(userPushTokens)
+    .where(eq(userPushTokens.token, input.token))
+    .limit(1);
+  if (existing && existing.userId !== input.userId) {
+    throw new Error("PUSH_TOKEN_OWNERSHIP_CONFLICT");
+  }
+
   await db.insert(userPushTokens).values({
     userId: input.userId,
     token: input.token,

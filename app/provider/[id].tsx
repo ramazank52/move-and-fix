@@ -238,14 +238,11 @@ export default function ProviderDetailScreen() {
                   <Text style={{ marginLeft: 8, flex: 1, color: colors.foreground, fontSize: 14, fontWeight: "800" }}>
                     {passportQuery.data.verification.isVerified ? "Kimlik ve belge doğrulaması tamamlandı" : "Doğrulama süreci tamamlanmadı"}
                   </Text>
-                  <Text style={{ color: colors.primary, fontSize: 15, fontWeight: "900" }}>{passportQuery.data.trust.score}/100</Text>
+                  <Text style={{ color: colors.primary, fontSize: 15, fontWeight: "900" }}>{passportQuery.data.trust.score == null ? "—" : `${passportQuery.data.trust.score}/100`}</Text>
                 </View>
                 <Text style={{ marginTop: 9, color: colors.muted, fontSize: 12, lineHeight: 18 }}>
-                  {passportQuery.data.provider.completedJobs} tamamlanan iş · {passportQuery.data.provider.reviewCount ?? 0} değerlendirme · {passportQuery.data.trust.activeComplaintCount === 0 ? "Açık şikâyet yok" : `${passportQuery.data.trust.activeComplaintCount} açık inceleme`}
+                  {passportQuery.data.provider.completedJobs} tamamlanan iş · {passportQuery.data.provider.reviewCount ?? 0} değerlendirme
                 </Text>
-                {passportQuery.data.verification.documentStatus.length > 0 ? (
-                  <Text style={{ marginTop: 5, color: colors.muted, fontSize: 11 }}>Belge durumu: {passportQuery.data.verification.documentStatus.map((item) => `${item.type} (${item.status})`).join(" · ")}</Text>
-                ) : null}
               </>
             )}
           </View>

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getUserById: vi.fn(),
-  recordConsentEvents: vi.fn(),
+  getMarketingConsentPreference: vi.fn(),
+  setMarketingConsentPreference: vi.fn(),
   getActivePushTokens: vi.fn(),
   deactivatePushToken: vi.fn(),
   getStoredNotificationPreferences: vi.fn(),
@@ -23,7 +24,11 @@ vi.mock("../server/_core/env", () => ({
   },
 }));
 
-vi.mock("../server/db", () => ({ getUserById: mocks.getUserById, recordConsentEvents: mocks.recordConsentEvents }));
+vi.mock("../server/db", () => ({
+  getUserById: mocks.getUserById,
+  getMarketingConsentPreference: mocks.getMarketingConsentPreference,
+  setMarketingConsentPreference: mocks.setMarketingConsentPreference,
+}));
 vi.mock("../server/notifications/push-store", () => ({
   getActivePushTokens: mocks.getActivePushTokens,
   deactivatePushToken: mocks.deactivatePushToken,
@@ -41,7 +46,8 @@ describe("çok kanallı bildirim teslimatı sözleşmesi", () => {
     mocks.getActivePushTokens.mockResolvedValue([{ token: "ExponentPushToken[test-token]" }]);
     mocks.getStoredNotificationPreferences.mockResolvedValue(null);
     mocks.saveNotificationPreferences.mockResolvedValue(undefined);
-    mocks.recordConsentEvents.mockResolvedValue(undefined);
+    mocks.getMarketingConsentPreference.mockResolvedValue({ enabled: false, documentVersion: null, updatedAt: null });
+    mocks.setMarketingConsentPreference.mockResolvedValue(undefined);
     mocks.saveInAppNotification.mockResolvedValue(1);
   });
 
@@ -83,13 +89,11 @@ describe("çok kanallı bildirim teslimatı sözleşmesi", () => {
       notificationTypes: { [NotificationType.PROMOTION]: { enabled: true } },
     });
 
-    expect(mocks.recordConsentEvents).toHaveBeenCalledWith([expect.objectContaining({
+    expect(mocks.setMarketingConsentPreference).toHaveBeenCalledWith(expect.objectContaining({
       userId: 7,
-      consentKey: "marketing_notifications",
-      purpose: "marketing",
-      action: "granted",
+      enabled: true,
       source: "notification_preferences",
-    })]);
+    }));
     expect(mocks.saveNotificationPreferences).toHaveBeenCalledTimes(1);
   });
 });

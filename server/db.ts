@@ -1528,6 +1528,7 @@ import {
   contactChangeEvents,
 } from "../drizzle/schema";
 import {
+  containsDirectContactData,
   type MaskedCommunicationChannel,
   sanitizeMaskedMessageContent,
 } from "./communications/MaskedCommunicationService";
@@ -3660,6 +3661,9 @@ export async function createServiceRequest(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  if (containsDirectContactData(data.title) || (data.description != null && containsDirectContactData(data.description))) {
+    throw new Error("DIRECT_CONTACT_DATA_FORBIDDEN");
+  }
   if (data.organizationId != null) {
     await assertOrganizationRequestAccess({ organizationId: data.organizationId, userId: data.userId });
   }
@@ -10888,20 +10892,6 @@ export async function getMoveTrustPassport(providerUserId: number) {
     .from(trustProfiles)
     .where(eq(trustProfiles.userId, providerUserId))
     .limit(1);
-  const documents = await database
-    .select({ type: providerDocuments.type, status: providerDocuments.status })
-    .from(providerDocuments)
-    .where(eq(providerDocuments.providerId, profile.id));
-  const [complaints] = await database
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(riskFlags)
-    .where(
-      and(
-        eq(riskFlags.subjectUserId, providerUserId),
-        eq(riskFlags.source, "report"),
-        inArray(riskFlags.status, ["open", "under_review"]),
-      ),
-    );
   return {
     provider: {
       id: profile.id,
@@ -10913,12 +10903,10 @@ export async function getMoveTrustPassport(providerUserId: number) {
     },
     verification: {
       isVerified: profile.isVerified === 1,
-      documentStatus: documents.map((document) => ({ type: document.type, status: document.status })),
     },
     trust: {
-      score: trust?.score ?? 100,
-      status: trust?.status ?? "active",
-      activeComplaintCount: Number(complaints?.count ?? 0),
+      score: trust?.score ?? null,
+      status: trust?.status ?? "not_rated",
       lastEvaluatedAt: trust?.lastEvaluatedAt ?? null,
     },
   };

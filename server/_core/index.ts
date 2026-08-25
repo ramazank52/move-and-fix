@@ -489,14 +489,18 @@ export async function createApp() {
 
   // Health check endpoints
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, timestamp: Date.now() });
+    res.json({ status: "ok" });
   });
   app.get("/api/health/detailed", async (_req, res) => {
+    if (process.env.NODE_ENV === "production") {
+      res.status(404).json({ error: "NOT_FOUND" });
+      return;
+    }
     try {
       const status = await healthChecker.getHealthStatus();
       res.json(status);
     } catch (err: unknown) {
-      res.status(503).json({ status: "unhealthy", error: err instanceof Error ? err.message : String(err) });
+      res.status(503).json({ status: "unhealthy", error: "HEALTH_DIAGNOSTIC_UNAVAILABLE" });
     }
   });
 

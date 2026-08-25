@@ -103,7 +103,7 @@ describe("E2E HTTP: Ortak oturumlu MoveOS", () => {
     it("sağlık kontrolünü ve güvenlik başlıklarını verir", async () => {
       const res = await httpRequest("GET", "/api/health");
       expect(res.status).toBe(200);
-      expect((res.body as { ok: boolean }).ok).toBe(true);
+      expect((res.body as { status: string }).status).toBe("ok");
       expect(res.headers["x-content-type-options"]).toBe("nosniff");
       expect(res.headers["x-frame-options"]).toBe("DENY");
       expect(res.headers["content-security-policy"]).toBeTruthy();

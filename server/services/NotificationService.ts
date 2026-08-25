@@ -22,7 +22,7 @@ import {
   normalizeError,
 } from '../_core/errors';
 import { ENV } from "../_core/env";
-import { getUserById, recordConsentEvents } from "../db";
+import { getMarketingConsentPreference, getUserById, setMarketingConsentPreference } from "../db";
 import {
   deactivatePushToken,
   getActivePushTokens,
@@ -157,6 +157,14 @@ export class NotificationService {
     type: NotificationType,
     data: Record<string, unknown>
   ): Promise<NotificationMessage> {
+    const numericUserId = Number(userId);
+    if (!Number.isSafeInteger(numericUserId) || numericUserId <= 0) {
+      throw new Error("NOTIFICATION_RECIPIENT_INVALID");
+    }
+    if (type === NotificationType.PROMOTION) {
+      const marketingConsent = await getMarketingConsentPreference(numericUserId);
+      if (!marketingConsent.enabled) throw new Error("MARKETING_CONSENT_REQUIRED");
+    }
     // Kullanıcı tercihlerini getir
     const preferences = await this.getUserPreferences(userId);
 
@@ -412,14 +420,11 @@ export class NotificationService {
     };
     const promotionPreference = preferences.notificationTypes?.[NotificationType.PROMOTION];
     if (promotionPreference) {
-      await recordConsentEvents([{
+      await setMarketingConsentPreference({
         userId: numericUserId,
-        consentKey: "marketing_notifications",
-        documentVersion: "1.0",
-        purpose: "marketing",
-        action: promotionPreference.enabled ? "granted" : "withdrawn",
+        enabled: promotionPreference.enabled,
         source: "notification_preferences",
-      }]);
+      });
     }
     await saveNotificationPreferences({
       userId: numericUserId,

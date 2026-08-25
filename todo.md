@@ -861,3 +861,11 @@
 - [ ] P18-3 — MoveTrust/public profile, UGC PII/moderation/rating invariant, ödeme buyer/provider URL ve organization BOLA sınırlarını denetle
 - [ ] P18-4 — Kanıtlanmış açıkları minimal fail-closed değişiklikler ve hedefli negatif testlerle düzelt; Blok 1 staging kanıtı olmadan Blok 2’ye geçme
 - [ ] P18-5 — Clean validation/export ve madde-bazlı P18 residual doğrulama raporunu üret
+
+## P19 Autonomous P18 Completion
+- [x] P19-1 — Production diagnostics/docs gate ve minimal health sözleşmesi için HTTP negatif testleri; scheduler/payment kaynak kontratları ve ilgili regresyonları tamamla (unavailable-state kapsamı P19-4 altında açık)
+- [ ] P19-2 — Consent/IYS/quiet-hours/push-token canonical lifecycle’ını fail-closed uygula
+- [ ] P19-2a — NotificationServiceV2 parallel dispatch yolunu canonical notification lifecycle ile birleştir veya production callsite’larından kaldır; user-level timezone olmadan quiet-hours PASS verme
+- [ ] P19-3 — UGC PII/moderation, MoveTrust public DTO ve review/rating invariant’larını uygula
+- [ ] P19-4 — Organization BOLA/role DTO, admin critical action ve unavailable-state açıklarını kapat
+- [ ] P19-5 — Repository-wide scan, clean validation, source export, manifest/SHA ve P18/P19 final raporunu üret

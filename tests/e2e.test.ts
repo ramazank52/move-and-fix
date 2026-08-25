@@ -121,8 +121,7 @@ describe("E2E: Complete User Journey", () => {
     it("should return health status", async () => {
       const res = await httpRequest("GET", "/api/health");
       expect(res.status).toBe(200);
-      const body = res.body as { ok: boolean; timestamp: number };
-      expect(body.ok).toBe(true);
+      expect(res.body).toEqual({ status: "ok" });
     });
 
     it("should include security headers", async () => {
