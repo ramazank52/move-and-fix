@@ -6,8 +6,8 @@ import {
 
 /**
  * Explicitly invoked worker primitive. It only writes the in-app inbox; it does
- * not call push, SMS, email or any external provider. Scheduling is deliberately
- * absent until a private staging runtime and reviewed migration exist.
+ * not call push, SMS, email or any external provider. It is invoked only by the
+ * explicit private-staging opt-in lifecycle after the reviewed migration exists.
  */
 export async function processOpportunityOutboxBatch(limit = 25) {
   const claimed = await claimMarketplaceOpportunityNotifications({ limit });

@@ -928,3 +928,11 @@
 - [ ] P29-4 — Measurement controller/UI state machine: manual rectangle/polygon, capability/permission/tracking/error/retry/interruption ve safe return durumlarını uygula
 - [ ] P29-5 — Native AR adapter/config/prebuild/privacy/capability durumlarını ve physical-device test matrixini hazırla; fiziksel doğruluğu BLOCKED tut
 - [ ] P29-6 — Tam route/control/quality/export, clean install/build, secret/SCA/SBOM ve final evidence paketini tamamla
+
+## P30 Marketplace and Complete-Source Closure
+- [ ] P30-1 — Current canonical tree ile legacy `abf555f3` source exportu arasındaki uyumluluk farkını belgele; legacy tree’yi geri yükleme veya source of truth sayma
+- [ ] P30-2 — Outbox transaction/revoke/deep-link/RBAC/PII/idempotency/retry/dead-letter kaynak güvenliğini tamamla; gerçek deliveryyi NOT_CONFIGURED bırak
+- [ ] P30-3 — Migration-backed `maxConcurrentJobs=1`, admin-only yönetim, atomic provider capacity/request winner invariant ve negatif testleri uygula
+- [ ] P30-4 — Fan-out davranışı ve canonical lifecycle role matrixini gerçek source/runtime callsite’larında doğrula; yalnız gerçek screen-controller’ın kullandığı shared-view integrationını uygula
+- [ ] P30-5 — 0090–0095 migration preflight/rollback/ledger-runbook, isolated TiDB blocker ve full quality evidence güncelle
+- [ ] P30-6 — Clean complete-source ZIP, manifest, SHA256SUMS, final implementation/test/blocker raporları ve source archive integrity doğrulamasını üret
