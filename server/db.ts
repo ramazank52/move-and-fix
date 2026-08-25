@@ -30,6 +30,7 @@ import {
 } from "./compliance/ServiceCatalogResolver";
 import { assertCountryMarketplaceTransition } from "./compliance/CountryComplianceRepository";
 import { decideProviderOnboardingActivation } from "./compliance/ProviderOnboardingPolicy";
+import { evaluateUserGeneratedContent } from "./moderation/UserContentModerationPolicy";
 import { getApmConfigurationStatus } from "./_core/observability";
 import {
   assertPaymentStatusTransition,
@@ -8888,6 +8889,15 @@ export async function createReview(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  if (!Number.isInteger(data.rating) || data.rating < 1 || data.rating > 5) {
+    throw new Error("Değerlendirme puanı 1 ile 5 arasında tam sayı olmalıdır");
+  }
+  if (data.comment) {
+    const moderation = evaluateUserGeneratedContent({ kind: "review_comment", text: data.comment });
+    if (moderation.status !== "approved") {
+      throw new Error("Yorum doğrudan iletişim bilgisi veya incelenmesi gereken içerik içeriyor");
+    }
+  }
 
   return db.transaction(async (tx) => {
     const requestRows = await tx
@@ -8939,22 +8949,41 @@ export async function createReview(data: {
 export async function getProviderReviews(providerId: number, limit = 50, offset = 0) {
   const db = await getDb();
   if (!db) return [];
-  return db
-    .select({
-      id: reviews.id,
-      requestId: reviews.requestId,
-      providerId: reviews.providerId,
-      rating: reviews.rating,
-      comment: reviews.comment,
-      createdAt: reviews.createdAt,
-      reviewerName: users.name,
-    })
-    .from(reviews)
-    .innerJoin(users, eq(reviews.userId, users.id))
-    .where(eq(reviews.providerId, providerId))
-    .orderBy(desc(reviews.createdAt))
-    .limit(limit)
-    .offset(offset);
+  try {
+    const rows = await db
+      .select({
+        id: reviews.id,
+        requestId: reviews.requestId,
+        providerId: reviews.providerId,
+        rating: reviews.rating,
+        comment: reviews.comment,
+        createdAt: reviews.createdAt,
+        reviewerName: users.name,
+      })
+      .from(reviews)
+      .innerJoin(users, eq(reviews.userId, users.id))
+      .where(eq(reviews.providerId, providerId))
+      .orderBy(desc(reviews.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    if (rows.length === 0) return rows;
+    const approvedRecords = await db
+      .select({ contentReference: userContentModerationRecords.contentReference })
+      .from(userContentModerationRecords)
+      .where(and(
+        eq(userContentModerationRecords.surface, "review"),
+        eq(userContentModerationRecords.status, "approved"),
+        inArray(userContentModerationRecords.contentReference, rows.map((review) => `review:${review.id}`)),
+      ));
+    const approvedReferences = new Set(approvedRecords.map((record) => record.contentReference));
+    return rows.filter((review) => approvedReferences.has(`review:${review.id}`));
+  } catch (error) {
+    // 0094/0095 may be intentionally unapplied during migration-first rollout.
+    // A public endpoint must never treat an absent moderation table as approval.
+    console.warn("[moderation] public review visibility unavailable", { providerId, error: error instanceof Error ? error.name : "unknown" });
+    return [];
+  }
 }
 
 // Provider dashboard: get jobs assigned to a provider

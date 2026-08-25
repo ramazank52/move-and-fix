@@ -899,3 +899,10 @@
 - [ ] P24-3 — Canonical review/rating aggregate, moderation-aware count, concurrency guard ve dry-run reconciliation/backfill planını uygula
 - [ ] P24-4 — Server-owned not-configured/unavailable durumlarıyla ilgili UI disabled/retry/error ayrımını uygula
 - [ ] P24-5 — 0094 checksum/journal/snapshot, preflight/rollback/lock-risk kanıtı ve negatif/concurrency/full kalite testlerini tamamla
+
+## P25 Approved-Only, Rating Integrity and Capability States
+- [ ] P25-1 — Public liste/detay/profil/arama/pagination/direct-ID için approved-only repository filtrelerini, owner/reviewer ayrı güvenli endpointlerini ve migration-first fail-closed uyumluluğu uygula
+- [ ] P25-2 — Completed-job canonical review DB invariantı, concurrency/idempotency, moderation-aware aggregate ve dry-run reconciliation hizmetini uygula
+- [ ] P25-3 — Server-owned capability status API/modeli ile payment/wallet/refund/premium, map/location, push, SMS/email, MoveAI, document/media ve external support UI durumlarını uygula
+- [ ] P25-4 — Moderation/rating/capability negatif ve concurrency testlerini; full regression, typecheck, lint, build, Drizzle/secret/diff kontrollerini tamamla
+- [ ] P25-5 — P25 kanıt raporu ve checkpointte COMPLETED_AND_VERIFIED, CODE_READY_NOT_CONFIGURED, EXTERNAL_BLOCKER, FAILED/REMAINING ayrımını yayınla
