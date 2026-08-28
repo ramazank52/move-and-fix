@@ -962,3 +962,9 @@
 - [x] P35-2 — Dependency/SCA, secret/source-integrity, security headers and fail-closed external integration sözleşmelerini yeniden doğrula
 - [x] P35-3 — Yalnız yeniden üretilebilen gerçek bulguları küçük, mimariyi koruyan kod/test düzeltmeleriyle kapat
 - [x] P35-4 — Full regression, TypeScript, lint, build, Drizzle metadata ve diff quality gates’i yeniden çalıştır; residual dış blocker’ları raporla
+
+## P36 iOS and Android Mobile E2E Evidence
+- [x] P36-1 — iOS/Android E2E test matrisini, kanıt türlerini ve gerçek cihaz/simulator/export ayrımını oluştur
+- [x] P36-2 — Sandbox’ta bağımsız çalıştırılabilir Expo config, native dependency, route/capability ve static mobile compatibility kontrollerini yürüt
+- [x] P36-3 — Çalıştırılabilir mobile/export ve hedefli sözleşme kalite kapılarını kaydet; fiziksel cihaz ve external integration adımlarını dürüst blocker bırak
+- [x] P36-4 — E2E kanıt raporu, owner device checklist ve checkpoint oluştur

@@ -1,0 +1,56 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1
++
+Progress: resolved 1, reused 0, downloaded 1, added 1, done
+Running 20 checks on your project...
+19/20 checks passed. 1 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+
+✖ Check that packages match versions required by installed Expo SDK
+
+🔧 Patch version mismatches
+package                expected  found    
+expo                   ~55.0.30  55.0.29  
+expo-asset             ~55.0.20  55.0.19  
+expo-audio             ~55.0.18  55.0.17  
+expo-build-properties  ~55.0.18  55.0.17  
+expo-crypto            ~55.0.19  55.0.18  
+expo-document-picker   ~55.0.17  55.0.16  
+expo-file-system       ~55.0.26  55.0.25  
+expo-haptics           ~55.0.18  55.0.17  
+expo-image-picker      ~55.0.24  55.0.23  
+expo-linear-gradient   ~55.0.18  55.0.17  
+expo-localization      ~55.0.19  55.0.18  
+expo-location          ~55.1.14  55.1.13  
+expo-notifications     ~55.0.27  55.0.26  
+expo-secure-store      ~55.0.18  55.0.17  
+expo-splash-screen     ~55.0.25  55.0.24  
+expo-system-ui         ~55.0.22  55.0.21  
+expo-video             ~55.0.21  55.0.20  
+expo-web-browser       ~55.0.20  55.0.19  
+
+Changelogs:
+- expo-asset → https://github.com/expo/expo/blob/sdk-55/packages/expo-asset/CHANGELOG.md
+- expo-audio → https://github.com/expo/expo/blob/sdk-55/packages/expo-audio/CHANGELOG.md
+- expo-build-properties → https://github.com/expo/expo/blob/sdk-55/packages/expo-build-properties/CHANGELOG.md
+- expo-crypto → https://github.com/expo/expo/blob/sdk-55/packages/expo-crypto/CHANGELOG.md
+- expo-document-picker → https://github.com/expo/expo/blob/sdk-55/packages/expo-document-picker/CHANGELOG.md
+- expo-file-system → https://github.com/expo/expo/blob/sdk-55/packages/expo-file-system/CHANGELOG.md
+- expo-haptics → https://github.com/expo/expo/blob/sdk-55/packages/expo-haptics/CHANGELOG.md
+- expo-image-picker → https://github.com/expo/expo/blob/sdk-55/packages/expo-image-picker/CHANGELOG.md
+- expo-linear-gradient → https://github.com/expo/expo/blob/sdk-55/packages/expo-linear-gradient/CHANGELOG.md
+- expo-localization → https://github.com/expo/expo/blob/sdk-55/packages/expo-localization/CHANGELOG.md
+- expo-location → https://github.com/expo/expo/blob/sdk-55/packages/expo-location/CHANGELOG.md
+- expo-notifications → https://github.com/expo/expo/blob/sdk-55/packages/expo-notifications/CHANGELOG.md
+- expo-secure-store → https://github.com/expo/expo/blob/sdk-55/packages/expo-secure-store/CHANGELOG.md
+- expo-splash-screen → https://github.com/expo/expo/blob/sdk-55/packages/expo-splash-screen/CHANGELOG.md
+- expo-system-ui → https://github.com/expo/expo/blob/sdk-55/packages/expo-system-ui/CHANGELOG.md
+- expo-video → https://github.com/expo/expo/blob/sdk-55/packages/expo-video/CHANGELOG.md
+- expo-web-browser → https://github.com/expo/expo/blob/sdk-55/packages/expo-web-browser/CHANGELOG.md
+
+18 packages out of date.
+Advice:
+Use 'npx expo install --check' to review and upgrade your dependencies.
+To ignore specific packages, add them to "expo.install.exclude" in package.json. Learn more: https://expo.fyi/dependency-validation
+
+1 check failed, indicating possible issues with the project.

@@ -1,0 +1,8 @@
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 0, reused 1, downloaded 0, added 0
+Packages: +14 -134
++++++++-------------------------------------------------------------------------
+Progress: resolved 0, reused 146, downloaded 0, added 14
+Progress: resolved 0, reused 146, downloaded 0, added 14, done
+
+Done in 2.3s

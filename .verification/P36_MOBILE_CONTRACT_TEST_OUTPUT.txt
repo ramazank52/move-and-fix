@@ -1,0 +1,151 @@
+
+ RUN  v3.2.6 /home/ubuntu/move-and-fix
+
+ ✓ tests/production-route-hygiene.test.ts (2 tests) 22ms
+ ✓ tests/media-scanner-adapter.test.ts (3 tests) 55ms
+stderr | tests/notification-delivery-contract.test.ts > çok kanallı bildirim teslimatı sözleşmesi > Expo kabulü ve uygulama içi kayıt varken credential'sız e-postayı teslim edildi diye saymaz
+email gönderimi başarısız: AppError: EMAIL_PROVIDER_NOT_CONFIGURED
+    at normalizeError [90m(/home/ubuntu/move-and-fix/[39mserver/_core/errors.ts:230:10[90m)[39m
+    at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:239:30[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:61:20
+    at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20 {
+  code: [32m'NOTIFICATION_CHANNEL_ERROR'[39m,
+  statusCode: [33m500[39m,
+  category: [32m'external_service'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { userId: [32m'7'[39m, type: [32m'order_completed'[39m, channel: [32m'email'[39m },
+  cause: Error: EMAIL_PROVIDER_NOT_CONFIGURED
+      at NotificationService.sendEmail [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:335:13[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+      at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:231:13[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:61:20
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20
+}
+
+stderr | tests/notification-delivery-contract.test.ts > çok kanallı bildirim teslimatı sözleşmesi > tüm canlı kanallar yapılandırılmamışsa bildirimi başarısız durumunda döndürür
+push gönderimi başarısız: AppError: PUSH_TOKEN_NOT_REGISTERED
+    at normalizeError [90m(/home/ubuntu/move-and-fix/[39mserver/_core/errors.ts:230:10[90m)[39m
+    at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:239:30[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+    at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20 {
+  code: [32m'NOTIFICATION_CHANNEL_ERROR'[39m,
+  statusCode: [33m500[39m,
+  category: [32m'external_service'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { userId: [32m'7'[39m, type: [32m'payment_received'[39m, channel: [32m'push'[39m },
+  cause: Error: PUSH_TOKEN_NOT_REGISTERED
+      at NotificationService.sendPushNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:263:36[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+      at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:225:13[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20
+}
+
+stderr | tests/notification-delivery-contract.test.ts > çok kanallı bildirim teslimatı sözleşmesi > tüm canlı kanallar yapılandırılmamışsa bildirimi başarısız durumunda döndürür
+sms gönderimi başarısız: AppError: SMS_PROVIDER_NOT_CONFIGURED
+    at normalizeError [90m(/home/ubuntu/move-and-fix/[39mserver/_core/errors.ts:230:10[90m)[39m
+    at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:239:30[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+    at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20 {
+  code: [32m'NOTIFICATION_CHANNEL_ERROR'[39m,
+  statusCode: [33m500[39m,
+  category: [32m'external_service'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { userId: [32m'7'[39m, type: [32m'payment_received'[39m, channel: [32m'sms'[39m },
+  cause: Error: SMS_PROVIDER_NOT_CONFIGURED
+      at NotificationService.sendSMS [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:317:13[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+      at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:228:13[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20
+}
+
+stderr | tests/notification-delivery-contract.test.ts > çok kanallı bildirim teslimatı sözleşmesi > tüm canlı kanallar yapılandırılmamışsa bildirimi başarısız durumunda döndürür
+email gönderimi başarısız: AppError: EMAIL_PROVIDER_NOT_CONFIGURED
+    at normalizeError [90m(/home/ubuntu/move-and-fix/[39mserver/_core/errors.ts:230:10[90m)[39m
+    at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:239:30[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+    at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20 {
+  code: [32m'NOTIFICATION_CHANNEL_ERROR'[39m,
+  statusCode: [33m500[39m,
+  category: [32m'external_service'[39m,
+  severity: [32m'high'[39m,
+  retryable: [33mtrue[39m,
+  context: { userId: [32m'7'[39m, type: [32m'payment_received'[39m, channel: [32m'email'[39m },
+  cause: Error: EMAIL_PROVIDER_NOT_CONFIGURED
+      at NotificationService.sendEmail [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:335:13[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+      at NotificationService.sendNotification [90m(/home/ubuntu/move-and-fix/[39mserver/services/NotificationService.ts:231:13[90m)[39m
+      at [90m/home/ubuntu/move-and-fix/[39mtests/notification-delivery-contract.test.ts:79:20
+      at [90mfile:///home/ubuntu/move-and-fix/[39mnode_modules/[4m@vitest[24m/runner/dist/chunk-hooks.js:752:20
+}
+
+ ✓ tests/notification-delivery-contract.test.ts (3 tests) 26ms
+ ✓ tests/route-manifest.test.ts (51 tests) 14ms
+stdout | tests/tracking-router-security.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/p33-area-measurement-request-contract.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+ ✓ tests/provider-location-matching.test.ts (4 tests) 5ms
+ ✓ tests/media-upload-limits.test.ts (2 tests) 4ms
+ ✓ tests/area-measurement-capability.test.ts (2 tests) 4ms
+ ✓ tests/navigation-entry.test.ts (4 tests) 4ms
+stdout | tests/notification-provider-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/notification-provider-contract.test.ts (2 tests) 5ms
+stdout | tests/tracking-router-security.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+stdout | tests/p33-area-measurement-request-contract.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/phone-verification-route.test.ts (1 test) 3ms
+ ✓ tests/tracking-router-security.test.ts (8 tests) 21ms
+ ✓ tests/p33-area-measurement-request-contract.test.ts (8 tests) 44ms
+stdout | tests/notification-preferences-router.test.ts
+[OAuth] Initialized with baseURL: https://api.manus.im
+
+stdout | tests/notification-preferences-router.test.ts
+📌 Event listener kaydedildi: payment.completed
+📌 Event listener kaydedildi: payment.failed
+📌 Event listener kaydedildi: order.created
+📌 Event listener kaydedildi: order.completed
+📌 Event listener kaydedildi: withdrawal.completed
+📌 Event listener kaydedildi: user.registered
+📌 Event listener kaydedildi: ai.command.executed
+
+ ✓ tests/notification-preferences-router.test.ts (3 tests) 12ms
+
+ Test Files  13 passed (13)
+      Tests  93 passed (93)
+   Start at  00:51:50
+   Duration  2.49s (transform 1.74s, setup 0ms, collect 6.29s, tests 219ms, environment 3ms, prepare 1.22s)
+
